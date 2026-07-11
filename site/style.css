@@ -1,0 +1,201 @@
+:root {
+  --bg: #f7f8fa;
+  --card: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b7280;
+  --sub: #374151;
+  --line: #e5e7eb;
+  --accent: #ff6600;
+  --link: #2563eb;
+  --tag-bg: #f3f4f6;
+  --tag-text: #374151;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Header */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #ffffff;
+  border-bottom: 1px solid var(--line);
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 6px;
+}
+.brand {
+  font-weight: 700;
+  font-size: 17px;
+  white-space: nowrap;
+}
+.campus-nav {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.campus-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+.campus-nav a:hover { color: var(--text); }
+.campus-nav a.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom: 2px solid var(--accent);
+}
+.search {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 14px;
+  width: 160px;
+  min-width: 100px;
+  outline: none;
+  background: #fff;
+  flex-shrink: 1;
+}
+.search:focus { border-color: var(--link); }
+
+.refresh-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--sub);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+.refresh-btn:disabled { opacity: .6; cursor: default; }
+.scrape-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.scrape-status.loading { color: var(--link); }
+.scrape-status.ok { color: #16a34a; }
+.scrape-status.err { color: #dc2626; }
+
+/* Timeline */
+.timeline { margin: 20px 0; }
+.date-sep {
+  margin: 22px 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.date-sep:first-child { border-top: none; padding-top: 0; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.card .meta {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.card .meta .college { color: var(--sub); font-weight: 600; }
+.card .title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  line-height: 1.45;
+}
+.card .title a { color: var(--text); text-decoration: none; }
+.card .title a:hover { color: var(--link); }
+
+/* 结构化详情 */
+.details {
+  font-size: 14px; color: var(--sub); line-height: 1.8; margin: 8px 0;
+  background: #fafbfc;
+  border-radius: 6px; padding: 10px 12px;
+  border-left: 3px solid var(--line);
+}
+.info-row {
+  padding: 3px 0;
+}
+.info-row b {
+  color: var(--text); font-weight: 600; display: inline-block;
+  min-width: 56px;
+}
+.bio-row { color: var(--muted); font-size: 13px; }
+.bio { display: inline; word-break: break-word; }
+
+.abstract {
+  font-size: 13px; color: var(--muted); line-height: 1.7;
+  padding: 8px 10px; background: var(--tag-bg);
+  border-radius: 6px; margin-top: 6px;
+}
+.abstract b { color: var(--sub); font-weight: 600; }
+.abstract span { word-break: break-word; }
+
+.tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  background: var(--tag-bg);
+  color: var(--tag-text);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 5px;
+  margin-left: 6px;
+}
+.status.ended { color: var(--muted); background: var(--tag-bg); }
+.status.soon { color: #fff; background: var(--accent); }
+
+/* 原来的 details 已替换为 .details（结构化信息区），保留此规则以防旧 HTML */
+
+.empty { text-align: center; color: var(--muted); padding: 40px 0; }
+
+.site-footer {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 24px 16px 40px;
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+}
+
+@media (max-width: 600px) {
+  .header-inner { flex-wrap: wrap; height: auto; padding: 8px 0; gap: 8px; }
+  .search { width: 100%; }
+  .card .title { font-size: 16px; }
+}

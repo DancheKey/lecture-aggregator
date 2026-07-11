@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="referrer" content="no-referrer" />
+  <title>各学院讲座统计 - 木铎金声</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+  </style>
+</head>
+<body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;">
+  <div id="app" v-cloak class="min-h-screen flex flex-col">
+
+    <!-- 顶部栏 -->
+    <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
+      <div class="max-w-6xl mx-auto px-4">
+        <div class="flex items-center gap-3 h-14">
+          <a href="./" class="flex items-center gap-2 shrink-0">
+            <img src="scnu-emblem.png" alt="华南师范大学" class="w-9 h-9 rounded-lg bg-white shadow-sm" />
+            <img src="site-title.png" alt="木铎金声" class="h-8 w-auto object-contain" />
+          </a>
+
+          <div class="ml-auto flex items-center gap-2">
+            <a href="./" class="text-[12pt] text-slate-600 hover:text-blue-600 whitespace-nowrap">返回首页</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+        <div>
+          <h1 class="text-[18pt] font-bold text-slate-800">各学院 / 部处讲座统计</h1>
+          <p class="text-[12pt] text-slate-500 mt-1">
+            共 <span class="font-semibold text-slate-800">{{ all.length }}</span> 条讲座，覆盖 <span class="font-semibold text-slate-800">{{ years.length }}</span> 个年份。
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[12pt] text-slate-500">排序：</span>
+          <button @click="sortBy = 'college'"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy === 'college' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按学院名</button>
+          <button @click="sortBy = 'total'"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy === 'total' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按总数</button>
+        </div>
+      </div>
+
+      <!-- 统计表格 -->
+      <div v-if="all.length" class="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto shadow-sm">
+        <table class="min-w-full text-[12pt]">
+          <thead class="bg-slate-50 text-slate-600">
+            <tr>
+              <th class="text-left px-4 py-3 font-semibold border-b border-slate-200 sticky left-0 bg-slate-50 z-10">学院 / 部处</th>
+              <th v-for="y in years" :key="y" class="text-right px-4 py-3 font-semibold border-b border-slate-200">{{ y }} 年</th>
+              <th class="text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600">总计</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in rows" :key="row.college" class="border-b border-slate-100 hover:bg-slate-50">
+              <td class="px-4 py-3 font-medium text-slate-700 sticky left-0 bg-white z-10">{{ row.college || '未分类' }}</td>
+              <td v-for="(n, idx) in row.cells" :key="years[idx]" :class="['px-4 py-3 text-right', n ? 'text-slate-700' : 'text-slate-300']">
+                {{ n || '—' }}
+              </td>
+              <td class="px-4 py-3 text-right font-bold text-blue-600">{{ row.total }}</td>
+            </tr>
+            <tr class="bg-slate-50 font-semibold text-slate-700">
+              <td class="px-4 py-3 sticky left-0 bg-slate-50 z-10">合计</td>
+              <td v-for="n in yearTotals" :key="n.year" class="px-4 py-3 text-right">{{ n.count }}</td>
+              <td class="px-4 py-3 text-right font-bold text-blue-600">{{ grandTotal }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-else class="text-center text-slate-400 py-16 text-[12pt]">数据加载中…</div>
+    </main>
+
+    <footer class="border-t border-slate-200 text-center text-[12pt] text-slate-400 py-6 bg-white">
+      数据来源于华南师范大学各学院公开站点，仅供师生参考，请以官方原文为准。
+    </footer>
+
+  </div>
+
+  <script src="stats.js"></script>
+</body>
+</html>

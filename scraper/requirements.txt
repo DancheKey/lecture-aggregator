@@ -1,0 +1,8 @@
+# 华师讲座采集器依赖（用于本地运行 / GitHub Actions CI）
+requests
+beautifulsoup4
+charset-normalizer
+pyyaml
+Pillow
+numpy
+easyocr

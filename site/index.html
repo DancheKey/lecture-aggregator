@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="referrer" content="no-referrer" />
+  <title>木铎金声</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .line-clamp-3 {
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .date-sticky { top: 57px; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+    /* AIHOT-like 信息流：条目 hover 微亮 */
+    .feed-item { transition: background-color 0.2s ease; }
+    .feed-item:hover { background-color: #f8fafc; }
+  </style>
+</head>
+<body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;">
+  <div id="app" v-cloak class="min-h-screen flex flex-col xl:px-80">
+
+    <!-- 顶部栏 -->
+    <header class="sticky top-0 z-20 w-full max-w-4xl mx-auto bg-white/95 backdrop-blur border-b border-slate-200">
+      <div class="px-4">
+        <div class="flex items-center gap-3 h-14">
+          <div class="flex items-center gap-2 shrink-0">
+            <img src="scnu-emblem.png" alt="华南师范大学" class="w-9 h-9 rounded-lg bg-white shadow-sm" />
+            <img src="site-title.png" alt="木铎金声" class="h-8 w-auto object-contain" />
+          </div>
+
+          <!-- 校区导航（桌面） -->
+          <nav class="hidden sm:flex items-center gap-1 ml-3">
+            <button v-for="c in campusList" :key="c"
+              @click="setCampus(c)"
+              :class="['px-3 py-1.5 rounded-full text-[12pt] transition', campus===c ? 'bg-blue-600 text-white font-semibold' : 'text-slate-500 hover:bg-slate-100']">
+              {{ c || '全部' }}
+            </button>
+          </nav>
+
+          <div class="relative ml-auto" @mouseenter="showMenu = true" @mouseleave="showMenu = false">
+            <button @click="showMenu = !showMenu"
+              class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition"
+              aria-label="更多操作">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+              </svg>
+            </button>
+            <div v-show="showMenu" class="absolute right-0 top-full pt-2 w-44 z-30">
+              <div class="bg-white rounded-lg shadow-lg border border-slate-200 py-1">
+                <button @click="scrape(); showMenu = false" :disabled="scraping"
+                  class="block w-full text-left px-4 py-2 text-[12pt] text-slate-600 hover:bg-slate-50 hover:text-blue-600 disabled:opacity-60">
+                  {{ scraping ? '抓取中…' : '抓取新数据' }}
+                </button>
+                <a href="stats.html" @click="showMenu = false"
+                  class="block px-4 py-2 text-[12pt] text-slate-600 hover:bg-slate-50 hover:text-blue-600">讲座统计</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 校区导航（移动端） -->
+        <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1">
+          <button v-for="c in campusList" :key="c"
+            @click="setCampus(c)"
+            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap', campus===c ? 'bg-blue-600 text-white font-semibold' : 'bg-slate-100 text-slate-500']">
+            {{ c || '全部' }}
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 左右两侧校训：fixed 悬浮于视口两侧，上下滚动时始终不动（≥1536px 宽屏显示） -->
+    <img src="motto.png" alt="华南师范大学校训" class="hidden xl:block fixed left-16 top-1/2 -translate-y-1/2 w-60 h-auto object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 90vh;" />
+    <img src="motto.png" alt="华南师范大学校训" class="hidden xl:block fixed right-16 top-1/2 -translate-y-1/2 w-60 h-auto object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 90vh;" />
+
+    <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
+          <!-- 统计 + 年份筛选 + 清除 -->
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-5">
+            <div class="text-[12pt] text-slate-500">
+              共 <span class="font-semibold text-slate-800">{{ totalCount }}</span> 条讲座
+              <template v-if="filtered.length !== totalCount">
+                · 当前筛选 <span class="font-semibold text-blue-600">{{ filtered.length }}</span> 条
+              </template>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <input v-model="query" type="search" placeholder="搜索讲座 / 主讲人…"
+                class="w-36 sm:w-56 px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+              <select v-model="year" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1 bg-white focus:border-blue-500 focus:outline-none">
+                <option value="">全部年份</option>
+                <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
+              </select>
+              <button v-if="campus || college || year || query"
+                @click="clearFilters"
+                class="text-[12pt] text-slate-400 hover:text-blue-600">清除筛选 ✕</button>
+            </div>
+          </div>
+
+          <!-- 时间线 -->
+          <div v-if="filtered.length">
+            <div v-for="g in pagedGroups" :key="g.key" class="mb-2">
+              <div class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">
+                <span class="w-1 h-5 rounded-full bg-blue-500"></span>
+                {{ g.key }}
+              </div>
+              <article v-for="l in g.items" :key="l.sourceUrl"
+                class="feed-item border-b border-slate-200 py-5 px-2 -mx-2">
+                <!-- 元信息 -->
+                <div class="flex items-center gap-2 text-[11pt] text-slate-400 mb-1.5">
+                  <span class="font-medium text-slate-500">{{ l.college }}</span>
+                  <span class="text-slate-300">·</span>
+                  <span>{{ fmtDateTime(l.lectureStart) }}</span>
+                  <span :class="['ml-auto px-2 py-0.5 rounded text-[11pt] font-semibold', statusInfo(l.lectureStart).hot ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400']">{{ statusInfo(l.lectureStart).label }}</span>
+                </div>
+                <!-- 标题 -->
+                <h2 class="text-[15pt] font-semibold leading-snug mb-2">
+                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 hover:underline">{{ l.title }}</a>
+                </h2>
+                <!-- 结构化详情 -->
+                <div v-if="l.topic || l.location || l.speaker || l.speakerBio"
+                  class="text-[12pt] text-slate-600 space-y-1 mb-2">
+                  <div v-if="l.topic"><span class="text-slate-400">题目</span> <span class="text-slate-600">{{ truncate(l.topic, 120) }}</span></div>
+                  <div v-if="l.location"><span class="text-slate-400">地点</span> <span class="text-slate-600">{{ l.location }}</span></div>
+                  <div v-if="l.speaker"><span class="text-slate-400">主讲</span> <span class="text-slate-600">{{ l.speaker }}<span v-if="l.speakerAffiliation" class="text-slate-400">（{{ l.speakerAffiliation }}）</span></span></div>
+                  <div v-if="l.speakerBio" class="text-slate-500 leading-relaxed">
+                    <span class="text-slate-400">简介</span> {{ truncate(cleanFooter(l.speakerBio), 220) }}
+                  </div>
+                </div>
+                <!-- 摘要 -->
+                <div v-if="abstractOf(l)" class="text-[12pt] text-slate-500 leading-relaxed line-clamp-3 mb-2">{{ abstractOf(l) }}</div>
+                <!-- 可点击 Tag + 点赞 -->
+                <div class="flex flex-wrap gap-2 items-center">
+                  <button @click="onTagClick('college', l.college)"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
+                  <button @click="onTagClick('campus', l.campus)"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.campus }}</button>
+                  <button @click="toggleLike(l.sourceUrl)"
+                    :class="['ml-auto px-2.5 py-1 rounded-full flex items-center gap-1 text-[12pt] transition border', hasLiked(l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-500']">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linejoin="round" d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
+                    </svg>
+                    <span>{{ likeCount(l.sourceUrl) }}</span>
+                  </button>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div v-else class="text-center text-slate-400 py-16 text-[12pt]">没有匹配的讲座。</div>
+
+          <!-- 分页导航 -->
+          <nav v-if="filtered.length > pageSize" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-[12pt]">
+            <button @click="prevPage" :disabled="currentPage === 1"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+            <button v-for="p in totalPages" :key="p" @click="gotoPage(p)"
+              :class="['min-w-[36px] px-2 py-1.5 rounded-lg border transition', p === currentPage ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50']">{{ p }}</button>
+            <button @click="nextPage" :disabled="currentPage === totalPages"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+            <span class="ml-3 text-slate-400 whitespace-nowrap">第 {{ currentPage }} / {{ totalPages }} 页 · 每页 {{ pageSize }} 条</span>
+          </nav>
+    </main>
+
+    <footer class="border-t border-slate-200 text-center text-[12pt] text-slate-400 py-6 bg-white">
+      数据来源于华南师范大学各学院公开站点，仅供师生参考，请以官方原文为准。
+    </footer>
+
+    <!-- Toast 提示 -->
+    <transition name="fade">
+      <div v-if="toast.show"
+        class="fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-slate-800 text-white text-[12pt] shadow-lg z-50">
+        {{ toast.message }}
+      </div>
+    </transition>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
