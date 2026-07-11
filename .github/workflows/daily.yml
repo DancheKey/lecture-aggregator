@@ -8,9 +8,11 @@ on:
     - cron: '0 19 * * *'
   workflow_dispatch: {}
 
-# 本工作流需要写回仓库（提交更新后的数据），仅授予最小权限
+# 本工作流需要写回仓库（提交更新后的数据），并发布 Pages
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 # 同一时间只跑一个抓取任务；新触发排队（不取消正在跑的），避免并发写冲突
 concurrency:
@@ -67,3 +69,18 @@ jobs:
             git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')"
             git push
           fi
+
+      # 下面步骤将 site/ 发布为 GitHub Pages。
+      # 注意：本工作流用 GITHUB_TOKEN 推送的数据提交不会触发 deploy.yml，
+      # 因此由本工作流直接完成部署，保证每日新数据即时上线。
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传站点产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
