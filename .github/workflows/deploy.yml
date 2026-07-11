@@ -1,0 +1,41 @@
+name: 部署到 GitHub Pages
+
+# 触发：每次推送到 main（含每日自动更新数据）都会重新部署
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# 发布 Pages 所需的最小权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个部署；新触发排队，不取消正在跑的
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      # 把 site/ 目录作为静态站点产物上传
+      - name: 上传站点产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
