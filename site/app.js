@@ -237,14 +237,21 @@ createApp({
         })
         .then(resp => {
           if (resp.unchanged) return;       // 无更新
-          // 兼容后端 {data:[...], updatedAt} 与静态数组两种格式
-          if (Array.isArray(resp)) { this.all = resp; this.mtime = 0; this.updatedAt = ''; }
-          else {
-            this.all = resp.data || [];
-            this.mtime = resp.mtime || 0;
-            // 优先用文件内嵌 updatedAt；本地模式下回退用 mtime 推算
-            this.updatedAt = resp.updatedAt || (resp.mtime ? new Date(resp.mtime * 1000).toISOString() : '');
+          // 兼容多种后端返回：
+          //  - {data:[...], updatedAt, mtime}            （新版 server.py，已解包）
+          //  - {data:{updatedAt,data:[...]}, updatedAt}  （旧版 server.py，未解包）
+          if (Array.isArray(resp)) { this.all = resp; this.mtime = 0; this.updatedAt = ''; return; }
+          let arr = resp.data;
+          let updatedAt = resp.updatedAt || '';
+          if (arr && typeof arr === 'object' && !Array.isArray(arr) && Array.isArray(arr.data)) {
+            // 旧版 server 把整个文件包了一层，这里再解一层
+            arr = arr.data;
+            if (!updatedAt) updatedAt = arr.updatedAt || '';
           }
+          this.all = Array.isArray(arr) ? arr : [];
+          this.mtime = resp.mtime || 0;
+          // 优先用文件内嵌 updatedAt；本地模式下回退用 mtime 推算
+          this.updatedAt = updatedAt || (resp.mtime ? new Date(resp.mtime * 1000).toISOString() : '');
         })
         .catch(() => {
           // 静态托管（无后端）时回退读取站点根 lectures.json
@@ -252,8 +259,11 @@ createApp({
           fetch('lectures.json', { cache: 'no-store' })
             .then(r => r.json())
             .then(arr => {
-              if (Array.isArray(arr)) { this.all = arr; this.updatedAt = ''; }
-              else { this.all = arr.data || []; this.updatedAt = arr.updatedAt || ''; }
+              let list = arr, ua = '';
+              if (Array.isArray(arr)) { list = arr; }
+              else if (arr && typeof arr === 'object' && Array.isArray(arr.data)) { list = arr.data; ua = arr.updatedAt || ''; }
+              this.all = Array.isArray(list) ? list : [];
+              this.updatedAt = ua;
               this.mtime = 0;
             })
             .catch(e => console.error('加载讲座失败', e));

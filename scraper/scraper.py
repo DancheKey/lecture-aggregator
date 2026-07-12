@@ -221,7 +221,13 @@ def main():
     data_dir = os.path.join(ROOT, 'data')
     os.makedirs(data_dir, exist_ok=True)
     import datetime
-    now_iso = datetime.datetime.now().isoformat(timespec='seconds')
+    # 用北京时间（Asia/Shanghai）记录更新时间，避免 GitHub Runner 默认 UTC 导致日期差一天
+    try:
+        from zoneinfo import ZoneInfo
+        now_iso = datetime.datetime.now(ZoneInfo('Asia/Shanghai')).isoformat(timespec='seconds')
+    except Exception:
+        # 回退：UTC+8 小时
+        now_iso = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).isoformat(timespec='seconds')
     # 写入带更新时间戳的包裹格式：{updatedAt, data}；前端与后端均兼容旧版纯数组。
     with open(os.path.join(data_dir, 'lectures.json'), 'w', encoding='utf-8') as f:
         json.dump({'updatedAt': now_iso, 'data': out}, f, ensure_ascii=False, indent=2)
