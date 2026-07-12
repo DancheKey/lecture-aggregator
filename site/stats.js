@@ -3,11 +3,21 @@
  */
 const { createApp } = Vue;
 
+const SORT_KEY_TOTAL = 'total';
+const SORT_KEY_COLLEGE = 'college';
+
+// 学院 / 年份 / 总计 统计页
+// 支持点击表头按任意列排序，多次点击切换升/降序；表格首列固定，表头固定，
+// 未来年份多、学院多时仍可一页内滚动查看。
 createApp({
   data() {
     return {
       all: [],
-      sortBy: 'college', // 'college' | 'total'
+      // 排序状态：key = 'college' | 'total' | 年份字符串(如 '2024')
+      // order = 'asc' | 'desc'（多次点击切换）
+      sortBy: { key: SORT_KEY_COLLEGE, order: 'asc' },
+      // 学院名过滤（未来学院数量多时便于定位）
+      collegeFilter: '',
     };
   },
 
@@ -37,18 +47,35 @@ createApp({
 
     // 行列表：每一行对应一个学院/部处
     rows() {
+      const key = this.sortBy.key;
+      const order = this.sortBy.order;
       const list = Object.keys(this.matrix).map(college => {
         const cells = this.years.map(y => this.matrix[college][y] || 0);
         const total = cells.reduce((a, b) => a + b, 0);
         return { college, cells, total };
+      }).filter(row => {
+        if (!this.collegeFilter) return true;
+        return (row.college || '').toLowerCase().includes(this.collegeFilter.toLowerCase());
       });
-      if (this.sortBy === 'total') {
-        list.sort((a, b) => b.total - a.total || (a.college || '').localeCompare(b.college || ''));
-      } else {
-        list.sort((a, b) => (a.college || '').localeCompare(b.college || ''));
-      }
+
+      list.sort((a, b) => {
+        let cmp = 0;
+        if (key === SORT_KEY_COLLEGE) {
+          cmp = (a.college || '').localeCompare(b.college || '');
+        } else if (key === SORT_KEY_TOTAL) {
+          cmp = a.total - b.total;
+        } else {
+          // 按具体年份列排序
+          const idx = this.years.indexOf(key);
+          if (idx >= 0) cmp = (a.cells[idx] || 0) - (b.cells[idx] || 0);
+        }
+        return order === 'asc' ? cmp : -cmp;
+      });
       return list;
     },
+
+    // 排序按钮/表头的激活状态（兼容旧用法）
+    sortDesc() { return this.sortBy.order === 'desc'; },
 
     // 每年合计
     yearTotals() {
@@ -68,6 +95,22 @@ createApp({
     yearOf(l) {
       if (!l || !l.lectureStart) return '';
       return String(l.lectureStart).slice(0, 4);
+    },
+    // 切换排序：点击同一列切换顺序，点击新列默认按数值降序、学院名升序
+    toggleSort(key) {
+      if (this.sortBy.key === key) {
+        this.sortBy.order = this.sortBy.order === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.sortBy = {
+          key,
+          order: key === SORT_KEY_COLLEGE ? 'asc' : 'desc',
+        };
+      }
+    },
+    // 表头显示的排序箭头
+    sortIcon(key) {
+      if (this.sortBy.key !== key) return '⇅';
+      return this.sortBy.order === 'asc' ? '↑' : '↓';
     },
     load() {
       fetch('/api/lectures', { cache: 'no-store' })

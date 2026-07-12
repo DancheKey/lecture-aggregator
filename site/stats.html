@@ -32,7 +32,7 @@
     </header>
 
     <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h1 class="text-[18pt] font-bold text-slate-800">各学院 / 部处讲座统计</h1>
           <p class="text-[12pt] text-slate-500 mt-1">
@@ -41,38 +41,53 @@
         </div>
         <div class="flex items-center gap-2">
           <span class="text-[12pt] text-slate-500">排序：</span>
-          <button @click="sortBy = 'college'"
-            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy === 'college' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按学院名</button>
-          <button @click="sortBy = 'total'"
-            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy === 'total' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按总数</button>
+          <button @click="toggleSort('college')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'college' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按学院名</button>
+          <button @click="toggleSort('total')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'total' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按总数</button>
         </div>
       </div>
 
-      <!-- 统计表格 -->
-      <div v-if="all.length" class="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto shadow-sm">
-        <table class="min-w-full text-[12pt]">
-          <thead class="bg-slate-50 text-slate-600">
-            <tr>
-              <th class="text-left px-4 py-3 font-semibold border-b border-slate-200 sticky left-0 bg-slate-50 z-10">学院 / 部处</th>
-              <th v-for="y in years" :key="y" class="text-right px-4 py-3 font-semibold border-b border-slate-200">{{ y }} 年</th>
-              <th class="text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600">总计</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in rows" :key="row.college" class="border-b border-slate-100 hover:bg-slate-50">
-              <td class="px-4 py-3 font-medium text-slate-700 sticky left-0 bg-white z-10">{{ row.college || '未分类' }}</td>
-              <td v-for="(n, idx) in row.cells" :key="years[idx]" :class="['px-4 py-3 text-right', n ? 'text-slate-700' : 'text-slate-300']">
-                {{ n || '—' }}
-              </td>
-              <td class="px-4 py-3 text-right font-bold text-blue-600">{{ row.total }}</td>
-            </tr>
-            <tr class="bg-slate-50 font-semibold text-slate-700">
-              <td class="px-4 py-3 sticky left-0 bg-slate-50 z-10">合计</td>
-              <td v-for="n in yearTotals" :key="n.year" class="px-4 py-3 text-right">{{ n.count }}</td>
-              <td class="px-4 py-3 text-right font-bold text-blue-600">{{ grandTotal }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- 学院筛选：未来学院数量多时便于快速定位 -->
+      <div class="mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
+        <label class="text-[12pt] text-slate-500 whitespace-nowrap">筛选学院：</label>
+        <input v-model="collegeFilter" type="text" placeholder="输入学院/部处名称..."
+          class="w-full sm:w-72 px-3 py-1.5 rounded-lg border border-slate-200 text-[12pt] focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white" />
+      </div>
+
+      <!-- 统计表格：横向可滚动、首列固定、纵向最大高度滚动 -->
+      <div v-if="all.length" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto max-h-[70vh] overflow-y-auto">
+          <table class="min-w-full text-[12pt] border-collapse">
+            <thead class="bg-slate-50 text-slate-600 sticky top-0 z-20">
+              <tr>
+                <th @click="toggleSort('college')" class="cursor-pointer select-none text-left px-4 py-3 font-semibold border-b border-slate-200 sticky left-0 bg-slate-50 z-30 min-w-[140px]">
+                  <span class="inline-flex items-center gap-1 hover:text-blue-600">学院 / 部处 <span class="text-blue-500 text-[10pt]">{{ sortIcon('college') }}</span></span>
+                </th>
+                <th v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 min-w-[80px]">
+                  <span class="inline-flex items-center gap-1 hover:text-blue-600 justify-end">{{ y }} 年 <span class="text-blue-500 text-[10pt]">{{ sortIcon(String(y)) }}</span></span>
+                </th>
+                <th @click="toggleSort('total')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600 min-w-[80px]">
+                  <span class="inline-flex items-center gap-1 justify-end">总计 <span class="text-blue-500 text-[10pt]">{{ sortIcon('total') }}</span></span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in rows" :key="row.college" class="border-b border-slate-100 hover:bg-slate-50">
+                <td class="px-4 py-3 font-medium text-slate-700 sticky left-0 bg-white z-10 min-w-[140px]">{{ row.college || '未分类' }}</td>
+                <td v-for="(n, idx) in row.cells" :key="years[idx]" :class="['px-4 py-3 text-right min-w-[80px]', n ? 'text-slate-700' : 'text-slate-300']">
+                  {{ n || '—' }}
+                </td>
+                <td class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ row.total }}</td>
+              </tr>
+              <tr class="bg-slate-50 font-semibold text-slate-700 sticky bottom-0 z-20">
+                <td class="px-4 py-3 sticky left-0 bg-slate-50 z-30 min-w-[140px]">合计</td>
+                <td v-for="n in yearTotals" :key="n.year" class="px-4 py-3 text-right min-w-[80px]">{{ n.count }}</td>
+                <td class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ grandTotal }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div v-else class="text-center text-slate-400 py-16 text-[12pt]">数据加载中…</div>
