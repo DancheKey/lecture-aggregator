@@ -65,8 +65,15 @@ def collect_links(html, base, list_url=None, collect_mode='auto'):
         # 跳过 javascript、锚点、当前列表页自身
         if href.startswith('javascript') or href == '#' or href.startswith('#'):
             continue
+        # 跳过占位/包装链接：外层 <a> 里还包着真实 <a>，它的 href 通常是 content.html / # 等
+        if a.find('a'):
+            continue
         url = _abs_url(href, base)
         if list_url_norm and url.rstrip('/') == list_url_norm:
+            continue
+        # 跳过明显无意义的占位文件名（如 content.html 本身是包装，index.html 是栏目首页）
+        path = url.rstrip('/').split('?')[0].lower()
+        if path.endswith('/content.html') or path.endswith('/index.html'):
             continue
         if collect_mode == 'all_items':
             # 排除明显导航词
@@ -88,10 +95,12 @@ def collect_links(html, base, list_url=None, collect_mode='auto'):
 
 
 def _normalize_title(title):
-    """标题归一化：去空白、去常见前后缀，用于同源去重比对。"""
+    """标题归一化：去空白、去常见前后缀与末尾日期，用于同源去重比对。"""
     s = re.sub(r'\s+', '', title.strip())
     # 去掉末尾常见的来源标注
     s = re.sub(r'[（(][^）)]*[）)]$', '', s)
+    # 去掉末尾常见的日期（CMS 列表页常把日期拼在标题后）：2026-06-25、2026/06/25、20260625
+    s = re.sub(r'(20\d{2}[-/]?\d{2}[-/]?\d{2}|20\d{6})$', '', s)
     return s
 
 
@@ -132,6 +141,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--since', help='仅抓取该 ISO 时间之后的新信息（增量模式）')
     parser.add_argument('--full', action='store_true', help='全量抓取，忽略增量')
+    parser.add_argument('--source', help='仅抓取指定名称的信息源（用于局部修复/测试）')
     args = parser.parse_args()
 
     cfg_path = os.path.join(ROOT, 'scraper', 'sources.yaml')
@@ -154,7 +164,9 @@ def main():
     existing = []
     if os.path.exists(data_path):
         try:
-            existing = json.load(open(data_path, encoding='utf-8'))
+            raw = json.load(open(data_path, encoding='utf-8'))
+            # 兼容新版包裹格式 {updatedAt, data} 与旧版纯数组
+            existing = raw.get('data', []) if isinstance(raw, dict) else raw
         except Exception:
             existing = []
     existing_urls = {str(r.get('sourceUrl', '')).rstrip('/') for r in existing if r.get('sourceUrl')}
@@ -167,7 +179,13 @@ def main():
             if u:
                 lectures[u] = r
 
-    for src in cfg['sources']:
+    sources = cfg['sources']
+    if args.source:
+        sources = [s for s in sources if s.get('name') == args.source]
+        if not sources:
+            print(f'[ERROR] 未找到信息源「{args.source}」', file=sys.stderr)
+            return
+    for src in sources:
         try:
             name = src['name']
             campus = src.get('campus', '')
@@ -216,6 +234,10 @@ def main():
 
     # 同源去重：同一学院标题相似的只保留一条
     raw = list(lectures.values())
+    # 局部修复模式（--source）：保留其他学院已有记录，仅替换指定学院的记录
+    if args.source:
+        other_existing = [r for r in existing if r.get('college') != args.source]
+        raw = other_existing + raw
     out = dedup(raw)
     out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)
     data_dir = os.path.join(ROOT, 'data')
@@ -231,11 +253,13 @@ def main():
     # 写入带更新时间戳的包裹格式：{updatedAt, data}；前端与后端均兼容旧版纯数组。
     with open(os.path.join(data_dir, 'lectures.json'), 'w', encoding='utf-8') as f:
         json.dump({'updatedAt': now_iso, 'data': out}, f, ensure_ascii=False, indent=2)
-    with open(last_scrape_path, 'w', encoding='utf-8') as f:
-        json.dump({'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'},
-                  f, ensure_ascii=False, indent=2)
+    # 局部修复模式不更新 last_scrape.json，避免影响下一次全量/定时增量调度
+    if not args.source:
+        with open(last_scrape_path, 'w', encoding='utf-8') as f:
+            json.dump({'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'},
+                      f, ensure_ascii=False, indent=2)
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
-          f'(mode={"incremental" if is_incremental else "full"}, since={since})')
+          f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
 
 
 if __name__ == '__main__':
