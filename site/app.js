@@ -17,6 +17,7 @@ createApp({
     return {
       all: [],
       mtime: 0,
+      updatedAt: '',   // 数据更新时间（ISO 字符串），来自后端 mtime 或静态文件 updatedAt
       // 校区固定顺序（与 sources.yaml / 后端一致）
       campusList: ['', '石牌', '大学城', '佛山', '汕尾', '校级'],
       campus: '',
@@ -236,16 +237,25 @@ createApp({
         })
         .then(resp => {
           if (resp.unchanged) return;       // 无更新
-          // 兼容后端 {data:[...]} 与静态数组两种格式
-          if (Array.isArray(resp)) { this.all = resp; this.mtime = 0; }
-          else { this.all = resp.data || []; this.mtime = resp.mtime || 0; }
+          // 兼容后端 {data:[...], updatedAt} 与静态数组两种格式
+          if (Array.isArray(resp)) { this.all = resp; this.mtime = 0; this.updatedAt = ''; }
+          else {
+            this.all = resp.data || [];
+            this.mtime = resp.mtime || 0;
+            // 优先用文件内嵌 updatedAt；本地模式下回退用 mtime 推算
+            this.updatedAt = resp.updatedAt || (resp.mtime ? new Date(resp.mtime * 1000).toISOString() : '');
+          }
         })
         .catch(() => {
           // 静态托管（无后端）时回退读取站点根 lectures.json
           if (incremental) return;          // 增量轮询失败静默忽略
           fetch('lectures.json', { cache: 'no-store' })
             .then(r => r.json())
-            .then(arr => { this.all = arr || []; this.mtime = 0; })
+            .then(arr => {
+              if (Array.isArray(arr)) { this.all = arr; this.updatedAt = ''; }
+              else { this.all = arr.data || []; this.updatedAt = arr.updatedAt || ''; }
+              this.mtime = 0;
+            })
             .catch(e => console.error('加载讲座失败', e));
         });
     },

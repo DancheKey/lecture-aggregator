@@ -72,10 +72,10 @@ createApp({
     load() {
       fetch('/api/lectures', { cache: 'no-store' })
         .then(r => { if (!r.ok) throw new Error('api'); return r.json(); })
-        .then(resp => { this.all = Array.isArray(resp) ? resp : (resp.data || []); })
+        .then(resp => { this.all = (resp && resp.data) ? resp.data : (Array.isArray(resp) ? resp : []); })
         .catch(() => fetch('lectures.json', { cache: 'no-store' })
           .then(r => r.json())
-          .then(arr => { this.all = arr || []; })
+          .then(arr => { this.all = (arr && arr.data) ? arr.data : (arr || []); })
           .catch(e => console.error('加载讲座数据失败', e)));
     },
   },

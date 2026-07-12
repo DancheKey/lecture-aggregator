@@ -86,6 +86,7 @@
           <div class="flex flex-wrap items-center justify-between gap-2 mb-5">
             <div class="text-[12pt] text-slate-500">
               共 <span class="font-semibold text-slate-800">{{ totalCount }}</span> 条讲座
+              <span v-if="updatedAt" class="ml-1 text-[11pt] text-slate-400">· 更新于 {{ updatedAt.slice(0, 10) }}</span>
               <template v-if="filtered.length !== totalCount">
                 · 当前筛选 <span class="font-semibold text-blue-600">{{ filtered.length }}</span> 条
               </template>

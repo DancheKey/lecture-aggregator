@@ -28,6 +28,39 @@ SOURCES_PATH = os.path.join(ROOT, 'scraper', 'sources.yaml')
 _scrape_lock = threading.Lock()
 
 
+def _find_scraper_python():
+    """选择一个能 import 爬虫依赖（requests/bs4）的 Python 解释器。
+
+    server.py 自身可能用没装这些依赖的解释器启动（例如某些环境默认的 3.13），
+    直接用它跑 scraper 会 ImportError -> 抓取失败。这里自动探测一个可用解释器：
+    优先尝试 sys.executable，再回退到本机已知装齐依赖的路径与 PATH 中的 python。
+    """
+    candidates = [sys.executable, r'D:\Tools\Python 312\python.exe']
+    try:
+        import shutil
+        for w in ('python3', 'python'):
+            p = shutil.which(w)
+            if p:
+                candidates.append(p)
+    except Exception:
+        pass
+    seen = set()
+    for c in candidates:
+        if not c or c in seen:
+            continue
+        seen.add(c)
+        try:
+            out = subprocess.run(
+                [c, '-c', 'import requests, bs4'],
+                capture_output=True, text=True, timeout=30,
+            )
+            if out.returncode == 0:
+                return c
+        except Exception:
+            continue
+    return sys.executable  # 兜底：实在找不到就沿用当前解释器（会如实报错）
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=SITE_DIR, **kwargs)
@@ -139,10 +172,17 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({'data': [], 'mtime': cur_mtime, 'unchanged': True})
                 return
             data = []
+            updated_at = ''
             if os.path.exists(path):
                 with open(path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-            self._send_json({'data': data, 'mtime': cur_mtime, 'unchanged': False})
+                    raw = json.load(f)
+                # 兼容包裹格式 {updatedAt, data} 与旧版纯数组
+                if isinstance(raw, dict) and 'data' in raw:
+                    data = raw.get('data', []) or []
+                    updated_at = raw.get('updatedAt', '') or ''
+                else:
+                    data = raw if isinstance(raw, list) else []
+            self._send_json({'data': data, 'mtime': cur_mtime, 'updatedAt': updated_at, 'unchanged': False})
             return
         if self.path.split('?')[0] == '/api/sources':
             return self._api_sources_get()
@@ -155,7 +195,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({'ok': False, 'message': '已有抓取任务在运行中，请稍候'}, 409)
                 return
             try:
-                cmd = [sys.executable, SCRAPER]
+                cmd = [_find_scraper_python(), SCRAPER]
                 # 若存在上次抓取记录，则以增量模式运行（仅抓取之后发布的新信息）
                 last_path = os.path.join(DATA_DIR, 'last_scrape.json')
                 if os.path.exists(last_path):
@@ -172,7 +212,7 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 if proc.returncode != 0:
                     tail = (proc.stderr or proc.stdout or '')[-400:]
-                    self._send_json({'ok': False, 'message': '采集失败：' + tail}, 500)
+                    self._send_json({'ok': False, 'message': '采集失败（请确认运行 server.py 的 Python 已安装 requests/bs4/easyocr 等依赖）：' + tail}, 500)
                     return
                 path = os.path.join(DATA_DIR, 'lectures.json')
                 count = 0

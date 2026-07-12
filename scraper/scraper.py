@@ -168,46 +168,51 @@ def main():
                 lectures[u] = r
 
     for src in cfg['sources']:
-        name = src['name']
-        campus = src.get('campus', '')
-        base = src['base']
-        # 本源所有列表页 URL（归一化），用于跳过「栏目入口」类链接
-        src_list_norm = set()
-        for lu in src.get('list_urls', []):
-            u = lu['url'] if isinstance(lu, dict) else lu
-            src_list_norm.add(str(u).rstrip('/'))
-        seen = set()
-        for lu in src.get('list_urls', []):
-            if isinstance(lu, dict):
-                list_url = lu['url']
-                collect_mode = lu.get('collect_mode', 'auto')
-            else:
-                list_url = lu
-                collect_mode = 'auto'
-            html = fetch(list_url)
-            for href, txt in collect_links(html, base, list_url=list_url, collect_mode=collect_mode):
-                href_norm = href.rstrip('/')
-                if href_norm in seen:
-                    continue
-                seen.add(href_norm)
-                # 增量模式：已抓取过的 URL 直接跳过（不下载详情、不解析、不做 OCR）
-                if is_incremental and href_norm in existing_urls:
-                    continue
-                # 跳过指向本源其他列表页的链接（栏目入口，不是讲座详情）
-                if href_norm in src_list_norm:
-                    continue
-                d = fetch(href)
-                if not d:
-                    continue
-                try:
-                    rec = parse_detail(d, href, name, campus, year, list_title=txt)
-                except Exception as e:
-                    print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
-                    continue
-                rec['listTitle'] = txt
-                lectures[href] = rec
-                print(f'[OK] {name} | {rec.get("lectureStart")} | {txt}')
-        time.sleep(1)
+        try:
+            name = src['name']
+            campus = src.get('campus', '')
+            base = src['base']
+            # 本源所有列表页 URL（归一化），用于跳过「栏目入口」类链接
+            src_list_norm = set()
+            for lu in src.get('list_urls', []):
+                u = lu['url'] if isinstance(lu, dict) else lu
+                src_list_norm.add(str(u).rstrip('/'))
+            seen = set()
+            for lu in src.get('list_urls', []):
+                if isinstance(lu, dict):
+                    list_url = lu['url']
+                    collect_mode = lu.get('collect_mode', 'auto')
+                else:
+                    list_url = lu
+                    collect_mode = 'auto'
+                html = fetch(list_url)
+                for href, txt in collect_links(html, base, list_url=list_url, collect_mode=collect_mode):
+                    href_norm = href.rstrip('/')
+                    if href_norm in seen:
+                        continue
+                    seen.add(href_norm)
+                    # 增量模式：已抓取过的 URL 直接跳过（不下载详情、不解析、不做 OCR）
+                    if is_incremental and href_norm in existing_urls:
+                        continue
+                    # 跳过指向本源其他列表页的链接（栏目入口，不是讲座详情）
+                    if href_norm in src_list_norm:
+                        continue
+                    d = fetch(href)
+                    if not d:
+                        continue
+                    try:
+                        rec = parse_detail(d, href, name, campus, year, list_title=txt)
+                    except Exception as e:
+                        print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
+                        continue
+                    rec['listTitle'] = txt
+                    lectures[href] = rec
+                    print(f'[OK] {name} | {rec.get("lectureStart")} | {txt}')
+            time.sleep(1)
+        except Exception as e:
+            # 单源异常不应拖垮整次抓取：记录后继续下一个源，已采数据照常写入
+            print(f'[ERROR] 信息源「{src.get("name")}」抓取失败：{e}', file=sys.stderr)
+            continue
 
     # 同源去重：同一学院标题相似的只保留一条
     raw = list(lectures.values())
@@ -215,11 +220,11 @@ def main():
     out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)
     data_dir = os.path.join(ROOT, 'data')
     os.makedirs(data_dir, exist_ok=True)
-    with open(os.path.join(data_dir, 'lectures.json'), 'w', encoding='utf-8') as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
-    # 记录本次抓取时间，供下次增量使用（只查此后的新信息）
     import datetime
     now_iso = datetime.datetime.now().isoformat(timespec='seconds')
+    # 写入带更新时间戳的包裹格式：{updatedAt, data}；前端与后端均兼容旧版纯数组。
+    with open(os.path.join(data_dir, 'lectures.json'), 'w', encoding='utf-8') as f:
+        json.dump({'updatedAt': now_iso, 'data': out}, f, ensure_ascii=False, indent=2)
     with open(last_scrape_path, 'w', encoding='utf-8') as f:
         json.dump({'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'},
                   f, ensure_ascii=False, indent=2)
