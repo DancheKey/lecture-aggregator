@@ -8,6 +8,7 @@ const SORT_KEY_COLLEGE = 'college';
 const SORT_KEY_VISITS = 'visits';
 const SORT_KEY_LIKES = 'likes';
 const STAT_KEY = 'lecture_stats_v1';   // 与 app.js 一致的本机统计键
+const UNKNOWN_YEAR = '其他';             // 讲座时间缺失时归入此类
 
 // 学院 / 年份 / 总计 统计页
 // 支持点击表头按任意列排序（学院名/各年份讲座数/总计/访问数/点赞数），多次点击切换升/降序；
@@ -32,14 +33,20 @@ createApp({
   },
 
   computed: {
-    // 所有出现过的年份（升序）
+    // 所有出现过的年份（升序），无法识别的讲座时间归入“其他”并放在最后
     years() {
       const set = new Set();
       this.all.forEach(l => {
         const y = this.yearOf(l);
         if (y) set.add(y);
       });
-      return Array.from(set).sort((a, b) => a.localeCompare(b));
+      const arr = Array.from(set).sort((a, b) => a.localeCompare(b));
+      const idx = arr.indexOf(UNKNOWN_YEAR);
+      if (idx >= 0) {
+        arr.splice(idx, 1);
+        arr.push(UNKNOWN_YEAR);
+      }
+      return arr;
     },
 
     // 当前展示模式：count（讲座数）/ visits（访问量）/ likes（点赞量）
@@ -148,7 +155,7 @@ createApp({
 
   methods: {
     yearOf(l) {
-      if (!l || !l.lectureStart) return '';
+      if (!l || !l.lectureStart) return UNKNOWN_YEAR;
       return String(l.lectureStart).slice(0, 4);
     },
     // 切换排序：
