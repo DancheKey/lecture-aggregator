@@ -5,6 +5,35 @@ import requests
 from bs4 import BeautifulSoup
 from timeparse import parse_cn_time, _year_from_text
 
+def _clean_ocr_text(ocr_text):
+    """清理图片 OCR 后常见的海报抬头、Logo、边框乱码等噪声。"""
+    t = ocr_text
+    # 合并连续空格
+    t = re.sub(r'\s+', ' ', t).strip()
+    # 常见顶部院校/机构抬头（行知书院、心理学院等海报常见）
+    header_words = [
+        '华南师范大学', '华南师大', '华师', '行知书院', '心理学院',
+        '研究生会', '学生会', '学术讲座', '系列讲座', '讲座预告', 'LECTURE',
+    ]
+    # 多次贪婪去除：抬头通常在最前面且短
+    for _ in range(3):
+        changed = False
+        for w in header_words:
+            # 只去掉位于开头、前面无汉字的短词；避免误删正文
+            pat = rf'^(?:[^\u4e00-\u9fa5]{{0,8}}){re.escape(w)}\s*'
+            new_t = re.sub(pat, '', t)
+            if new_t != t:
+                t = new_t
+                changed = True
+        if not changed:
+            break
+    # 去除尾部常见边框乱码或装饰字符（如「曷」「号」孤立出现）
+    t = re.sub(r'[\s]*[曷号]+$\s*', '', t).strip()
+    # 去除孤立单个非中文字符（常见 OCR 噪声）
+    t = re.sub(r'\s+[^\u4e00-\u9fa5a-zA-Z0-9]{1,2}\s*$', '', t).strip()
+    return t
+
+
 # 懒加载 easyocr Reader：仅在遇到图片讲座时才初始化
 _OCR_READER = None
 
@@ -25,6 +54,9 @@ def _img_to_text(img_url_or_bytes):
         else:
             url = img_url_or_bytes
             if url.startswith('//'):
+                url = 'https:' + url
+            elif url.startswith('/statics.'):
+                # 站点把 statics.scnu.edu.cn 以根路径形式引用，实际缺协议
                 url = 'https:' + url
             r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=20)
             img_bytes = r.content
@@ -124,10 +156,26 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     body_text = _normalize_label_text(body_text)
     ocr_text = ''
     if content_div and len(body_text) < 50:
-        imgs = [img.get('src') for img in content_div.find_all('img') if img.get('src')]
+        base_url = url
+        imgs = []
+        for img in content_div.find_all('img'):
+            src = img.get('src')
+            if not src:
+                continue
+            if src.startswith('http'):
+                pass
+            elif src.startswith('//'):
+                src = 'https:' + src
+            elif src.startswith('/'):
+                src = base_url.split('/')[0] + src
+            else:
+                src = base_url.rsplit('/', 1)[0] + '/' + src
+            imgs.append(src)
         if imgs:
             ocr_text = ' '.join(_img_to_text(img) for img in imgs[:3])
             if ocr_text:
+                # 清理 OCR 中常见的顶部/底部噪声
+                ocr_text = _clean_ocr_text(ocr_text)
                 body_text = (body_text + ' ' + ocr_text).strip()
                 text = (text + ' ' + ocr_text).strip()
 
@@ -144,8 +192,11 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         # CMS 顶部常见「2023-11-08 10:00 来源：」式时间戳
         m = re.search(r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?)', search_text)
     if not m:
-        # 兜底：整页前部
+        # 兜底：整页前部（正文为图片时 content_div 为空，发布时间只在整页 soup text 中）
         m = re.search(PUB, text)
+    if not m:
+        # 再兜底：CMS 顶部时间戳在整页中
+        m = re.search(r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?)', text)
     publish_time = m.group(1).strip() if m else None
 
     # 从标题/URL 提取显式年份（标题兼容紧凑格式 20251204）
@@ -169,9 +220,24 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     }
 
     t = parse_cn_time(text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
-    # 兜底：部分站点（如心理学院）讲座日期只在列表标题里，正文仅有发布日期
-    if not t and list_title:
-        t = parse_cn_time(list_title, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
+    # 若解析结果与发布时间同一天，很可能解析到的是发布日期而非讲座日期；
+    # 优先使用列表标题（通常包含真实讲座日期），其次尝试 OCR 中的明确「时间」标签。
+    if t and publish_time and t['start'].strftime('%Y-%m-%d') == publish_time[:10]:
+        if list_title:
+            t_lt = parse_cn_time(list_title, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
+            if t_lt and t_lt['start'].strftime('%Y-%m-%d') != publish_time[:10]:
+                t = t_lt
+        # 图片 OCR 场景：正文存在「时间」标签时，优先用标签后片段
+        if ocr_text:
+            tm = re.search(r'(?:时间|时闻)[：:\s]*(.{0,70})', text)
+            if tm:
+                t2 = parse_cn_time(tm.group(1).strip(), default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
+                if t2 and t2['start'].strftime('%Y-%m-%d') != publish_time[:10]:
+                    t = t2
+    if not t:
+        # 兜底：部分站点（如心理学院）讲座日期只在列表标题里，正文仅有发布日期
+        if list_title:
+            t = parse_cn_time(list_title, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
     if t:
         result['lectureStart'] = t['start'].isoformat(sep=' ')
         result['lectureEnd'] = t['end'].isoformat(sep=' ') if t['end'] else None
@@ -203,6 +269,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         # 地点值通常很短；如果超过 50 字符说明吃到了后续内容，截断到第一个句号/逗号
         if len(loc) > 60:
             loc = re.split(r'[。，;；\n]', loc)[0].strip()
+        # 去除 OCR 尾部常见乱码或装饰字符（如「曷」「号」）
+        loc = re.sub(r'[\s]*[曷号]+$\s*', '', loc).strip()
+        loc = re.sub(r'\s+[^\u4e00-\u9fa5a-zA-Z0-9]{1,2}\s*$', '', loc).strip()
         result['location'] = loc
 
     # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人」）---
@@ -288,7 +357,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
 
     # 兜底：若正文来自图片 OCR 且没有明确「摘要」标签，把 OCR 文本清理后作为摘要
     if ocr_text and not result.get('abstract'):
-        clean = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', ocr_text).strip()
+        clean = _clean_ocr_text(ocr_text)
+        clean = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', clean).strip()
         clean = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', clean).strip()
         clean = re.split(rf'(?:{NOISE_MARKERS})', clean)[0].strip()
         # 去掉海报顶部常见噪声（学院/学生会/系列讲座等重复字样）
@@ -298,8 +368,19 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         clean = re.sub(r'\s*(时间|时闻)\s*[:：].*$', '', clean).strip()
         clean = re.sub(r'\s*地点\s*[:：].*$', '', clean).strip()
         clean = re.sub(r'\s*20\d{2}年\d{1,2}月\d{1,2}日.*$', '', clean).strip()
+        # 再次清理尾部乱码
+        clean = re.sub(r'[\s]*[曷号]+$\s*', '', clean).strip()
+        clean = re.sub(r'\s+[^\u4e00-\u9fa5a-zA-Z0-9]{1,2}\s*$', '', clean).strip()
         if len(clean) > 10:
             result['abstract'] = clean
+
+    # 图片 OCR 场景：标题通常就是海报主标题，若未提取到 topic，用标题去掉日期前缀作为主题
+    if ocr_text and not result.get('topic') and title:
+        topic_candidate = re.sub(r'^(20\d{6}\s+|20\d{2}[-/]\d{2}[-/]\d{2}\s+|\d{1,2}月\d{1,2}日\s*)', '', title).strip()
+        # 去掉末尾的"学术讲座"/"讲座"等通用词，保留具体主题
+        topic_candidate = re.sub(r'(?:教授|老师|先生|女士)\s*(学术讲座|讲座|报告|讲坛)$', '', topic_candidate).strip()
+        if topic_candidate and topic_candidate != title and len(topic_candidate) > 3:
+            result['topic'] = topic_candidate
 
     # 图片 OCR 场景下，「简介」二字常被标题误触发，导致 speakerBio 变成整段海报文字。
     # 若 speakerBio 来自 OCR 且包含时间/地点等结构化信息，说明不是真正的主讲人简介，清空。

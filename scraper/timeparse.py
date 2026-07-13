@@ -19,6 +19,7 @@ FULL_PATTERNS = [
     r'(\d{4})\.(\d{2})\.(\d{2})',
 ]
 MONTHDAY = r'(\d{1,2})\s*月\s*(\d{1,2})\s*日'
+SLASH_MONTHDAY = r'(\d{1,2})/(\d{1,2})'
 COLON = r'[:：]'
 
 
@@ -72,6 +73,13 @@ def _parse_segment(seg, default_year, publish_time):
     md = re.search(MONTHDAY, seg)
     if md:
         return _build(md, seg, y, md.group(1), md.group(2))
+
+    # 4) 图片 OCR 常见美式月日：06/10，默认取 default_year
+    sm = re.search(SLASH_MONTHDAY, seg)
+    if sm:
+        # 避免把日期时间 2026/06/10 中的 MM/DD 重复解析；slash 月日要求前无四位年份
+        if not re.search(r'20\d{2}/' + sm.group(0), seg):
+            return _build(sm, seg, y, sm.group(1), sm.group(2))
     return None
 
 

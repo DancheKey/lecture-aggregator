@@ -34,10 +34,6 @@ def fetch(url):
 def main():
     sys.path.insert(0, os.path.join(ROOT, 'scraper'))
     from parsers import parse_detail  # noqa: E402
-    # 重新解析时跳过图片 OCR：避免 torch/easyocr 在部分机器上崩溃，同时大幅提升速度；
-    # 结构化字段（题目/地点/主讲人/简介/摘要）通常已在正文中。
-    import parsers as _parsers
-    _parsers._img_to_text = lambda img_url_or_bytes: ''
 
     with open(DATA_PATH, 'r', encoding='utf-8') as f:
         raw = json.load(f)
