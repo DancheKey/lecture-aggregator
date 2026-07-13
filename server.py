@@ -36,7 +36,6 @@ _site_visits = {'total': 0}            # 站点总访问量
 _lecture_stats = {}                     # url -> {"visits": N, "likes": M}
 _recent_site_ip = {}                   # ip -> 最近一次计数的时间戳（站点访问防刷）
 _recent_lecture = {}                   # (ip, url) -> 时间戳（单讲座访问防刷）
-_recent_like = {}                       # (ip, url) -> 时间戳（单讲座点赞防刷）
 VISIT_THROTTLE = 180                   # 同一 IP / 同一讲座 3 分钟内只计 1 次
 
 
@@ -255,23 +254,28 @@ class Handler(SimpleHTTPRequestHandler):
             return self._send_json({'ok': True, 'visits': cur.get('visits', 0)})
 
     def _api_lecture_like_post(self):
-        """记录一次点赞：前端已做本机去重，这里按 (IP, url) 3 分钟去重再累加。"""
+        """记录一次点赞：前端已做本机 toggle（奇数次赞、偶数次取消），这里直接累加。"""
         body = self._read_body_json()
         url = (body.get('url') or '').strip()
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
-        ip = self._client_ip()
-        now = time.time()
         with _stat_lock:
-            key = (ip, url)
-            last = _recent_like.get(key, 0)
-            if now - last >= VISIT_THROTTLE:
-                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
-                st['likes'] = st.get('likes', 0) + 1
-                _recent_like[key] = now
-                _save_lecture_stats()
-            cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
-            return self._send_json({'ok': True, 'likes': cur.get('likes', 0)})
+            st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+            st['likes'] = st.get('likes', 0) + 1
+            _save_lecture_stats()
+            return self._send_json({'ok': True, 'likes': st.get('likes', 0)})
+
+    def _api_lecture_unlike_post(self):
+        """取消一次点赞：前端偶数次点击触发，这里累减（最小 0）。"""
+        body = self._read_body_json()
+        url = (body.get('url') or '').strip()
+        if not url:
+            return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
+        with _stat_lock:
+            st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+            st['likes'] = max(0, st.get('likes', 0) - 1)
+            _save_lecture_stats()
+            return self._send_json({'ok': True, 'likes': st.get('likes', 0)})
 
     def do_GET(self):
         if self.path.split('?')[0] == '/api/visits':
@@ -357,6 +361,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._api_lecture_visit_post()
         if base == '/api/lecture/like':
             return self._api_lecture_like_post()
+        if base == '/api/lecture/unlike':
+            return self._api_lecture_unlike_post()
         self.send_error(404)
 
     def do_PUT(self):

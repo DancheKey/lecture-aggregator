@@ -205,21 +205,34 @@ createApp({
       return this.likedUrls.has(url);
     },
     toggleLike(url) {
+      if (!url) return;
       if (this.hasLiked(url)) {
-        this.showToast('您已经赞过该讲座');
-        return;
+        // 偶数次点击：取消当次点赞
+        this.likes[url] = Math.max(0, (this.likes[url] || 0) - 1);
+        this.likedUrls.delete(url);
+        this.saveLikes();
+        this.bumpLocalStat(url, 'likes', -1);
+        this.showToast('已取消点赞');
+        // 同步到后端（累减）；失败不影响本机
+        fetch('/api/lecture/unlike', {
+          method: 'POST', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        }).catch(() => {});
+      } else {
+        // 奇数次点击：点赞
+        this.likes[url] = (this.likes[url] || 0) + 1;
+        this.likedUrls.add(url);
+        this.saveLikes();
+        this.bumpLocalStat(url, 'likes', 1);
+        this.showToast('点赞成功');
+        // 同步到后端（累加）；失败不影响本机
+        fetch('/api/lecture/like', {
+          method: 'POST', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        }).catch(() => {});
       }
-      this.likes[url] = (this.likes[url] || 0) + 1;
-      this.likedUrls.add(url);
-      this.saveLikes();
-      this.bumpLocalStat(url, 'likes');
-      this.showToast('点赞成功');
-      // 同步到后端（有后端时记录全局点赞数）；失败不影响本机
-      fetch('/api/lecture/like', {
-        method: 'POST', cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      }).catch(() => {});
     },
 
     /* ---------- 讲座级访问/点赞统计 ---------- */
@@ -231,9 +244,9 @@ createApp({
       try { localStorage.setItem(STAT_KEY, JSON.stringify(this.lectureStats)); } catch (e) { /* ignore */ }
     },
     // 本机累计一次统计（公网无后端时降级使用，带 3 分钟防刷）
-    bumpLocalStat(url, field) {
+    bumpLocalStat(url, field, delta = 1) {
       const s = this.lectureStats[url] || { visits: 0, likes: 0 };
-      s[field] = (s[field] || 0) + 1;
+      s[field] = Math.max(0, (s[field] || 0) + delta);
       this.lectureStats[url] = s;
       this.saveLocalStats();
     },
