@@ -9,10 +9,17 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <style>
-    [v-cloak] { display: none; }
+    [v-cloak] { display: none !important; }
+    #page-loading {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      background: #f7f8fa; color: #94a3b8;
+      font-size: 14pt; letter-spacing: 0.05em;
+    }
   </style>
 </head>
 <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;">
+  <div id="page-loading">数据加载中…</div>
   <div id="app" v-cloak class="min-h-screen flex flex-col">
 
     <!-- 顶部栏 -->

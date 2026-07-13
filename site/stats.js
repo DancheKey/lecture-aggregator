@@ -165,8 +165,8 @@ createApp({
       const v = this.cellValue(cell);
       return v || '—';
     },
-    // 读取每条讲座的访问/点赞：优先后端，但与本地 localStorage 合并（取最大值），
-    // 避免本地已有点赞/访问被后端空数据覆盖。
+    // 读取每条讲座的访问/点赞：优先后端，无后端时回退本机。
+    // 后端返回的 URL 会覆盖本地同名键，避免本机残留旧测试数据与后端不一致。
     loadLectureStats() {
       let localStats = {};
       try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
@@ -174,17 +174,10 @@ createApp({
       fetch('/api/lecture/stats', { cache: 'no-store' })
         .then(r => r.json())
         .then(j => {
-          if (j && j.stats && Object.keys(j.stats).length) {
-            const merged = { ...localStats };
-            for (const [url, st] of Object.entries(j.stats)) {
-              const local = merged[url] || { visits: 0, likes: 0 };
-              merged[url] = {
-                visits: Math.max(local.visits || 0, st.visits || 0),
-                likes: Math.max(local.likes || 0, st.likes || 0),
-              };
-            }
-            this.lectureStats = merged;
-            localStorage.setItem(STAT_KEY, JSON.stringify(merged));
+          if (j && j.stats) {
+            // 后端优先：后端有的 URL 直接覆盖本地；后端没有的保留本地
+            this.lectureStats = { ...localStats, ...j.stats };
+            localStorage.setItem(STAT_KEY, JSON.stringify(this.lectureStats));
           } else {
             this.lectureStats = localStats;
           }
@@ -205,5 +198,7 @@ createApp({
   mounted() {
     this.load();
     this.loadLectureStats();
+    const loader = document.getElementById('page-loading');
+    if (loader) loader.style.display = 'none';
   },
 }).mount('#app');
