@@ -55,6 +55,27 @@ def _clean_title(t):
     return t
 
 
+def _normalize_label_text(text):
+    """去除常见字段标签中因 CMS 拆分 span 而混入的空格，如「题 目」「地 点」「主 讲 人」。"""
+    labels = [
+        # 主题/题目
+        '题目', '主题', '讲座主题', '报告题目', '演讲题目', '报告主题',
+        # 时间地点人物
+        '地点', '时间', '主讲人', '主讲师', '报告人', '主讲嘉宾', '演讲人',
+        # 简介/摘要/内容
+        '主讲人简介', '主讲人简历', '简历', '简介',
+        '摘要', '讲座内容', '讲座内容提要', '内容提要', '讲座摘要',
+        '报告摘要', '内容摘要', '内容简介', '讲座简介', '报告内容', '讲座概要', '内容概要',
+        # 发布信息
+        '发布时间', '发布日期', '来源',
+    ]
+    # 先匹配长的复合标签，避免「讲座内容」把「讲座内容提要」先吃掉
+    for label in sorted(labels, key=len, reverse=True):
+        spaced = ''.join(c + r'\s*' for c in label)
+        text = re.sub(spaced, label, text)
+    return text
+
+
 def _year_from_url(url):
     """从内容页 URL 路径提取年份。
 
@@ -91,6 +112,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
 
     text = soup.get_text(' ')
     text = re.sub(r'\s+', ' ', text).strip()
+    text = _normalize_label_text(text)
 
     # 提前定位正文容器；若正文几乎为空但含图片（如行知书院讲座海报），对图片 OCR 提取文字
     content_div = (soup.find('div', class_='article-content')
@@ -99,6 +121,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
                    or soup.find('div', class_='entry-content'))
     body_text = content_div.get_text(' ') if content_div else text
     body_text = re.sub(r'\s+', ' ', body_text).strip()
+    body_text = _normalize_label_text(body_text)
     ocr_text = ''
     if content_div and len(body_text) < 50:
         imgs = [img.get('src') for img in content_div.find_all('img') if img.get('src')]
@@ -154,17 +177,23 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         result['lectureEnd'] = t['end'].isoformat(sep=' ') if t['end'] else None
 
     # 字段标签前瞻——每个字段只取到下一个标签为止
-    LABELS = '地点|题目|时间|主讲[人师]|报告人|主讲嘉宾|演讲人|摘要|简历|简介|发布|来源'
+    # 把「主题」「讲座内容提要」「摘要」等也纳入 STOP，避免 topic/地点/主讲人 把后续字段一起吃进去
+    LABELS = (
+        '地点|题目|主题|讲座主题|报告题目|演讲题目|报告主题|'
+        '时间|主讲[人师]|报告人|主讲嘉宾|演讲人|'
+        '摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
+        '讲座内容|讲座简介|报告内容|讲座概要|内容概要|'
+        '简历|主讲人简介|主讲人简历|简介|发布|来源'
+    )
     STOP = rf'(?=\s*(?:{LABELS}|$))'
 
-    # --- 题目 ---
-    m = re.search(rf'题目[：:]\s*(.+?){STOP}', text)
+    # --- 题目/主题（兼容「题目/主题/讲座主题/报告题目/演讲题目/报告主题」）---
+    topic_pat = rf'(?:题目|主题|讲座主题|报告题目|演讲题目|报告主题)[：:]\s*(.+?){STOP}'
+    m = re.search(topic_pat, text)
     if m:
         t = m.group(1).strip()
-        # 清除尾部粘连的「摘要」（如「题目：xxx摘要：」无空格的情况）
-        t = re.sub(r'\s*摘要\s*[:：]?.*$', '', t).strip()
-        # 清除尾部粘连的「报告会」「预告」等非正文词
-        t = re.sub(r'(?:摘要|预告)\s*[:：].*$', '', t).strip()
+        # 清除尾部粘连的「摘要」「主讲人」「预告」等非正文词
+        t = re.sub(r'\s*(?:摘要|主讲人|报告人|预告)\s*[:：]?.*$', '', t).strip()
         result['topic'] = t
 
     # --- 地点 ---
@@ -200,25 +229,60 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     # --- 简历/简介（优先在文章正文区域内搜索）---
     # body_text 已在函数开头构建（含可能的 OCR 文本）
 
-    bio_pat = rf'(?:简历|主讲人简介|简介)[\s:：]*'
-    m = re.search(rf'{bio_pat}(.+)', body_text)
+    # 内容摘要类标签：出现这些说明主讲人简介已结束、讲座内容介绍开始
+    SUMMARY_LABELS = (
+        '讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
+        '讲座内容|讲座简介|报告内容|讲座概要|内容概要|摘要'
+    )
+
+    # 页面噪声/侧边栏标记：遇到这些说明正文已结束，应截断
+    NOISE_MARKERS = (
+        '资讯及通知|相关新闻|最新动态|推荐阅读|相关文章|相关讲座|'
+        '上一篇|下一篇|附件下载|相关链接|网友评论|分享|标签|相关推荐|'
+        '通知公告|最新公告|站内搜索|快速导航'
+    )
+
+    bio_pat = rf'(?:主讲人简介|主讲人简历|简历|(?<!内容)简介)[\s:：]*'
+    m = re.search(rf'{bio_pat}(.+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|$))', body_text)
     if m:
         bio = m.group(1).strip()
         # 清理版权声明等尾部噪声
         bio = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', bio).strip()
         # 清理图片路径等残留
         bio = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', bio).strip()
+        # 截断页面噪声
+        bio = re.split(rf'(?:{NOISE_MARKERS})', bio)[0].strip()
         if len(bio) > 10:
             result['speakerBio'] = bio
 
+    # 无标签简介兜底：正文某段落以主讲人姓名开头，通常即个人简介
+    if not result['speakerBio'] and result['speaker'] and content_div:
+        speaker = result['speaker'].strip()
+        for p in content_div.find_all('p'):
+            p_text = re.sub(r'\s+', ' ', p.get_text(' ', strip=True)).strip()
+            if len(p_text) < 30:
+                continue
+            # 去掉段落开头可能的职称/称谓，再判断是否以主讲人姓名开头
+            start = re.sub(r'^\s*(Professor|Dr\.|Mr\.|Ms\.|教授|副教授|讲师|研究员|博士)\s*', '', p_text)
+            if start.startswith(speaker):
+                p_text = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', p_text).strip()
+                p_text = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', p_text).strip()
+                p_text = re.split(rf'(?:{NOISE_MARKERS})', p_text)[0].strip()
+                if len(p_text) > 10:
+                    result['speakerBio'] = p_text
+                    break
+
     # --- 摘要/内容（优先从正文区域提取完整版）---
-    abs_pat = rf'摘要[：:]\s*'
+    # 把「讲座内容提要/讲座内容/报告摘要」等内容摘要类字段统一作为 abstract
+    abs_pat = rf'(?:{SUMMARY_LABELS})[：:]\s*'
     m = re.search(rf'{abs_pat}(.+)', body_text)
     if m:
         abstract = m.group(1).strip()
         # 清理版权噪声和图片
         abstract = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', abstract).strip()
         abstract = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', abstract).strip()
+        # 截断页面噪声/侧边栏
+        abstract = re.split(rf'(?:{NOISE_MARKERS})', abstract)[0].strip()
         if len(abstract) > 5:
             result['abstract'] = abstract
 
@@ -226,6 +290,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     if ocr_text and not result.get('abstract'):
         clean = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', ocr_text).strip()
         clean = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', clean).strip()
+        clean = re.split(rf'(?:{NOISE_MARKERS})', clean)[0].strip()
         # 去掉海报顶部常见噪声（学院/学生会/系列讲座等重复字样）
         clean = re.sub(r'.*?(系列讲座|学术讲座|讲座预告)', '', clean, count=1).strip()
         # 去掉尾部「时间：... 地点：...」等结构化信息，避免与独立字段重复；

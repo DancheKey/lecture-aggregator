@@ -132,8 +132,8 @@
                 <h2 class="text-[15pt] font-semibold leading-snug mb-2">
                   <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-blue-600 hover:text-blue-800 hover:underline">{{ l.title }}</a>
                 </h2>
-                <!-- 结构化详情 -->
-                <div v-if="l.topic || l.location || l.speaker || l.speakerBio"
+                <!-- 结构化详情：题目/地点/主讲/简介/内容摘要 -->
+                <div v-if="l.topic || l.location || l.speaker || l.speakerBio || abstractOf(l)"
                   class="text-[12pt] text-slate-600 space-y-1 mb-2">
                   <div v-if="l.topic"><span class="text-slate-400">题目</span> <span class="text-slate-600">{{ truncate(l.topic, 120) }}</span></div>
                   <div v-if="l.location"><span class="text-slate-400">地点</span> <span class="text-slate-600">{{ l.location }}</span></div>
@@ -141,9 +141,10 @@
                   <div v-if="l.speakerBio" class="text-slate-500 leading-relaxed">
                     <span class="text-slate-400">简介</span> {{ truncate(cleanFooter(l.speakerBio), 220) }}
                   </div>
+                  <div v-if="abstractOf(l)" class="text-slate-500 leading-relaxed line-clamp-3">
+                    <span class="text-slate-400">内容摘要</span> {{ abstractOf(l) }}
+                  </div>
                 </div>
-                <!-- 摘要 -->
-                <div v-if="abstractOf(l)" class="text-[12pt] text-slate-500 leading-relaxed line-clamp-3 mb-2">{{ abstractOf(l) }}</div>
                 <!-- 可点击 Tag + 点赞 -->
                 <div class="flex flex-wrap gap-2 items-center">
                   <button @click="onTagClick('college', l.college)"
