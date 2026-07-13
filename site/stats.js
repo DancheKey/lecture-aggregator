@@ -165,15 +165,31 @@ createApp({
       const v = this.cellValue(cell);
       return v || '—';
     },
-    // 读取每条讲座的访问/点赞：优先后端，失败降级本机 localStorage
+    // 读取每条讲座的访问/点赞：优先后端，但与本地 localStorage 合并（取最大值），
+    // 避免本地已有点赞/访问被后端空数据覆盖。
     loadLectureStats() {
+      let localStats = {};
+      try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
+      catch (e) { localStats = {}; }
       fetch('/api/lecture/stats', { cache: 'no-store' })
         .then(r => r.json())
-        .then(j => { if (j && j.stats) this.lectureStats = j.stats; })
-        .catch(() => {
-          try { this.lectureStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
-          catch (e) { this.lectureStats = {}; }
-        });
+        .then(j => {
+          if (j && j.stats && Object.keys(j.stats).length) {
+            const merged = { ...localStats };
+            for (const [url, st] of Object.entries(j.stats)) {
+              const local = merged[url] || { visits: 0, likes: 0 };
+              merged[url] = {
+                visits: Math.max(local.visits || 0, st.visits || 0),
+                likes: Math.max(local.likes || 0, st.likes || 0),
+              };
+            }
+            this.lectureStats = merged;
+            localStorage.setItem(STAT_KEY, JSON.stringify(merged));
+          } else {
+            this.lectureStats = localStats;
+          }
+        })
+        .catch(() => { this.lectureStats = localStats; });
     },
     load() {
       fetch('/api/lectures', { cache: 'no-store' })

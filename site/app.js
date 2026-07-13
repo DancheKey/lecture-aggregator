@@ -176,6 +176,17 @@ createApp({
       try {
         this.likes = JSON.parse(localStorage.getItem(LIKE_KEY) || '{}');
         this.likedUrls = new Set(JSON.parse(localStorage.getItem(LIKED_KEY) || '[]'));
+        // 兼容旧数据：早期版本点赞只存 LIKE_KEY，未同步到 STAT_KEY；
+        // 初始化时把已有 likes 合并进 lectureStats，确保统计页能正确汇总。
+        this.loadLocalStats();
+        for (const [url, count] of Object.entries(this.likes)) {
+          const s = this.lectureStats[url] || { visits: 0, likes: 0 };
+          if (count > (s.likes || 0)) {
+            s.likes = count;
+            this.lectureStats[url] = s;
+          }
+        }
+        this.saveLocalStats();
       } catch (e) {
         this.likes = {};
         this.likedUrls = new Set();
@@ -373,6 +384,9 @@ createApp({
     this.loadSiteVisits();
     this.loadLectureStats();
     this.loadLectures(false);
+    // 隐藏初始 loading 占位，避免 Vue 挂载前显示原始模板
+    const pl = document.getElementById('page-loading');
+    if (pl) pl.style.display = 'none';
   },
 
   watch: {
