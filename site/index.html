@@ -25,9 +25,18 @@
     .date-sticky { top: 57px; }
     .fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
     .fade-enter-from, .fade-leave-to { opacity: 0; }
-    /* AIHOT-like 信息流：条目 hover 微亮 */
-    .feed-item { transition: background-color 0.2s ease; }
-    .feed-item:hover { background-color: #f8fafc; }
+    /* 讲座卡片：边框 + 悬停抬升，参考 RSS 阅读器信息流视觉 */
+    .lecture-card {
+      transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+    .lecture-card:hover {
+      box-shadow: 0 6px 20px -6px rgba(15, 23, 42, 0.12);
+      border-color: #cbd5e1;
+      transform: translateY(-2px);
+    }
+    /* 回到顶部按钮悬停动画 */
+    .back-top-btn { transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.2s ease; }
+    .back-top-btn:hover { transform: translateY(-2px) scale(1.08); color: #2563eb; box-shadow: 0 10px 24px -6px rgba(15,23,42,0.22); }
   </style>
 </head>
 <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;">
@@ -92,10 +101,11 @@
           <!-- 统计 + 年份筛选 + 清除 -->
           <div v-if="!loading" class="flex flex-wrap items-center justify-between gap-2 mb-5">
             <div class="text-[12pt] text-slate-500">
-              共 <span class="font-semibold text-slate-800">{{ totalCount }}</span> 条讲座
+              共 <span class="font-semibold text-slate-800">{{ totalCount }}</span> 场讲座
+              <span class="ml-1 text-[11pt] text-slate-400">· 覆盖 {{ sourceNoticeCount }} 条来源通知</span>
               <span v-if="updatedAt" class="ml-1 text-[11pt] text-slate-400">· 更新于 {{ updatedAt.slice(0, 10) }}</span>
               <template v-if="filtered.length !== totalCount">
-                · 当前筛选 <span class="font-semibold text-blue-600">{{ filtered.length }}</span> 条
+                · 当前筛选 <span class="font-semibold text-blue-600">{{ filtered.length }}</span> 场
               </template>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
@@ -120,7 +130,7 @@
                 {{ g.key }}
               </div>
               <article v-for="l in g.items" :key="l.sourceUrl"
-                class="feed-item border-b border-slate-200 py-5 px-2 -mx-2">
+                class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
                 <!-- 元信息 -->
                 <div class="flex items-center gap-2 text-[11pt] text-slate-400 mb-1.5">
                   <span class="font-medium text-slate-500">{{ l.college }}</span>
@@ -147,8 +157,18 @@
                 </div>
                 <!-- 可点击 Tag + 点赞 -->
                 <div class="flex flex-wrap gap-2 items-center">
-                  <button @click="onTagClick('college', l.college)"
-                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
+                  <!-- 多来源讲座：列出所有来源单位标签 -->
+                  <template v-if="l.merged">
+                    <button v-for="c in sourceColleges(l)" :key="c"
+                      @click="onTagClick('college', c)"
+                      class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
+                    <button @click="toggleSources(l.sourceUrl)"
+                      class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-[12pt] border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.sourceUrl] ? '▲' : '▼' }}</button>
+                  </template>
+                  <template v-else>
+                    <button @click="onTagClick('college', l.college)"
+                      class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
+                  </template>
                   <button @click="onTagClick('campus', l.campus)"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.campus }}</button>
                   <button @click="toggleLike(l.sourceUrl)"
@@ -158,6 +178,15 @@
                     </svg>
                     <span>{{ likeCount(l.sourceUrl) }}</span>
                   </button>
+                </div>
+                <!-- 多来源：展开各官方原文链接 -->
+                <div v-if="l.merged && expanded[l.sourceUrl]" class="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
+                  <a v-for="s in l.sources" :key="s.sourceUrl" :href="safeUrl(s.sourceUrl)" target="_blank" rel="noopener noreferrer"
+                    @click="recordVisit(l.sourceUrl)"
+                    class="flex items-center gap-2 text-[12pt] text-blue-600 hover:text-blue-800 hover:underline">
+                    <span class="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[11pt]">{{ s.college }}</span>
+                    <span class="truncate">{{ s.title || s.sourceUrl }}</span>
+                  </a>
                 </div>
               </article>
             </div>
@@ -191,15 +220,14 @@
       </div>
     </transition>
 
-    <!-- 回到顶部：下滑后出现，悬浮在讲座信息区右下角 -->
+    <!-- 回到顶部：下滑后出现，纯灰箭头圆形白底，悬停放大+阴影 -->
     <transition name="fade">
       <button v-if="showBackTop" @click="scrollToTop"
-        class="fixed bottom-6 right-6 z-40 flex items-center gap-1.5 px-3.5 py-2.5 rounded-full bg-blue-600 text-white text-[12pt] shadow-lg hover:bg-blue-700 active:scale-95 transition"
+        class="back-top-btn fixed bottom-6 right-6 z-40 flex items-center justify-center w-11 h-11 rounded-full bg-white text-slate-500 shadow-lg border border-slate-200"
         aria-label="回到顶部">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 17a1 1 0 01-1-1V7.414L5.707 11.707a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0l5 5a1 1 0 01-1.414 1.414L11 7.414V16a1 1 0 01-1 1z" clip-rule="evenodd" />
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 15V5M5 10l5-5 5 5" />
         </svg>
-        回到顶部
       </button>
     </transition>
   </div>

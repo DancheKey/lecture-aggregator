@@ -37,11 +37,17 @@ createApp({
       pageSize: 25,        // 每页显示条数
       currentPage: 1,      // 当前页码
       showBackTop: false,  // 滚动超过阈值后显示「回到顶部」按钮
+      expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
     };
   },
 
   computed: {
     totalCount() { return this.all.length; },
+
+    // 来源通知总数（合并后按各讲座的 sourceCount 求和），用于首页说明与统计一致性
+    sourceNoticeCount() {
+      return this.all.reduce((a, l) => a + (l.sourceCount || 1), 0);
+    },
 
     // 数据中出现过的年份（倒序，字符串便于与下拉值比较）
     years() {
@@ -314,6 +320,22 @@ createApp({
       if (field === 'college') this.college = val;
       else this.campus = val;
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    // 多来源讲座：返回去重后的所有来源单位（用于标签展示）
+    sourceColleges(l) {
+      if (!l || !l.sources || !l.sources.length) return [l.college];
+      const seen = new Set();
+      const out = [];
+      l.sources.forEach(s => {
+        const c = s.college || l.college;
+        if (!seen.has(c)) { seen.add(c); out.push(c); }
+      });
+      return out;
+    },
+    // 切换多来源讲座的原文链接展开
+    toggleSources(url) {
+      if (!url) return;
+      this.expanded = { ...this.expanded, [url]: !this.expanded[url] };
     },
     /* ---------- 回到顶部 ---------- */
     onScroll() {

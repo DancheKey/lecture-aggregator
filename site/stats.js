@@ -47,20 +47,32 @@ createApp({
       return this.displayMode;
     },
 
+    // 来源通知总数（合并后按各讲座的 sourceCount 求和）
+    sourceNoticeCount() {
+      return this.all.reduce((a, l) => a + (l.sourceCount || 1), 0);
+    },
+
     // 学院 -> 年份 -> {count, visits, likes}
+    // count 按各讲座的 sources（来源通知）展开计数，使「各学院/部处之和」= 原始发布条数；
+    // visits/likes 为讲座级统计，仅按主卡 url 计一次，避免按来源重复累加。
     matrix() {
       const m = {};
       this.all.forEach(l => {
         const y = this.yearOf(l);
         if (!y) return;
-        const c = l.college || '未分类';
-        const url = l.sourceUrl || '';
-        const st = this.lectureStats[url] || { visits: 0, likes: 0 };
-        m[c] = m[c] || {};
-        const cell = m[c][y] = m[c][y] || { count: 0, visits: 0, likes: 0 };
-        cell.count += 1;
-        cell.visits += (st.visits || 0);
-        cell.likes += (st.likes || 0);
+        const primaryUrl = l.sourceUrl || '';
+        const st = this.lectureStats[primaryUrl] || { visits: 0, likes: 0 };
+        const sources = (l.sources && l.sources.length) ? l.sources : [l];
+        sources.forEach(src => {
+          const c = src.college || '未分类';
+          m[c] = m[c] || {};
+          const cell = m[c][y] = m[c][y] || { count: 0, visits: 0, likes: 0 };
+          cell.count += 1;
+          if (src.sourceUrl === primaryUrl) {
+            cell.visits += (st.visits || 0);
+            cell.likes += (st.likes || 0);
+          }
+        });
       });
       return m;
     },
@@ -104,19 +116,18 @@ createApp({
       return list;
     },
 
-    // 每年合计（包含讲座数、访问量、点赞量）
+    // 每年合计：count 按来源通知展开，visits/likes 按主卡计一次
     yearTotals() {
       return this.years.map(y => {
         const yearLectures = this.all.filter(l => this.yearOf(l) === y);
-        const count = yearLectures.length;
-        const visits = yearLectures.reduce((sum, l) => {
+        let count = 0, visits = 0, likes = 0;
+        yearLectures.forEach(l => {
+          const sources = (l.sources && l.sources.length) ? l.sources : [l];
+          count += sources.length;
           const st = this.lectureStats[l.sourceUrl || ''] || { visits: 0, likes: 0 };
-          return sum + (st.visits || 0);
-        }, 0);
-        const likes = yearLectures.reduce((sum, l) => {
-          const st = this.lectureStats[l.sourceUrl || ''] || { visits: 0, likes: 0 };
-          return sum + (st.likes || 0);
-        }, 0);
+          visits += (st.visits || 0);
+          likes += (st.likes || 0);
+        });
         return { year: y, count, visits, likes };
       });
     },
