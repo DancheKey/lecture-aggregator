@@ -189,6 +189,18 @@
         {{ toast.message }}
       </div>
     </transition>
+
+    <!-- 回到顶部：下滑后出现，悬浮在讲座信息区右下角 -->
+    <transition name="fade">
+      <button v-if="showBackTop" @click="scrollToTop"
+        class="fixed bottom-6 right-6 z-40 flex items-center gap-1.5 px-3.5 py-2.5 rounded-full bg-blue-600 text-white text-[12pt] shadow-lg hover:bg-blue-700 active:scale-95 transition"
+        aria-label="回到顶部">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 17a1 1 0 01-1-1V7.414L5.707 11.707a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0l5 5a1 1 0 01-1.414 1.414L11 7.414V16a1 1 0 01-1 1z" clip-rule="evenodd" />
+        </svg>
+        回到顶部
+      </button>
+    </transition>
   </div>
 
   <script src="app.js"></script>

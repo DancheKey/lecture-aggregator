@@ -36,6 +36,7 @@ createApp({
       toast: { show: false, message: '', timer: null },
       pageSize: 25,        // 每页显示条数
       currentPage: 1,      // 当前页码
+      showBackTop: false,  // 滚动超过阈值后显示「回到顶部」按钮
     };
   },
 
@@ -314,6 +315,13 @@ createApp({
       else this.campus = val;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
+    /* ---------- 回到顶部 ---------- */
+    onScroll() {
+      this.showBackTop = (window.scrollY || window.pageYOffset || 0) > 400;
+    },
+    scrollToTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
 
     /* ---------- 数据加载（增量） ---------- */
     loadLectures(incremental) {
@@ -400,6 +408,13 @@ createApp({
     // 隐藏初始 loading 占位，避免 Vue 挂载前显示原始模板
     const pl = document.getElementById('page-loading');
     if (pl) pl.style.display = 'none';
+    // 监听滚动，下滑超过阈值时显示「回到顶部」按钮
+    this.onScroll();
+    window.addEventListener('scroll', this.onScroll);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('scroll', this.onScroll);
   },
 
   watch: {

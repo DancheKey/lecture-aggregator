@@ -20,6 +20,10 @@ createApp({
       // 排序状态：key = 'college' | 'total' | 'visits' | 'likes' | 年份字符串(如 '2024')
       // order = 'asc' | 'desc'（多次点击切换）
       sortBy: { key: SORT_KEY_COLLEGE, order: 'asc' },
+      // 显示模式：count | visits | likes —— 决定单元格与末列展示什么数值。
+      // 仅由顶部 4 个排序按钮设置；点击年份列只改变 sortBy.key，不改变显示模式，
+      // 这样在「访问数 / 点赞数」模式下点击年份，仍按该模式展示并按年份排序。
+      displayMode: 'count',
       // 学院名过滤（未来学院数量多时便于定位）
       collegeFilter: '',
       // 每条讲座的访问/点赞统计：url -> {visits, likes}（后端优先，无后端时回退本机）
@@ -40,9 +44,7 @@ createApp({
 
     // 当前展示模式：count（讲座数）/ visits（访问量）/ likes（点赞量）
     mode() {
-      if (this.sortBy.key === SORT_KEY_VISITS) return 'visits';
-      if (this.sortBy.key === SORT_KEY_LIKES) return 'likes';
-      return 'count';
+      return this.displayMode;
     },
 
     // 学院 -> 年份 -> {count, visits, likes}
@@ -138,11 +140,26 @@ createApp({
       if (!l || !l.lectureStart) return '';
       return String(l.lectureStart).slice(0, 4);
     },
-    // 切换排序：点击同一列切换顺序，点击新列默认按数值降序、学院名升序
+    // 切换排序：
+    //  - 点击年份列：仅改变排序键，保持当前显示模式（仍按访问数/点赞数展示并排序）
+    //  - 点击顶部排序按钮：同时设置显示模式与排序键
     toggleSort(key) {
+      const isYearKey = key !== SORT_KEY_COLLEGE && key !== SORT_KEY_TOTAL
+        && key !== SORT_KEY_VISITS && key !== SORT_KEY_LIKES;
+      if (isYearKey) {
+        if (this.sortBy.key === key) {
+          this.sortBy.order = this.sortBy.order === 'asc' ? 'desc' : 'asc';
+        } else {
+          this.sortBy = { key, order: 'desc' };
+        }
+        return;
+      }
+      const newMode = key === SORT_KEY_VISITS ? 'visits'
+        : key === SORT_KEY_LIKES ? 'likes' : 'count';
       if (this.sortBy.key === key) {
         this.sortBy.order = this.sortBy.order === 'asc' ? 'desc' : 'asc';
       } else {
+        this.displayMode = newMode;
         this.sortBy = {
           key,
           order: (key === SORT_KEY_COLLEGE) ? 'asc' : 'desc',
