@@ -155,8 +155,12 @@ createApp({
 
   methods: {
     yearOf(l) {
-      if (!l || !l.lectureStart) return UNKNOWN_YEAR;
-      return String(l.lectureStart).slice(0, 4);
+      if (!l) return UNKNOWN_YEAR;
+      if (l.lectureStart) return String(l.lectureStart).slice(0, 4);
+      // 部分讲座未解析到具体时间，但发布时间或标题里包含年份，据此归入对应年份
+      const m = (l.publishTime || '').match(/^(\d{4})/) || (l.title || '').match(/(\d{4})/);
+      if (m) return m[1];
+      return UNKNOWN_YEAR;
     },
     // 切换排序：
     //  - 点击年份列：仅改变排序键，保持当前显示模式（仍按访问数/点赞数展示并排序）

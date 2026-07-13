@@ -56,7 +56,7 @@
           <nav class="hidden sm:flex items-center gap-1 ml-3">
             <button v-for="c in campusList" :key="c"
               @click="setCampus(c)"
-              :class="['px-3 py-1.5 rounded-full text-[12pt] transition', campus===c ? 'bg-blue-600 text-white font-semibold' : 'text-slate-500 hover:bg-slate-100']">
+              :class="['px-3 py-1.5 rounded-full text-[12pt] transition', campus===c ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
               {{ c || '全部' }}
             </button>
           </nav>
@@ -86,7 +86,7 @@
         <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1">
           <button v-for="c in campusList" :key="c"
             @click="setCampus(c)"
-            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap', campus===c ? 'bg-blue-600 text-white font-semibold' : 'bg-slate-100 text-slate-500']">
+            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap', campus===c ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
             {{ c || '全部' }}
           </button>
         </div>
@@ -140,7 +140,7 @@
                 </div>
                 <!-- 标题 -->
                 <h2 class="text-[15pt] font-semibold leading-snug mb-2">
-                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-blue-600 hover:text-blue-800 hover:underline">{{ l.title }}</a>
+                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}</a>
                 </h2>
                 <!-- 结构化详情：题目/地点/主讲/简介/内容摘要 -->
                 <div v-if="l.topic || l.location || l.speaker || l.speakerBio || abstractOf(l)"
@@ -172,7 +172,7 @@
                   <button @click="onTagClick('campus', l.campus)"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.campus }}</button>
                   <button @click="toggleLike(l.sourceUrl)"
-                    :class="['ml-auto px-2.5 py-1 rounded-full flex items-center gap-1 text-[12pt] transition border', hasLiked(l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-500']">
+                    :class="['ml-auto px-2.5 py-1 rounded-full flex items-center gap-1 text-[12pt] transition border', hasLiked(l.sourceUrl) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linejoin="round" d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
                     </svg>
