@@ -83,7 +83,7 @@
 
     <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
           <!-- 统计 + 年份筛选 + 清除 -->
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-5">
+          <div v-if="!loading" class="flex flex-wrap items-center justify-between gap-2 mb-5">
             <div class="text-[12pt] text-slate-500">
               共 <span class="font-semibold text-slate-800">{{ totalCount }}</span> 条讲座
               <span v-if="updatedAt" class="ml-1 text-[11pt] text-slate-400">· 更新于 {{ updatedAt.slice(0, 10) }}</span>

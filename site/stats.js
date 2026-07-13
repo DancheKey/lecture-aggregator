@@ -11,6 +11,7 @@ const STAT_KEY = 'lecture_stats_v1';   // 与 app.js 一致的本机统计键
 
 // 学院 / 年份 / 总计 统计页
 // 支持点击表头按任意列排序（学院名/各年份讲座数/总计/访问数/点赞数），多次点击切换升/降序；
+// 默认按学院名排序，仅显示学院、年份、总计列；点击访问数/点赞数后动态切换为仅显示对应指标；
 // 表格首列固定、表头固定，未来年份多、学院多时仍可一页内滚动查看。
 createApp({
   data() {
@@ -35,6 +36,13 @@ createApp({
         if (y) set.add(y);
       });
       return Array.from(set).sort((a, b) => a.localeCompare(b));
+    },
+
+    // 当前展示模式：count（讲座数）/ visits（访问量）/ likes（点赞量）
+    mode() {
+      if (this.sortBy.key === SORT_KEY_VISITS) return 'visits';
+      if (this.sortBy.key === SORT_KEY_LIKES) return 'likes';
+      return 'count';
     },
 
     // 学院 -> 年份 -> {count, visits, likes}
@@ -81,34 +89,47 @@ createApp({
         } else if (key === SORT_KEY_LIKES) {
           cmp = a.likesTotal - b.likesTotal;
         } else {
-          // 按具体年份列排序（该年讲座数）
+          // 按具体年份列排序（当前模式下对应的数值）
           const idx = this.years.indexOf(key);
-          if (idx >= 0) cmp = (a.cells[idx].count || 0) - (b.cells[idx].count || 0);
+          if (idx >= 0) {
+            if (this.mode === 'visits') cmp = (a.cells[idx].visits || 0) - (b.cells[idx].visits || 0);
+            else if (this.mode === 'likes') cmp = (a.cells[idx].likes || 0) - (b.cells[idx].likes || 0);
+            else cmp = (a.cells[idx].count || 0) - (b.cells[idx].count || 0);
+          }
         }
         return order === 'asc' ? cmp : -cmp;
       });
       return list;
     },
 
-    // 每年合计（讲座数）
+    // 每年合计（包含讲座数、访问量、点赞量）
     yearTotals() {
-      return this.years.map(y => ({
-        year: y,
-        count: this.all.filter(l => this.yearOf(l) === y).length,
-      }));
+      return this.years.map(y => {
+        const yearLectures = this.all.filter(l => this.yearOf(l) === y);
+        const count = yearLectures.length;
+        const visits = yearLectures.reduce((sum, l) => {
+          const st = this.lectureStats[l.sourceUrl || ''] || { visits: 0, likes: 0 };
+          return sum + (st.visits || 0);
+        }, 0);
+        const likes = yearLectures.reduce((sum, l) => {
+          const st = this.lectureStats[l.sourceUrl || ''] || { visits: 0, likes: 0 };
+          return sum + (st.likes || 0);
+        }, 0);
+        return { year: y, count, visits, likes };
+      });
     },
 
     // 总合计
     grandTotal() {
       return this.yearTotals.reduce((a, t) => a + t.count, 0);
     },
-    // 全站访问数合计（来自 lectureStats）
+    // 全站访问数合计
     grandVisits() {
-      return Object.values(this.lectureStats).reduce((a, s) => a + (s.visits || 0), 0);
+      return this.yearTotals.reduce((a, t) => a + t.visits, 0);
     },
     // 全站点赞数合计
     grandLikes() {
-      return Object.values(this.lectureStats).reduce((a, s) => a + (s.likes || 0), 0);
+      return this.yearTotals.reduce((a, t) => a + t.likes, 0);
     },
   },
 
@@ -132,6 +153,17 @@ createApp({
     sortIcon(key) {
       if (this.sortBy.key !== key) return '⇅';
       return this.sortBy.order === 'asc' ? '↑' : '↓';
+    },
+    // 根据当前模式取单元格数值
+    cellValue(cell) {
+      if (this.mode === 'visits') return cell.visits || 0;
+      if (this.mode === 'likes') return cell.likes || 0;
+      return cell.count || 0;
+    },
+    // 单元格显示：0 显示为 —，非 0 显示数值
+    cellDisplay(cell) {
+      const v = this.cellValue(cell);
+      return v || '—';
     },
     // 读取每条讲座的访问/点赞：优先后端，失败降级本机 localStorage
     loadLectureStats() {
