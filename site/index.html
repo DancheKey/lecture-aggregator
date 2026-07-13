@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://busuanzi.ibruce.info; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.ibruce.info; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="referrer" content="no-referrer" />
   <title>木铎金声</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -105,7 +105,8 @@
           </div>
 
           <!-- 时间线 -->
-          <div v-if="filtered.length">
+          <div v-if="loading" class="text-center text-slate-400 py-16 text-[12pt]">数据加载中…</div>
+          <div v-else-if="filtered.length">
             <div v-for="g in pagedGroups" :key="g.key" class="mb-2">
               <div class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">
                 <span class="w-1 h-5 rounded-full bg-blue-500"></span>
@@ -122,7 +123,7 @@
                 </div>
                 <!-- 标题 -->
                 <h2 class="text-[15pt] font-semibold leading-snug mb-2">
-                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 hover:underline">{{ l.title }}</a>
+                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-blue-600 hover:text-blue-800 hover:underline">{{ l.title }}</a>
                 </h2>
                 <!-- 结构化详情 -->
                 <div v-if="l.topic || l.location || l.speaker || l.speakerBio"
@@ -170,6 +171,8 @@
 
     <footer class="border-t border-slate-200 text-center text-[12pt] text-slate-400 py-6 bg-white">
       数据来源于华南师范大学各学院公开站点，仅供师生参考，请以官方原文为准。
+      <span v-if="hasBackend" class="block sm:inline sm:ml-2 mt-1 sm:mt-0">· 本站总访问量 {{ siteVisits }} 次</span>
+      <span v-else class="block sm:inline sm:ml-2 mt-1 sm:mt-0">· 本站总访问量 <span id="busuanzi_value_site_pv">0</span> 次</span>
     </footer>
 
     <!-- Toast 提示 -->

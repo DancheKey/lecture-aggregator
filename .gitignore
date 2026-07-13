@@ -16,6 +16,11 @@ server.log
 # 注意：data/last_scrape.json 必须入库！GitHub Actions 每日定时抓取依赖它在
 # 仓库中持久化，才能「接着上一次」做增量更新，而非每次全量重扫。
 # （data/lectures.json 为公开讲座数据，本就入库。）
+#
+# 以下为本机 server.py 运行时生成的访问量/点赞统计状态，属本地运行时数据，
+# 不应提交到仓库（公网为静态托管也不读取）。
+data/visits.json
+data/lecture_stats.json
 
 # ===== 本地开发记忆与内部资料（不公开，避免推到公网仓库） =====
 .workbuddy/

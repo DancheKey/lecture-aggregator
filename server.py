@@ -25,7 +25,53 @@ DATA_DIR = os.path.join(ROOT, 'data')
 SCRAPER = os.path.join(ROOT, 'scraper', 'scraper.py')
 SOURCES_PATH = os.path.join(ROOT, 'scraper', 'sources.yaml')
 
+VISITS_PATH = os.path.join(DATA_DIR, 'visits.json')          # 站点访问量：{"total": N}
+LECTURE_STATS_PATH = os.path.join(DATA_DIR, 'lecture_stats.json')  # 每条讲座的访问/点赞：{url:{visits,likes}}
+
 _scrape_lock = threading.Lock()
+_stat_lock = threading.Lock()
+
+# ---- 访问量 / 点赞统计的运行时状态（文件持久化 + 内存防刷窗口） ----
+_site_visits = {'total': 0}            # 站点总访问量
+_lecture_stats = {}                     # url -> {"visits": N, "likes": M}
+_recent_site_ip = {}                   # ip -> 最近一次计数的时间戳（站点访问防刷）
+_recent_lecture = {}                   # (ip, url) -> 时间戳（单讲座访问防刷）
+_recent_like = {}                       # (ip, url) -> 时间戳（单讲座点赞防刷）
+VISIT_THROTTLE = 180                   # 同一 IP / 同一讲座 3 分钟内只计 1 次
+
+
+def _load_stat_files():
+    """启动时把磁盘上的统计状态读入内存（若不存在则用默认值）。"""
+    global _site_visits, _lecture_stats
+    try:
+        if os.path.exists(VISITS_PATH):
+            _site_visits = json.load(open(VISITS_PATH, encoding='utf-8')) or {'total': 0}
+    except Exception:
+        _site_visits = {'total': 0}
+    try:
+        if os.path.exists(LECTURE_STATS_PATH):
+            _lecture_stats = json.load(open(LECTURE_STATS_PATH, encoding='utf-8')) or {}
+    except Exception:
+        _lecture_stats = {}
+
+
+def _save_visits():
+    try:
+        with open(VISITS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(_site_visits, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def _save_lecture_stats():
+    try:
+        with open(LECTURE_STATS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(_lecture_stats, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+_load_stat_files()
 
 
 def _find_scraper_python():
@@ -154,7 +200,84 @@ class Handler(SimpleHTTPRequestHandler):
                 return None
         return None
 
+    def _client_ip(self):
+        """尽量还原真实客户端 IP（兼容反向代理透传）。"""
+        xff = self.headers.get('X-Forwarded-For')
+        if xff:
+            return xff.split(',')[0].strip()
+        return self.client_address[0]
+
+    # ---- 访问量 / 点赞统计 ----
+
+    def _api_visits_get(self):
+        """站点总访问量：同一 IP 3 分钟内重复刷新只计 1 次。"""
+        ip = self._client_ip()
+        now = time.time()
+        with _stat_lock:
+            last = _recent_site_ip.get(ip, 0)
+            if now - last >= VISIT_THROTTLE:
+                _site_visits['total'] = _site_visits.get('total', 0) + 1
+                _recent_site_ip[ip] = now
+                _save_visits()
+            return self._send_json({'ok': True, 'total': _site_visits.get('total', 0)})
+
+    def _api_lecture_stats_get(self):
+        """返回每条讲座的访问/点赞统计：{url: {visits, likes}}。"""
+        with _stat_lock:
+            return self._send_json({'ok': True, 'stats': _lecture_stats})
+
+    def _read_body_json(self):
+        length = int(self.headers.get('Content-Length', 0) or 0)
+        if length <= 0:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length))
+        except (json.JSONDecodeError, ValueError):
+            return {}
+
+    def _api_lecture_visit_post(self):
+        """记录一次讲座访问：同一 (IP, url) 3 分钟内只计 1 次。"""
+        body = self._read_body_json()
+        url = (body.get('url') or '').strip()
+        if not url:
+            return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
+        ip = self._client_ip()
+        now = time.time()
+        with _stat_lock:
+            key = (ip, url)
+            last = _recent_lecture.get(key, 0)
+            if now - last >= VISIT_THROTTLE:
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+                st['visits'] = st.get('visits', 0) + 1
+                _recent_lecture[key] = now
+                _save_lecture_stats()
+            cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
+            return self._send_json({'ok': True, 'visits': cur.get('visits', 0)})
+
+    def _api_lecture_like_post(self):
+        """记录一次点赞：前端已做本机去重，这里按 (IP, url) 3 分钟去重再累加。"""
+        body = self._read_body_json()
+        url = (body.get('url') or '').strip()
+        if not url:
+            return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
+        ip = self._client_ip()
+        now = time.time()
+        with _stat_lock:
+            key = (ip, url)
+            last = _recent_like.get(key, 0)
+            if now - last >= VISIT_THROTTLE:
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+                st['likes'] = st.get('likes', 0) + 1
+                _recent_like[key] = now
+                _save_lecture_stats()
+            cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
+            return self._send_json({'ok': True, 'likes': cur.get('likes', 0)})
+
     def do_GET(self):
+        if self.path.split('?')[0] == '/api/visits':
+            return self._api_visits_get()
+        if self.path.split('?')[0] == '/api/lecture/stats':
+            return self._api_lecture_stats_get()
         if self.path.split('?')[0] == '/api/lectures':
             path = os.path.join(DATA_DIR, 'lectures.json')
             # 解析 since 参数（文件 mtime，秒级浮点）
@@ -230,6 +353,10 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if base == '/api/sources':
             return self._api_sources_post()
+        if base == '/api/lecture/visit':
+            return self._api_lecture_visit_post()
+        if base == '/api/lecture/like':
+            return self._api_lecture_like_post()
         self.send_error(404)
 
     def do_PUT(self):

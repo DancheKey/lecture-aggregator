@@ -45,6 +45,10 @@
             :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'college' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按学院名</button>
           <button @click="toggleSort('total')"
             :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'total' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按总数</button>
+          <button @click="toggleSort('visits')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'visits' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按访问数</button>
+          <button @click="toggleSort('likes')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'likes' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按点赞数</button>
         </div>
       </div>
 
@@ -70,24 +74,37 @@
                 <th @click="toggleSort('total')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600 min-w-[80px]">
                   <span class="inline-flex items-center gap-1 justify-end">总计 <span class="text-blue-500 text-[10pt]">{{ sortIcon('total') }}</span></span>
                 </th>
+                <th @click="toggleSort('visits')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600 min-w-[80px]">
+                  <span class="inline-flex items-center gap-1 justify-end">访问数 <span class="text-blue-500 text-[10pt]">{{ sortIcon('visits') }}</span></span>
+                </th>
+                <th @click="toggleSort('likes')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600 min-w-[80px]">
+                  <span class="inline-flex items-center gap-1 justify-end">点赞数 <span class="text-blue-500 text-[10pt]">{{ sortIcon('likes') }}</span></span>
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in rows" :key="row.college" class="border-b border-slate-100 hover:bg-slate-50">
                 <td class="px-4 py-3 font-medium text-slate-700 sticky left-0 bg-white z-10 min-w-[140px]">{{ row.college || '未分类' }}</td>
-                <td v-for="(n, idx) in row.cells" :key="years[idx]" :class="['px-4 py-3 text-right min-w-[80px]', n ? 'text-slate-700' : 'text-slate-300']">
-                  {{ n || '—' }}
+                <td v-for="(n, idx) in row.cells" :key="years[idx]" :class="['px-4 py-3 text-right min-w-[80px]', n.count ? 'text-slate-700' : 'text-slate-300']">
+                  {{ n.count || '—' }}
                 </td>
+                <td class="px-4 py-3 text-right min-w-[80px] text-slate-600">{{ row.visitsTotal }}</td>
+                <td class="px-4 py-3 text-right min-w-[80px] text-slate-600">{{ row.likesTotal }}</td>
                 <td class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ row.total }}</td>
               </tr>
               <tr class="bg-slate-50 font-semibold text-slate-700 sticky bottom-0 z-20">
                 <td class="px-4 py-3 sticky left-0 bg-slate-50 z-30 min-w-[140px]">合计</td>
                 <td v-for="n in yearTotals" :key="n.year" class="px-4 py-3 text-right min-w-[80px]">{{ n.count }}</td>
+                <td class="px-4 py-3 text-right min-w-[80px] text-blue-600">{{ grandVisits }}</td>
+                <td class="px-4 py-3 text-right min-w-[80px] text-blue-600">{{ grandLikes }}</td>
                 <td class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ grandTotal }}</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p class="text-[11pt] text-slate-400 mt-3 px-1">
+          访问数 / 点赞数：本地（localhost）模式下为全网真实统计；公网访问时由于站点为静态托管、无后端，显示为当前浏览器累计值。
+        </p>
       </div>
 
       <div v-else class="text-center text-slate-400 py-16 text-[12pt]">数据加载中…</div>

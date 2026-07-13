@@ -5,6 +5,7 @@ const { createApp } = Vue;
 
 const LIKE_KEY = 'lecture_likes_v1';
 const LIKED_KEY = 'lecture_liked_urls_v1';
+const STAT_KEY = 'lecture_stats_v1';      // 本机讲座访问/点赞统计（公网无后端时降级使用）
 
 // 配置项：若已部署「工作流触发代理」（持有 PAT 的 Cloudflare Worker / Vercel Function 等，
 // 见 SECURITY.md R6），把其地址填到此处，公网「抓取新数据」按钮即可立即触发 GitHub Actions；
@@ -28,6 +29,10 @@ createApp({
       showMenu: false,    // 顶部栏更多操作下拉菜单
       likes: {},          // url -> count（本地点赞数）
       likedUrls: new Set(), // 当前浏览器已点赞的 url 集合
+      loading: true,       // 首屏数据加载中（避免闪现空列表）
+      siteVisits: 0,       // 站点总访问量
+      hasBackend: false,   // 是否存在后端（/api/visits 可用）
+      lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
       toast: { show: false, message: '', timer: null },
       pageSize: 25,        // 每页显示条数
       currentPage: 1,      // 当前页码
@@ -196,7 +201,68 @@ createApp({
       this.likes[url] = (this.likes[url] || 0) + 1;
       this.likedUrls.add(url);
       this.saveLikes();
+      this.bumpLocalStat(url, 'likes');
       this.showToast('点赞成功');
+      // 同步到后端（有后端时记录全局点赞数）；失败不影响本机
+      fetch('/api/lecture/like', {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      }).catch(() => {});
+    },
+
+    /* ---------- 讲座级访问/点赞统计 ---------- */
+    loadLocalStats() {
+      try { this.lectureStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
+      catch (e) { this.lectureStats = {}; }
+    },
+    saveLocalStats() {
+      try { localStorage.setItem(STAT_KEY, JSON.stringify(this.lectureStats)); } catch (e) { /* ignore */ }
+    },
+    // 本机累计一次统计（公网无后端时降级使用，带 3 分钟防刷）
+    bumpLocalStat(url, field) {
+      const s = this.lectureStats[url] || { visits: 0, likes: 0 };
+      s[field] = (s[field] || 0) + 1;
+      this.lectureStats[url] = s;
+      this.saveLocalStats();
+    },
+    // 点击讲座标题时记录一次访问（fire-and-forget；后端优先，失败降级本机）
+    recordVisit(url) {
+      const now = Date.now();
+      const s = this.lectureStats[url] || { visits: 0, likes: 0, lastVisit: 0 };
+      if (now - (s.lastVisit || 0) >= 180000) {  // 3 分钟内同一讲座只计 1 次
+        s.visits = (s.visits || 0) + 1;
+        s.lastVisit = now;
+        this.lectureStats[url] = s;
+        this.saveLocalStats();
+      }
+      fetch('/api/lecture/visit', {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      }).catch(() => {});
+    },
+    // 加载站点访问量：有后端用后端，无后端（公网静态）降级用不蒜子
+    loadSiteVisits() {
+      fetch('/api/visits', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; } })
+        .catch(() => { this.hasBackend = false; this._loadBusuanzi(); });
+    },
+    _loadBusuanzi() {
+      if (document.getElementById('busuanzi_pure_mini_js')) return;
+      const s = document.createElement('script');
+      s.id = 'busuanzi_pure_mini_js';
+      s.async = true;
+      s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
+      document.head.appendChild(s);
+    },
+    // 加载每条讲座的访问/点赞：优先后端，失败降级本机 localStorage
+    loadLectureStats() {
+      fetch('/api/lecture/stats', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => { if (j && j.stats) this.lectureStats = j.stats; })
+        .catch(() => { this.loadLocalStats(); });
     },
     showToast(msg) {
       this.toast.message = msg;
@@ -252,6 +318,7 @@ createApp({
           this.mtime = resp.mtime || 0;
           // 优先用文件内嵌 updatedAt；本地模式下回退用 mtime 推算
           this.updatedAt = updatedAt || (resp.mtime ? new Date(resp.mtime * 1000).toISOString() : '');
+          this.loading = false;   // 首次加载完成，解除 loading
         })
         .catch(() => {
           // 静态托管（无后端）时回退读取站点根 lectures.json
@@ -265,8 +332,9 @@ createApp({
               this.all = Array.isArray(list) ? list : [];
               this.updatedAt = ua;
               this.mtime = 0;
+              this.loading = false;   // 静态回退加载完成
             })
-            .catch(e => console.error('加载讲座失败', e));
+            .catch(e => { console.error('加载讲座失败', e); this.loading = false; });
         });
     },
 
@@ -302,6 +370,8 @@ createApp({
 
   mounted() {
     this.loadLikes();
+    this.loadSiteVisits();
+    this.loadLectureStats();
     this.loadLectures(false);
   },
 
