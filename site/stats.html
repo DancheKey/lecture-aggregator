@@ -32,7 +32,7 @@
           </a>
 
           <div class="ml-auto flex items-center gap-2">
-            <a href="./" class="text-[12pt] text-slate-600 hover:text-blue-600 whitespace-nowrap">返回首页</a>
+            <a href="./" class="text-[12pt] text-slate-600 hover:text-slate-800 whitespace-nowrap">返回首页</a>
           </div>
         </div>
       </div>
@@ -49,13 +49,13 @@
         <div class="flex items-center gap-2">
           <span class="text-[12pt] text-slate-500">排序：</span>
           <button @click="toggleSort('college')"
-            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'college' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按学院名</button>
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'college' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按学院名</button>
           <button @click="toggleSort('total')"
-            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'total' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按总数</button>
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'total' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按总数</button>
           <button @click="toggleSort('visits')"
-            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'visits' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按访问数</button>
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'visits' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按访问数</button>
           <button @click="toggleSort('likes')"
-            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'likes' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400']">按点赞数</button>
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'likes' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按点赞数</button>
         </div>
       </div>
 
@@ -63,7 +63,7 @@
       <div class="mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
         <label class="text-[12pt] text-slate-500 whitespace-nowrap">筛选学院：</label>
         <input v-model="collegeFilter" type="text" placeholder="输入学院/部处名称..."
-          class="w-full sm:w-72 px-3 py-1.5 rounded-lg border border-slate-200 text-[12pt] focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-white" />
+          class="w-full sm:w-72 px-3 py-1.5 rounded-lg border border-slate-200 text-[12pt] focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 bg-white" />
       </div>
 
       <!-- 统计表格：横向可滚动、首列固定、纵向最大高度滚动 -->
@@ -73,19 +73,19 @@
             <thead class="bg-slate-50 text-slate-600 sticky top-0 z-20">
               <tr>
                 <th @click="toggleSort('college')" class="cursor-pointer select-none text-left px-4 py-3 font-semibold border-b border-slate-200 sticky left-0 bg-slate-50 z-30 min-w-[140px]">
-                  <span class="inline-flex items-center gap-1 hover:text-blue-600">学院 / 部处 <span class="text-blue-500 text-[10pt]">{{ sortIcon('college') }}</span></span>
+                  <span class="inline-flex items-center gap-1 hover:text-slate-800">学院 / 部处 <span class="text-slate-400 text-[10pt]">{{ sortIcon('college') }}</span></span>
                 </th>
                 <th v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 min-w-[80px]">
-                  <span class="inline-flex items-center gap-1 hover:text-blue-600 justify-end">{{ y }} 年 <span class="text-blue-500 text-[10pt]">{{ sortIcon(String(y)) }}</span></span>
+                  <span class="inline-flex items-center gap-1 hover:text-slate-800 justify-end">{{ y }} 年 <span class="text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span></span>
                 </th>
-                <th v-if="mode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600 min-w-[80px]">
-                  <span class="inline-flex items-center gap-1 justify-end">总计 <span class="text-blue-500 text-[10pt]">{{ sortIcon('total') }}</span></span>
+                <th v-if="mode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 min-w-[80px]">
+                  <span class="inline-flex items-center gap-1 justify-end">总计 <span class="text-slate-400 text-[10pt]">{{ sortIcon('total') }}</span></span>
                 </th>
-                <th v-else-if="mode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600 min-w-[80px]">
-                  <span class="inline-flex items-center gap-1 justify-end">访问数 <span class="text-blue-500 text-[10pt]">{{ sortIcon('visits') }}</span></span>
+                <th v-else-if="mode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 min-w-[80px]">
+                  <span class="inline-flex items-center gap-1 justify-end">访问数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('visits') }}</span></span>
                 </th>
-                <th v-else-if="mode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-blue-600 min-w-[80px]">
-                  <span class="inline-flex items-center gap-1 justify-end">点赞数 <span class="text-blue-500 text-[10pt]">{{ sortIcon('likes') }}</span></span>
+                <th v-else-if="mode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 min-w-[80px]">
+                  <span class="inline-flex items-center gap-1 justify-end">点赞数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('likes') }}</span></span>
                 </th>
               </tr>
             </thead>
@@ -95,16 +95,16 @@
                 <td v-for="(n, idx) in row.cells" :key="years[idx]" :class="['px-4 py-3 text-right min-w-[80px]', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
                   {{ cellDisplay(n) }}
                 </td>
-                <td v-if="mode === 'count'" class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ row.total }}</td>
-                <td v-else-if="mode === 'visits'" class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ row.visitsTotal }}</td>
-                <td v-else-if="mode === 'likes'" class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ row.likesTotal }}</td>
+                <td v-if="mode === 'count'" class="px-4 py-3 text-right font-bold text-slate-800 min-w-[80px]">{{ row.total }}</td>
+                <td v-else-if="mode === 'visits'" class="px-4 py-3 text-right font-bold text-slate-800 min-w-[80px]">{{ row.visitsTotal }}</td>
+                <td v-else-if="mode === 'likes'" class="px-4 py-3 text-right font-bold text-slate-800 min-w-[80px]">{{ row.likesTotal }}</td>
               </tr>
               <tr class="bg-slate-50 font-semibold text-slate-700 sticky bottom-0 z-20">
                 <td class="px-4 py-3 sticky left-0 bg-slate-50 z-30 min-w-[140px]">合计</td>
                 <td v-for="n in yearTotals" :key="n.year" class="px-4 py-3 text-right min-w-[80px]">{{ mode === 'count' ? n.count : (mode === 'visits' ? n.visits : n.likes) }}</td>
-                <td v-if="mode === 'count'" class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ grandTotal }}</td>
-                <td v-else-if="mode === 'visits'" class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ grandVisits }}</td>
-                <td v-else-if="mode === 'likes'" class="px-4 py-3 text-right font-bold text-blue-600 min-w-[80px]">{{ grandLikes }}</td>
+                <td v-if="mode === 'count'" class="px-4 py-3 text-right font-bold text-slate-800 min-w-[80px]">{{ grandTotal }}</td>
+                <td v-else-if="mode === 'visits'" class="px-4 py-3 text-right font-bold text-slate-800 min-w-[80px]">{{ grandVisits }}</td>
+                <td v-else-if="mode === 'likes'" class="px-4 py-3 text-right font-bold text-slate-800 min-w-[80px]">{{ grandLikes }}</td>
               </tr>
             </tbody>
           </table>
