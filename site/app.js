@@ -25,6 +25,7 @@ createApp({
       college: '',
       year: '',
       query: '',
+      showLikedOnly: false,  // 仅显示已点赞讲座
       scraping: false,
       showMenu: false,    // 顶部栏更多操作下拉菜单
       likes: {},          // url -> count（本地点赞数）
@@ -67,6 +68,7 @@ createApp({
     filtered() {
       const q = this.query.trim().toLowerCase();
       const list = this.all.filter(l => {
+        if (this.showLikedOnly && !this.hasLiked(l.sourceUrl)) return false;
         if (this.campus && l.campus !== this.campus) return false;
         if (this.college && l.college !== this.college) return false;
         if (this.year && this.yearOf(l) !== this.year) return false;
@@ -132,8 +134,11 @@ createApp({
   methods: {
     /* ---------- 工具 ---------- */
     yearOf(l) {
-      if (!l || !l.lectureStart) return '';
-      return String(l.lectureStart).slice(0, 4);
+      if (!l) return '';
+      if (l.lectureStart) return String(l.lectureStart).slice(0, 4);
+      // 部分讲座未解析到具体时间，但发布时间或标题里含年份，据此归入对应年份（与 stats.js 保持一致）
+      const m = (l.publishTime || '').match(/^(\d{4})/) || (l.title || '').match(/(\d{4})/);
+      return m ? m[1] : '';
     },
     fmtDateTime(iso) {
       if (!iso) return '待定';
@@ -303,10 +308,11 @@ createApp({
     },
 
     /* ---------- 筛选交互 ---------- */
-    setCampus(c) { this.campus = c; },
+    setCampus(c) { this.campus = c; this.showLikedOnly = false; },
     setCollege(c) { this.college = c; },
     setYear(y) { this.year = y; },
-    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; },
+    toggleLikedFilter() { this.showLikedOnly = !this.showLikedOnly; this.campus = ''; this.college = ''; },
+    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.showLikedOnly = false; },
     /* ---------- 分页 ---------- */
     gotoPage(p) {
       if (p < 1 || p > this.totalPages) return;
@@ -445,5 +451,6 @@ createApp({
     campus() { this.currentPage = 1; },
     college() { this.currentPage = 1; },
     year() { this.currentPage = 1; },
+    showLikedOnly() { this.currentPage = 1; },
   },
 }).mount('#app');

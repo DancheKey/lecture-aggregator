@@ -183,6 +183,10 @@ sources:
   list_urls:
   - http://soe.scnu.edu.cn/tongzhigonggao/
   - http://soe.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://soe.scnu.edu.cn/tongzhigonggao/xueshujiangzuo/
+    collect_mode: all_items
+  - url: http://soe.scnu.edu.cn/tongzhigonggao/xueshujiangzuo/2.html
+    collect_mode: all_items
 - name: 科学技术与社会研究院
   campus: 大学城
   base: http://sts.scnu.edu.cn
@@ -206,12 +210,25 @@ sources:
   base: http://skc.scnu.edu.cn
   list_urls:
   - http://skc.scnu.edu.cn/xueshuhuodongyugao/
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/2.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/3.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/4.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/5.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/6.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/7.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/8.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/9.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/10.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/11.html
+  - http://skc.scnu.edu.cn/xueshuhuodongyugao/12.html
 - name: 北斗研究院
-  campus: 石牌
+  campus: 佛山
   base: http://bd.scnu.edu.cn
   list_urls:
   - http://bd.scnu.edu.cn/tongzhigonggao/
   - http://bd.scnu.edu.cn/tongzhigonggao/2.html
+  - http://bd.scnu.edu.cn/xueshujiangzuo/
+  - http://bd.scnu.edu.cn/xueshujiangzuo/2.html
 - name: 教育科学学院（汕尾）
   campus: 汕尾
   base: https://jykxsw.scnu.edu.cn
