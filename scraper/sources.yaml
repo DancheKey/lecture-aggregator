@@ -286,6 +286,11 @@ sources:
   list_urls:
   - http://ai.scnu.edu.cn/xueshukeyan/xslt/
   - http://ai.scnu.edu.cn/xueshukeyan/xslt/2.html
+  - http://ai.scnu.edu.cn/bkjy/zyjzhhd/
+  - http://ai.scnu.edu.cn/bkjy/zyjzhhd/2.html
+  exclude_urls:
+  - http://ai.scnu.edu.cn/a/20221010/165.html
+  - http://ai.scnu.edu.cn/a/20221008/164.html
 - name: 图书馆
   campus: 校级
   base: http://lib.scnu.edu.cn

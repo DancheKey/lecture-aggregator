@@ -78,6 +78,93 @@ def is_lecture(title):
     return True
 
 
+def _extract_narrative(body_text, title):
+    """无结构化标签的叙事体文章兜底提取：主题、地点、主讲人、摘要。"""
+    result = {}
+    if body_text:
+        body_text = re.sub(r'\s+', ' ', body_text).strip()
+    # 主题：优先从标题《...》书名号提取
+    if title:
+        m = re.search(r'《([^《》]{3,60})》', title)
+        if m:
+            result['topic'] = m.group(1).strip()
+    if not body_text:
+        return result
+
+    # 地点：常见“在/于...楼/室/厅/校区...举行/举办/召开”，允许楼后带房间号
+    loc_patterns = [
+        r'在\s*([^。，；]{2,55}?(?:楼|室|厅|馆|校区|校园|中心|广场|会议室|教室|礼堂|报告厅|学术厅|综合楼|行政楼|教学楼|信息楼|院楼|大楼)(?:\s*[0-9]+)?)\s*(?:成功)?(?:举行|举办|召开|进行|开展)',
+        r'于\s*([^。，；]{2,55}?(?:楼|室|厅|馆|校区|校园|中心|广场|会议室|教室|礼堂|报告厅|学术厅|综合楼|行政楼|教学楼|信息楼|院楼|大楼)(?:\s*[0-9]+)?)\s*(?:成功)?(?:举行|举办|召开|进行|开展)',
+    ]
+    for pat in loc_patterns:
+        m = re.search(pat, body_text)
+        if m:
+            loc = m.group(1).strip()
+            loc = re.sub(r'^[在于]\s*', '', loc)
+            result['location'] = loc
+            break
+
+    # 主讲人：从包含“主讲/主持/带来”的子句中提取
+    keywords = ['主讲', '主持', '带来']
+    titles = ['教授', '副教授', '讲师', '博士', '老师', '副院长', '院长']
+    prefixes = [
+        '由学院新引进的', '由学院', '讲座由', '由',
+        '院长兼', '副院长兼', '人工智能学院', '计算机学院', '学院',
+        '新引进的', '青年拔尖人才', '拔尖人才',
+    ]
+    for kw in keywords:
+        if kw not in body_text:
+            continue
+        left = body_text.split(kw, 1)[0].strip()
+        left = re.split(r'[。，；]', left)[-1].strip()
+        changed = True
+        while changed:
+            changed = False
+            for p in prefixes:
+                if left.startswith(p):
+                    left = left[len(p):].strip()
+                    changed = True
+        for t in titles:
+            if left.startswith(t):
+                left = left[len(t):].strip()
+        # name + optional title
+        m = re.search(r'^([\u4e00-\u9fa5]{2,4})(?:\s*(?:' + '|'.join(titles) + r'))?', left)
+        if m:
+            name = m.group(1).strip()
+            for t in titles:
+                if name.endswith(t):
+                    name = name[:-len(t)].strip()
+            if name and len(name) >= 2:
+                result['speaker'] = name
+                break
+        # just name
+        if re.match(r'^[\u4e00-\u9fa5]{2,4}$', left):
+            result['speaker'] = left
+            break
+
+    # 主题：若标题未提供，再尝试正文中“主讲《...》”
+    if not result.get('topic'):
+        cm = re.search(r'主讲\s*[《<]([^》>]{3,60})[》>]', body_text)
+        if cm:
+            result['topic'] = cm.group(1).strip()
+
+    # 摘要：取正文第一句之后的 1-3 句，过滤图片说明
+    sentences = [p.strip() for p in re.split(r'[。\n]+', body_text) if len(p.strip()) > 20]
+    if sentences:
+        start_idx = 0
+        # 首句若只含时间/地点/主讲元信息，则跳过
+        if (re.search(r'(?:月|日|晚|召开|举行|举办|主讲|由)', sentences[0]) and
+                len(sentences) > 1):
+            start_idx = 1
+        abstract = '。'.join(sentences[start_idx:start_idx + 3]) + '。'
+        abstract = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', abstract).strip()
+        abstract = re.sub(r'图\s*\d+\s*[：:].*?(?=(?:图\s*\d+|$))', '', abstract).strip()
+        abstract = re.sub(r'\s*图\s*\d+\s*.*$', '', abstract).strip()
+        if len(abstract) > 15:
+            result['abstract'] = abstract
+    return result
+
+
 def _clean_title(t):
     t = t.strip()
     if ' - ' in t:
@@ -149,6 +236,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     # 提前定位正文容器；若正文几乎为空但含图片（如行知书院讲座海报），对图片 OCR 提取文字
     content_div = (soup.find('div', class_='article-content')
                    or soup.find('div', class_='content')
+                   or soup.find('div', class_='news-details-all')
+                   or soup.find('div', class_='news-details-middle')
                    or soup.find('article')
                    or soup.find('div', class_='entry-content'))
     body_text = content_div.get_text(' ') if content_div else text
@@ -388,5 +477,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         if result['speakerBio'] in ocr_text or ocr_text in result['speakerBio']:
             if any(k in result['speakerBio'] for k in ['时间', '地点', '时闻', '日期']):
                 result['speakerBio'] = ''
+
+    # 兜底：无结构化标签的叙事体文章（如人工智能学院）
+    if not result['topic'] or not result['location'] or not result['speaker'] or not result.get('abstract'):
+        narrative = _extract_narrative(body_text, title)
+        if not result['topic'] and narrative.get('topic'):
+            result['topic'] = narrative['topic']
+        if not result['location'] and narrative.get('location'):
+            result['location'] = narrative['location']
+        if not result['speaker'] and narrative.get('speaker'):
+            result['speaker'] = narrative['speaker']
+        if not result.get('abstract') and narrative.get('abstract'):
+            result['abstract'] = narrative['abstract']
 
     return result

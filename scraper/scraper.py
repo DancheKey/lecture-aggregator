@@ -195,6 +195,8 @@ def main():
             for lu in src.get('list_urls', []):
                 u = lu['url'] if isinstance(lu, dict) else lu
                 src_list_norm.add(str(u).rstrip('/'))
+            # 明确排除的非讲座 URL
+            exclude_urls = {str(u).rstrip('/') for u in src.get('exclude_urls', [])}
             seen = set()
             for lu in src.get('list_urls', []):
                 if isinstance(lu, dict):
@@ -211,6 +213,10 @@ def main():
                     seen.add(href_norm)
                     # 增量模式：已抓取过的 URL 直接跳过（不下载详情、不解析、不做 OCR）
                     if is_incremental and href_norm in existing_urls:
+                        continue
+                    # 跳过源配置中明确排除的 URL（如宣讲会、整体规划等非讲座页面）
+                    if href_norm in exclude_urls:
+                        print(f'[SKIP] {name} exclude {href}')
                         continue
                     # 跳过指向本源其他列表页的链接（栏目入口，不是讲座详情）
                     if href_norm in src_list_norm:
