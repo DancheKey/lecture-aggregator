@@ -113,10 +113,21 @@ class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         # 禁用缓存：每次刷新都拿到最新数据
         self.send_header('Cache-Control', 'no-store')
+        # gzip 协商：若浏览器声明支持，则对响应体做 gzip 压缩
+        if getattr(self, '_gz', False):
+            self.send_header('Content-Encoding', 'gzip')
         super().end_headers()
 
     def _send_json(self, obj, code=200):
         body = json.dumps(obj, ensure_ascii=False).encode('utf-8')
+        # 协商 gzip：仅当客户端声明支持时压缩，否则原样发送（兼容简易客户端）
+        accept = self.headers.get('Accept-Encoding', '') or ''
+        if 'gzip' in accept.lower() and len(body) > 1024:
+            import gzip as _gzip
+            body = _gzip.compress(body, 6)
+            self._gz = True
+        else:
+            self._gz = False
         self.send_response(code)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))

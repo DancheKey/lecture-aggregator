@@ -3,6 +3,11 @@
  */
 const { createApp } = Vue;
 
+// 首屏遮罩：Vue 挂载后显式移除 #page-loading（比纯 display:none 更干净）
+const removeOnMount = {
+  mounted(el) { el.remove(); },
+};
+
 const LIKE_KEY = 'lecture_likes_v1';
 const LIKED_KEY = 'lecture_liked_urls_v1';
 const STAT_KEY = 'lecture_stats_v1';      // 本机讲座访问/点赞统计（公网无后端时降级使用）
@@ -35,7 +40,7 @@ createApp({
       hasBackend: false,   // 是否存在后端（/api/visits 可用）
       lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
       toast: { show: false, message: '', timer: null },
-      pageSize: 25,        // 每页显示条数
+      pageSize: 50,        // 每页显示条数（数据量增大后放大，减少翻页次数）
       currentPage: 1,      // 当前页码
       showBackTop: false,  // 滚动超过阈值后显示「回到顶部」按钮
       expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
@@ -472,6 +477,10 @@ createApp({
 
   beforeUnmount() {
     window.removeEventListener('scroll', this.onScroll);
+  },
+
+  directives: {
+    'remove-on-mount': removeOnMount,
   },
 
   watch: {
