@@ -183,8 +183,8 @@
                     <button @click="onTagClick('college', l.college)"
                       class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
                   </template>
-                  <button @click="onTagClick('campus', l.campus)"
-                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.campus }}</button>
+                  <button v-for="c in sourceCampuses(l)" :key="c" @click="onTagClick('campus', c)"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
                   <button @click="toggleLike(l.sourceUrl)"
                     :class="['ml-auto px-2.5 py-1 rounded-full flex items-center gap-1 text-[12pt] transition border', hasLiked(l.sourceUrl) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">

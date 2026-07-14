@@ -33,14 +33,14 @@ createApp({
   },
 
   computed: {
-    // 所有出现过的年份（升序），无法识别的讲座时间归入“其他”并放在最后
+    // 所有出现过的年份（降序：最新年份在左），无法识别的讲座时间归入“其他”并放在最后
     years() {
       const set = new Set();
       this.all.forEach(l => {
         const y = this.yearOf(l);
         if (y) set.add(y);
       });
-      const arr = Array.from(set).sort((a, b) => a.localeCompare(b));
+      const arr = Array.from(set).sort((a, b) => b.localeCompare(a));
       const idx = arr.indexOf(UNKNOWN_YEAR);
       if (idx >= 0) {
         arr.splice(idx, 1);

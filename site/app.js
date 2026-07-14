@@ -69,8 +69,15 @@ createApp({
       const q = this.query.trim().toLowerCase();
       const list = this.all.filter(l => {
         if (this.showLikedOnly && !this.hasLiked(l.sourceUrl)) return false;
-        if (this.campus && l.campus !== this.campus) return false;
-        if (this.college && l.college !== this.college) return false;
+        // 合并讲座可能跨校区/学院，任一来源匹配即保留
+        if (this.campus) {
+          const campuses = new Set([l.campus, ...(l.sources || []).map(s => s.campus)].filter(Boolean));
+          if (!campuses.has(this.campus)) return false;
+        }
+        if (this.college) {
+          const colleges = new Set([l.college, ...(l.sources || []).map(s => s.college)].filter(Boolean));
+          if (!colleges.has(this.college)) return false;
+        }
         if (this.year && this.yearOf(l) !== this.year) return false;
         if (q) {
           const hay = [l.title, l.topic, l.speaker, l.speakerAffiliation,
@@ -345,6 +352,17 @@ createApp({
       const out = [];
       l.sources.forEach(s => {
         const c = s.college || l.college;
+        if (!seen.has(c)) { seen.add(c); out.push(c); }
+      });
+      return out;
+    },
+    // 多来源讲座：返回去重后的所有校区（用于标签展示）
+    sourceCampuses(l) {
+      if (!l || !l.sources || !l.sources.length) return [l.campus];
+      const seen = new Set();
+      const out = [];
+      l.sources.forEach(s => {
+        const c = s.campus || l.campus;
         if (!seen.has(c)) { seen.add(c); out.push(c); }
       });
       return out;
