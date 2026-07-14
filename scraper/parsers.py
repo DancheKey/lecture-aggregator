@@ -334,11 +334,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     # 字段标签前瞻——每个字段只取到下一个标签为止
     # 把「主题」「讲座内容提要」「摘要」等也纳入 STOP，避免 topic/地点/主讲人 把后续字段一起吃进去
     LABELS = (
-        '地点|题目|主题|讲座主题|报告题目|演讲题目|报告主题|'
-        '时间|主讲[人师]|报告人|主讲嘉宾|演讲人|'
+        '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|'
+        '地点|题目|主题|讲座主题|演讲题目|报告主题|'
+        '时间|主讲[人师]|报告人|主讲嘉宾|演讲人|邀请人|'
         '摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
         '讲座内容|讲座简介|报告内容|讲座概要|内容概要|'
-        '简历|主讲人简介|主讲人简历|简介|专家介绍|发布|来源'
+        '简历|主讲人简介|主讲人简历|简介|专家介绍|专家简介|发布|来源'
     )
     STOP = rf'(?=\s*(?:{LABELS}|$))'
 
@@ -361,22 +362,34 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         # 去除 OCR 尾部常见乱码或装饰字符（如「曷」「号」）
         loc = re.sub(r'[\s]*[曷号]+$\s*', '', loc).strip()
         loc = re.sub(r'\s+[^\u4e00-\u9fa5a-zA-Z0-9]{1,2}\s*$', '', loc).strip()
+        # 折叠 CMS 把地点拆成单字/单数字造成的空格（如「理 6 栋 302」→「理6栋302」），
+        # 仅合并「中文-中文/中文-数字/数字-中文」间的空格，保留英文单词与纯数字间的空格。
+        loc = re.sub(r'(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5\d])|(?<=\d)\s+(?=[\u4e00-\u9fa5])', '', loc).strip()
         result['location'] = loc
 
     # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人」）---
-    speaker_pat = rf'(?:主讲[人师]|报告人|主讲嘉宾|演讲人)[：:]\s*(.+?){STOP}'
+    speaker_pat = rf'(?:主讲[人师]|报告人|主讲嘉宾|演讲人|报告专家|报告嘉宾)\s*[：:]\s*(.+?){STOP}'
     m = re.search(speaker_pat, text)
     if m:
         sp = m.group(1).strip()
         # 去掉尾部职称后缀
-        sp_clean = re.sub(r'\s*(?:教授|研究员|副教授|讲师|博士|老师|先生|女士).*$', '', sp).strip()
+        sp_clean = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|研究员|教授|讲师|博士后|博士|院士|老师|先生|女士).*$', '', sp).strip()
         # 尝试拆分姓名+单位（括号形式）
         mm = re.match(r'(.+?)\s*[（(]([^）)]{2,40})[）)]', sp)
         if mm:
             result['speaker'] = sp_clean.split('（')[0].strip()
             result['speakerAffiliation'] = re.sub(r'\s+', '', mm.group(2))
         else:
-            result['speaker'] = sp_clean
+            # 空格分隔的「姓名 职称 单位」或「姓名 单位」（如物理学院「郑炜 教授 中国科学技术大学」）
+            _TITLES = r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|研究员|教授|讲师|博士后|博士|院士|老师)'
+            mm2 = re.match(rf'^([\u4e00-\u9fa5·]{{2,5}})\s+[\u4e00-\u9fa5]{{0,4}}{_TITLES}\s+([\u4e00-\u9fa5A-Za-z].{{2,40}})$', sp)
+            if not mm2:
+                mm2 = re.match(r'^([\u4e00-\u9fa5·]{2,5})\s+([\u4e00-\u9fa5]{4,40})$', sp)
+            if mm2:
+                result['speaker'] = mm2.group(1).strip()
+                result['speakerAffiliation'] = re.sub(r'\s+', '', mm2.group(2)).strip()
+            else:
+                result['speaker'] = sp_clean
 
     # 兜底：从标题括号中提取主讲人，如「（朱英教授）」
     if not result['speaker']:

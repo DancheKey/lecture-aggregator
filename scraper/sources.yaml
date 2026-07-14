@@ -171,12 +171,19 @@ sources:
   list_urls:
   - http://music.scnu.edu.cn/tongzhigonggao/
   - http://music.scnu.edu.cn/tongzhigonggao/2.html
+# 物理学院信息源：统一使用 Seminars 学术报告页（大学城）。
+# 历史全量（31 页，606 条 2009–2026）已一次性抓取并持久化在 data/lectures.json；
+# 日常增量只需扫描最新的第 1、2 页即可捕获新发布的讲座（均 all_items 模式：
+# 列表页即讲座列表，标题不含关键词需绕过 is_lecture 过滤）。
+# 如需全量重建，临时把 3.html…31.html 追加回来再跑 --full 即可。
 - name: 物理学院
   campus: 大学城
   base: http://physics.scnu.edu.cn
   list_urls:
-  - http://physics.scnu.edu.cn/tongzhigonggao/
-  - http://physics.scnu.edu.cn/tongzhigonggao/2.html
+  - url: https://physics.scnu.edu.cn/RESEARCH/EVENTS/Seminars/
+    collect_mode: all_items
+  - url: https://physics.scnu.edu.cn/RESEARCH/EVENTS/Seminars/2.html
+    collect_mode: all_items
 - name: 化学学院
   campus: 大学城
   base: http://sce.scnu.edu.cn
