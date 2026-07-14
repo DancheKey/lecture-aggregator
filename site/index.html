@@ -105,7 +105,7 @@
               <span class="ml-1 text-[11pt] text-slate-400">· 覆盖 {{ sourceNoticeCount }} 条来源通知</span>
               <span v-if="updatedAt" class="ml-1 text-[11pt] text-slate-400">· 更新于 {{ updatedAt.slice(0, 10) }}</span>
               <template v-if="filtered.length !== totalCount">
-                · 当前筛选 <span class="font-semibold text-blue-600">{{ filtered.length }}</span> 场
+                · 当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
               </template>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
