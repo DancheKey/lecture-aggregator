@@ -41,7 +41,7 @@ createApp({
       hasBackend: false,   // 是否存在后端（/api/visits 可用）
       lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
       toast: { show: false, message: '', timer: null },
-      pageSize: 50,        // 每页显示条数（数据量增大后放大，减少翻页次数）
+      pageSize: 25,        // 每页显示条数（配合渐进式加载，首屏更快）
       currentPage: 1,      // 当前页码
       showBackTop: false,  // 滚动超过阈值后显示「回到顶部」按钮
       expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
