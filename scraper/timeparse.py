@@ -14,11 +14,11 @@ from datetime import datetime, date
 PERIOD_OFFSET = {'上午': 0, '早上': 0, '中午': 12, '下午': 12, '晚上': 12, '傍晚': 12}
 
 FULL_PATTERNS = [
-    r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日',
+    r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]',
     r'(\d{4})-(\d{2})-(\d{2})',
     r'(\d{4})\.(\d{2})\.(\d{2})',
 ]
-MONTHDAY = r'(\d{1,2})\s*月\s*(\d{1,2})\s*日'
+MONTHDAY = r'(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?'
 SLASH_MONTHDAY = r'(\d{1,2})/(\d{1,2})'
 COLON = r'[:：]'
 
@@ -146,6 +146,8 @@ def parse_cn_time(text, default_year=None, publish_time=None, title_year=None, u
     if publish_time:
         clean = clean.replace(publish_time, '')
         clean = clean.replace(publish_time[:10], '')
+        # 移除「发布时间：」标签本身，避免正文里的「时间：」标签被它抢先匹配
+        clean = re.sub(r'发布\s*时间\s*[：:]\s*', '', clean)
 
     lm = re.search(r'(时间|讲座时间)[：:]\s*(.{0,40})', clean)
     if lm:

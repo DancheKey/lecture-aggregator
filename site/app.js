@@ -84,6 +84,17 @@ createApp({
         if (!ta && !tb) return 0;
         if (!ta) return 1;
         if (!tb) return -1;
+        // 主排序：日期倒序
+        const da = ta.slice(0, 10), db = tb.slice(0, 10);
+        if (da !== db) return db.localeCompare(da);
+        // 同一天同系列（砺儒讲坛第X讲等）按编号倒序，让133讲在132讲之上
+        const seriesNo = (title) => {
+          const m = String(title || '').match(/第(\d+)(?:讲|场|期|届)/);
+          return m ? parseInt(m[1], 10) : 0;
+        };
+        const sa = seriesNo(a.title), sb = seriesNo(b.title);
+        if (sa && sb && sa !== sb) return sb - sa;
+        // 否则按完整时间倒序
         return tb.localeCompare(ta);
       });
       return list;

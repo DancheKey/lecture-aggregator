@@ -39,8 +39,32 @@ sources:
   campus: 石牌
   base: http://aol.scnu.edu.cn
   list_urls:
-  - http://aol.scnu.edu.cn/tongzhigonggao/
-  - http://aol.scnu.edu.cn/tongzhigonggao/2.html
+  - http://aol.scnu.edu.cn/announce/
+  - http://aol.scnu.edu.cn/announce/2.html
+  - http://aol.scnu.edu.cn/announce/3.html
+  - http://aol.scnu.edu.cn/announce/4.html
+  - http://aol.scnu.edu.cn/announce/5.html
+  - http://aol.scnu.edu.cn/announce/6.html
+  - http://aol.scnu.edu.cn/announce/7.html
+  - http://aol.scnu.edu.cn/announce/8.html
+  - http://aol.scnu.edu.cn/announce/9.html
+  - http://aol.scnu.edu.cn/announce/10.html
+  - http://aol.scnu.edu.cn/announce/11.html
+  - http://aol.scnu.edu.cn/announce/12.html
+  - http://aol.scnu.edu.cn/announce/13.html
+  - http://aol.scnu.edu.cn/announce/14.html
+  - http://aol.scnu.edu.cn/announce/15.html
+  - http://aol.scnu.edu.cn/announce/16.html
+  - http://aol.scnu.edu.cn/announce/17.html
+  - http://aol.scnu.edu.cn/announce/18.html
+  - http://aol.scnu.edu.cn/announce/19.html
+  - http://aol.scnu.edu.cn/announce/20.html
+  - http://aol.scnu.edu.cn/announce/21.html
+  - http://aol.scnu.edu.cn/announce/22.html
+  - http://aol.scnu.edu.cn/announce/23.html
+  - http://aol.scnu.edu.cn/announce/24.html
+  - http://aol.scnu.edu.cn/announce/25.html
+  - http://aol.scnu.edu.cn/announce/26.html
 - name: 教育信息技术学院
   campus: 石牌
   base: http://site.scnu.edu.cn
