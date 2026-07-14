@@ -55,14 +55,16 @@ jobs:
       - name: 运行爬虫（增量）
         run: python scraper/scraper.py
 
-      - name: 同步静态数据源
-        run: cp data/lectures.json site/lectures.json
+      - name: 同步静态数据源并生成前端切片
+        run: |
+          cp data/lectures.json site/lectures.json
+          python scripts/generate_frontend_data.py
 
       - name: 提交并推送（仅在有变化时）
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/lectures.json data/last_scrape.json site/lectures.json
+          git add data/lectures.json data/last_scrape.json site/lectures.json site/lectures/latest.json site/lectures/lite.json
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else

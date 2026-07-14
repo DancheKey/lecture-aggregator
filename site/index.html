@@ -130,6 +130,9 @@
               <template v-if="filtered.length !== totalCount">
                 · 当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
               </template>
+              <span v-if="dataStage === 'partial'" class="ml-2 text-[11pt] text-blue-600 animate-pulse">
+                （已显示最新 50 条，正在加载全部数据…）
+              </span>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
               <input v-model="query" type="search" placeholder="搜索讲座 / 主讲人…"
@@ -221,8 +224,11 @@
           <nav v-if="filtered.length > pageSize" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-[12pt]">
             <button @click="prevPage" :disabled="currentPage === 1"
               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
-            <button v-for="p in totalPages" :key="p" @click="gotoPage(p)"
-              :class="['min-w-[36px] px-2 py-1.5 rounded-lg border transition', p === currentPage ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50']">{{ p }}</button>
+            <template v-for="p in pageNumbers" :key="p">
+              <button v-if="p !== '...'" @click="gotoPage(p)"
+                :class="['min-w-[36px] px-2 py-1.5 rounded-lg border transition', p === currentPage ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50']">{{ p }}</button>
+              <span v-else class="px-1.5 text-slate-400 select-none">…</span>
+            </template>
             <button @click="nextPage" :disabled="currentPage === totalPages"
               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
             <span class="ml-3 text-slate-400 whitespace-nowrap">第 {{ currentPage }} / {{ totalPages }} 页 · 每页 {{ pageSize }} 条</span>

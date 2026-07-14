@@ -36,6 +36,7 @@ createApp({
       likes: {},          // url -> count（本地点赞数）
       likedUrls: new Set(), // 当前浏览器已点赞的 url 集合
       loading: true,       // 首屏数据加载中（避免闪现空列表）
+      dataStage: 'loading', // 'loading' | 'partial' | 'full'：渐进加载阶段
       siteVisits: 0,       // 站点总访问量
       hasBackend: false,   // 是否存在后端（/api/visits 可用）
       lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
@@ -130,6 +131,22 @@ createApp({
     // 总页数
     totalPages() {
       return Math.max(1, Math.ceil(this.filtered.length / this.pageSize));
+    },
+
+    // 智能分页页码：当前页前后最多2页 + 首尾，省略号占位
+    pageNumbers() {
+      const total = this.totalPages;
+      const cur = this.currentPage;
+      if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+      const pages = [];
+      if (cur <= 3) {
+        pages.push(1, 2, 3, 4, 5, '...', total);
+      } else if (cur >= total - 2) {
+        pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total);
+      } else {
+        pages.push(1, '...', cur - 1, cur, cur + 1, '...', total);
+      }
+      return pages;
     },
 
     // 当前页对应的扁平列表（已筛选 + 按时间倒序）
@@ -385,7 +402,12 @@ createApp({
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
-    /* ---------- 数据加载（增量） ---------- */
+    /* ---------- 数据加载（增量 / 渐进式） ----------
+     * 本地后端存在时：走 /api/lectures，已启用 gzip，返回全量。
+     * GitHub Pages 静态托管时：先拉体积最小的 latest.json（最新 50 条，约 20KB
+     * gzip）立刻渲染第一页；后台再拉 lite.json（全量精简字段，约 240KB
+     * gzip）启用完整筛选与翻页。
+     */
     loadLectures(incremental) {
       const url = (incremental && this.mtime)
         ? `/api/lectures?since=${this.mtime}`
@@ -396,40 +418,57 @@ createApp({
           return r.json();
         })
         .then(resp => {
-          if (resp.unchanged) return;       // 无更新
-          // 兼容多种后端返回：
-          //  - {data:[...], updatedAt, mtime}            （新版 server.py，已解包）
-          //  - {data:{updatedAt,data:[...]}, updatedAt}  （旧版 server.py，未解包）
-          if (Array.isArray(resp)) { this.all = resp; this.mtime = 0; this.updatedAt = ''; return; }
-          let arr = resp.data;
-          let updatedAt = resp.updatedAt || '';
-          if (arr && typeof arr === 'object' && !Array.isArray(arr) && Array.isArray(arr.data)) {
-            // 旧版 server 把整个文件包了一层，这里再解一层
-            arr = arr.data;
-            if (!updatedAt) updatedAt = arr.updatedAt || '';
-          }
-          this.all = Array.isArray(arr) ? arr : [];
-          this.mtime = resp.mtime || 0;
-          // 优先用文件内嵌 updatedAt；本地模式下回退用 mtime 推算
-          this.updatedAt = updatedAt || (resp.mtime ? new Date(resp.mtime * 1000).toISOString() : '');
-          this.loading = false;   // 首次加载完成，解除 loading
+          if (resp.unchanged) return;
+          this._applyLectureData(resp);
+          this.dataStage = 'full';
+          this.loading = false;
         })
         .catch(() => {
-          // 静态托管（无后端）时回退读取站点根 lectures.json
-          if (incremental) return;          // 增量轮询失败静默忽略
-          fetch('lectures.json', { cache: 'no-store' })
-            .then(r => r.json())
-            .then(arr => {
-              let list = arr, ua = '';
-              if (Array.isArray(arr)) { list = arr; }
-              else if (arr && typeof arr === 'object' && Array.isArray(arr.data)) { list = arr.data; ua = arr.updatedAt || ''; }
-              this.all = Array.isArray(list) ? list : [];
-              this.updatedAt = ua;
-              this.mtime = 0;
-              this.loading = false;   // 静态回退加载完成
-            })
-            .catch(e => { console.error('加载讲座失败', e); this.loading = false; });
+          // 静态托管（无后端）时回退：先 fastest latest，再 full lite
+          if (incremental) return;
+          this._loadStaticLatest();
         });
+    },
+
+    _applyLectureData(resp) {
+      // 兼容多种后端返回：
+      //  - {data:[...], updatedAt, mtime}            （新版 server.py，已解包）
+      //  - {data:{updatedAt,data:[...]}, updatedAt}  （旧版 server.py，未解包）
+      if (Array.isArray(resp)) { this.all = resp; this.mtime = 0; this.updatedAt = ''; return; }
+      let arr = resp.data;
+      let updatedAt = resp.updatedAt || '';
+      if (arr && typeof arr === 'object' && !Array.isArray(arr) && Array.isArray(arr.data)) {
+        arr = arr.data;
+        if (!updatedAt) updatedAt = arr.updatedAt || '';
+      }
+      this.all = Array.isArray(arr) ? arr : [];
+      this.mtime = resp.mtime || 0;
+      this.updatedAt = updatedAt || (resp.mtime ? new Date(resp.mtime * 1000).toISOString() : '');
+    },
+
+    _loadStaticLatest() {
+      // 先加载 latest.json：仅 50 条，用于首屏秒开
+      fetch('lectures/latest.json', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(resp => {
+          this._applyLectureData(resp);
+          this.dataStage = 'partial';
+          this.loading = false;
+          // 后台继续加载完整精简数据
+          this._loadStaticFull();
+        })
+        .catch(() => { this._loadStaticFull(true); });
+    },
+
+    _loadStaticFull(fallbackToOriginal = false) {
+      const path = fallbackToOriginal ? 'lectures.json' : 'lectures/lite.json';
+      fetch(path, { cache: 'no-store' })
+        .then(r => r.json())
+        .then(resp => {
+          this._applyLectureData(resp);
+          this.dataStage = 'full';
+        })
+        .catch(e => { console.error('加载完整讲座数据失败', e); });
     },
 
     /* ---------- 触发后端抓取 ---------- */
@@ -490,5 +529,15 @@ createApp({
     college() { this.currentPage = 1; },
     year() { this.currentPage = 1; },
     showLikedOnly() { this.currentPage = 1; },
+    // 数据阶段从 partial 变 full 时，如果当前没有筛选，保持当前页；否则回到第一页
+    dataStage(newVal, oldVal) {
+      if (oldVal === 'partial' && newVal === 'full') {
+        if (!this.query && !this.campus && !this.college && !this.year && !this.showLikedOnly) {
+          // 无筛选时，full 数据已包含当前 50 条，保持页面不跳变
+          return;
+        }
+        this.currentPage = 1;
+      }
+    },
   },
 }).mount('#app');
