@@ -17,14 +17,53 @@ TIMEOUT = 15
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _decode_html(raw):
+    """鲁棒解码 HTML：优先 <meta charset> 声明，其次 UTF-8 严格，再次 GB18030 兜底。
+
+    华师站点编码混杂（现代站 UTF-8、老站 GBK/GB2312）。仅用 charset_normalizer 易把
+    GBK 误判为 UTF-8（页面混有 ASCII 时），导致中文乱码、日期解析错位（如 ibc 站点把
+    「2025年12月30日」丢失，侧边栏 ASCII 日期被误当讲座时间）。故增加 meta 声明优先 +
+    GB18030 超集兜底，覆盖绝大多数中文站点。
+    """
+    # 1) <meta charset> / <meta http-equiv=Content-Type> 显式声明优先
+    try:
+        head = raw[:2048].decode('latin-1', errors='ignore')
+        m = re.search(r'charset\s*=\s*[\'"]?\s*([a-z0-9\-_]+)', head, re.I)
+        if m:
+            enc = m.group(1).strip().lower()
+            if enc in ('gb2312', 'gbk', 'gb18030', 'gbk2312'):
+                enc = 'gb18030'
+            elif enc in ('big5', 'big5hkscs'):
+                enc = 'big5'
+            if enc not in ('utf-8', 'utf8', 'us-ascii', 'ascii', 'iso-8859-1'):
+                try:
+                    return raw.decode(enc)
+                except UnicodeDecodeError:
+                    pass
+    except Exception:
+        pass
+    # 2) UTF-8 严格优先（现代站点主流）
+    try:
+        raw.decode('utf-8')
+        return raw.decode('utf-8')
+    except UnicodeDecodeError:
+        pass
+    # 3) GB18030 兜底（GBK/GB2312 超集，覆盖老站点）
+    try:
+        return raw.decode('gb18030')
+    except UnicodeDecodeError:
+        pass
+    # 4) charset_normalizer 最终兜底
+    best = charset_normalizer.from_bytes(raw).best()
+    if best:
+        return str(best)
+    return raw.decode('utf-8', errors='replace')
+
+
 def fetch(url):
     try:
         r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-        # 华师部分站点为 GBK 编码，需按字节自动识别，避免中文乱码
-        best = charset_normalizer.from_bytes(r.content).best()
-        if best:
-            return str(best)
-        return r.content.decode('utf-8', errors='replace')
+        return _decode_html(r.content)
     except Exception as e:
         print(f'[WARN] fetch failed {url}: {e}', file=sys.stderr)
         return None
@@ -38,7 +77,7 @@ EXCLUDE_TITLE_KW = ['通知', '招聘', '答辩', '公示', '大赛', '初赛', 
                     '培训', '宣讲', '招募', '报名', '征稿', '评奖', '获奖', '喜报',
                     '放假', '就业', '职路', '生涯', '课程', '安排', '年会', '夏令营',
                     '实习', '调剂', '复试', '录取', '考试', '成果获', '研究成果', '论文', '发表',
-                    '论点摘编', '出版', '立项', '结项', '获批', '荣获', '工作坊']
+                    '论点摘编', '出版', '立项', '结项', '获批', '荣获']
 # 常见 CMS 内容页 URL 特征：/a/20260616/348.html 或 /xueshujiangzuo/2026/0628/74.html
 _CONTENT_URL_RE = re.compile(r'/((a/\d{8}/\d+\.html)|(\d{4}/\d{4}/\d+\.html)|(\d{4}/\d{2}/\d{2}/.*\.html))', re.I)
 

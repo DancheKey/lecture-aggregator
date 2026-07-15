@@ -250,6 +250,42 @@ def _year_from_url(url):
     return None
 
 
+def _split_location_time(loc):
+    """从地点字段中抽取被 OCR 混入的时间区间，返回 (clean_loc, (h0, m0, h1, m1) or None)。
+
+    汕尾校区教学工作坊等海报详情页：正文只有一张海报图，OCR 出的正文既含地点也含时间，
+    如「南教-209教室14: 30-17: 00」「蔚教-101教室14: 30-16: O0士办单位 …」。
+    把时间分离出来，地点只保留「南教-209教室」这样的纯地点，时间稍后补到 lectureStart/End。
+    OCR 常见噪声：冒号被识为分号「;」、数字 0 被识为字母 O。需一并容忍。
+    """
+    if not loc:
+        return loc, None
+    # 容忍 OCR 把时间区间的冒号写成「;」、把 0 写成 O/o
+    pat = re.compile(
+        r'(\d{1,2})\s*[:;]\s*([O0-9]{1,2})\s*[-–~—]\s*(\d{1,2})\s*[:;]\s*([O0-9]{1,2})?'
+    )
+    m = pat.search(loc)
+    if not m:
+        return loc, None
+
+    def fix(x):
+        return int(str(x).replace('O', '0').replace('o', '0'))
+
+    try:
+        h0, m0 = fix(m.group(1)), fix(m.group(2))
+        h1, m1 = fix(m.group(3)), fix(m.group(4)) if m.group(4) else 0
+    except (ValueError, TypeError):
+        return loc, None
+    # 合理性校验（含 OCR 把 17:30 误识成 17:30 等正常情况）；越界则放弃分离
+    if not (0 <= h0 < 24 and 0 <= m0 < 60 and 0 <= h1 < 24 and 0 <= m1 < 60):
+        return loc, None
+    # 截掉时间及其后的「主办单位…」等 OCR 噪声，仅保留地点本体
+    clean = loc[:m.start()].strip()
+    clean = re.sub(r'[\s]*[曷号]+$\s*', '', clean).strip()
+    clean = re.sub(r'\s+[^\u4e00-\u9fa5a-zA-Z0-9]{1,2}\s*$', '', clean).strip()
+    return clean or loc, (h0, m0, h1, m1)
+
+
 def parse_detail(html, url, college, campus, default_year=None, list_title=None):
     soup = BeautifulSoup(html, 'html.parser')
     # 列表页标题通常就是干净的讲座标题，优先使用；否则回退到详情页 h1/title
@@ -291,9 +327,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     body_text = re.sub(r'\s+', ' ', body_text).strip()
     body_text = _normalize_label_text(body_text)
     ocr_text = ''
-    if content_div and len(body_text) < 50:
+    # 预收集正文图片（用于「解析不到日期时按需 OCR 海报」），避免对正文较长的页面也强制 OCR。
+    imgs = []
+    if content_div:
         base_url = url
-        imgs = []
         for img in content_div.find_all('img'):
             src = img.get('src')
             if not src:
@@ -307,13 +344,22 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
             else:
                 src = base_url.rsplit('/', 1)[0] + '/' + src
             imgs.append(src)
-        if imgs:
-            ocr_text = ' '.join(_img_to_text(img) for img in imgs[:3])
-            if ocr_text:
-                # 清理 OCR 中常见的顶部/底部噪声
-                ocr_text = _clean_ocr_text(ocr_text)
-                body_text = (body_text + ' ' + ocr_text).strip()
-                text = (text + ' ' + ocr_text).strip()
+
+    def _do_ocr():
+        """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
+        nonlocal ocr_text, body_text, text
+        if ocr_text or not imgs:
+            return
+        raw = ' '.join(_img_to_text(img) for img in imgs[:3])
+        if raw:
+            # 清理 OCR 中常见的顶部/底部噪声
+            ocr_text = _clean_ocr_text(raw)
+            body_text = (body_text + ' ' + ocr_text).strip()
+            text = (text + ' ' + ocr_text).strip()
+
+    # 正文近乎为空（纯海报页）时直接 OCR
+    if len(body_text) < 50:
+        _do_ocr()
 
     # 发布时间：优先在正文区域内匹配，避免整页导航/版权把日期带偏。
     # 格式 1：发布：YYYY-MM-DD HH:MM[:SS]
@@ -339,6 +385,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     title_year = _year_from_text(title) if title else None
     url_year = _year_from_url(url)
 
+    # 海报 OCR 场景中，地点字段常混入时间区间（如「南教-209教室14: 30-17: 00」），
+    # 用 loc_times 累积「(start_h, start_m, end_h, end_m)」元组，解析完日期后回填到讲座时间。
+    loc_times = []
+
     result = {
         'sourceUrl': url,
         'college': college,
@@ -356,6 +406,13 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     }
 
     t = parse_cn_time(text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
+    # 正文（含 meta）未解析出日期，但正文含海报图片：对海报 OCR 后重试，
+    # 以恢复「时间待定」记录里海报上的真实日期。仅在此情形触发 OCR，
+    # 避免对正文较长、日期已在文字中的页面做无谓的 OCR 重抓。
+    if not t and imgs:
+        _do_ocr()
+        if ocr_text:
+            t = parse_cn_time(text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
     # 若解析结果与发布时间同一天，很可能解析到的是发布日期而非讲座日期；
     # 优先使用列表标题（通常包含真实讲座日期），其次尝试 OCR 中的明确「时间」标签。
     if t and publish_time and t['start'].strftime('%Y-%m-%d') == publish_time[:10]:
@@ -378,9 +435,28 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         result['lectureStart'] = t['start'].isoformat(sep=' ')
         result['lectureEnd'] = t['end'].isoformat(sep=' ') if t['end'] else None
 
+    # 把地点字段里分离出的时间区间回填到讲座时间：
+    #  - 若已有日期但时间完全缺失（00:00），用分离出的区间补全 start/end；
+    #  - 若 start 已有时间但 end 缺失，用分离出的结束时间补全 end；
+    # 这样海报中「地点: 南教-209教室14:30-17:00」式 OCR 能补全完整的起止时间。
+    if loc_times and result['lectureStart']:
+        h0, m0, h1, m1 = loc_times[0]
+        try:
+            st = datetime.datetime.fromisoformat(result['lectureStart'])
+            if st.hour == 0 and st.minute == 0:
+                st = st.replace(hour=h0, minute=m0)
+                result['lectureStart'] = st.isoformat(sep=' ')
+                if not result['lectureEnd']:
+                    result['lectureEnd'] = st.replace(hour=h1, minute=m1).isoformat(sep=' ')
+            elif not result['lectureEnd'] and (h1, m1) != (st.hour, st.minute):
+                result['lectureEnd'] = st.replace(hour=h1, minute=m1).isoformat(sep=' ')
+        except (ValueError, TypeError):
+            pass
+
     # 字段标签前瞻——每个字段只取到下一个标签为止
     # 美术学院常见标签：讲座题目、主讲嘉宾、学术主持、主办单位、上一篇/下一篇
     LABELS = (
+        '教学工作坊时间|教学工作坊地点|'
         '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|'
         '讲座题目|讲座时间|讲座地点|主办单位|学术主持|上一篇|下一篇|Tags|'
         '地点|题目|主题|讲座主题|演讲题目|报告主题|'
@@ -406,6 +482,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         loc = m.group(1).strip()
         # 美术学院等页面：地点后常粘连「主办单位/上一篇/下一篇/Tags/版权」等噪声，优先截断
         loc = re.split(r'(?:主办单位|上一篇|下一篇|Tags|Copyright|版权所有|All Rights Reserved|SCNU)', loc)[0].strip()
+        # 汕尾校区教学工作坊海报：地点标签常为「教学工作坊地点:」，且「教学工作坊时间:」中的
+        # 「时间」二字会 premature 触发 STOP，把「教学工作坊」后缀带进地点；这里显式剔除。
+        loc = re.sub(r'教学工作坊.*$', '', loc).strip()
         # 地点值通常很短；如果超过 60 字符说明仍吃到了后续内容，截断到第一个句号/逗号
         if len(loc) > 60:
             loc = re.split(r'[。，;；\n]', loc)[0].strip()
@@ -415,12 +494,23 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         # 折叠 CMS 把地点拆成单字/单数字造成的空格（如「理 6 栋 302」→「理6栋302」），
         # 仅合并「中文-中文/中文-数字/数字-中文」间的空格，保留英文单词与纯数字间的空格。
         loc = re.sub(r'(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5\d])|(?<=\d)\s+(?=[\u4e00-\u9fa5])', '', loc).strip()
+        # 海报 OCR 场景中，地点字段常被混入时间区间（如「南教-209教室14: 30-17: 00」）
+        # 或「南教-209教室14: 30-17; 主办甲位: …」式 OCR 噪声。把时间分离出来补到讲座时间，
+        # 地点只保留纯地点。
+        loc, loc_time = _split_location_time(loc)
+        if loc_time:
+            loc_times.append(loc_time)
         result['location'] = loc
 
     # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
-    speaker_pat = rf'(?:主讲[人师]|主讲|报告人|主讲嘉宾|演讲人|报告专家|报告嘉宾)\s*[：:]\s*(.+?){STOP}'
+    # 注意：排除「主讲《…》」（正文里「主讲《课程名》」是动宾短语，不是主讲人标签），
+    # 否则会把书名号后的课程名误当主讲人（如汕尾校区海报 bio 中的「主讲《动物组织学与胚胎学》」）。
+    # 汕尾校区教学工作坊海报用「主讲专家:」「专家姓名:」标注主讲人，一并纳入。
+    speaker_label_found = False
+    speaker_pat = rf'(?:主讲[人师]|主讲(?!《)(?:专家)?|报告人|主讲嘉宾|演讲人|报告专家|报告嘉宾|专家姓名)\s*[：:]\s*(.+?){STOP}'
     m = re.search(speaker_pat, text)
     if m:
+        speaker_label_found = True
         sp = m.group(1).strip()
         # 如果值太长，先在第一个非 speaker/affiliation 的标点处截断，避免把整段简历都吞进来
         if len(sp) > 25:
@@ -555,7 +645,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
             result['topic'] = narrative['topic']
         if not result['location'] and narrative.get('location'):
             result['location'] = narrative['location']
-        if not result['speaker'] and narrative.get('speaker'):
+        # 若已识别到主讲人标签（即便其值为空，如汕尾海报「专家姓名:」与「活动主题:」错位），
+        # 不再用叙事兜底覆盖，避免把研究方向片段（如「毒理及细胞对话机制」）误当主讲人。
+        if not result['speaker'] and not speaker_label_found and narrative.get('speaker'):
             result['speaker'] = narrative['speaker']
         if not result.get('abstract') and narrative.get('abstract'):
             result['abstract'] = narrative['abstract']

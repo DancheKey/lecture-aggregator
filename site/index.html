@@ -105,26 +105,35 @@
     <img src="motto.webp" alt="华南师范大学校训" loading="lazy" decoding="async" class="hidden xl:block fixed right-16 top-1/2 -translate-y-1/2 w-60 h-auto object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 90vh;" />
 
     <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
-          <!-- 统计 + 年份筛选 + 清除 -->
-          <div v-if="!loading" class="flex flex-wrap items-center justify-between gap-2 mb-5">
-            <div class="text-[12pt] text-slate-500">
-              共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
-              <span class="ml-1 text-[11pt] text-slate-400">· 覆盖 {{ displaySource }} 条来源通知</span>
-              <span v-if="updatedAt" class="ml-1 text-[11pt] text-slate-400">· 更新于 {{ updatedAt.slice(0, 10) }}</span>
-              <template v-if="filtered.length !== totalCount">
-                · 当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
-              </template>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <input v-model="query" type="search" placeholder="搜索讲座 / 主讲人…"
-                class="w-36 sm:w-56 px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
-              <select v-model="year" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1 bg-white focus:border-blue-500 focus:outline-none">
-                <option value="">全部年份</option>
-                <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
-              </select>
-              <button v-if="campus || college || year || query"
-                @click="clearFilters"
-                class="text-[12pt] text-slate-400 hover:text-blue-600">清除筛选 ✕</button>
+          <!-- 统计 + 筛选工具栏：同一行，筛选时左侧文字切换为"当前筛选"，避免控件跳行 -->
+          <div v-if="!loading" class="mb-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <!-- 左侧统计文字：筛选时显示"当前筛选"，否则显示"更新于" -->
+              <div class="text-[12pt] text-slate-500 flex flex-wrap items-center gap-1">
+                共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
+                <span class="text-slate-300">·</span>
+                覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知
+                <template v-if="filtered.length !== totalCount">
+                  <span class="text-slate-300">·</span>
+                  当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
+                </template>
+                <template v-else-if="updatedAt">
+                  <span class="text-slate-300">·</span>
+                  更新于 {{ updatedAt.slice(0, 10) }}
+                </template>
+              </div>
+              <!-- 右侧筛选控件：固定不换行，避免输入时跳行 -->
+              <div class="flex items-center gap-2 flex-nowrap shrink-0">
+                <input v-model="query" type="search" placeholder="搜索讲座 / 主讲人…"
+                  class="w-36 sm:w-56 min-w-0 px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                <select v-model="year" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                  <option value="">全部年份</option>
+                  <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
+                </select>
+                <button v-if="campus || college || year || query"
+                  @click="clearFilters"
+                  class="text-[12pt] text-slate-400 hover:text-blue-600">清除筛选 ✕</button>
+              </div>
             </div>
           </div>
 

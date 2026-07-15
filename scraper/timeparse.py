@@ -33,6 +33,15 @@ def _apply_period(hh, period):
 
 
 def _build(m, seg, y, mo, d):
+    # 防御：月份/日期/年份越界（如 URL 路径 2025/0507 被 SLASH_MONTHDAY 误匹配成
+    # "月=25/日=05"）直接返回 None，避免构造 datetime 抛异常导致整条解析失败；
+    # 调用方会回退到其他日期模式或留空，而非丢弃整条讲座。
+    try:
+        y_i, mo_i, d_i = int(y), int(mo), int(d)
+    except (ValueError, TypeError):
+        return None
+    if not (1 <= mo_i <= 12) or not (1 <= d_i <= 31) or y_i <= 0:
+        return None
     seg = seg[m.start():]
     period = 0
     pm = re.search(r'(上午|早上|中午|下午|晚上|傍晚)', seg)
@@ -40,15 +49,57 @@ def _build(m, seg, y, mo, d):
         period = PERIOD_OFFSET[pm.group(1)]
     times = re.findall(r'(\d{1,2})\s*' + COLON + r'\s*(\d{2})', seg)
     if not times:
-        return {'start': datetime(int(y), int(mo), int(d), 0, 0),
+        return {'start': datetime(y_i, mo_i, d_i, 0, 0),
                 'end': None, 'has_time': False}
     h0 = _apply_period(int(times[0][0]), period)
-    start = datetime(int(y), int(mo), int(d), h0, int(times[0][1]))
+    start = datetime(y_i, mo_i, d_i, h0, int(times[0][1]))
     end = None
     if len(times) > 1:
         h1 = _apply_period(int(times[1][0]), period)
-        end = datetime(int(y), int(mo), int(d), h1, int(times[1][1]))
+        end = datetime(y_i, mo_i, d_i, h1, int(times[1][1]))
     return {'start': start, 'end': end, 'has_time': True}
+
+
+def _parse_compact_run(m, seg, yy, run):
+    """抗 OCR 噪声的紧凑数字日期：年份后接 3-6 位乱序数字（如 2024111128 / 20241715 / 2024715）。
+
+    汕尾校区教学工作坊海报经 easyocr 后，日期常被粘连成无分隔符的数字串，
+    且可能多/少一位（如「2024年11月28日」→「2024111128」、月份被重复一次；
+    「2024年7月5日」→「20241715」，斜杠被误识成「1」）。
+    这里对 run 做多种切分试探，按优先级取首个「月∈[1,12] 且 日∈[1,31]」的合法组合。
+
+    额外处理：若标准切分失败，尝试把 run 中的「1」当作斜杠/分隔符的 OCR 误识别
+    （如「1715」→「7/5」），从而恢复单数月日格式。
+    """
+    n = len(run)
+    cands = []
+    if n == 3:
+        cands.append((int(run[0]), int(run[1:])))
+    elif n == 4:
+        cands.append((int(run[:2]), int(run[2:])))      # 主切分：MM=前两位
+        cands.append((int(run[0]), int(run[1:])))        # 单数月：715 -> (7,15)
+    elif n == 5:
+        cands.append((int(run[1:3]), int(run[3:])))      # 首部多一位
+        cands.append((int(run[:2]), int(run[2:4])))      # 尾部多一位
+    elif n == 6:
+        if run[0:2] == run[2:4]:
+            # 月份被重复一次：111128 -> 11(月) 28(日)
+            cands.append((int(run[2:4]), int(run[4:6])))
+        else:
+            cands.append((int(run[:2]), int(run[2:4])))
+            cands.append((int(run[2:4]), int(run[4:6])))
+    for mo, d in cands:
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            return _build(m, seg, str(yy), str(mo), str(d))
+
+    # 兜底：把「1」当作斜杠/分隔符的 OCR 误识别（如 2024/7/5 → 20241715）
+    if '1' in run:
+        parts = [p for p in re.split(r'1', run) if p and p.isdigit()]
+        if len(parts) == 2:
+            mo, d = int(parts[0]), int(parts[1])
+            if 1 <= mo <= 12 and 1 <= d <= 31:
+                return _build(m, seg, str(yy), str(mo), str(d))
+    return None
 
 
 def _parse_segment(seg, default_year, publish_time):
@@ -56,25 +107,36 @@ def _parse_segment(seg, default_year, publish_time):
     pub = publish_time[:10] if publish_time else None
     y = default_year
 
-    # 1) 完整日期（含中文年）：最可靠，优先使用显式年份。
+    # 1) 完整中文日期（含中文年）：最可靠，优先使用显式年份。
     #    YYYY年M月D日 不可能是发布时间，可直接命中。
     m = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日', seg)
     if m:
         return _build(m, seg, m.group(1), m.group(2), m.group(3))
 
-    # 2) 完整日期 YYYY-MM-DD / YYYY.MM.DD：跳过等于发布日期的，避免把发布日期当讲座日期。
-    for p in [r'(\d{4})-(\d{2})-(\d{2})', r'(\d{4})\.(\d{2})\.(\d{2})']:
+    # 2) 完整日期 YYYY-MM-DD / YYYY.MM.DD / YYYY/M/D / YYYY/MMDD：
+    #    跳过等于发布日期的，避免把发布日期当讲座日期。
+    for p in [r'(\d{4})-(\d{2})-(\d{2})',
+              r'(\d{4})\.(\d{2})\.(\d{2})',
+              r'(\d{4})/(\d{1,2})/(\d{1,2})',   # 2023/11/30、2024/3/14、2025/5/8
+              r'(\d{4})/(\d{2})(\d{2})']:        # 2023/1119（年 + MMDD 无内分隔）
         for m in re.finditer(p, seg):
             if pub and f"{m.group(1)}-{m.group(2).zfill(2)}-{m.group(3).zfill(2)}" == pub:
                 continue
             return _build(m, seg, m.group(1), m.group(2), m.group(3))
 
-    # 3) 仅有 M月D日：使用外部传入的默认年份（title_year / url_year / publish_time / current）
+    # 3) 抗 OCR 噪声的紧凑数字日期：年份后接 3-6 位乱序数字（如 2024111128 / 2024715）。
+    m = re.search(r'20(\d{2})\D{0,3}?(\d{3,6})', seg)
+    if m:
+        cand = _parse_compact_run(m, seg, 2000 + int(m.group(1)), m.group(2))
+        if cand:
+            return cand
+
+    # 4) 仅有 M月D日：使用外部传入的默认年份（title_year / url_year / publish_time / current）
     md = re.search(MONTHDAY, seg)
     if md:
         return _build(md, seg, y, md.group(1), md.group(2))
 
-    # 4) 图片 OCR 常见美式月日：06/10，默认取 default_year
+    # 5) 图片 OCR 常见美式月日：06/10，默认取 default_year
     sm = re.search(SLASH_MONTHDAY, seg)
     if sm:
         # 避免把日期时间 2026/06/10 中的 MM/DD 重复解析；slash 月日要求前无四位年份
@@ -99,10 +161,12 @@ def _year_from_text(text):
 
 
 def _apply_publish_correction(res, publish_time):
-    """发布时间交叉校验：讲座不可能早于发布时间。
+    """发布时间交叉校验：仅当解析年份比发布年早 2 年及以上时才修正。
 
-    若解析出的年份早于发布年（典型 OCR/正文漏年份被默认成更早或解析错位），
-    将年份抬到发布年。这是单向安全修正，不会把正常「发布后举办」的讲座改错。
+    典型场景是 OCR/正文漏年份导致的明显错位（如把 2024 解成 2022）。
+    年差 0 或 1 年的跨年讲座（如 2025-12 讲座、2026-01 发布）属正常预告，
+    不应被抬年——否则会破坏「发布时间晚于讲座时间即新闻」的过滤判断，
+    导致跨年新闻稿被误判为未来讲座而漏过滤。
     """
     if not res or not publish_time:
         return res
@@ -110,7 +174,7 @@ def _apply_publish_correction(res, publish_time):
         pub_y = int(publish_time[:4])
     except (ValueError, IndexError):
         return res
-    if res['start'].year < pub_y:
+    if pub_y - res['start'].year >= 2:
         res['start'] = res['start'].replace(year=pub_y)
         if res['end']:
             res['end'] = res['end'].replace(year=pub_y)
@@ -149,7 +213,7 @@ def parse_cn_time(text, default_year=None, publish_time=None, title_year=None, u
         # 移除「发布时间：」标签本身，避免正文里的「时间：」标签被它抢先匹配
         clean = re.sub(r'发布\s*时间\s*[：:]\s*', '', clean)
 
-    lm = re.search(r'(时间|讲座时间)[：:]\s*(.{0,40})', clean)
+    lm = re.search(r'(时间|时闻|讲座时间|讲座时闻)\s*[：:]?\s*(.{0,80})', clean)
     if lm:
         res = _parse_segment(lm.group(2), effective_default, publish_time)
         if res:

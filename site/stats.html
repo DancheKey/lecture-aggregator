@@ -48,15 +48,22 @@
     </header>
 
     <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div>
-          <h1 class="text-[18pt] font-bold text-slate-800">各学院 / 部处讲座统计</h1>
-          <p class="text-[12pt] text-slate-500 mt-1">
-            去重后 <span class="font-semibold text-slate-800">{{ displayLecture }}</span> 场讲座，覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知，跨 <span class="font-semibold text-slate-800">{{ years.length }}</span> 个年份。
-          </p>
+      <div class="mb-4">
+        <h1 class="text-[18pt] font-bold text-slate-800">各学院 / 部处讲座统计</h1>
+        <p class="text-[12pt] text-slate-500 mt-1">
+          去重后 <span class="font-semibold text-slate-800">{{ displayLecture }}</span> 场讲座，覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知，跨 <span class="font-semibold text-slate-800">{{ years.length }}</span> 个年份。
+        </p>
+      </div>
+
+      <!-- 排序 + 筛选学院：同一行（筛选学院在左，排序在右） -->
+      <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+          <label class="text-[12pt] text-slate-500 whitespace-nowrap">筛选学院：</label>
+          <input v-model="collegeFilter" type="text" placeholder="输入学院/部处名称..."
+            class="w-full sm:w-64 px-3 py-1.5 rounded-lg border border-slate-200 text-[12pt] focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 bg-white" />
         </div>
-        <div class="flex items-center gap-2">
-          <span class="text-[12pt] text-slate-500">排序：</span>
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <span class="text-[12pt] text-slate-500 whitespace-nowrap">排序：</span>
           <button @click="toggleSort('college')"
             :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'college' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按学院名</button>
           <button @click="toggleSort('total')"
@@ -66,13 +73,6 @@
           <button @click="toggleSort('likes')"
             :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'likes' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按点赞数</button>
         </div>
-      </div>
-
-      <!-- 学院筛选：未来学院数量多时便于快速定位 -->
-      <div class="mb-3 flex flex-col sm:flex-row sm:items-center gap-2">
-        <label class="text-[12pt] text-slate-500 whitespace-nowrap">筛选学院：</label>
-        <input v-model="collegeFilter" type="text" placeholder="输入学院/部处名称..."
-          class="w-full sm:w-72 px-3 py-1.5 rounded-lg border border-slate-200 text-[12pt] focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 bg-white" />
       </div>
 
       <!-- 统计表格：横向可滚动、首列固定、纵向最大高度滚动 -->
