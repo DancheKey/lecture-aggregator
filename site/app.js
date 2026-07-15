@@ -316,12 +316,24 @@ createApp({
         body: JSON.stringify({ url }),
       }).catch(() => {});
     },
-    // 加载站点访问量：有后端用后端，无后端（公网静态）降级用不蒜子
+    // 加载站点访问量：优先级 本地后端 > countapi.xyz > 不蒜子
+    // 避免公网静态版因不蒜子偶发不可用而长期显示 0
     loadSiteVisits() {
+      // 1) 本地后端（server.py）直接返回真实总数
       fetch('/api/visits', { cache: 'no-store' })
         .then(r => r.json())
-        .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; } })
-        .catch(() => { this.hasBackend = false; this._loadBusuanzi(); });
+        .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; } else throw new Error('no-total'); })
+        .catch(() => {
+          // 2) 公网静态版：countapi.xyz（CORS 友好、无需密钥，两页共用同一命名空间保证一致）
+          fetch('https://api.countapi.xyz/hit/lecture-aggregator/site', { cache: 'no-store' })
+            .then(r => r.json())
+            .then(j => { if (j && typeof j.value === 'number') { this.siteVisits = j.value; this.hasBackend = true; } else throw new Error('no-value'); })
+            .catch(() => {
+              // 3) 最终回退不蒜子
+              this.hasBackend = false;
+              this._loadBusuanzi();
+            });
+        });
     },
     _loadBusuanzi() {
       if (document.getElementById('busuanzi_pure_mini_js')) return;
