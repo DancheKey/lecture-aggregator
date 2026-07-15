@@ -40,6 +40,9 @@ createApp({
       currentPage: 1,      // 当前页码
       showBackTop: false,  // 滚动超过阈值后显示「回到顶部」按钮
       expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
+      // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
+      displayTotal: 1,
+      displaySource: 1,
     };
   },
 
@@ -463,7 +466,51 @@ createApp({
           this._applyLectureData(resp);
           this.dataStage = 'full';
         })
-        .catch(e => { console.error('加载完整讲座数据失败', e); });
+        .catch(e => { console.error('加载完整讲座数据失败', e); this.finalizeCountAnimation(); });
+    },
+
+    /* ---------- 顶部数字滚动动画 ----------
+     * 页面加载即开始从 1 快速向上滚动；完整数据（dataStage='full'）到达后，
+     * 从当前滚动值平滑过渡到真实值，定格在 totalCount / sourceNoticeCount，
+     * 从而避免「先显示 50 再跳到 865」的突兀跳变。
+     */
+    startCountAnimation() {
+      if (this._countRAF) return;
+      const ROLL_MS = 1500;   // 滚动阶段时长（ease-out 逼近软上限）
+      const CEIL = 950;       // 软上限，避免在没有真实值时飞得太高
+      const t0 = performance.now();
+      const tick = (now) => {
+        if (!this._finalized) {
+          const t = Math.min((now - t0) / ROLL_MS, 1);
+          const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
+          const v = Math.max(1, Math.floor(1 + e * (CEIL - 1)));
+          this.displayTotal = v;
+          this.displaySource = Math.max(1, Math.floor(v * 1.02));
+          this._countRAF = requestAnimationFrame(tick);
+        } else {
+          const dt = Math.min((now - this._finalStart) / 700, 1);
+          const e = 1 - Math.pow(1 - dt, 3);
+          this.displayTotal = Math.round(this._fromTotal + e * (this._toTotal - this._fromTotal));
+          this.displaySource = Math.round(this._fromSource + e * (this._toSource - this._fromSource));
+          if (dt >= 1) {
+            this.displayTotal = this._toTotal;
+            this.displaySource = this._toSource;
+            this._countRAF = null;
+            return;
+          }
+          this._countRAF = requestAnimationFrame(tick);
+        }
+      };
+      this._countRAF = requestAnimationFrame(tick);
+    },
+    finalizeCountAnimation() {
+      if (this._finalized) return;
+      this._finalized = true;
+      this._finalStart = performance.now();
+      this._fromTotal = this.displayTotal;
+      this._fromSource = this.displaySource;
+      this._toTotal = this.totalCount;
+      this._toSource = this.sourceNoticeCount;
     },
 
     /* ---------- 触发后端抓取 ---------- */
@@ -497,6 +544,7 @@ createApp({
   },
 
   mounted() {
+    this.startCountAnimation();
     this.loadLikes();
     this.loadSiteVisits();
     this.loadLectureStats();
@@ -522,6 +570,7 @@ createApp({
     showLikedOnly() { this.currentPage = 1; },
     // 数据阶段从 partial 变 full 时，如果当前没有筛选，保持当前页；否则回到第一页
     dataStage(newVal, oldVal) {
+      if (newVal === 'full') this.finalizeCountAnimation();
       if (oldVal === 'partial' && newVal === 'full') {
         if (!this.query && !this.campus && !this.college && !this.year && !this.showLikedOnly) {
           // 无筛选时，full 数据已包含当前 50 条，保持页面不跳变

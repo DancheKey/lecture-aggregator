@@ -108,8 +108,8 @@
           <!-- 统计 + 年份筛选 + 清除 -->
           <div v-if="!loading" class="flex flex-wrap items-center justify-between gap-2 mb-5">
             <div class="text-[12pt] text-slate-500">
-              共 <span class="font-semibold text-slate-800">{{ totalCount }}</span> 场讲座
-              <span class="ml-1 text-[11pt] text-slate-400">· 覆盖 {{ sourceNoticeCount }} 条来源通知</span>
+              共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
+              <span class="ml-1 text-[11pt] text-slate-400">· 覆盖 {{ displaySource }} 条来源通知</span>
               <span v-if="updatedAt" class="ml-1 text-[11pt] text-slate-400">· 更新于 {{ updatedAt.slice(0, 10) }}</span>
               <template v-if="filtered.length !== totalCount">
                 · 当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场

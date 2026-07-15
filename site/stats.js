@@ -38,6 +38,9 @@ createApp({
       loading: true,
       // 加载失败提示
       loadError: '',
+      // 顶部数字「从 1 滚动增长」动画的展示值（数据到达后平滑定格）
+      displayLecture: 1,
+      displaySource: 1,
       // 站点总访问量
       siteVisits: 0,
       // 是否接入后端（决定总访问量显示后端数据或不蒜子）
@@ -229,6 +232,44 @@ createApp({
         })
         .catch(() => { this.lectureStats = localStats; });
     },
+    // 顶部数字「从 1 滚动增长」动画：数据到达后平滑定格到真实值
+    startCountAnimation() {
+      if (this._countRAF) return;
+      const ROLL_MS = 1200, CEIL = 950;
+      const t0 = performance.now();
+      const tick = (now) => {
+        if (!this._finalized) {
+          const t = Math.min((now - t0) / ROLL_MS, 1);
+          const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
+          const v = Math.max(1, Math.floor(1 + e * (CEIL - 1)));
+          this.displayLecture = v;
+          this.displaySource = Math.max(1, Math.floor(v * 1.02));
+          this._countRAF = requestAnimationFrame(tick);
+        } else {
+          const dt = Math.min((now - this._finalStart) / 700, 1);
+          const e = 1 - Math.pow(1 - dt, 3);
+          this.displayLecture = Math.round(this._fromL + e * (this._toL - this._fromL));
+          this.displaySource = Math.round(this._fromS + e * (this._toS - this._fromS));
+          if (dt >= 1) {
+            this.displayLecture = this._toL;
+            this.displaySource = this._toS;
+            this._countRAF = null;
+            return;
+          }
+          this._countRAF = requestAnimationFrame(tick);
+        }
+      };
+      this._countRAF = requestAnimationFrame(tick);
+    },
+    finalizeCountAnimation() {
+      if (this._finalized) return;
+      this._finalized = true;
+      this._finalStart = performance.now();
+      this._fromL = this.displayLecture;
+      this._fromS = this.displaySource;
+      this._toL = this.lectureCount;
+      this._toS = this.sourceNoticeCount;
+    },
     // 加载统计页专用数据切片（ lectures/stats.json ），体积极小，避免解析 2MB+ 全量数据。
     load() {
       this.loading = true;
@@ -237,11 +278,13 @@ createApp({
         .then(resp => {
           this.summary = resp || null;
           this.loading = false;
+          this.finalizeCountAnimation();
         })
         .catch(e => {
           console.error('加载统计数据失败', e);
           this.loadError = '统计数据加载失败，请稍后刷新重试。';
           this.loading = false;
+          this.finalizeCountAnimation();
         });
     },
     // 加载站点总访问量：有后端用后端，无后端（公网静态）降级用不蒜子
@@ -262,6 +305,7 @@ createApp({
   },
 
   mounted() {
+    this.startCountAnimation();
     this.load();
     this.loadLectureStats();
     this.loadSiteVisits();
