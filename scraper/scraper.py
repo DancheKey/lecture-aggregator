@@ -10,7 +10,7 @@ import charset_normalizer
 from bs4 import BeautifulSoup
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from parsers import parse_detail, is_lecture  # noqa: E402
+from parsers import parse_detail, is_lecture, is_news_record  # noqa: E402
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; SCNULectureAggregator/0.1)'}
 TIMEOUT = 15
@@ -32,6 +32,12 @@ def fetch(url):
 
 NAV_KW = ['首页', '主页', '上一页', '下一页', '尾页', '返回', '更多', '>>',
           'home', 'about', 'contact', 'rss', 'sitemap']
+# all_items 模式下，列表标题命中这些词直接视为非讲座（通知/招聘/比赛/培训等），
+# 不再下载详情页解析。用于「学术讲座栏目但列表标题即讲座名」的院系（如砺儒论坛、勷勤数学）。
+EXCLUDE_TITLE_KW = ['通知', '招聘', '答辩', '公示', '大赛', '初赛', '复赛', '决赛',
+                    '培训', '宣讲', '招募', '报名', '征稿', '评奖', '获奖', '喜报',
+                    '放假', '就业', '职路', '生涯', '课程', '安排', '年会', '夏令营',
+                    '实习', '调剂', '复试', '录取', '考试']
 # 常见 CMS 内容页 URL 特征：/a/20260616/348.html 或 /xueshujiangzuo/2026/0628/74.html
 _CONTENT_URL_RE = re.compile(r'/((a/\d{8}/\d+\.html)|(\d{4}/\d{4}/\d+\.html)|(\d{4}/\d{2}/\d{2}/.*\.html))', re.I)
 
@@ -79,6 +85,9 @@ def collect_links(html, base, list_url=None, collect_mode='auto'):
             # 排除明显导航词
             tlow = txt.lower()
             if any(k in tlow for k in NAV_KW):
+                continue
+            # 排除标题命中负向关键词的非讲座条目（通知/招聘/比赛/培训等）
+            if any(k in txt for k in EXCLUDE_TITLE_KW):
                 continue
             # 排除过短文本（导航常见）
             if len(txt) < 4:
@@ -228,6 +237,10 @@ def main():
                         rec = parse_detail(d, href, name, campus, year, list_title=txt)
                     except Exception as e:
                         print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
+                        continue
+                    # parse_detail 返回 None 表示命中新闻/回顾过滤，跳过不收录
+                    if rec is None:
+                        print(f'[SKIP-NEWS] {name} | {txt} | {href}')
                         continue
                     rec['listTitle'] = txt
                     lectures[href] = rec

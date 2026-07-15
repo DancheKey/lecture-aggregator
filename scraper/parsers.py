@@ -1,6 +1,7 @@
 """详情页字段解析：从华师各学院 CMS 详情页提取讲座标准字段。"""
 import re
 import io
+import datetime
 import requests
 from bs4 import BeautifulSoup
 from timeparse import parse_cn_time, _year_from_text
@@ -76,6 +77,35 @@ def is_lecture(title):
     if any(k in title for k in EXCLUDE_KW):
         return False
     return True
+
+
+def _date_head(s):
+    """从日期字符串中提取 YYYY-MM-DD 并转为 datetime.date，失败返回 None。"""
+    if not s:
+        return None
+    m = re.match(r'(\d{4})-(\d{2})-(\d{2})', s)
+    if not m:
+        return None
+    try:
+        return datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except Exception:
+        return None
+
+
+def is_news_record(rec):
+    """判断是否为新闻/回顾而非讲座预告。
+
+    主规则：发布时间晚于讲座时间（即讲座结束后才发布），视为对已结束讲座的
+    报道或回顾，不纳入聚合。
+    辅助规则：标题含明显新闻/回顾类关键词（已在 EXCLUDE_KW 中，由 is_lecture 拦截）。
+    """
+    if not rec:
+        return False
+    ls = _date_head(rec.get('lectureStart') or '')
+    pub = _date_head(rec.get('publishTime') or '')
+    if ls and pub and pub > ls:
+        return True
+    return False
 
 
 def _extract_narrative(body_text, title):
@@ -529,5 +559,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
             result['speaker'] = narrative['speaker']
         if not result.get('abstract') and narrative.get('abstract'):
             result['abstract'] = narrative['abstract']
+
+    # 新闻/回顾过滤：发布时间晚于讲座时间，视为对已结束讲座的报道，不纳入聚合
+    if is_news_record(result):
+        return None
 
     return result

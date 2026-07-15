@@ -317,23 +317,29 @@ createApp({
       }).catch(() => {});
     },
     // 加载站点访问量：优先级 本地后端 > countapi.xyz > 不蒜子
-    // 避免公网静态版因不蒜子偶发不可用而长期显示 0
+    // 避免公网静态版因不蒜子偶发不可用而长期显示 0；首页/统计页同 origin 共享缓存，保证两页一致
     loadSiteVisits() {
+      // 0) 优先读共享缓存（任一页面成功获取后写入），避免第三方接口偶发失败显示 0
+      const cached = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
+      if (cached > 0) { this.siteVisits = cached; this.hasBackend = true; }
       // 1) 本地后端（server.py）直接返回真实总数
       fetch('/api/visits', { cache: 'no-store' })
         .then(r => r.json())
-        .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; } else throw new Error('no-total'); })
+        .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; this._persistVisits(j.total); } else throw new Error('no-total'); })
         .catch(() => {
           // 2) 公网静态版：countapi.xyz（CORS 友好、无需密钥，两页共用同一命名空间保证一致）
           fetch('https://api.countapi.xyz/hit/lecture-aggregator/site', { cache: 'no-store' })
             .then(r => r.json())
-            .then(j => { if (j && typeof j.value === 'number') { this.siteVisits = j.value; this.hasBackend = true; } else throw new Error('no-value'); })
+            .then(j => { if (j && typeof j.value === 'number') { this.siteVisits = j.value; this.hasBackend = true; this._persistVisits(j.value); } else throw new Error('no-value'); })
             .catch(() => {
               // 3) 最终回退不蒜子
               this.hasBackend = false;
               this._loadBusuanzi();
             });
         });
+    },
+    _persistVisits(v) {
+      try { localStorage.setItem('site_visits_total', String(v)); } catch (e) { /* ignore */ }
     },
     _loadBusuanzi() {
       if (document.getElementById('busuanzi_pure_mini_js')) return;
@@ -342,6 +348,14 @@ createApp({
       s.async = true;
       s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
       document.head.appendChild(s);
+      // 不蒜子异步更新后，把真实值写回共享缓存，供另一页读取，避免其显示 0
+      let tries = 0;
+      const iv = setInterval(() => {
+        const el = document.getElementById('busuanzi_value_site_pv');
+        const v = el ? parseInt((el.textContent || '0').replace(/\D/g, ''), 10) || 0 : 0;
+        if (v > 0) { this._persistVisits(v); clearInterval(iv); }
+        else if (++tries > 20) clearInterval(iv);
+      }, 500);
     },
     // 加载每条讲座的访问/点赞：优先后端，失败降级本机 localStorage
     loadLectureStats() {

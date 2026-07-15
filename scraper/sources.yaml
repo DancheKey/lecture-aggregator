@@ -5,6 +5,8 @@ sources:
   list_urls:
   - http://jky.scnu.edu.cn/xinwenzixun/tongzhigonggao/
   - http://jky.scnu.edu.cn/xinwenzixun/tongzhigonggao/2.html
+  - url: http://jky.scnu.edu.cn/research/keyanxinxi/
+    collect_mode: all_items
 - name: 哲学与社会发展学院
   campus: 石牌
   base: http://zhx.scnu.edu.cn
@@ -17,12 +19,16 @@ sources:
   list_urls:
   - http://mks.scnu.edu.cn/tongzhigonggao/
   - http://mks.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://mks.scnu.edu.cn/academic/
+    collect_mode: all_items
 - name: 历史文化学院
   campus: 石牌
   base: http://lswh.scnu.edu.cn
   list_urls:
   - http://lswh.scnu.edu.cn/tongzhigonggao/
   - http://lswh.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://lswh.scnu.edu.cn/xueshujiaoliu/
+    collect_mode: all_items
 - name: 外国语言文化学院
   campus: 石牌
   base: http://sfs.scnu.edu.cn
@@ -77,12 +83,16 @@ sources:
   list_urls:
   - http://maths.scnu.edu.cn/tongzhigonggao/
   - http://maths.scnu.edu.cn/tongzhigonggao/2.html
+  - url: https://maths.scnu.edu.cn/kexueyanjiu/xueshujiaoliu/
+    collect_mode: all_items
 - name: 生命科学学院
   campus: 石牌
   base: http://life.scnu.edu.cn
   list_urls:
   - http://life.scnu.edu.cn/tongzhigonggao/
   - http://life.scnu.edu.cn/tongzhigonggao/2.html
+  - url: https://life.scnu.edu.cn/kexueyanjiu/xueshujiaoliu/
+    collect_mode: auto
 - name: 地理科学学院
   campus: 石牌
   base: http://geography.scnu.edu.cn
@@ -114,6 +124,8 @@ sources:
   list_urls:
   - http://ibrr.scnu.edu.cn/tongzhigonggao/
   - http://ibrr.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://ibrr.scnu.edu.cn/kexueyanjiu/xueshujiaoliu/
+    collect_mode: auto
 - name: 教师教育学部
   campus: 石牌
   base: http://cte.scnu.edu.cn

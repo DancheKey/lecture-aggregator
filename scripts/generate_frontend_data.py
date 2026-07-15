@@ -65,6 +65,8 @@ def build_stats(data, updated_at):
     year_totals = {}
     # 最小讲座索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
     lectures = []
+    # 学院 -> 校区（供统计页校区筛选）
+    campus_map = {}
 
     for item in data:
         y = year_of(item)
@@ -73,7 +75,8 @@ def build_stats(data, updated_at):
         primary_url = item.get('sourceUrl') or ''
         sources = item.get('sources') or [item]
         # 累加来源通知总数
-        source_notice_count += item.get('sourceCount') or len(sources) or 1
+        s_count = item.get('sourceCount') or len(sources) or 1
+        source_notice_count += s_count
         # 预计算矩阵：按来源通知展开计数
         for src in sources:
             c = src.get('college') or '未分类'
@@ -81,14 +84,18 @@ def build_stats(data, updated_at):
             cell_year = y or UNKNOWN_YEAR
             matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
             year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
-        # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
+        # 记录学院 -> 校区映射（取主学院）
         primary_college = item.get('college') or '未分类'
         if not primary_college or primary_college == '未分类':
             primary_college = next((src.get('college') for src in sources if src.get('sourceUrl') == primary_url), '未分类')
+        if primary_college not in campus_map:
+            campus_map[primary_college] = item.get('campus') or ''
+        # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
         lectures.append({
             'u': primary_url,
             'y': y or UNKNOWN_YEAR,
             'c': primary_college,
+            's': s_count,
         })
 
     # 年份排序：数字年份降序，"其他"放最后
@@ -107,6 +114,7 @@ def build_stats(data, updated_at):
         'matrix': matrix,
         'yearTotals': year_totals,
         'lectures': lectures,
+        'campusMap': campus_map,
     }
 
 
