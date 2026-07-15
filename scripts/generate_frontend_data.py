@@ -77,17 +77,13 @@ def build_stats(data, updated_at):
         # 累加来源通知总数
         s_count = item.get('sourceCount') or len(sources) or 1
         source_notice_count += s_count
-        # 预计算矩阵：按来源通知展开计数
-        for src in sources:
-            c = src.get('college') or '未分类'
-            matrix.setdefault(c, {})
-            cell_year = y or UNKNOWN_YEAR
-            matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
-            year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
-        # 记录学院 -> 校区映射（取主学院）
+        # 预计算矩阵：按去重后讲座计数（每个 item 只计一次，按主学院/主年份）
         primary_college = item.get('college') or '未分类'
-        if not primary_college or primary_college == '未分类':
-            primary_college = next((src.get('college') for src in sources if src.get('sourceUrl') == primary_url), '未分类')
+        matrix.setdefault(primary_college, {})
+        cell_year = y or UNKNOWN_YEAR
+        matrix[primary_college][cell_year] = matrix[primary_college].get(cell_year, 0) + 1
+        year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
+        # 记录学院 -> 校区映射（取主学院）
         if primary_college not in campus_map:
             campus_map[primary_college] = item.get('campus') or ''
         # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞

@@ -24,9 +24,25 @@
             <img src="site-title.png" alt="木铎金声" class="h-8 w-auto object-contain" />
           </a>
 
+          <!-- 校区导航（桌面）：与首页一致，放在木铎金声 logo 之后 -->
+          <nav class="hidden sm:flex items-center gap-1 ml-3">
+            <button v-for="cp in campuses" :key="cp" @click="campusFilter = cp"
+              :class="['px-3 py-1.5 rounded-full text-[12pt] transition', campusFilter === cp ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
+              {{ cp === '' ? '全部' : cp }}
+            </button>
+          </nav>
+
           <div class="ml-auto flex items-center gap-2">
             <a href="./" class="text-[12pt] text-slate-600 hover:text-slate-800 whitespace-nowrap">返回首页</a>
           </div>
+        </div>
+
+        <!-- 校区导航（移动端） -->
+        <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1">
+          <button v-for="cp in campuses" :key="cp" @click="campusFilter = cp"
+            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap', campusFilter === cp ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
+            {{ cp === '' ? '全部' : cp }}
+          </button>
         </div>
       </div>
     </header>
@@ -57,15 +73,6 @@
         <label class="text-[12pt] text-slate-500 whitespace-nowrap">筛选学院：</label>
         <input v-model="collegeFilter" type="text" placeholder="输入学院/部处名称..."
           class="w-full sm:w-72 px-3 py-1.5 rounded-lg border border-slate-200 text-[12pt] focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 bg-white" />
-      </div>
-
-      <!-- 校区筛选：便于按校区统计发布情况 -->
-      <div class="mb-4 flex flex-wrap items-center gap-2">
-        <span class="text-[12pt] text-slate-500 whitespace-nowrap">校区：</span>
-        <button v-for="cp in campuses" :key="cp" @click="campusFilter = cp"
-          :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', campusFilter === cp ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">
-          {{ cp === '' ? '全部' : cp }}
-        </button>
       </div>
 
       <!-- 统计表格：横向可滚动、首列固定、纵向最大高度滚动 -->

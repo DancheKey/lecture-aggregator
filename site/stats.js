@@ -175,7 +175,7 @@ createApp({
       const counts = {};
       Object.entries(this.matrix).forEach(([college, yearMap]) => {
         if (cols && !cols.has(college)) return;
-        Object.entries(yearMap).forEach(([y, c]) => { counts[y] = (counts[y] || 0) + c; });
+        Object.entries(yearMap).forEach(([y, c]) => { counts[y] = (counts[y] || 0) + (c.count || 0); });
       });
       const totals = {};
       this.years.forEach(y => { totals[y] = { year: y, count: counts[y] || 0, visits: 0, likes: 0 }; });

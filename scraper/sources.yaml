@@ -143,11 +143,13 @@ sources:
   - http://aied.scnu.edu.cn/tongzhigonggao/
   - http://aied.scnu.edu.cn/tongzhigonggao/2.html
 - name: 光电科学与工程学院
-  campus: 石牌
+  campus: 大学城
   base: https://ose.scnu.edu.cn
   list_urls:
-  - https://ose.scnu.edu.cn/tongzhigonggao/
-  - https://ose.scnu.edu.cn/tongzhigonggao/2.html
+  - url: https://ose.scnu.edu.cn/xueshuyanjiu/xueshujiaoliu/
+    collect_mode: all_items
+  - url: https://ose.scnu.edu.cn/xueshuyanjiu/xueshujiaoliu/2.html
+    collect_mode: all_items
 - name: 文学院
   campus: 大学城
   base: http://wxy.scnu.edu.cn
@@ -169,8 +171,10 @@ sources:
   campus: 大学城
   base: http://ggy.scnu.edu.cn
   list_urls:
-  - http://ggy.scnu.edu.cn/tongzhigonggao/
-  - http://ggy.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://ggy.scnu.edu.cn/xueshukeyan/xueshudongtai/
+    collect_mode: all_items
+  - url: http://ggy.scnu.edu.cn/xueshukeyan/xueshudongtai/2.html
+    collect_mode: all_items
 - name: 体育科学学院
   campus: 大学城
   base: http://sport.scnu.edu.cn
@@ -200,8 +204,10 @@ sources:
   campus: 大学城
   base: http://sce.scnu.edu.cn
   list_urls:
-  - http://sce.scnu.edu.cn/tongzhigonggao/
-  - http://sce.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://sce.scnu.edu.cn/kexueyanjiu/xueshuhuodong/
+    collect_mode: all_items
+  - url: http://sce.scnu.edu.cn/kexueyanjiu/xueshuhuodong/2.html
+    collect_mode: all_items
 - name: 旅游管理学院
   campus: 大学城
   base: http://stm.scnu.edu.cn
@@ -218,8 +224,10 @@ sources:
   campus: 大学城
   base: http://iqm.scnu.edu.cn
   list_urls:
-  - http://iqm.scnu.edu.cn/tongzhigonggao/
-  - http://iqm.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://iqm.scnu.edu.cn/ae/
+    collect_mode: all_items
+  - url: http://iqm.scnu.edu.cn/ae/2.html
+    collect_mode: all_items
 - name: 环境学院
   campus: 大学城
   base: http://soe.scnu.edu.cn
@@ -246,8 +254,10 @@ sources:
   campus: 佛山
   base: http://abdn.scnu.edu.cn
   list_urls:
-  - http://abdn.scnu.edu.cn/tongzhigonggao/
-  - http://abdn.scnu.edu.cn/tongzhigonggao/2.html
+  - url: https://abdn.scnu.edu.cn/lecture/
+    collect_mode: all_items
+  - url: https://abdn.scnu.edu.cn/lecture/2.html
+    collect_mode: all_items
 - name: 社会科学处
   campus: 校级
   base: http://skc.scnu.edu.cn
@@ -276,20 +286,26 @@ sources:
   campus: 汕尾
   base: https://jykxsw.scnu.edu.cn
   list_urls:
-  - https://jykxsw.scnu.edu.cn/tongzhigonggao/
-  - https://jykxsw.scnu.edu.cn/tongzhigonggao/2.html
+  - url: https://jykxsw.scnu.edu.cn/xueshukeyan/Academic_Trends/
+    collect_mode: all_items
+  - url: https://jykxsw.scnu.edu.cn/xueshukeyan/Academic_Trends/2.html
+    collect_mode: all_items
 - name: 数据科学与工程学院
   campus: 汕尾
   base: http://ds.scnu.edu.cn
   list_urls:
-  - http://ds.scnu.edu.cn/tongzhigonggao/
-  - http://ds.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://ds.scnu.edu.cn/kexueyanjiu/xueshujiaoliu/
+    collect_mode: all_items
+  - url: http://ds.scnu.edu.cn/kexueyanjiu/xueshujiaoliu/2.html
+    collect_mode: all_items
 - name: 汕尾校区公共课教学部
   campus: 汕尾
   base: https://swc.scnu.edu.cn
   list_urls:
-  - http://swc.scnu.edu.cn/announce/
-  - http://swc.scnu.edu.cn/announce/2.html
+  - url: https://swc.scnu.edu.cn/collaborative/
+    collect_mode: all_items
+  - url: https://swc.scnu.edu.cn/collaborative/2.html
+    collect_mode: all_items
 - name: 材料与新能源学院
   campus: 汕尾
   base: http://smne.scnu.edu.cn
@@ -332,8 +348,10 @@ sources:
   campus: 佛山
   base: http://ibc.scnu.edu.cn
   list_urls:
-  - http://ibc.scnu.edu.cn/tongzhigonggao/
-  - http://ibc.scnu.edu.cn/tongzhigonggao/2.html
+  - url: http://ibc.scnu.edu.cn/news/xueshudongtai/
+    collect_mode: all_items
+  - url: http://ibc.scnu.edu.cn/news/xueshudongtai/2.html
+    collect_mode: all_items
 - name: 雷恩数智商学院
   campus: 佛山
   base: https://rennes.scnu.edu.cn
