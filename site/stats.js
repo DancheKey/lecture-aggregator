@@ -38,6 +38,10 @@ createApp({
       loading: true,
       // 加载失败提示
       loadError: '',
+      // 站点总访问量
+      siteVisits: 0,
+      // 是否接入后端（决定总访问量显示后端数据或不蒜子）
+      hasBackend: true,
     };
   },
 
@@ -240,10 +244,26 @@ createApp({
           this.loading = false;
         });
     },
+    // 加载站点总访问量：有后端用后端，无后端（公网静态）降级用不蒜子
+    loadSiteVisits() {
+      fetch('/api/visits', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; } })
+        .catch(() => { this.hasBackend = false; this._loadBusuanzi(); });
+    },
+    _loadBusuanzi() {
+      if (document.getElementById('busuanzi_pure_mini_js')) return;
+      const s = document.createElement('script');
+      s.id = 'busuanzi_pure_mini_js';
+      s.async = true;
+      s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
+      document.head.appendChild(s);
+    },
   },
 
   mounted() {
     this.load();
     this.loadLectureStats();
+    this.loadSiteVisits();
   },
 }).mount('#app');
