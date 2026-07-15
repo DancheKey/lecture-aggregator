@@ -43,8 +43,8 @@ createApp({
       displaySource: 1,
       // 站点总访问量
       siteVisits: 0,
-      // 是否接入后端（决定总访问量显示后端数据或不蒜子）
-      hasBackend: true,
+      // 是否接入后端（决定总访问量显示后端数据或不蒜子；与首页一致默认 false）
+      hasBackend: false,
     };
   },
 
