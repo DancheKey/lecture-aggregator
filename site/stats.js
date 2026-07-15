@@ -1,5 +1,9 @@
 /* 木铎金声 · 讲座统计页（Vue 3）
  * 从 stats.html 外部化，避免内联脚本在 file:// 或严格 CSP 下被拦截。
+ *
+ * 2026-07-15 优化：不再加载 2MB+ 全量 /api/lectures，改为加载预生成的
+ * lectures/stats.json（约 75KB），仅包含学院-年份矩阵、年份合计与最小讲座索引；
+ * 访问/点赞数仍通过 /api/lecture/stats 与本机 localStorage 动态合并后计算。
  */
 const { createApp } = Vue;
 
@@ -17,7 +21,8 @@ const UNKNOWN_YEAR = '其他';             // 讲座时间缺失时归入此类
 createApp({
   data() {
     return {
-      all: [],
+      // 来自 lectures/stats.json 的预计算数据
+      summary: null,
       // 排序状态：key = 'college' | 'total' | 'visits' | 'likes' | 年份字符串(如 '2024')
       // order = 'asc' | 'desc'（多次点击切换）
       sortBy: { key: SORT_KEY_COLLEGE, order: 'asc' },
@@ -29,24 +34,17 @@ createApp({
       collegeFilter: '',
       // 每条讲座的访问/点赞统计：url -> {visits, likes}（后端优先，无后端时回退本机）
       lectureStats: {},
+      // 是否正在加载数据（用于显示轻量提示）
+      loading: true,
+      // 加载失败提示
+      loadError: '',
     };
   },
 
   computed: {
-    // 所有出现过的年份（降序：最新年份在左），无法识别的讲座时间归入“其他”并放在最后
+    // 所有出现过的年份（由后端预计算好，最新年份在左，"其他"在最后）
     years() {
-      const set = new Set();
-      this.all.forEach(l => {
-        const y = this.yearOf(l);
-        if (y) set.add(y);
-      });
-      const arr = Array.from(set).sort((a, b) => b.localeCompare(a));
-      const idx = arr.indexOf(UNKNOWN_YEAR);
-      if (idx >= 0) {
-        arr.splice(idx, 1);
-        arr.push(UNKNOWN_YEAR);
-      }
-      return arr;
+      return (this.summary && this.summary.years) || [];
     },
 
     // 当前展示模式：count（讲座数）/ visits（访问量）/ likes（点赞量）
@@ -54,32 +52,40 @@ createApp({
       return this.displayMode;
     },
 
-    // 来源通知总数（合并后按各讲座的 sourceCount 求和）
+    // 去重后讲座总数
+    lectureCount() {
+      return (this.summary && this.summary.lectureCount) || 0;
+    },
+
+    // 来源通知总数（由后端预计算：按各讲座来源通知展开）
     sourceNoticeCount() {
-      return this.all.reduce((a, l) => a + (l.sourceCount || 1), 0);
+      return (this.summary && this.summary.sourceNoticeCount) || 0;
     },
 
     // 学院 -> 年份 -> {count, visits, likes}
-    // count 按各讲座的 sources（来源通知）展开计数，使「各学院/部处之和」= 原始发布条数；
-    // visits/likes 为讲座级统计，仅按主卡 url 计一次，避免按来源重复累加。
+    // count 来自预计算矩阵；visits/likes 由最小讲座索引 + lectureStats 动态合并。
     matrix() {
       const m = {};
-      this.all.forEach(l => {
-        const y = this.yearOf(l);
-        if (!y) return;
-        const primaryUrl = l.sourceUrl || '';
-        const st = this.lectureStats[primaryUrl] || { visits: 0, likes: 0 };
-        const sources = (l.sources && l.sources.length) ? l.sources : [l];
-        sources.forEach(src => {
-          const c = src.college || '未分类';
-          m[c] = m[c] || {};
-          const cell = m[c][y] = m[c][y] || { count: 0, visits: 0, likes: 0 };
-          cell.count += 1;
-          if (src.sourceUrl === primaryUrl) {
-            cell.visits += (st.visits || 0);
-            cell.likes += (st.likes || 0);
-          }
+      const rawMatrix = (this.summary && this.summary.matrix) || {};
+      // 先写入预计算的 count
+      Object.entries(rawMatrix).forEach(([college, yearMap]) => {
+        m[college] = {};
+        Object.entries(yearMap).forEach(([year, count]) => {
+          m[college][year] = { count: count || 0, visits: 0, likes: 0 };
         });
+      });
+      // 再叠加访问/点赞（按主卡 url 计一次，避免按来源重复累加）
+      const lectures = (this.summary && this.summary.lectures) || [];
+      lectures.forEach(l => {
+        const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
+        if (!st.visits && !st.likes) return;
+        const c = l.c || '未分类';
+        const y = l.y || UNKNOWN_YEAR;
+        const cell = (m[c] && m[c][y]) || { count: 0, visits: 0, likes: 0 };
+        cell.visits += (st.visits || 0);
+        cell.likes += (st.likes || 0);
+        if (!m[c]) m[c] = {};
+        m[c][y] = cell;
       });
       return m;
     },
@@ -123,20 +129,24 @@ createApp({
       return list;
     },
 
-    // 每年合计：count 按来源通知展开，visits/likes 按主卡计一次
+    // 每年合计：count 来自预计算 yearTotals；visits/likes 动态叠加。
     yearTotals() {
-      return this.years.map(y => {
-        const yearLectures = this.all.filter(l => this.yearOf(l) === y);
-        let count = 0, visits = 0, likes = 0;
-        yearLectures.forEach(l => {
-          const sources = (l.sources && l.sources.length) ? l.sources : [l];
-          count += sources.length;
-          const st = this.lectureStats[l.sourceUrl || ''] || { visits: 0, likes: 0 };
-          visits += (st.visits || 0);
-          likes += (st.likes || 0);
-        });
-        return { year: y, count, visits, likes };
+      const rawTotals = (this.summary && this.summary.yearTotals) || {};
+      const totals = {};
+      Object.entries(rawTotals).forEach(([year, count]) => {
+        totals[year] = { year, count: count || 0, visits: 0, likes: 0 };
       });
+      const lectures = (this.summary && this.summary.lectures) || [];
+      lectures.forEach(l => {
+        const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
+        if (!st.visits && !st.likes) return;
+        const y = l.y || UNKNOWN_YEAR;
+        const t = totals[y] || { year: y, count: 0, visits: 0, likes: 0 };
+        t.visits += (st.visits || 0);
+        t.likes += (st.likes || 0);
+        totals[y] = t;
+      });
+      return this.years.map(y => totals[y] || { year: y, count: 0, visits: 0, likes: 0 });
     },
 
     // 总合计
@@ -154,14 +164,6 @@ createApp({
   },
 
   methods: {
-    yearOf(l) {
-      if (!l) return UNKNOWN_YEAR;
-      if (l.lectureStart) return String(l.lectureStart).slice(0, 4);
-      // 部分讲座未解析到具体时间，但发布时间或标题里包含年份，据此归入对应年份
-      const m = (l.publishTime || '').match(/^(\d{4})/) || (l.title || '').match(/(\d{4})/);
-      if (m) return m[1];
-      return UNKNOWN_YEAR;
-    },
     // 切换排序：
     //  - 点击年份列：仅改变排序键，保持当前显示模式（仍按访问数/点赞数展示并排序）
     //  - 点击顶部排序按钮：同时设置显示模式与排序键
@@ -223,21 +225,25 @@ createApp({
         })
         .catch(() => { this.lectureStats = localStats; });
     },
+    // 加载统计页专用数据切片（ lectures/stats.json ），体积极小，避免解析 2MB+ 全量数据。
     load() {
-      fetch('/api/lectures', { cache: 'no-store' })
-        .then(r => { if (!r.ok) throw new Error('api'); return r.json(); })
-        .then(resp => { this.all = (resp && resp.data) ? resp.data : (Array.isArray(resp) ? resp : []); })
-        .catch(() => fetch('lectures.json', { cache: 'no-store' })
-          .then(r => r.json())
-          .then(arr => { this.all = (arr && arr.data) ? arr.data : (arr || []); })
-          .catch(e => console.error('加载讲座数据失败', e)));
+      this.loading = true;
+      fetch('lectures/stats.json', { cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('stats'); return r.json(); })
+        .then(resp => {
+          this.summary = resp || null;
+          this.loading = false;
+        })
+        .catch(e => {
+          console.error('加载统计数据失败', e);
+          this.loadError = '统计数据加载失败，请稍后刷新重试。';
+          this.loading = false;
+        });
     },
   },
 
   mounted() {
     this.load();
     this.loadLectureStats();
-    const loader = document.getElementById('page-loading');
-    if (loader) loader.style.display = 'none';
   },
 }).mount('#app');

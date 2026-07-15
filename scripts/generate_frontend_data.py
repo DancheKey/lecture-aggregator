@@ -5,6 +5,8 @@
     用于 GitHub Pages 首屏快速渲染 + 完整筛选。
   - site/lectures/latest.json：仅保留最新 50 条（首页第一页），字段与 lite.json 一致，
     体积最小，用于"先渲染第一页，后台再加载完整数据"的渐进体验。
+  - site/lectures/stats.json：统计页专用，包含预计算的学院-年份矩阵、年份合计、
+    以及用于动态访问/点赞数的最小讲座索引，避免统计页加载 2MB+ 全量数据。
 
 运行：python scripts/generate_frontend_data.py
 """
@@ -15,11 +17,26 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
 SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
 LATEST_SIZE = 50
+UNKNOWN_YEAR = '其他'
 
 
 def strip_fields(item):
     """去掉首页列表用不到的大字段。"""
     return {k: v for k, v in item.items() if k not in ('abstract', 'speakerBio')}
+
+
+def year_of(item):
+    """与 stats.js 保持一致的年份提取逻辑。"""
+    if item.get('lectureStart'):
+        return str(item['lectureStart'])[:4]
+    m = (item.get('publishTime') or '').strip()[:4] or None
+    if m and m.isdigit():
+        return m
+    t = (item.get('title') or '')
+    m2 = __import__('re').search(r'(\d{4})', t)
+    if m2:
+        return m2.group(1)
+    return UNKNOWN_YEAR
 
 
 def load_lectures():
@@ -38,6 +55,61 @@ def sort_for_latest(data):
     return sorted(data, key=key, reverse=True)
 
 
+def build_stats(data, updated_at):
+    """生成统计页专用 JSON：预计算矩阵 + 最小讲座索引。"""
+    years_set = set()
+    source_notice_count = 0
+    # 学院 -> 年份 -> 来源通知数
+    matrix = {}
+    # 年份 -> 来源通知数
+    year_totals = {}
+    # 最小讲座索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
+    lectures = []
+
+    for item in data:
+        y = year_of(item)
+        if y:
+            years_set.add(y)
+        primary_url = item.get('sourceUrl') or ''
+        sources = item.get('sources') or [item]
+        # 累加来源通知总数
+        source_notice_count += item.get('sourceCount') or len(sources) or 1
+        # 预计算矩阵：按来源通知展开计数
+        for src in sources:
+            c = src.get('college') or '未分类'
+            matrix.setdefault(c, {})
+            cell_year = y or UNKNOWN_YEAR
+            matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
+            year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
+        # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
+        primary_college = item.get('college') or '未分类'
+        if not primary_college or primary_college == '未分类':
+            primary_college = next((src.get('college') for src in sources if src.get('sourceUrl') == primary_url), '未分类')
+        lectures.append({
+            'u': primary_url,
+            'y': y or UNKNOWN_YEAR,
+            'c': primary_college,
+        })
+
+    # 年份排序：数字年份降序，"其他"放最后
+    def year_key(y):
+        return (0, y) if y.isdigit() else (1, y)
+
+    years = sorted([y for y in years_set if y.isdigit()], key=lambda y: -int(y))
+    if UNKNOWN_YEAR in years_set:
+        years.append(UNKNOWN_YEAR)
+
+    return {
+        'updatedAt': updated_at,
+        'lectureCount': len(data),
+        'sourceNoticeCount': source_notice_count,
+        'years': years,
+        'matrix': matrix,
+        'yearTotals': year_totals,
+        'lectures': lectures,
+    }
+
+
 def main():
     os.makedirs(SITE_DIR, exist_ok=True)
     data, updated_at = load_lectures()
@@ -48,6 +120,7 @@ def main():
     sorted_data = sort_for_latest(data)
     latest = [strip_fields(item) for item in sorted_data[:LATEST_SIZE]]
     lite = [strip_fields(item) for item in data]
+    stats = build_stats(data, updated_at)
 
     wrapper = {'updatedAt': updated_at, 'data': latest}
     with open(os.path.join(SITE_DIR, 'latest.json'), 'w', encoding='utf-8') as f:
@@ -57,10 +130,16 @@ def main():
     with open(os.path.join(SITE_DIR, 'lite.json'), 'w', encoding='utf-8') as f:
         json.dump(wrapper, f, ensure_ascii=False, separators=(',', ':'))
 
+    with open(os.path.join(SITE_DIR, 'stats.json'), 'w', encoding='utf-8') as f:
+        json.dump(stats, f, ensure_ascii=False, separators=(',', ':'))
+
     latest_bytes = os.path.getsize(os.path.join(SITE_DIR, 'latest.json'))
     lite_bytes = os.path.getsize(os.path.join(SITE_DIR, 'lite.json'))
+    stats_bytes = os.path.getsize(os.path.join(SITE_DIR, 'stats.json'))
+    stats_lectures_count = len(stats['lectures'])
     print(f'[done] latest.json: {len(latest)} 条 ({latest_bytes / 1024:.1f} KB)')
     print(f'[done] lite.json: {len(lite)} 条 ({lite_bytes / 1024:.1f} KB)')
+    print(f'[done] stats.json: {stats_lectures_count} 条索引 ({stats_bytes / 1024:.1f} KB)')
 
 
 if __name__ == '__main__':
