@@ -3,11 +3,6 @@
  */
 const { createApp } = Vue;
 
-// 首屏遮罩：Vue 挂载后显式移除 #page-loading（比纯 display:none 更干净）
-const removeOnMount = {
-  mounted(el) { el.remove(); },
-};
-
 const LIKE_KEY = 'lecture_likes_v1';
 const LIKED_KEY = 'lecture_liked_urls_v1';
 const STAT_KEY = 'lecture_stats_v1';      // 本机讲座访问/点赞统计（公网无后端时降级使用）
@@ -516,10 +511,6 @@ createApp({
 
   beforeUnmount() {
     window.removeEventListener('scroll', this.onScroll);
-  },
-
-  directives: {
-    'remove-on-mount': removeOnMount,
   },
 
   watch: {

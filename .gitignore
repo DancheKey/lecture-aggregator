@@ -9,6 +9,12 @@ venv/
 *.log
 server.log
 
+# ===== 手动备份 =====
+data/*.backup.json
+
+# ===== 截图 =====
+site/screenshots/
+
 # ===== 内部资料（不公开，避免推到公网仓库） =====
 信息源网址清单.md
 

@@ -67,7 +67,7 @@ def _img_to_text(img_url_or_bytes):
         return ''
 
 LECTURE_KW = ['学术讲座', '讲座', '学术报告', '学术沙龙', '讲坛', '报告会', '前沿讲座']
-EXCLUDE_KW = ['回顾', '总结', '新闻', '喜报', '招聘', '招生', '答辩', '公示', '报名', '获奖']
+EXCLUDE_KW = ['回顾', '总结', '新闻', '喜报', '招聘', '招生', '答辩', '公示', '报名', '获奖', '工作坊', '申请表', '改期']
 
 
 def is_lecture(title):
@@ -178,9 +178,10 @@ def _normalize_label_text(text):
     """去除常见字段标签中因 CMS 拆分 span 而混入的空格，如「题 目」「地 点」「主 讲 人」。"""
     labels = [
         # 主题/题目
-        '题目', '主题', '讲座主题', '报告题目', '演讲题目', '报告主题',
+        '题目', '主题', '讲座主题', '报告题目', '演讲题目', '报告主题', '讲座题目',
         # 时间地点人物
-        '地点', '时间', '主讲人', '主讲师', '报告人', '主讲嘉宾', '演讲人',
+        '地点', '时间', '主讲人', '主讲师', '报告人', '主讲嘉宾', '演讲人', '主讲',
+        '学术主持', '主办单位',
         # 简介/摘要/内容
         '主讲人简介', '主讲人简历', '简历', '简介',
         '摘要', '讲座内容', '讲座内容提要', '内容提要', '讲座摘要',
@@ -188,6 +189,11 @@ def _normalize_label_text(text):
         # 发布信息
         '发布时间', '发布日期', '来源',
     ]
+    # 1) 先把方括号/花括号形式的标签统一转成「标签：」
+    #    如美术学院页面：【主题】xxx、【主讲人】xxx、【时间】xxx、【地点】xxx
+    for label in sorted(labels, key=len, reverse=True):
+        text = re.sub(rf'[【\[]\s*{re.escape(label)}\s*[】\]]', label + '：', text)
+    # 2) 再处理 CMS 把标签拆成单字加空格的情况，如「题 目：」「主 讲 人：」
     # 先匹配长的复合标签，避免「讲座内容」把「讲座内容提要」先吃掉
     for label in sorted(labels, key=len, reverse=True):
         spaced = ''.join(c + r'\s*' for c in label)
@@ -230,6 +236,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         title = _clean_title(title)
 
     text = soup.get_text(' ')
+    # 美术学院等站点：正文可能是图片，但 meta description / og:description 里保存了结构化文字
+    meta_parts = []
+    for meta in (
+        soup.find('meta', attrs={'name': 'description'}),
+        soup.find('meta', property='og:description'),
+        soup.find('meta', attrs={'name': 'og:description'}),
+    ):
+        if meta and meta.get('content') and len(meta.get('content').strip()) > 3:
+            meta_parts.append(meta.get('content').strip())
+    if meta_parts:
+        text = text + ' ' + ' '.join(meta_parts)
     text = re.sub(r'\s+', ' ', text).strip()
     text = _normalize_label_text(text)
 
@@ -332,11 +349,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         result['lectureEnd'] = t['end'].isoformat(sep=' ') if t['end'] else None
 
     # 字段标签前瞻——每个字段只取到下一个标签为止
-    # 把「主题」「讲座内容提要」「摘要」等也纳入 STOP，避免 topic/地点/主讲人 把后续字段一起吃进去
+    # 美术学院常见标签：讲座题目、主讲嘉宾、学术主持、主办单位、上一篇/下一篇
     LABELS = (
         '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|'
+        '讲座题目|讲座时间|讲座地点|主办单位|学术主持|上一篇|下一篇|Tags|'
         '地点|题目|主题|讲座主题|演讲题目|报告主题|'
-        '时间|主讲[人师]|报告人|主讲嘉宾|演讲人|邀请人|'
+        '时间|主讲[人师]|主讲|报告人|主讲嘉宾|演讲人|邀请人|'
         '摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
         '讲座内容|讲座简介|报告内容|讲座概要|内容概要|'
         '简历|主讲人简介|主讲人简历|简介|专家介绍|专家简介|发布|来源'
@@ -344,7 +362,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     STOP = rf'(?=\s*(?:{LABELS}|$))'
 
     # --- 题目/主题（兼容「题目/主题/讲座主题/报告题目/演讲题目/报告主题」）---
-    topic_pat = rf'(?:题目|主题|讲座主题|报告题目|演讲题目|报告主题)[：:]\s*(.+?){STOP}'
+    topic_pat = rf'(?:讲座题目|题目|主题|讲座主题|报告题目|演讲题目|报告主题)[：:]\s*(.+?){STOP}'
     m = re.search(topic_pat, text)
     if m:
         t = m.group(1).strip()
@@ -356,7 +374,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     m = re.search(rf'地点[：:]\s*(.+?){STOP}', text)
     if m:
         loc = m.group(1).strip()
-        # 地点值通常很短；如果超过 50 字符说明吃到了后续内容，截断到第一个句号/逗号
+        # 美术学院等页面：地点后常粘连「主办单位/上一篇/下一篇/Tags/版权」等噪声，优先截断
+        loc = re.split(r'(?:主办单位|上一篇|下一篇|Tags|Copyright|版权所有|All Rights Reserved|SCNU)', loc)[0].strip()
+        # 地点值通常很短；如果超过 60 字符说明仍吃到了后续内容，截断到第一个句号/逗号
         if len(loc) > 60:
             loc = re.split(r'[。，;；\n]', loc)[0].strip()
         # 去除 OCR 尾部常见乱码或装饰字符（如「曷」「号」）
@@ -367,27 +387,34 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         loc = re.sub(r'(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5\d])|(?<=\d)\s+(?=[\u4e00-\u9fa5])', '', loc).strip()
         result['location'] = loc
 
-    # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人」）---
-    speaker_pat = rf'(?:主讲[人师]|报告人|主讲嘉宾|演讲人|报告专家|报告嘉宾)\s*[：:]\s*(.+?){STOP}'
+    # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
+    speaker_pat = rf'(?:主讲[人师]|主讲|报告人|主讲嘉宾|演讲人|报告专家|报告嘉宾)\s*[：:]\s*(.+?){STOP}'
     m = re.search(speaker_pat, text)
     if m:
         sp = m.group(1).strip()
+        # 如果值太长，先在第一个非 speaker/affiliation 的标点处截断，避免把整段简历都吞进来
+        if len(sp) > 25:
+            cut = re.search(r'[，、；。]', sp[4:])
+            if cut:
+                sp = sp[:4 + cut.start()].strip()
         # 去掉尾部职称后缀
-        sp_clean = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|研究员|教授|讲师|博士后|博士|院士|老师|先生|女士).*$', '', sp).strip()
+        sp_clean = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', sp).strip()
         # 尝试拆分姓名+单位（括号形式）
         mm = re.match(r'(.+?)\s*[（(]([^）)]{2,40})[）)]', sp)
         if mm:
             result['speaker'] = sp_clean.split('（')[0].strip()
-            result['speakerAffiliation'] = re.sub(r'\s+', '', mm.group(2))
+            aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm.group(2)).strip()
+            result['speakerAffiliation'] = re.sub(r'\s+', '', aff)
         else:
             # 空格分隔的「姓名 职称 单位」或「姓名 单位」（如物理学院「郑炜 教授 中国科学技术大学」）
-            _TITLES = r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|研究员|教授|讲师|博士后|博士|院士|老师)'
+            _TITLES = r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师)'
             mm2 = re.match(rf'^([\u4e00-\u9fa5·]{{2,5}})\s+[\u4e00-\u9fa5]{{0,4}}{_TITLES}\s+([\u4e00-\u9fa5A-Za-z].{{2,40}})$', sp)
             if not mm2:
                 mm2 = re.match(r'^([\u4e00-\u9fa5·]{2,5})\s+([\u4e00-\u9fa5]{4,40})$', sp)
             if mm2:
                 result['speaker'] = mm2.group(1).strip()
-                result['speakerAffiliation'] = re.sub(r'\s+', '', mm2.group(2)).strip()
+                aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm2.group(2)).strip()
+                result['speakerAffiliation'] = re.sub(r'\s+', '', aff).strip()
             else:
                 result['speaker'] = sp_clean
 
