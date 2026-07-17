@@ -27,6 +27,8 @@ site/screenshots/
 
 # ===== 内部资料（不公开，避免推到公网仓库） =====
 信息源网址清单.md
+EVALUATION.md
+需求规格说明书.md
 
 # ===== 运行时 / 增量状态 =====
 # 注意：data/last_scrape.json 必须入库！GitHub Actions 每日定时抓取依赖它在
