@@ -557,8 +557,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     if m_time_label:
         # 关键：标注值已含完整 4 位年份，是权威年份，绝不能再传 publish_time 触发
         # 「解析年<发布年就抬年」的修正——否则旧讲座（如 2016 年）在 2025 年批量重发时，
-        # 会被发布年 2025 强行抬年。故此处只传 default_year，不传 publish/title/url year。
-        t_label = parse_cn_time(m_time_label.group(1).strip(), default_year)
+        # 会被发布年 2025 强行抬年。故此处不传 publish_time。
+        # 但 default_year 本身可能因当前系统时间而变成未来年（如 2026），若标注子串因
+        # 非常规结尾（"号"）等未被识别为完整日期，月份日会被错误填充为当前未来年。因此
+        # 仍把 title_year/url_year 作为年份回退提示传入，保持权威年份优先且避免未来年污染。
+        t_label = parse_cn_time(m_time_label.group(1).strip(), default_year,
+                                 title_year=title_year, url_year=url_year)
         if t_label:
             t = t_label
     if not t:

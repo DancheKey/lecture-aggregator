@@ -126,7 +126,8 @@ def _parse_segment(seg, default_year, publish_time):
 
     # 1) 完整中文日期（含中文年）：最可靠，优先使用显式年份。
     #    YYYY年M月D日 不可能是发布时间，可直接命中。
-    m = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日', seg)
+    #    兼容 "日" 与 "号" 两种常见结尾（如 "2023年12月29号"）。
+    m = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]', seg)
     if m:
         return _build(m, seg, m.group(1), m.group(2), m.group(3))
 

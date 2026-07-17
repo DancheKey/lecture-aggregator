@@ -51,6 +51,7 @@ site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{la
 - **中文「点」时间**：支持「下午3点」「上午10点30分」「3点半」→ 叠加上下午偏移。
 - **URL 路径日期兜底** `_date_from_url`：华师 CMS 详情页 URL 内嵌完整日期（`/a/20241122/141.html`、`/a/2025/0507/74.html`），是相对时间/海报 OCR 不可用时的主力兜底。
 - **年份修正 `_apply_publish_correction`**：**仅当解析年份比发布年早 ≥2 年才抬年**。年差 0/1 的跨年讲座（2025-12 讲座、2026-01 发布）是正常预告，不动。
+- **「号」字兼容**：中文日期结尾有「日」也有「号」（如「2023年12月29号」）。`timeparse._parse_segment` 的完整中文日期正则必须同时支持两种结尾，否则完整年份会未被识别，回退到 `M月D日` 并用当前系统年（如 2026）填充，导致未来年污染。`parsers.py` 正文标注递归调用时仍须传 `title_year`/`url_year` 作为年份回退，但不传 `publish_time`。
 
 ### 1.3 字段清洗（`parsers.py`）
 - **标题 `_clean_title`**：去除列表锚文本粘入的日期前缀（`2024-05-21艺术乡建…` → `艺术乡建…`）；仅匹配「年+月+日」完整日期，正文年份如「2023年越南…」不误删。
@@ -87,6 +88,8 @@ site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{la
 14. **OCR 沙箱硬崩**：RapidOCR 已无 torch 依赖，批量修数据无需禁用；若个别环境崩，`parsers._img_to_text = lambda img: ''` 置空即可降级。
 15. **URL 路径日期被 SLASH_MONTHDAY 误匹配**：URL 路径 `2025/0507/` 中的 `25/05` 会被误当「月=25/日=05」触发异常。`timeparse._build` 已加 mo∈[1,12]、d∈[1,31]、y>0 校验，非法返回 None 回退其他模式。
 16. **数据双份一致性**：`data/lectures.json`（爬虫产出）与 `site/lectures.json`（Pages 实际读）必须一致；手动改数据后务必 `cp data/lectures.json site/lectures.json`。
+17. **正文时间标注里的「号」字导致未来年污染**：中文日期结尾有「日」也有「号」（如「2023年12月29号下午14:00」）。`timeparse._parse_segment` 完整中文日期正则只写了 `\s*日`，没兼容 `号`，导致命中正文 `时间：2023年12月29号` 后完整年份未被识别，回退到 `M月D日` 并用 `default_year=当前系统年`（如 2026）填充，生成 `2026-12-29` 这种错误。根因修复：`timeparse._parse_segment` 第 1 步改为 `\s*[日号]`。同时 `parsers.py` 高优先级时间标注递归调用传入 `title_year`/`url_year` 作为年份回退（仍不传 `publish_time`，防旧讲座重发被抬年）。修复后必须删旧记录重抓（计算机学院 2026-12-29 等 4 条即此修复）。
+
 
 ---
 
