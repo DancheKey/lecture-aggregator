@@ -91,7 +91,7 @@ site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{la
 17. **正文时间标注里的「号」字导致未来年污染**：中文日期结尾有「日」也有「号」（如「2023年12月29号下午14:00」）。`timeparse._parse_segment` 完整中文日期正则只写了 `\s*日`，没兼容 `号`，导致命中正文 `时间：2023年12月29号` 后完整年份未被识别，回退到 `M月D日` 并用 `default_year=当前系统年`（如 2026）填充，生成 `2026-12-29` 这种错误。根因修复：`timeparse._parse_segment` 第 1 步改为 `\s*[日号]`。同时 `parsers.py` 高优先级时间标注递归调用传入 `title_year`/`url_year` 作为年份回退（仍不传 `publish_time`，防旧讲座重发被抬年）。修复后必须删旧记录重抓（计算机学院 2026-12-29 等 4 条即此修复）。
 18. **dedup 误删不同讲座（致命隐性丢数据）**：`scraper.dedup` 原判定键为 `(college, _normalize_title(title))`。当某院列表标题是通用词（如「学术报告通知」「学术讲座信息」），且 §1.3 的 `_clean_title` 已把锚文本里的日期前缀去掉后，多个**不同日期、不同 URL**的讲座会归一化成同一标题 → 撞键被合并成 1 条，其余**静默丢弃**。计算机学院曾因此从列表可达的 42 条掉到 21 条（如 `2682`「学术报告通知」与 `2715`「学术报告通知」撞键只留 1 条，零散丢失、不易察觉）。根因修复：`dedup` 判定键改为 `(college, 归一化标题, 讲座日期, 来源URL)`——**只要 sourceUrl 不同就视为不同讲座，绝不合并且丢弃**；同 URL 真重复仍正确合并（保留字段更完整的）。⚠️ 以后新增/修源若发现某院条数明显少于列表可达数，先怀疑 dedup 而非增量。
 19. **首页 / 统计页数字动画定格在旧数 + 统计页访问量为 0**：
-    - 数字动画旧实现设了 `CEIL = 950` 软上限，完整 JSON 加载前数字滚到 950 就停下，等好几秒后才跳到真实值（如 1741），造成「卡死」错觉。第一版修复用 `SPEED * sqrt(elapsed)`，但平方根曲线数值增长偏慢（2 秒才到几十），用户反馈「前面太慢、到 1000+ 才快」。最终改为**指数逼近曲线** `v = 1 + (CEIL-1) * (1 - exp(-K*elapsed))`（`CEIL=2200` 软渐近线、`K=0.23`）：起步快（约 1 秒到几百）、随后自然减速，绝不硬定格；数据到达后由 `finalizeCountAnimation` 平滑过渡（见 §3.7.1）。
+    - 数字动画旧实现设了 `CEIL = 950` 软上限，完整 JSON 加载前数字滚到 950 就停下，等好几秒后才跳到真实值（如 1741），造成「卡死」错觉。第一版修复用 `SPEED * sqrt(elapsed)`，但平方根曲线数值增长偏慢（2 秒才到几十），用户反馈「前面太慢、到 1000+ 才快」。第二版改**指数逼近曲线** `1 + (CEIL-1)*(1-exp(-K*t))`（`CEIL=2200`），但上限高于真实值，网络慢时滚动会**超过真实值再回落**，体感差。最终定为**二次加速 + 封顶**：`v = min(TARGET, 1 + A*t^2)`（`TARGET=1700`≈当前真实总量、`A=70`），起步慢（约 1 秒到 70）、逐渐加快、到 ~5 秒封顶 1700（低于真实 1741，永不超、不回落）；数据到达后由 `finalizeCountAnimation` 平滑过渡到真实值（见 §3.7.1）。
     - 统计页访问量为 0 的根因是 CSP 太严：`stats.html` 的 `connect-src 'self'` 把 `countapi.xyz` 和不蒜子都拦截了；`index.html` 的 CSP 也没放行 `countapi.xyz`。修复：两页 CSP 统一放行 `https://busuanzi.ibruce.info` 与 `https://api.countapi.xyz`，并让 `loadSiteVisits` 先读 `localStorage` 共享缓存、再按「后端 > countapi > 不蒜子」优先级获取（见 §3.7.2）。
 
 
@@ -133,10 +133,10 @@ site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{la
 
 公网无后端，首页先加载 `lectures/latest.json`（50 条）再后台加载 `lectures/lite.json`（全量）；统计页直接加载 `lectures/stats.json`。两页顶部都有「讲座数 / 来源通知数」滚动动画，底部共享站点总访问量。为保证体验与一致性，约定如下：
 
-#### 3.7.1 数字滚动动画：不设硬上限、慢慢滚、数据到达后平滑过渡
+#### 3.7.1 数字滚动动画：从 1 二次加速、封顶不超真实值、数据到达后平滑过渡
 - 旧的实现用 `CEIL = 950` 作为滚动软上限，导致 950 这个「历史数字」在屏幕上停留数秒，等完整 JSON 到达后才跳到真实值（如 1741），视觉上像「卡死」。
-- 正确做法：`startCountAnimation` 不设硬上限，从 1 开始按**指数逼近曲线** `v = 1 + (CEIL-1) * (1 - Math.exp(-K * elapsed))` 增长（`CEIL = 2200` 为软渐近线、`K = 0.23` 为速率）：起步快（约 1 秒到几百）、随后自然减速逼近软上限，**绝不硬定格在某一数字**；数据到达后调用 `finalizeCountAnimation`，从当前显示值平滑过渡（easeOutCubic，约 700ms）到 `totalCount` / `sourceNoticeCount`。
-- 即使完整数据在 3–5 秒后才到，数字也只会滚到一两百，然后自然补到真实值，**不会出现定格在旧数字上的情况**。
+- 正确做法：`startCountAnimation` 从 1 开始按**二次加速 + 封顶**曲线 `v = min(TARGET, 1 + A * elapsed^2)` 增长（`TARGET = 1700` 为软上限，略低于当前真实总量 `1741`；`A = 70` 为加速度）：起步慢（约 1 秒到 70）、**逐渐加快**、到约 5 秒封顶在 1700。因为 `TARGET` 低于真实值，**滚动永远不超过真实值、不会出现「超了再回落」**；数据到达后调用 `finalizeCountAnimation`，从当前显示值平滑过渡（easeOutCubic，约 700ms）到 `totalCount` / `sourceNoticeCount`。
+- 调参经验：用户三次反馈迭代——① 去掉 950 硬上限（防定格）→ ② 不能用 `sqrt`（前期数值增长太慢）→ ③ 不能用「指数逼近到高于真实值的 CEIL」（网络慢会超真实值再回落）。最终二次加速封顶最稳：**TARGET 必须 ≤ 真实总量**，否则慢网络下仍会超了回落。若真实总量长期变化（如涨到 3000），把 `TARGET` 同步上调即可。
 - 涉及文件：`site/app.js`（`displayTotal` / `displaySource`）、`site/stats.js`（`displayLecture` / `displaySource`）。
 
 #### 3.7.2 站点总访问量：两页必须同源、共享缓存

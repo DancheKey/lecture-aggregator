@@ -544,15 +544,15 @@ createApp({
      */
     startCountAnimation() {
       if (this._countRAF) return;
-      // 指数逼近曲线：起步快（约 1 秒到几百），随后自然减速逼近软上限，
-      // 绝不硬定格在某一数字；数据到达后由 finalize 平滑过渡到真实值。
-      const CEIL = 2200;      // 软渐近上限（高于当前真实值，仅用于减速，永不硬停）
-      const K = 0.23;         // 速率系数：t=1s→≈450，t=3s→≈1100
+      // 二次加速曲线：起步慢、逐渐加快；封顶 TARGET(≈当前真实体量) 且永不超真实值，
+      // 杜绝「超了再回落」的体感。数据到达后由 finalize 从当前值平滑过渡到真实值。
+      const TARGET = 1700;    // 软上限≈当前真实总量(1741)，滚动封顶在此，绝不超真实值
+      const A = 70;           // 加速度：v = 1 + A*t^2，t=1s→≈71，t=3s→≈631，t≈5s→封顶1700
       const t0 = performance.now();
       const tick = (now) => {
         if (!this._finalized) {
           const elapsed = (now - t0) / 1000;
-          const v = Math.max(1, Math.floor(1 + (CEIL - 1) * (1 - Math.exp(-K * elapsed))));
+          const v = Math.min(TARGET, Math.max(1, Math.floor(1 + A * elapsed * elapsed)));
           this.displayTotal = v;
           this.displaySource = Math.max(1, Math.floor(v * 1.02));
           this._countRAF = requestAnimationFrame(tick);
