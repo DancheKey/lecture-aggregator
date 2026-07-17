@@ -89,6 +89,7 @@ site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{la
 15. **URL 路径日期被 SLASH_MONTHDAY 误匹配**：URL 路径 `2025/0507/` 中的 `25/05` 会被误当「月=25/日=05」触发异常。`timeparse._build` 已加 mo∈[1,12]、d∈[1,31]、y>0 校验，非法返回 None 回退其他模式。
 16. **数据双份一致性**：`data/lectures.json`（爬虫产出）与 `site/lectures.json`（Pages 实际读）必须一致；手动改数据后务必 `cp data/lectures.json site/lectures.json`。
 17. **正文时间标注里的「号」字导致未来年污染**：中文日期结尾有「日」也有「号」（如「2023年12月29号下午14:00」）。`timeparse._parse_segment` 完整中文日期正则只写了 `\s*日`，没兼容 `号`，导致命中正文 `时间：2023年12月29号` 后完整年份未被识别，回退到 `M月D日` 并用 `default_year=当前系统年`（如 2026）填充，生成 `2026-12-29` 这种错误。根因修复：`timeparse._parse_segment` 第 1 步改为 `\s*[日号]`。同时 `parsers.py` 高优先级时间标注递归调用传入 `title_year`/`url_year` 作为年份回退（仍不传 `publish_time`，防旧讲座重发被抬年）。修复后必须删旧记录重抓（计算机学院 2026-12-29 等 4 条即此修复）。
+18. **dedup 误删不同讲座（致命隐性丢数据）**：`scraper.dedup` 原判定键为 `(college, _normalize_title(title))`。当某院列表标题是通用词（如「学术报告通知」「学术讲座信息」），且 §1.3 的 `_clean_title` 已把锚文本里的日期前缀去掉后，多个**不同日期、不同 URL**的讲座会归一化成同一标题 → 撞键被合并成 1 条，其余**静默丢弃**。计算机学院曾因此从列表可达的 42 条掉到 21 条（如 `2682`「学术报告通知」与 `2715`「学术报告通知」撞键只留 1 条，零散丢失、不易察觉）。根因修复：`dedup` 判定键改为 `(college, 归一化标题, 讲座日期, 来源URL)`——**只要 sourceUrl 不同就视为不同讲座，绝不合并且丢弃**；同 URL 真重复仍正确合并（保留字段更完整的）。⚠️ 以后新增/修源若发现某院条数明显少于列表可达数，先怀疑 dedup 而非增量。
 
 
 ---
@@ -119,6 +120,11 @@ site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{la
 ### 3.5 推送约定
 - 本项目约定：**不主动 `git push`**，本地验证无误、人确认后才推。调试工具（`tools/`）与本地 bat 已 `.gitignore` + `git rm --cached` 排除，不入库。
 - 推送触发 `deploy.yml`（`on: push: [main]`）自动部署 `site/` 到 Pages，约 1–2 分钟生效；浏览器可能缓存旧 JSON，硬刷新 `Ctrl+Shift+R`。
+
+### 3.6 ⚠️ 源级「漏抓」问题 → 必须全量重爬（禁用增量）
+- **用户明确约定**：一旦某信息源（或某几个源）被指出「有讲座没抓到 / 抓错」，**不再套用「只抓该时间之后发布的新讲座」的增量逻辑**，而要对该源执行 `scraper.py --full --source <name>` 全量重新爬取更新（覆盖该源历史全部讲座），再重生成切片。
+- 理由：增量 `since` 只补新讲座、不回头修旧记录；而漏抓的往往是历史老讲座（2015–2022），增量永远补不上。常见根因两类：① 解析器 bug（如 §2.17「号」字、§2.18 dedup 误删）→ 旧记录不会自动更新；② 列表标题/新闻过滤误判 → 须修代码后全量重爬。
+- 多个源同时被指出问题时，逐个 `--full --source` **串行**重爬（避免写同一 `data/lectures.json` 互相覆盖）。
 
 ---
 

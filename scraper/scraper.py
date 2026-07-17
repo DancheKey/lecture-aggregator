@@ -197,11 +197,33 @@ def _normalize_title(title):
     return s
 
 
+def _completeness(r):
+    """记录字段完整度：非空关键字段越多越「完整」，去重时优先保留。"""
+    return sum(1 for v in [
+        r.get('lectureStart'), r.get('location'), r.get('speaker'),
+        r.get('speakerAffiliation'), r.get('topic'), r.get('speakerBio')
+    ] if v)
+
+
 def dedup(records):
-    """同一学院内，标题高度相似的讲座只保留一条（保留字段更完整的）。"""
+    """同源去重：同一讲座只保留一条（保留字段更完整的）。
+
+    ⚠️ 判定「同一讲座」必须 4 要素同时相同：
+        (college, 归一化标题, 讲座日期, 来源 URL)
+    只要 sourceUrl 不同，就视为不同讲座——即便标题撞车
+    （例如多期「学术报告通知」仅日期不同、列表标题被 _clean_title 去掉
+    日期前缀后都变成「学术报告通知」），也绝不合并且丢弃，否则会把
+    大量真实的不同讲座静默删掉。
+
+    这样设计：同一 URL 被不同列表页/不同次抓取重复收录时仍能正确合并
+    （同 URL 必然同 key），而不同 URL 的真实讲座永不被误删。
+    """
     groups = {}
     for rec in records:
-        key = (rec.get('college', ''), _normalize_title(rec.get('title', '')))
+        url = str(rec.get('sourceUrl', '')).rstrip('/')
+        ntitle = _normalize_title(rec.get('title', ''))
+        ls = (rec.get('lectureStart') or '')[:10]   # 仅取日期部分，忽略具体时分
+        key = (rec.get('college', ''), ntitle, ls, url)
         if key not in groups:
             groups[key] = []
         groups[key].append(rec)
@@ -212,17 +234,10 @@ def dedup(records):
         if len(group) == 1:
             kept.append(group[0])
             continue
-        # 按字段完整度排序：非空字段多的优先
-        group.sort(
-            key=lambda r: sum(1 for v in [
-                r.get('lectureStart'), r.get('location'), r.get('speaker'),
-                r.get('speakerAffiliation'), r.get('topic'), r.get('speakerBio')
-            ] if v),
-            reverse=True,
-        )
+        # 同 URL 真重复：按字段完整度排序，保留最完整的一条
+        group.sort(key=_completeness, reverse=True)
         kept.append(group[0])
         dup_count += len(group) - 1
-        names = set(r['sourceUrl'] for r in group[1:])
         print(f'[DEDUP] {key[0]} | {group[0]["title"][:40]} → 保留1条, 去重{len(group)-1}条')
     if dup_count:
         print(f'[DEDUP] 总共去除 {dup_count} 条重复记录')
