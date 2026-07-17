@@ -130,8 +130,11 @@
 
     <footer class="border-t border-slate-200 text-center text-[12pt] text-slate-400 py-6 bg-white">
       数据来源于华南师范大学各学院/部处公开站点，仅供师生参考，请以官方原文为准。
-      <span v-if="hasBackend" class="block sm:inline sm:ml-2 mt-1 sm:mt-0">· 本站总访问量 {{ siteVisits }} 次</span>
-      <span v-else class="block sm:inline sm:ml-2 mt-1 sm:mt-0">· 本站总访问量 <span id="busuanzi_value_site_pv">0</span> 次</span>
+      <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
+        · 本站总访问量 <span v-if="siteVisits != null">{{ siteVisits }}</span><span v-else>—</span> 次
+      </span>
+      <!-- 不蒜子只作为隐藏数据源，不再直接显示 0；JS 会读取其值后更新 siteVisits -->
+      <span id="busuanzi_value_site_pv" style="display:none">0</span>
     </footer>
 
   </div>

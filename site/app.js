@@ -15,6 +15,13 @@ const WORKFLOW_DISPATCH_URL = '';
 
 createApp({
   data() {
+    // 页面加载瞬间就从共享缓存读访问量，避免一开始显示 0；没有缓存则显示占位符 —
+    const cachedVisits = (() => {
+      try {
+        const v = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
+        return v > 0 ? v : null;
+      } catch (e) { return null; }
+    })();
     return {
       all: [],
       mtime: 0,
@@ -33,8 +40,8 @@ createApp({
       likedUrls: new Set(), // 当前浏览器已点赞的 url 集合
       loading: true,       // 首屏数据加载中（避免闪现空列表）
       dataStage: 'loading', // 'loading' | 'partial' | 'full'：渐进加载阶段
-      siteVisits: 0,       // 站点总访问量
-      hasBackend: false,   // 是否存在后端（/api/visits 可用）
+      siteVisits: cachedVisits, // 站点总访问量（null 表示尚未从任何来源拿到）
+      hasBackend: cachedVisits != null, // 是否已从本地后端或第三方拿到有效值
       lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
       toast: { show: false, message: '', timer: null },
       pageSize: 25,        // 每页显示条数（配合渐进式加载，首屏更快）
@@ -366,8 +373,8 @@ createApp({
             .then(r => r.json())
             .then(j => { if (j && typeof j.value === 'number') { this.siteVisits = j.value; this.hasBackend = true; this._persistVisits(j.value); } else throw new Error('no-value'); })
             .catch(() => {
-              // 3) 最终回退不蒜子
-              this.hasBackend = false;
+              // 3) 最终回退不蒜子。注意：不要再把 hasBackend 设为 false，否则模板会显示 0；
+              // 保持当前已有显示（缓存值），后台加载不蒜子，成功后再更新 siteVisits。
               this._loadBusuanzi();
             });
         });
@@ -382,12 +389,12 @@ createApp({
       s.async = true;
       s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
       document.head.appendChild(s);
-      // 不蒜子异步更新后，把真实值写回共享缓存，供另一页读取，避免其显示 0
+      // 不蒜子异步更新后，把真实值写回共享缓存并更新 siteVisits，供另一页读取
       let tries = 0;
       const iv = setInterval(() => {
         const el = document.getElementById('busuanzi_value_site_pv');
         const v = el ? parseInt((el.textContent || '0').replace(/\D/g, ''), 10) || 0 : 0;
-        if (v > 0) { this._persistVisits(v); clearInterval(iv); }
+        if (v > 0) { this.siteVisits = v; this.hasBackend = true; this._persistVisits(v); clearInterval(iv); }
         else if (++tries > 20) clearInterval(iv);
       }, 500);
     },

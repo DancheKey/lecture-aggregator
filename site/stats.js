@@ -22,6 +22,13 @@ const CAMPUSES = ['', '石牌', '大学城', '佛山', '汕尾', '校级'];
 // 表格首列固定、表头固定，未来年份多、学院多时仍可一页内滚动查看。
 createApp({
   data() {
+    // 页面加载瞬间就从共享缓存读访问量，避免一开始显示 0；没有缓存则显示占位符 —
+    const cachedVisits = (() => {
+      try {
+        const v = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
+        return v > 0 ? v : null;
+      } catch (e) { return null; }
+    })();
     return {
       // 来自 lectures/stats.json 的预计算数据
       summary: null,
@@ -47,10 +54,10 @@ createApp({
       // 顶部数字「从 1 滚动增长」动画的展示值（数据到达后平滑定格）
       displayLecture: 1,
       displaySource: 1,
-      // 站点总访问量
-      siteVisits: 0,
-      // 是否接入后端（决定总访问量显示后端数据或不蒜子；与首页一致默认 false）
-      hasBackend: false,
+      // 站点总访问量（null 表示尚未从任何来源拿到）
+      siteVisits: cachedVisits,
+      // 是否已从本地后端或第三方拿到有效值
+      hasBackend: cachedVisits != null,
     };
   },
 
@@ -353,8 +360,8 @@ createApp({
             .then(r => r.json())
             .then(j => { if (j && typeof j.value === 'number') { this.siteVisits = j.value; this.hasBackend = true; this._persistVisits(j.value); } else throw new Error('no-value'); })
             .catch(() => {
-              // 3) 最终回退不蒜子
-              this.hasBackend = false;
+              // 3) 最终回退不蒜子。注意：不要再把 hasBackend 设为 false，否则模板会显示 0；
+              // 保持当前已有显示（缓存值），后台加载不蒜子，成功后再更新 siteVisits。
               this._loadBusuanzi();
             });
         });
@@ -369,12 +376,12 @@ createApp({
       s.async = true;
       s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
       document.head.appendChild(s);
-      // 不蒜子异步更新后，把真实值写回共享缓存，供另一页读取，避免其显示 0
+      // 不蒜子异步更新后，把真实值写回共享缓存并更新 siteVisits，供另一页读取
       let tries = 0;
       const iv = setInterval(() => {
         const el = document.getElementById('busuanzi_value_site_pv');
         const v = el ? parseInt((el.textContent || '0').replace(/\D/g, ''), 10) || 0 : 0;
-        if (v > 0) { this._persistVisits(v); clearInterval(iv); }
+        if (v > 0) { this.siteVisits = v; this.hasBackend = true; this._persistVisits(v); clearInterval(iv); }
         else if (++tries > 20) clearInterval(iv);
       }, 500);
     },
