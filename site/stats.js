@@ -283,13 +283,15 @@ createApp({
     // 不预设硬上限，避免旧数值（如 950）在屏幕上「定格」等待。
     startCountAnimation() {
       if (this._countRAF) return;
-      const SPEED = 42;       // 每秒约增长 42，视觉上「慢慢滚」但永不上限
+      // 指数逼近曲线：起步快（约 1 秒到几百），随后自然减速逼近软上限，
+      // 绝不硬定格在某一数字；数据到达后由 finalize 平滑过渡到真实值。
+      const CEIL = 2200;      // 软渐近上限（高于当前真实值，仅用于减速，永不硬停）
+      const K = 0.23;         // 速率系数：t=1s→≈450，t=3s→≈1100
       const t0 = performance.now();
       const tick = (now) => {
         if (!this._finalized) {
           const elapsed = (now - t0) / 1000;
-          // 平方根曲线：增速逐渐放缓，无硬上限；数据到达后自然过渡
-          const v = Math.max(1, Math.floor(1 + SPEED * Math.sqrt(elapsed)));
+          const v = Math.max(1, Math.floor(1 + (CEIL - 1) * (1 - Math.exp(-K * elapsed))));
           this.displayLecture = v;
           this.displaySource = Math.max(1, Math.floor(v * 1.02));
           this._countRAF = requestAnimationFrame(tick);
