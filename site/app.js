@@ -39,6 +39,7 @@ createApp({
       toast: { show: false, message: '', timer: null },
       pageSize: 25,        // 每页显示条数（配合渐进式加载，首屏更快）
       currentPage: 1,      // 当前页码
+      gotoInput: '',        // 跳页输入框的临时值
       showBackTop: false,  // 滚动超过阈值后显示「回到顶部」按钮
       expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
       // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
@@ -158,18 +159,24 @@ createApp({
       return Math.max(1, Math.ceil(this.filtered.length / this.pageSize));
     },
 
-    // 智能分页页码：当前页前后最多2页 + 首尾，省略号占位
+    // 智能分页页码：当前页前后各 2 页 + 首尾，省略号占位（边界平滑过渡）
     pageNumbers() {
       const total = this.totalPages;
       const cur = this.currentPage;
-      if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+      if (total <= 9) return Array.from({ length: total }, (_, i) => i + 1);
       const pages = [];
-      if (cur <= 3) {
-        pages.push(1, 2, 3, 4, 5, '...', total);
-      } else if (cur >= total - 2) {
-        pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total);
+      const left = Math.max(1, cur - 2);
+      const right = Math.min(total, cur + 2);
+      if (left > 2) {
+        pages.push(1, '...');
       } else {
-        pages.push(1, '...', cur - 1, cur, cur + 1, '...', total);
+        for (let i = 1; i < left; i++) pages.push(i);
+      }
+      for (let i = left; i <= right; i++) pages.push(i);
+      if (right < total - 1) {
+        pages.push('...', total);
+      } else {
+        for (let i = right + 1; i <= total; i++) pages.push(i);
       }
       return pages;
     },
@@ -412,6 +419,14 @@ createApp({
     },
     prevPage() { this.gotoPage(this.currentPage - 1); },
     nextPage() { this.gotoPage(this.currentPage + 1); },
+    // 跳页输入框：支持「跳转」按钮或回车，自动 clamp 到 [1, 总页数]
+    jumpToPage() {
+      const n = parseInt(this.gotoInput, 10);
+      if (!Number.isNaN(n)) {
+        this.gotoPage(n);
+        this.gotoInput = '';
+      }
+    },
     // 点击卡片上的学院/校区 Tag → 直接筛选该维度
     onTagClick(field, val) {
       if (field === 'college') this.college = val;

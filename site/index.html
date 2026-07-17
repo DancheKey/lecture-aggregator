@@ -225,7 +225,14 @@
             </template>
             <button @click="nextPage" :disabled="currentPage === totalPages"
               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
-            <span class="ml-3 text-slate-400 whitespace-nowrap">第 {{ currentPage }} / {{ totalPages }} 页 · 每页 {{ pageSize }} 条</span>
+            <span class="ml-3 inline-flex items-center gap-1 whitespace-nowrap">
+              <span class="text-slate-400">跳至</span>
+              <input type="number" min="1" :max="totalPages" v-model.number="gotoInput" @keydown.enter="jumpToPage"
+                class="w-16 px-2 py-1.5 text-center rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <span class="text-slate-400">页</span>
+              <button @click="jumpToPage"
+                class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">跳转</button>
+            </span>
           </nav>
     </main>
 
