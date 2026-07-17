@@ -283,6 +283,9 @@ def _clean_title(t):
         t = t.split(' - ')[0].strip()
     if '｜' in t:
         t = t.split('｜')[0].strip()
+    # 列表页锚文本常把发布日期前缀粘进标题（如「2024-05-21艺术乡建…」「2023年12月24日红树林…」）。
+    # 去掉标题开头的日期前缀，仅保留真实讲座标题。日期本身已由时间解析单独处理。
+    t = re.sub(r'^\s*(?:19|20)\d{2}\s*[-/年\.]\s*\d{1,2}\s*[-/月\.]\s*\d{1,2}\s*[日号]?\s*', '', t).strip()
     return t
 
 
@@ -544,7 +547,22 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         'publishTime': publish_time,
     }
 
-    t = parse_cn_time(text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
+    # 高优先级：正文显式「时间：<完整年月日[时分]>」标注是讲座时间的权威来源，
+    # 直接解析该标注子串——避免被侧边栏「相关新闻/最新公告」等处的松散日期污染
+    # （如地理科学学院把旧讲座在 2025-03-16 批量重发，侧边栏日期会盖过正文的真实讲座日期）。
+    # 要求标注值以完整 4 位年份日期开头，才认定为权威；否则（如「时间：周四10:00」相对时间）走通用解析。
+    t = None
+    m_time_label = re.search(
+        r'(?:讲座时间|报告时间|活动时间|时间)[：:\s]*((?:19|20)\d{2}\s*[-/年].{0,30})', text)
+    if m_time_label:
+        # 关键：标注值已含完整 4 位年份，是权威年份，绝不能再传 publish_time 触发
+        # 「解析年<发布年就抬年」的修正——否则旧讲座（如 2016 年）在 2025 年批量重发时，
+        # 会被发布年 2025 强行抬年。故此处只传 default_year，不传 publish/title/url year。
+        t_label = parse_cn_time(m_time_label.group(1).strip(), default_year)
+        if t_label:
+            t = t_label
+    if not t:
+        t = parse_cn_time(text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
     t_untrusted = False  # 时间来源是否不可信（URL 兜底 / 疑似发布日），供 T3 海报覆盖
     # 正文（含 meta）未解析出日期，但正文含海报图片：对海报 OCR 后重试，
     # 以恢复「时间待定」记录里海报上的真实日期。仅在此情形触发 OCR，
@@ -613,7 +631,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     LABELS = (
         '教学工作坊时间|教学工作坊地点|'
         '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|'
-        '讲座题目|讲座时间|讲座地点|主办单位|学术主持|上一篇|下一篇|Tags|'
+        '讲座题目|讲座时间|讲座地点|主办单位|学术主持|上一篇|下一篇|标签|Tags|'
         '地点|题目|主题|讲座主题|演讲题目|报告主题|'
         '时间|主讲[人师]|讲座人|主持人|主讲|报告人|主讲嘉宾|演讲人|邀请人|'
         '摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
@@ -646,7 +664,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     if m:
         loc = m.group(1).strip()
         # 美术学院等页面：地点后常粘连「主办单位/上一篇/下一篇/Tags/版权」等噪声，优先截断
-        loc = re.split(r'(?:主办单位|协办单位|承办单位|邀请人|讲座人|主持人|上一篇|下一篇|Tags|Copyright|版权所有|All Rights Reserved|SCNU)', loc)[0].strip()
+        loc = re.split(r'(?:主办单位|协办单位|承办单位|邀请人|讲座人|主持人|上一篇|下一篇|标签|Tags|Copyright|版权所有|All Rights Reserved|SCNU)', loc)[0].strip()
         # 汕尾校区教学工作坊海报：地点标签常为「教学工作坊地点:」，且「教学工作坊时间:」中的
         # 「时间」二字会 premature 触发 STOP，把「教学工作坊」后缀带进地点；这里显式剔除。
         loc = re.sub(r'教学工作坊.*$', '', loc).strip()
