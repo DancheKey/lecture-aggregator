@@ -283,20 +283,20 @@ createApp({
     // 不预设硬上限，避免旧数值（如 950）在屏幕上「定格」等待。
     startCountAnimation() {
       if (this._countRAF) return;
-      // 二次加速曲线：起步慢、逐渐加快；封顶 TARGET(≈当前真实体量) 且永不超真实值，
-      // 杜绝「超了再回落」的体感。数据到达后由 finalize 从当前值平滑过渡到真实值。
-      const TARGET = 1700;    // 软上限≈当前真实总量(1741)，滚动封顶在此，绝不超真实值
-      const A = 70;           // 加速度：v = 1 + A*t^2，t=1s→≈71，t=3s→≈631，t≈5s→封顶1700
+      // 加载阶段：线性慢速增长，明确是「加载中占位」而非真实数据；
+      // 不封顶在像真实值的数字上，避免误导。完整数据到达后由 finalize 快速滚到真实值。
+      const SPEED = 65;       // 每秒约 65，视觉上慢慢滚但不会定格成假数字
       const t0 = performance.now();
       const tick = (now) => {
         if (!this._finalized) {
           const elapsed = (now - t0) / 1000;
-          const v = Math.min(TARGET, Math.max(1, Math.floor(1 + A * elapsed * elapsed)));
+          const v = Math.max(1, Math.floor(1 + SPEED * elapsed));
           this.displayLecture = v;
           this.displaySource = Math.max(1, Math.floor(v * 1.02));
           this._countRAF = requestAnimationFrame(tick);
         } else {
-          const dt = Math.min((now - this._finalStart) / 700, 1);
+          // 数据到达后快速（300ms）滚到真实值，营造「最后冲刺」感
+          const dt = Math.min((now - this._finalStart) / 300, 1);
           const e = 1 - Math.pow(1 - dt, 3);
           this.displayLecture = Math.round(this._fromL + e * (this._toL - this._fromL));
           this.displaySource = Math.round(this._fromS + e * (this._toS - this._fromS));

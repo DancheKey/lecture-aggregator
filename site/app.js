@@ -469,16 +469,18 @@ createApp({
     },
 
     /* ---------- 数据加载（增量 / 渐进式） ----------
-     * 本地后端存在时：走 /api/lectures，已启用 gzip，返回全量。
-     * GitHub Pages 静态托管时：先拉体积最小的 latest.json（最新 50 条，约 20KB
-     * gzip）立刻渲染第一页；后台再拉 lite.json（全量精简字段，约 240KB
-     * gzip）启用完整筛选与翻页。
+     * 本地后端存在时：走 /api/lectures，返回全量最新数据。
+     * GitHub Pages 静态托管时：先拉体积最小的 latest.json（最新 50 条）立刻渲染
+     * 第一页；后台再拉 lite.json 启用完整筛选与翻页。
+     * 关键优化：公网环境下不要先等 /api/lectures 超时，而是直接走静态切片；
+     * 浏览器缓存使用 default，让 GitHub Pages 的 max-age=600 生效，避免每次刷新
+     * 都重新下载 1MB+ 的 lite.json。
      */
     loadLectures(incremental) {
       const url = (incremental && this.mtime)
         ? `/api/lectures?since=${this.mtime}`
         : '/api/lectures';
-      fetch(url, { cache: 'no-store' })
+      fetch(url, { cache: 'default' })
         .then(r => {
           if (!r.ok) throw new Error('api-unavailable');
           return r.json();
@@ -513,14 +515,14 @@ createApp({
     },
 
     _loadStaticLatest() {
-      // 先加载 latest.json：仅 50 条，用于首屏秒开
-      fetch('lectures/latest.json', { cache: 'no-store' })
+      // 先加载 latest.json：仅 50 条，用于首屏秒开；cache:default 让浏览器复用 600s 缓存
+      fetch('lectures/latest.json', { cache: 'default' })
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
           this.dataStage = 'partial';
           this.loading = false;
-          // 后台继续加载完整精简数据
+          // 后台继续加载完整精简数据（lite.json 已 gzip，约 1MB，启用完整筛选翻页）
           this._loadStaticFull();
         })
         .catch(() => { this._loadStaticFull(true); });
@@ -528,7 +530,7 @@ createApp({
 
     _loadStaticFull(fallbackToOriginal = false) {
       const path = fallbackToOriginal ? 'lectures.json' : 'lectures/lite.json';
-      fetch(path, { cache: 'no-store' })
+      fetch(path, { cache: 'default' })
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
@@ -544,20 +546,20 @@ createApp({
      */
     startCountAnimation() {
       if (this._countRAF) return;
-      // 二次加速曲线：起步慢、逐渐加快；封顶 TARGET(≈当前真实体量) 且永不超真实值，
-      // 杜绝「超了再回落」的体感。数据到达后由 finalize 从当前值平滑过渡到真实值。
-      const TARGET = 1700;    // 软上限≈当前真实总量(1741)，滚动封顶在此，绝不超真实值
-      const A = 70;           // 加速度：v = 1 + A*t^2，t=1s→≈71，t=3s→≈631，t≈5s→封顶1700
+      // 加载阶段：线性慢速增长，明确是「加载中占位」而非真实数据；
+      // 不封顶在像真实值的数字上，避免误导。完整数据到达后由 finalize 快速滚到真实值。
+      const SPEED = 65;       // 每秒约 65，视觉上慢慢滚但不会定格成假数字
       const t0 = performance.now();
       const tick = (now) => {
         if (!this._finalized) {
           const elapsed = (now - t0) / 1000;
-          const v = Math.min(TARGET, Math.max(1, Math.floor(1 + A * elapsed * elapsed)));
+          const v = Math.max(1, Math.floor(1 + SPEED * elapsed));
           this.displayTotal = v;
           this.displaySource = Math.max(1, Math.floor(v * 1.02));
           this._countRAF = requestAnimationFrame(tick);
         } else {
-          const dt = Math.min((now - this._finalStart) / 700, 1);
+          // 数据到达后快速（300ms）滚到真实值，营造「最后冲刺」感
+          const dt = Math.min((now - this._finalStart) / 300, 1);
           const e = 1 - Math.pow(1 - dt, 3);
           this.displayTotal = Math.round(this._fromTotal + e * (this._toTotal - this._fromTotal));
           this.displaySource = Math.round(this._fromSource + e * (this._toSource - this._fromSource));
@@ -617,7 +619,14 @@ createApp({
     this.loadLikes();
     this.loadSiteVisits();
     this.loadLectureStats();
-    this.loadLectures(false);
+    // 公网静态托管不要先等 /api/lectures 超时；先秒开 latest.json，后台再补全量。
+    // 本地后端（127.0.0.1/localhost）仍优先 /api/lectures，保证数据最新。
+    const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+    if (isLocal) {
+      this.loadLectures(false);
+    } else {
+      this._loadStaticLatest();
+    }
     // 隐藏初始 loading 占位，避免 Vue 挂载前显示原始模板
     const pl = document.getElementById('page-loading');
     if (pl) pl.style.display = 'none';

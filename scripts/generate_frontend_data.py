@@ -23,6 +23,9 @@ SITE_LECTURES_PATH = os.path.join(ROOT, 'site', 'lectures.json')
 SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
 LATEST_SIZE = 50
 UNKNOWN_YEAR = '其他'
+# 首页首屏（latest.json）只需要列表卡片展示字段，长文本按首页 truncate 长度截断，
+# 让首屏秒开；详情字段仍保留在 lite.json 中，确保展开/查看时与本地一致。
+LATEST_PREVIEW_LEN = 220
 
 
 def atomic_write(path, content, mode='text'):
@@ -43,6 +46,17 @@ def strip_fields(item):
     历史上曾在这里剥离 abstract、speakerBio 以减小体积，但导致公网卡片比本地少「简介/内容摘要」。
     """
     return dict(item)
+
+
+def latest_preview(item):
+    """生成首屏 latest.json 的轻量条目：保留列表必要字段，长文本截断。
+    与 lite.json 字段完全一致，只是 abstract/speakerBio 被截断，不损失功能只损失未展开长度。"""
+    preview = dict(item)
+    for key in ('abstract', 'speakerBio'):
+        val = preview.get(key)
+        if val and len(val) > LATEST_PREVIEW_LEN:
+            preview[key] = val[:LATEST_PREVIEW_LEN]
+    return preview
 
 
 def year_of(item):
@@ -142,7 +156,7 @@ def main():
         return
 
     sorted_data = sort_for_latest(data)
-    latest = [strip_fields(item) for item in sorted_data[:LATEST_SIZE]]
+    latest = [latest_preview(item) for item in sorted_data[:LATEST_SIZE]]
     lite = [strip_fields(item) for item in data]
     stats = build_stats(data, updated_at)
 
