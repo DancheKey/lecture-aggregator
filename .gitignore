@@ -38,6 +38,10 @@ site/screenshots/
 data/visits.json
 data/lecture_stats.json
 
+# 访问量「每年每月」报告：由 scripts/gen_visits_report.py 生成的产物，
+# 随时可重跑得到，不入库（数据来源 data/visits.json 本身已 gitignore）。
+reports/
+
 # ===== 本地开发记忆与内部资料（不公开，避免推到公网仓库） =====
 .workbuddy/
 wechat_accounts.md

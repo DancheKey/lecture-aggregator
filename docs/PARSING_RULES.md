@@ -148,6 +148,35 @@ site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{la
   4. 两页使用同一 countapi 命名空间 `lecture-aggregator/site`，与不蒜子站点 PV 语义一致，保证跨页一致。
 - 涉及文件：`site/app.js`、`site/stats.js`、`site/index.html`（CSP）、`site/stats.html`（CSP）。
 
+### 3.8 站点访问量：本地独立计数 + 「每年每月」报告（不依赖外部）
+
+#### 3.8.1 外部计数器的本质局限（必须先讲清）
+- **纯静态站（GitHub Pages）没有后端**，就不可能在「服务端」聚合访问量。busuanzi / countapi.xyz 这类外部服务扮演的正是「接收每次点击的远端」。
+- 它们**只返回累计总数**，永远给不了「按年 / 按月」的明细。因此「每年每个月的访问量」用外部服务**原理上就做不到**——外部接口从未记录过按月数据。
+- 外链一旦失效（busuanzi 抽风、countapi 限流/关停），统计就跟着失效或归零。这正是不依赖外部方案的动机。
+
+#### 3.8.2 本地独立计数器（已落地，零外部依赖）
+- `server.py` 的 `GET /api/visits` 就是**完全本地**的计数器：把 `{"total": N, "by_day": {"YYYY-MM-DD": 次数}}` 写到 `data/visits.json`，不连任何外部服务。
+- 本次升级后它**按本地日期累计 `by_day`**（同一 IP 3 分钟内只计 1 次，防刷），旧格式（仅 `total`）自动兼容为「历史遗留总数」。
+- 首页/统计页 `loadSiteVisits` 的**第一优先级就是 `/api/visits`**——所以本地 `server.py` 运行时，统计根本不走外部；只有公网静态版（无后端）才回退到 countapi/不蒜子。
+
+#### 3.8.3 生成「每年每月」报告（独立运行的代码）
+- 脚本：`scripts/gen_visits_report.py`（纯标准库，跨平台直接跑）。
+  ```
+  "D:/Tools/Python 312/python.exe" scripts/gen_visits_report.py
+  ```
+- 输出：`reports/visits-by-month.html`——**自包含单文件**：数据以 JSON 内联进页面，双击即可在浏览器查看（`file://` 也行）；若由 `server.py` 托管后访问，页面会再拉一次 `/api/visits` 取实时数据刷新。
+- 表格结构：行=年份，列=1–12 月，单元格=当月访问量（按数值做热力着色），外加「年计」列、底部「月计/合计」行与概览卡片（累计总数 / 按日明细 / 历史遗留 / 有记录天数 / 起止日期）。
+- 该报告**刻意不放进 `site/`**，因此不会被部署到公网；只作本地/自托管查看用。`reports/` 也不入库（生成的产物）。
+
+#### 3.8.4 公网要真正「不依赖外部」怎么做
+- GitHub Pages 本身无后端，必须自己**自托管一个计数端点**：把 `server.py`（或只保留 `/api/visits` 的极简服务）跑在可达地址（VPS / 内网穿透 / 自己的机器），把前端 `loadSiteVisits` 第一优先级的 `/api/visits` 指向它（例如改 baseURL 或部署时注入配置）。这样访问量完全自控，外链崩了也不影响。
+- 若暂不自托管，公网仍走 countapi/不蒜子当「总访问量」降级来源（仅总数，无按月明细），与本地 `by_day` 互不冲突。
+
+#### 3.8.5 历史月份明细无法补回
+- 外部服务从未记录按月数据，过去的月份明细**无法补回**。本报告里的「按年每月」数据，从**启用按日记录之日起**随真实访问累加；当前 `data/visits.json` 里早于按日记录的总数是「历史遗留」，不摊到具体月份。
+- `data/visits.json` 已被 `.gitignore` 忽略（属本地运行时数据），不入库、公网也不读取。
+
 ---
 
 ## 4. 相关文件索引
@@ -158,6 +187,8 @@ site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{la
 | 详情解析 | `scraper/parsers.py` |
 | 时间解析 | `scraper/timeparse.py` |
 | 切片生成 | `scripts/generate_frontend_data.py` |
+| 本地服务/计数 | `server.py`（含 `/api/visits` 按日累计 `by_day`，数据写 `data/visits.json`） |
+| 访问量报告 | `scripts/gen_visits_report.py` → `reports/visits-by-month.html`（按年/月，自包含单文件） |
 | 主数据 | `data/lectures.json` |
 | 静态副本 | `site/lectures.json` + `site/lectures/{latest,lite,stats}.json` |
 | 前端 | `site/index.html` + `app.js`；`site/stats.html` + `stats.js` |

@@ -47,6 +47,9 @@ def _load_stat_files():
             _site_visits = json.load(open(VISITS_PATH, encoding='utf-8')) or {'total': 0}
     except Exception:
         _site_visits = {'total': 0}
+    # 兼容旧格式（仅有 total，无 by_day 按日明细）；旧值仍保留为「历史遗留总数」
+    if not isinstance(_site_visits.get('by_day'), dict):
+        _site_visits['by_day'] = {}
     try:
         if os.path.exists(LECTURE_STATS_PATH):
             _lecture_stats = json.load(open(LECTURE_STATS_PATH, encoding='utf-8')) or {}
@@ -220,16 +223,24 @@ class Handler(SimpleHTTPRequestHandler):
     # ---- 访问量 / 点赞统计 ----
 
     def _api_visits_get(self):
-        """站点总访问量：同一 IP 3 分钟内重复刷新只计 1 次。"""
+        """站点总访问量与按日明细：同一 IP 3 分钟内重复刷新只计 1 次。
+
+        返回 {"ok": true, "total": N, "by_day": {"YYYY-MM-DD": count, ...}}。
+        by_day 按本地日期累计，供生成「每年每月访问量」报告；
+        完全本地（data/visits.json），不依赖任何外部计数服务（busuanzi / countapi 等）。
+        """
         ip = self._client_ip()
         now = time.time()
         with _stat_lock:
             last = _recent_site_ip.get(ip, 0)
             if now - last >= VISIT_THROTTLE:
                 _site_visits['total'] = _site_visits.get('total', 0) + 1
+                today = time.strftime('%Y-%m-%d', time.localtime(now))
+                bd = _site_visits.setdefault('by_day', {})
+                bd[today] = bd.get(today, 0) + 1
                 _recent_site_ip[ip] = now
                 _save_visits()
-            return self._send_json({'ok': True, 'total': _site_visits.get('total', 0)})
+            return self._send_json({'ok': True, 'total': _site_visits.get('total', 0), 'by_day': _site_visits.get('by_day', {})})
 
     def _api_lecture_stats_get(self):
         """返回每条讲座的访问/点赞统计：{url: {visits, likes}}。"""
