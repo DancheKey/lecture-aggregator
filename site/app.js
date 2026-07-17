@@ -538,20 +538,19 @@ createApp({
     },
 
     /* ---------- 顶部数字滚动动画 ----------
-     * 页面加载即开始从 1 快速向上滚动；完整数据（dataStage='full'）到达后，
-     * 从当前滚动值平滑过渡到真实值，定格在 totalCount / sourceNoticeCount，
-     * 从而避免「先显示 50 再跳到 865」的突兀跳变。
+     * 页面加载即开始从 1 缓慢向上滚动；完整数据（dataStage='full'）到达后，
+     * 从当前滚动值平滑过渡到真实值，定格在 totalCount / sourceNoticeCount。
+     * 关键：不预设硬上限（如 950），避免旧数据残留在屏幕上「定格」数秒。
      */
     startCountAnimation() {
       if (this._countRAF) return;
-      const ROLL_MS = 1500;   // 滚动阶段时长（ease-out 逼近软上限）
-      const CEIL = 950;       // 软上限，避免在没有真实值时飞得太高
+      const SPEED = 42;       // 每秒约增长 42，视觉上「慢慢滚」但永不上限
       const t0 = performance.now();
       const tick = (now) => {
         if (!this._finalized) {
-          const t = Math.min((now - t0) / ROLL_MS, 1);
-          const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
-          const v = Math.max(1, Math.floor(1 + e * (CEIL - 1)));
+          const elapsed = (now - t0) / 1000;
+          // 平方根曲线：增速逐渐放缓，无硬上限；数据到达后自然过渡
+          const v = Math.max(1, Math.floor(1 + SPEED * Math.sqrt(elapsed)));
           this.displayTotal = v;
           this.displaySource = Math.max(1, Math.floor(v * 1.02));
           this._countRAF = requestAnimationFrame(tick);

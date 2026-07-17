@@ -279,16 +279,17 @@ createApp({
         })
         .catch(() => { this.lectureStats = localStats; });
     },
-    // 顶部数字「从 1 滚动增长」动画：数据到达后平滑定格到真实值
+    // 顶部数字「从 1 滚动增长」动画：数据到达后平滑定格到真实值。
+    // 不预设硬上限，避免旧数值（如 950）在屏幕上「定格」等待。
     startCountAnimation() {
       if (this._countRAF) return;
-      const ROLL_MS = 1200, CEIL = 950;
+      const SPEED = 42;       // 每秒约增长 42，视觉上「慢慢滚」但永不上限
       const t0 = performance.now();
       const tick = (now) => {
         if (!this._finalized) {
-          const t = Math.min((now - t0) / ROLL_MS, 1);
-          const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
-          const v = Math.max(1, Math.floor(1 + e * (CEIL - 1)));
+          const elapsed = (now - t0) / 1000;
+          // 平方根曲线：增速逐渐放缓，无硬上限；数据到达后自然过渡
+          const v = Math.max(1, Math.floor(1 + SPEED * Math.sqrt(elapsed)));
           this.displayLecture = v;
           this.displaySource = Math.max(1, Math.floor(v * 1.02));
           this._countRAF = requestAnimationFrame(tick);
