@@ -70,9 +70,32 @@ cp data/lectures.json site/lectures.json
 - **定时**：北京时间**每天凌晨 3:00**（cron `0 19 * * *`，GitHub 用 UTC）自动运行爬虫增量更新；
 - **手动**：Actions 页面 `Run workflow`，或通过网站「抓取新数据」按钮经代理触发（见 SECURITY.md R6）；
 - 运行方式：GitHub 临时云机器装 Python + 依赖（含 RapidOCR，已缓存模型）→ 跑 `scraper/scraper.py`
-  （增量，只补新讲座，不重复解析旧条目、不做旧海报 OCR）→ 把 `data/lectures.json` 同步为
+  （增量，**只补新讲座，不会重复解析已抓过的旧 URL**）→ 把 `data/lectures.json` 同步为
   `site/lectures.json` → 提交并推送 → Pages 自动重新发布。
 - **全程免费、无需服务器、无需你每次操作**，访问者每天都能看到最新讲座。
+
+> ⚠️ **增量陷阱（务必理解，否则旧数据永远修不了）**
+> 自动任务以 `data/lectures.json` 为基底，**已抓过的 URL 不会再次下载解析**。后果：
+> 1. 解析器升级 / 修了 bug 后，**旧讲座不会被自动修正**；
+> 2. 某条旧记录时间或字段错了，daily 自动跑**永远修不了**（例如某图书馆讲座时间长期显示为发布日而非海报真实时间，根因即此）。
+>
+> **手动修复已抓旧记录的标准操作**（替换 `<URL>` / `<学院名>`）：
+> ```bash
+> # 1) 从 data 删除目标 URL（或整院记录）
+> python -c "import json;p='data/lectures.json';o=json.load(open(p,encoding='utf-8'));o['data']=[x for x in o['data'] if x.get('sourceUrl')!='<URL>'];json.dump(o,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)"
+> # 2) 重新抓取该院（该 URL 已不在基底，会重新下载并用新解析器解析）
+> python scraper/scraper.py --source <学院名>
+> # 3) 重新生成前端切片 + 同步静态副本
+> python scripts/generate_frontend_data.py
+> cp data/lectures.json site/lectures.json
+> # 4) git add + commit + push（触发 Pages 重新部署）
+> ```
+> 详见 `docs/PARSING_RULES.md` 的「运维约定 / 增量陷阱」一节。
+
+> 📌 **代码即规则**：上面的解析逻辑（OCR 触发、时间解析、新闻过滤、字段清洗）都已固化在
+> `scraper/parsers.py`、`scraper/timeparse.py`、`scraper/scraper.py`、`scripts/generate_frontend_data.py`
+> 中并带注释，平台独立运行时会自动生效，无需额外配置。本文件与 `docs/PARSING_RULES.md` 只补充
+> 「代码无法自解释」的运维约定与踩坑来由。
 
 > 发布前请确保：① `site/.nojekyll` 已存在（避免 Pages 用 Jekyll 处理静态文件）；
 > ② `data/last_scrape.json` 已随仓库提交（增量基线，否则每次全量重扫）；
