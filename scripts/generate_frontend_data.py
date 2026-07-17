@@ -2,10 +2,10 @@
 
 从 data/lectures.json 生成：
   - site/lectures.json：全量原始数据，供本地 /api/lectures 与 GitHub Pages 回退使用。
-  - site/lectures/lite.json：全量数据，但去掉首页用不到的大字段（abstract、speakerBio），
-    用于 GitHub Pages 首屏快速渲染 + 完整筛选。
-  - site/lectures/latest.json：仅保留最新 50 条（首页第一页），字段与 lite.json 一致，
-    体积最小，用于"先渲染第一页，后台再加载完整数据"的渐进体验。
+  - site/lectures/lite.json：全量数据（含 abstract、speakerBio），与本地 /api/lectures
+    字段完全一致，用于 GitHub Pages 首屏快速渲染 + 完整筛选 + 完整卡片展示。
+  - site/lectures/latest.json：仅保留最新 50 条（首页第一页），字段与 lite.json 一致
+    （含 abstract、speakerBio），用于"先渲染第一页，后台再加载完整数据"的渐进体验。
   - site/lectures/stats.json：统计页专用，包含预计算的学院-年份矩阵、年份合计、
     以及用于动态访问/点赞数的最小讲座索引，避免统计页加载 2MB+ 全量数据。
 
@@ -39,8 +39,10 @@ def atomic_write(path, content, mode='text'):
 
 
 def strip_fields(item):
-    """去掉首页列表用不到的大字段。"""
-    return {k: v for k, v in item.items() if k not in ('abstract', 'speakerBio')}
+    """保留全部字段，确保公网静态版（lite/latest）与本地 /api/lectures 卡片内容一致。
+    历史上曾在这里剥离 abstract、speakerBio 以减小体积，但导致公网卡片比本地少「简介/内容摘要」。
+    """
+    return dict(item)
 
 
 def year_of(item):
