@@ -5,4 +5,6 @@ charset-normalizer
 pyyaml
 Pillow
 numpy
-easyocr
+# OCR 引擎：RapidOCR（ONNXRuntime 后端，替代原 easyocr；中文海报更准确、更轻量）
+rapidocr-onnxruntime
+opencv-python-headless

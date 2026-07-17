@@ -27,7 +27,7 @@ createApp({
       summary: null,
       // 排序状态：key = 'college' | 'total' | 'visits' | 'likes' | 年份字符串(如 '2024')
       // order = 'asc' | 'desc'（多次点击切换）
-      sortBy: { key: SORT_KEY_COLLEGE, order: 'asc' },
+      sortBy: { key: SORT_KEY_TOTAL, order: 'desc' },
       // 显示模式：count | visits | likes —— 决定单元格与末列展示什么数值。
       // 仅由顶部 4 个排序按钮设置；点击年份列只改变 sortBy.key，不改变显示模式，
       // 这样在「访问数 / 点赞数」模式下点击年份，仍按该模式展示并按年份排序。
@@ -196,6 +196,11 @@ createApp({
     // 当前筛选（校区 + 学院名）下的讲座总数
     filteredLectureCount() {
       return this.rows.reduce((a, r) => a + r.total, 0);
+    },
+
+    // 当前筛选（校区 + 学院名）下的学院/部处（单位）数量
+    filteredCollegeCount() {
+      return this.rows.length;
     },
 
     // 总合计

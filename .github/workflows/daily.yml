@@ -36,17 +36,9 @@ jobs:
           cache: pip
           cache-dependency-path: scraper/requirements.txt
 
-      # EasyOCR 依赖 OpenCV，运行需要系统级图形库；缺少会导致 import 失败
-      - name: 安装系统依赖（OpenCV/EasyOCR）
-        run: sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
-
-      # 缓存 EasyOCR 识别模型（约百 MB），避免每次重新下载
-      - name: 缓存 EasyOCR 模型
-        uses: actions/cache@v4
-        with:
-          path: ~/.EasyOCR
-          key: easyocr-models-v1
-
+      # OCR 引擎已换为 RapidOCR（onnxruntime 后端）：
+      #   - 识别模型随 rapidocr-onnxruntime 包分发，无需单独下载/缓存（不再需要 ~/.EasyOCR 缓存）。
+      #   - 图像处理用 opencv-python-headless，无需 libgl1 等系统图形库（headless 版已剥离 GL 依赖）。
       - name: 安装 Python 依赖
         run: pip install -r scraper/requirements.txt
 
@@ -56,15 +48,13 @@ jobs:
         run: python scraper/scraper.py
 
       - name: 同步静态数据源并生成前端切片
-        run: |
-          cp data/lectures.json site/lectures.json
-          python scripts/generate_frontend_data.py
+        run: python scripts/generate_frontend_data.py
 
       - name: 提交并推送（仅在有变化时）
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/lectures.json data/last_scrape.json site/lectures.json site/lectures/latest.json site/lectures/lite.json
+          git add data/lectures.json data/last_scrape.json site/lectures.json site/lectures/latest.json site/lectures/lite.json site/lectures/stats.json
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else

@@ -9,8 +9,18 @@ venv/
 *.log
 server.log
 
-# ===== 手动备份 =====
+# ===== 手动备份（不入库） =====
 data/*.backup.json
+data/*.bak
+data/*.bak.*
+*.bak.json
+
+# ===== 本地调试/开发工具（仅本地使用，不推送公网） =====
+# tools/ 下均为一次性诊断/回填/OCR 基准脚本，网站运行（爬虫+前端切片）不依赖它们；
+# daily.yml 只用 scraper/ 与 scripts/。保留在本地，绝不入库。
+tools/
+# 本地预览启动脚本，公网不需要
+start_local.bat
 
 # ===== 截图 =====
 site/screenshots/

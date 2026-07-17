@@ -1,12 +1,16 @@
 """为前端生成优化后的数据切片。
 
 从 data/lectures.json 生成：
+  - site/lectures.json：全量原始数据，供本地 /api/lectures 与 GitHub Pages 回退使用。
   - site/lectures/lite.json：全量数据，但去掉首页用不到的大字段（abstract、speakerBio），
     用于 GitHub Pages 首屏快速渲染 + 完整筛选。
   - site/lectures/latest.json：仅保留最新 50 条（首页第一页），字段与 lite.json 一致，
     体积最小，用于"先渲染第一页，后台再加载完整数据"的渐进体验。
   - site/lectures/stats.json：统计页专用，包含预计算的学院-年份矩阵、年份合计、
     以及用于动态访问/点赞数的最小讲座索引，避免统计页加载 2MB+ 全量数据。
+
+所有文件均先写入 .tmp 临时文件，再原子重命名，确保首页与统计页在任何时刻
+不会看到"半新半旧"的数据版本。
 
 运行：python scripts/generate_frontend_data.py
 """
@@ -15,9 +19,23 @@ import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
+SITE_LECTURES_PATH = os.path.join(ROOT, 'site', 'lectures.json')
 SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
 LATEST_SIZE = 50
 UNKNOWN_YEAR = '其他'
+
+
+def atomic_write(path, content, mode='text'):
+    """将内容写入 .tmp 文件，再用 os.replace 原子替换目标文件。
+    避免写入过程中读者读到半份文件。"""
+    tmp = path + '.tmp'
+    if mode == 'text':
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(content, f, ensure_ascii=False, separators=(',', ':'))
+    else:
+        with open(tmp, 'wb') as f:
+            f.write(content)
+    os.replace(tmp, path)
 
 
 def strip_fields(item):
@@ -126,21 +144,17 @@ def main():
     lite = [strip_fields(item) for item in data]
     stats = build_stats(data, updated_at)
 
-    wrapper = {'updatedAt': updated_at, 'data': latest}
-    with open(os.path.join(SITE_DIR, 'latest.json'), 'w', encoding='utf-8') as f:
-        json.dump(wrapper, f, ensure_ascii=False, separators=(',', ':'))
-
-    wrapper = {'updatedAt': updated_at, 'data': lite}
-    with open(os.path.join(SITE_DIR, 'lite.json'), 'w', encoding='utf-8') as f:
-        json.dump(wrapper, f, ensure_ascii=False, separators=(',', ':'))
-
-    with open(os.path.join(SITE_DIR, 'stats.json'), 'w', encoding='utf-8') as f:
-        json.dump(stats, f, ensure_ascii=False, separators=(',', ':'))
+    # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
+    atomic_write(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': data})
+    atomic_write(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
+    atomic_write(os.path.join(SITE_DIR, 'lite.json'), {'updatedAt': updated_at, 'data': lite})
+    atomic_write(os.path.join(SITE_DIR, 'stats.json'), stats)
 
     latest_bytes = os.path.getsize(os.path.join(SITE_DIR, 'latest.json'))
     lite_bytes = os.path.getsize(os.path.join(SITE_DIR, 'lite.json'))
     stats_bytes = os.path.getsize(os.path.join(SITE_DIR, 'stats.json'))
     stats_lectures_count = len(stats['lectures'])
+    print(f'[done] site/lectures.json: {len(data)} 条')
     print(f'[done] latest.json: {len(latest)} 条 ({latest_bytes / 1024:.1f} KB)')
     print(f'[done] lite.json: {len(lite)} 条 ({lite_bytes / 1024:.1f} KB)')
     print(f'[done] stats.json: {stats_lectures_count} 条索引 ({stats_bytes / 1024:.1f} KB)')

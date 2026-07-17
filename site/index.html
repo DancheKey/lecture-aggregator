@@ -34,11 +34,11 @@
   </style>
 </head>
 <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <div id="app" v-cloak class="min-h-screen flex flex-col xl:px-80">
+  <div id="app" v-cloak class="min-h-screen flex flex-col">
 
     <!-- 顶部栏 -->
-    <header class="sticky top-0 z-20 w-full max-w-4xl mx-auto bg-white/95 backdrop-blur border-b border-slate-200">
-      <div class="px-4">
+    <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
+      <div class="max-w-4xl mx-auto px-4">
         <div class="flex items-center gap-3 h-14">
           <div class="flex items-center gap-2 shrink-0">
             <img src="scnu-emblem.png" alt="华南师范大学" class="w-9 h-9 rounded-lg bg-white shadow-sm" />
@@ -124,15 +124,19 @@
               </div>
               <!-- 右侧筛选控件：固定不换行，避免输入时跳行 -->
               <div class="flex items-center gap-2 flex-nowrap shrink-0">
-                <input v-model="query" type="search" placeholder="搜索讲座 / 主讲人…"
-                  class="w-36 sm:w-56 min-w-0 px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                <input v-model="query" type="search" :placeholder="searchPlaceholder"
+                  class="w-32 sm:w-44 min-w-0 px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                <!-- 搜索维度：与搜索框做 AND 组合（全部/单位/地点/题目） -->
+                <select v-model="searchField" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                  <option value="">全部</option>
+                  <option value="college">单位</option>
+                  <option value="location">地点</option>
+                  <option value="topic">题目</option>
+                </select>
                 <select v-model="year" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
                   <option value="">全部年份</option>
                   <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
                 </select>
-                <button v-if="campus || college || year || query"
-                  @click="clearFilters"
-                  class="text-[12pt] text-slate-400 hover:text-blue-600">清除筛选 ✕</button>
               </div>
             </div>
           </div>

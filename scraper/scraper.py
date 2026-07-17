@@ -143,6 +143,50 @@ def collect_links(html, base, list_url=None, collect_mode='auto'):
     return links
 
 
+_NEXT_PAGE_KW = ('下一页', '下页', '下一頁', '下一页»', '»', '>>', 'Next', 'next', 'NEXT')
+
+
+def _next_page_url(html, base):
+    """从列表页提取「下一页」链接的绝对地址；无则 None。
+
+    用于自动跟随分页：从首列表页开始，沿「下一页」依次抓取，
+    直到末页（「下一页」缺失 / 指向自身 / 已访问）为止。避免像
+    tongzhigonggao/2.html 那样手工罗列每个分页地址。
+    """
+    if not html:
+        return None
+    soup = BeautifulSoup(html, 'html.parser')
+    for a in soup.find_all('a'):
+        t = a.get_text(strip=True)
+        if t not in _NEXT_PAGE_KW:
+            continue
+        h = a.get('href')
+        if not h or h.startswith('javascript') or h == '#' or h.startswith('#'):
+            continue
+        return _abs_url(h, base)
+    return None
+
+
+def _sequential_candidate(cur_url):
+    """JS 渲染分页的兜底：列表页静态 HTML 无「下一页」链接（分页器由 JS 注入，
+    形如 <div class="pages"></div>），但分页地址遵循 `根目录/N.html` 规律
+    （如 /xueshujiangzuo/2.html、/ae/Colloquium/3.html）。根据当前页 URL 推导下一页。
+
+    仅作为 _next_page_url 返回 None 时的兜底；是否采用由调用方结合本页是否
+    确有内容（new_count>0）来判断，避免对单页源误翻页。
+    """
+    if not cur_url:
+        return None
+    # .../xueshujiangzuo/2.html -> .../xueshujiangzuo/3.html
+    m = re.search(r'/(\d+)\.html$', cur_url)
+    if m:
+        return cur_url[:m.start()] + '/' + str(int(m.group(1)) + 1) + '.html'
+    # 根目录形式：.../xueshujiangzuo/ -> .../xueshujiangzuo/2.html
+    if cur_url.endswith('/'):
+        return cur_url.rstrip('/') + '/2.html'
+    return None
+
+
 def _normalize_title(title):
     """标题归一化：去空白、去常见前后缀与末尾日期，用于同源去重比对。"""
     s = re.sub(r'\s+', '', title.strip())
@@ -247,6 +291,7 @@ def main():
             # 明确排除的非讲座 URL
             exclude_urls = {str(u).rstrip('/') for u in src.get('exclude_urls', [])}
             seen = set()
+            visited_pages = set()
             for lu in src.get('list_urls', []):
                 if isinstance(lu, dict):
                     list_url = lu['url']
@@ -254,37 +299,65 @@ def main():
                 else:
                     list_url = lu
                     collect_mode = 'auto'
-                html = fetch(list_url)
-                for href, txt in collect_links(html, base, list_url=list_url, collect_mode=collect_mode):
-                    href_norm = href.rstrip('/')
-                    if href_norm in seen:
-                        continue
-                    seen.add(href_norm)
-                    # 增量模式：已抓取过的 URL 直接跳过（不下载详情、不解析、不做 OCR）
-                    if is_incremental and href_norm in existing_urls:
-                        continue
-                    # 跳过源配置中明确排除的 URL（如宣讲会、整体规划等非讲座页面）
-                    if href_norm in exclude_urls:
-                        print(f'[SKIP] {name} exclude {href}')
-                        continue
-                    # 跳过指向本源其他列表页的链接（栏目入口，不是讲座详情）
-                    if href_norm in src_list_norm:
-                        continue
-                    d = fetch(href)
-                    if not d:
-                        continue
-                    try:
-                        rec = parse_detail(d, href, name, campus, year, list_title=txt)
-                    except Exception as e:
-                        print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
-                        continue
-                    # parse_detail 返回 None 表示命中新闻/回顾过滤，跳过不收录
-                    if rec is None:
-                        print(f'[SKIP-NEWS] {name} | {txt} | {href}')
-                        continue
-                    rec['listTitle'] = txt
-                    lectures[href] = rec
-                    print(f'[OK] {name} | {rec.get("lectureStart")} | {txt}')
+                # 自动跟随分页：从本列表页开始，沿「下一页」依次抓取，直到末页
+                cur = list_url
+                while cur and cur.rstrip('/') not in visited_pages:
+                    visited_pages.add(cur.rstrip('/'))
+                    html = fetch(cur)
+                    new_count = 0
+                    for href, txt in collect_links(html, base, list_url=cur, collect_mode=collect_mode):
+                        href_norm = href.rstrip('/')
+                        if href_norm in seen:
+                            continue
+                        seen.add(href_norm)
+                        new_count += 1
+                        # 增量模式：已抓取过的 URL 直接跳过（不下载详情、不解析、不做 OCR）
+                        if is_incremental and href_norm in existing_urls:
+                            continue
+                        # 跳过源配置中明确排除的 URL（如宣讲会、整体规划等非讲座页面）
+                        if href_norm in exclude_urls:
+                            print(f'[SKIP] {name} exclude {href}')
+                            continue
+                        # 跳过指向本源其他列表页的链接（栏目入口，不是讲座详情）
+                        if href_norm in src_list_norm:
+                            continue
+                        d = fetch(href)
+                        if not d:
+                            continue
+                        try:
+                            rec = parse_detail(d, href, name, campus, year, list_title=txt)
+                        except Exception as e:
+                            print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
+                            continue
+                        # parse_detail 返回 None 表示命中新闻/回顾过滤，跳过不收录
+                        if rec is None:
+                            print(f'[SKIP-NEWS] {name} | {txt} | {href}')
+                            continue
+                        rec['listTitle'] = txt
+                        lectures[href] = rec
+                        print(f'[OK] {name} | {rec.get("lectureStart")} | {txt}')
+                    # 翻到下一页；优先用静态「下一页」链接，缺失时回退到 /N.html 顺序翻页
+                    nxt = _next_page_url(html, base) if html else None
+                    sequential = False
+                    if not nxt and new_count > 0:
+                        # 本页确有内容但无「下一页」锚点：多为 JS 注入分页器，
+                        # 尝试按 根目录/N.html 规律推导下一页（如 /xueshujiangzuo/2.html）。
+                        cand = _sequential_candidate(cur)
+                        if cand:
+                            nxt = cand
+                            sequential = True
+                    if (not nxt or nxt.rstrip('/') in visited_pages
+                            or nxt.rstrip('/') == cur.rstrip('/')):
+                        break
+                    # 顺序翻页越过末页后，下一页往往重定向回首页或为空页，
+                    # 此时本页没有新链接，及时停止，避免空转。
+                    if sequential and new_count == 0:
+                        break
+                    cur = nxt
+                    # 安全阀：极端情况下避免无限翻页
+                    if len(visited_pages) > 300:
+                        print(f'[WARN] {name} 分页超过 300 页，停止跟随')
+                        break
             time.sleep(1)
         except Exception as e:
             # 单源异常不应拖垮整次抓取：记录后继续下一个源，已采数据照常写入

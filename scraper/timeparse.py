@@ -49,6 +49,19 @@ def _build(m, seg, y, mo, d):
         period = PERIOD_OFFSET[pm.group(1)]
     times = re.findall(r'(\d{1,2})\s*' + COLON + r'\s*(\d{2})', seg)
     if not times:
+        # 中文「X点 / X点X分 / X点半」式时间（如「下午3点」「上午10点30分」），
+        # 冒号时间缺失时兜底（常见于海报 OCR 文本）。
+        dot = re.findall(r'(\d{1,2})\s*点\s*(?:(\d{1,2})\s*分?|半)?', seg)
+        if dot:
+            hh = int(dot[0][0])
+            if dot[0][1]:
+                mm = int(dot[0][1])
+            elif re.search(r'半', seg):
+                mm = 30
+            else:
+                mm = 0
+            times = [(str(hh), str(mm).zfill(2))]
+    if not times:
         return {'start': datetime(y_i, mo_i, d_i, 0, 0),
                 'end': None, 'has_time': False}
     h0 = _apply_period(int(times[0][0]), period)
@@ -72,6 +85,10 @@ def _parse_compact_run(m, seg, yy, run):
     （如「1715」→「7/5」），从而恢复单数月日格式。
     """
     n = len(run)
+    # 避免把年份区间（如「2016-2023」）误当日期：4 位数字且前两位是 19/20 时，
+    # 它通常是某个「年份」而非「月日」（月最大为 12），直接跳过。
+    if n == 4 and run[:2] in ('19', '20'):
+        return None
     cands = []
     if n == 3:
         cands.append((int(run[0]), int(run[1:])))
@@ -124,8 +141,10 @@ def _parse_segment(seg, default_year, publish_time):
                 continue
             return _build(m, seg, m.group(1), m.group(2), m.group(3))
 
-    # 3) 抗 OCR 噪声的紧凑数字日期：年份后接 3-6 位乱序数字（如 2024111128 / 2024715）。
-    m = re.search(r'20(\d{2})\D{0,3}?(\d{3,6})', seg)
+    # 3) 抗 OCR 噪声的紧凑数字日期：年份后接 3-6 位紧邻数字（如 2024111128 / 2024715）。
+    # 分隔符只允许空格/制表符这类 OCR 间隙，绝不能是「-」「~」「—」等区间符号，
+    # 否则会把「2004-2016」「2016-202 3」这类年份区间误当成紧凑日期。
+    m = re.search(r'20(\d{2})([ \t]{0,2})(\d{3,6})', seg)
     if m:
         cand = _parse_compact_run(m, seg, 2000 + int(m.group(1)), m.group(2))
         if cand:

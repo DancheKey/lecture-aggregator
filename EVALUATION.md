@@ -10,7 +10,7 @@
 | 维度 | 现状 |
 |------|------|
 | 定位 | 华南师范大学学术讲座信息聚合站 |
-| 技术栈 | 前端 Vue 3 + Tailwind CSS（CDN，免构建）；后端 Python 标准库 http.server；爬虫 requests + BeautifulSoup4 + EasyOCR |
+| 技术栈 | 前端 Vue 3 + Tailwind CSS（CDN，免构建）；后端 Python 标准库 http.server；爬虫 requests + BeautifulSoup4 + RapidOCR |
 | 数据规模 | 115 条讲座，覆盖 2020–2026 年、4 校区 + 校级、50 个学院/部处信息源 |
 | 部署形态 | 本机全栈（server.py）/ 公网纯静态（GitHub Pages + Actions 每日自动更新） |
 | 代码量 | 前端 3 页 + 1 个 JS；爬虫 3 个 py；后端 1 个 py；1 个 CI 工作流 |
@@ -26,7 +26,7 @@
 - **本地点赞**：localStorage 去重，同一浏览器不可重复点赞
 - **增量爬虫**：URL 去重 + 时间基线（last_scrape.json），跳过已抓条目，OCR 仅对海报图触发
 - **每日自动更新**：GitHub Actions 定时（北京 03:00）+ 手动触发
-- **OCR 兜底**：正文不足 50 字时对海报图片做 EasyOCR
+- **OCR 兜底**：正文不足 50 字时对海报图片做 RapidOCR
 
 ### ⚠️ 功能局限（非缺陷，属架构取舍）
 1. **点赞不跨设备共享**：当前点赞存浏览器 localStorage，公网访客看到的"点赞数"实为该浏览器本地计数（初始为 0）。若要真实社交点赞需后端存储。

@@ -17,7 +17,7 @@ site/                 ← 前端（Vue3 + Tailwind CDN，纯静态）
   lectures.json       ← 静态数据源（部署副本，由脚本从 data/ 同步）
   scnu-emblem.png / motto.png / site-title.png
 data/lectures.json    ← 爬虫产出的唯一数据源
-scraper/               ← Python 爬虫（requests + bs4 + EasyOCR）
+scraper/               ← Python 爬虫（requests + bs4 + RapidOCR）
 server.py              ← 本地开发/全栈后端（静态托管 + /api/*）
 ```
 
@@ -69,7 +69,7 @@ cp data/lectures.json site/lectures.json
 
 - **定时**：北京时间**每天凌晨 3:00**（cron `0 19 * * *`，GitHub 用 UTC）自动运行爬虫增量更新；
 - **手动**：Actions 页面 `Run workflow`，或通过网站「抓取新数据」按钮经代理触发（见 SECURITY.md R6）；
-- 运行方式：GitHub 临时云机器装 Python + 依赖（含 EasyOCR，已缓存模型）→ 跑 `scraper/scraper.py`
+- 运行方式：GitHub 临时云机器装 Python + 依赖（含 RapidOCR，已缓存模型）→ 跑 `scraper/scraper.py`
   （增量，只补新讲座，不重复解析旧条目、不做旧海报 OCR）→ 把 `data/lectures.json` 同步为
   `site/lectures.json` → 提交并推送 → Pages 自动重新发布。
 - **全程免费、无需服务器、无需你每次操作**，访问者每天都能看到最新讲座。
@@ -94,13 +94,13 @@ cp data/lectures.json site/lectures.json
 适合希望「在网页上点一下就抓最新讲座」的场景。
 
 ### 1. 需要的资源（用户准备）
-- 一台公网云服务器（腾讯云 CVM / 阿里云 ECS，1 核 2G 约 ¥60–100/月；CPU 跑 EasyOCR 较慢，抓一次约数分钟）
+- 一台公网云服务器（腾讯云 CVM / 阿里云 ECS，1 核 2G 约 ¥60–100/月；CPU 跑 RapidOCR 较慢，抓一次约数分钟）
 - 服务器登录凭证（SSH）
 - （可选）一个域名 + ICP 备案（**国内服务器必须备案**才能用 80/443 端口对外）
 
 ### 2. 依赖安装（服务器上）
 ```bash
-pip install requests beautifulsoup4 charset-normalizer pyyaml easyocr
+pip install requests beautifulsoup4 charset-normalizer pyyaml rapidocr-onnxruntime opencv-python-headless
 ```
 
 ### 3. 守护运行 server.py（用 gunicorn + supervisor 示例）
@@ -142,7 +142,7 @@ server {
 1. 纯静态部署下：**网页抓取**、**信息源管理**不可用（前端已做降级提示）。
 2. 点赞数据是**浏览器本地存储**（localStorage），换设备/清缓存会清零，不跨用户共享。
 3. 静态数据是部署时的**快照**，更新需重新走「爬虫 → 同步 → 部署」流程。
-4. 爬虫依赖 EasyOCR（CPU 模式较慢、包体大），全栈部署时首抓需耐心等待。
+4. 爬虫依赖 RapidOCR（CPU 模式较慢、包体大），全栈部署时首抓需耐心等待。
 
 ---
 

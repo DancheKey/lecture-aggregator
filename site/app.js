@@ -25,6 +25,7 @@ createApp({
       college: '',
       year: '',
       query: '',
+      searchField: '',  // 搜索维度：''=全部 | college=单位 | location=地点 | topic=题目
       showLikedOnly: false,  // 仅显示已点赞讲座
       scraping: false,
       showMenu: false,    // 顶部栏更多操作下拉菜单
@@ -68,6 +69,16 @@ createApp({
       return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
     },
 
+    // 搜索框占位提示：随所选维度变化
+    searchPlaceholder() {
+      return {
+        '': '搜索讲座 / 主讲人 / 地点…',
+        college: '搜索单位…',
+        location: '搜索地点…',
+        topic: '搜索题目 / 主讲…'
+      }[this.searchField] || '搜索…';
+    },
+
     // 复合筛选 + 按讲座时间倒序
     filtered() {
       const q = this.query.trim().toLowerCase();
@@ -84,8 +95,24 @@ createApp({
         }
         if (this.year && this.yearOf(l) !== this.year) return false;
         if (q) {
-          const hay = [l.title, l.topic, l.speaker, l.speakerAffiliation,
-            l.speakerBio, l.listTitle, l.college].join(' ').toLowerCase();
+          let hay;
+          if (this.searchField === 'location') {
+            // 地点：仅按讲座地点匹配（多来源取各自地点）
+            hay = [l.location, ...(l.sources || []).map(s => s.location)]
+              .filter(Boolean).join(' ').toLowerCase();
+          } else if (this.searchField === 'topic') {
+            // 题目：标题 + 题目字段
+            hay = [l.title, l.topic, l.listTitle].filter(Boolean).join(' ').toLowerCase();
+          } else if (this.searchField === 'college') {
+            // 单位：仅按主办单位匹配，避免场地在某单位的讲座被误配
+            hay = [l.college, ...(l.sources || []).map(s => s.college)]
+              .filter(Boolean).join(' ').toLowerCase();
+          } else {
+            // 全部（默认）：在所有常见字段中匹配
+            hay = [l.title, l.topic, l.speaker, l.speakerAffiliation,
+              l.speakerBio, l.listTitle, l.college, l.location, l.campus, l.organizer]
+              .filter(Boolean).join(' ').toLowerCase();
+          }
           if (!hay.includes(q)) return false;
         }
         return true;
@@ -590,6 +617,7 @@ createApp({
   watch: {
     // 任一筛选条件变化，回到第一页
     query() { this.currentPage = 1; },
+    searchField() { this.currentPage = 1; },
     campus() { this.currentPage = 1; },
     college() { this.currentPage = 1; },
     year() { this.currentPage = 1; },

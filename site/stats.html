@@ -51,7 +51,7 @@
       <div class="mb-4">
         <h1 class="text-[18pt] font-bold text-slate-800">各学院 / 部处讲座统计</h1>
         <p class="text-[12pt] text-slate-500 mt-1">
-          去重后 <span class="font-semibold text-slate-800">{{ displayLecture }}</span> 场讲座，覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知，跨 <span class="font-semibold text-slate-800">{{ years.length }}</span> 个年份。
+          去重后 <span class="font-semibold text-slate-800">{{ displayLecture }}</span> 场讲座，覆盖 <span class="font-semibold text-slate-800">{{ filteredCollegeCount }}</span> 个单位 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知，跨 <span class="font-semibold text-slate-800">{{ years.length }}</span> 个年份。
         </p>
       </div>
 
@@ -64,10 +64,10 @@
         </div>
         <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <span class="text-[12pt] text-slate-500 whitespace-nowrap">排序：</span>
-          <button @click="toggleSort('college')"
-            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'college' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按学院名</button>
           <button @click="toggleSort('total')"
             :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'total' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按总数</button>
+          <button @click="toggleSort('college')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'college' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按学院名</button>
           <button @click="toggleSort('visits')"
             :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'visits' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按访问数</button>
           <button @click="toggleSort('likes')"
@@ -75,9 +75,9 @@
         </div>
       </div>
 
-      <!-- 统计表格：横向可滚动、首列固定、纵向最大高度滚动 -->
+      <!-- 统计表格：横向可滚动、首列固定；纵向随页面自然展开 -->
       <div v-if="summary && summary.lectureCount" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto max-h-[70vh] overflow-y-auto">
+        <div class="overflow-x-auto">
           <table class="min-w-full text-[12pt] border-collapse">
             <thead class="bg-slate-50 text-slate-600 sticky top-0 z-20">
               <tr>
