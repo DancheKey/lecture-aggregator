@@ -7,6 +7,7 @@ import time
 import yaml
 import requests
 import charset_normalizer
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -244,6 +245,81 @@ def dedup(records):
     return kept
 
 
+def _process_source(src, year, existing_urls, is_incremental):
+    """处理单个信息源，返回 {url: rec} 字典。"""
+    name = src['name']
+    campus = src.get('campus', '')
+    base = src['base']
+    src_list_norm = set()
+    for lu in src.get('list_urls', []):
+        u = lu['url'] if isinstance(lu, dict) else lu
+        src_list_norm.add(str(u).rstrip('/'))
+    exclude_urls = {str(u).rstrip('/') for u in src.get('exclude_urls', [])}
+    seen = set()
+    visited_pages = set()
+    local = {}
+    try:
+        for lu in src.get('list_urls', []):
+            if isinstance(lu, dict):
+                list_url = lu['url']
+                collect_mode = lu.get('collect_mode', 'auto')
+            else:
+                list_url = lu
+                collect_mode = 'auto'
+            cur = list_url
+            while cur and cur.rstrip('/') not in visited_pages:
+                visited_pages.add(cur.rstrip('/'))
+                html = fetch(cur)
+                new_count = 0
+                for href, txt in collect_links(html, base, list_url=cur, collect_mode=collect_mode):
+                    href_norm = href.rstrip('/')
+                    if href_norm in seen:
+                        continue
+                    seen.add(href_norm)
+                    new_count += 1
+                    if is_incremental and href_norm in existing_urls:
+                        continue
+                    if href_norm in exclude_urls:
+                        print(f'[SKIP] {name} exclude {href}')
+                        continue
+                    if href_norm in src_list_norm:
+                        continue
+                    d = fetch(href)
+                    if not d:
+                        continue
+                    try:
+                        rec = parse_detail(d, href, name, campus, year, list_title=txt)
+                    except Exception as e:
+                        print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
+                        continue
+                    if rec is None:
+                        print(f'[SKIP-NEWS] {name} | {txt} | {href}')
+                        continue
+                    rec['listTitle'] = txt
+                    local[href] = rec
+                    print(f'[OK] {name} | {rec.get("lectureStart")} | {txt}')
+                nxt = _next_page_url(html, base) if html else None
+                sequential = False
+                if not nxt and new_count > 0:
+                    cand = _sequential_candidate(cur)
+                    if cand:
+                        nxt = cand
+                        sequential = True
+                if (not nxt or nxt.rstrip('/') in visited_pages
+                        or nxt.rstrip('/') == cur.rstrip('/')):
+                    break
+                if sequential and new_count == 0:
+                    break
+                cur = nxt
+                if len(visited_pages) > 300:
+                    print(f'[WARN] {name} 分页超过 300 页，停止跟随')
+                    break
+        time.sleep(1)
+    except Exception as e:
+        print(f'[ERROR] 信息源「{name}」抓取失败：{e}', file=sys.stderr)
+    return local
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
@@ -293,91 +369,19 @@ def main():
         if not sources:
             print(f'[ERROR] 未找到信息源「{args.source}」', file=sys.stderr)
             return
-    for src in sources:
-        try:
-            name = src['name']
-            campus = src.get('campus', '')
-            base = src['base']
-            # 本源所有列表页 URL（归一化），用于跳过「栏目入口」类链接
-            src_list_norm = set()
-            for lu in src.get('list_urls', []):
-                u = lu['url'] if isinstance(lu, dict) else lu
-                src_list_norm.add(str(u).rstrip('/'))
-            # 明确排除的非讲座 URL
-            exclude_urls = {str(u).rstrip('/') for u in src.get('exclude_urls', [])}
-            seen = set()
-            visited_pages = set()
-            for lu in src.get('list_urls', []):
-                if isinstance(lu, dict):
-                    list_url = lu['url']
-                    collect_mode = lu.get('collect_mode', 'auto')
-                else:
-                    list_url = lu
-                    collect_mode = 'auto'
-                # 自动跟随分页：从本列表页开始，沿「下一页」依次抓取，直到末页
-                cur = list_url
-                while cur and cur.rstrip('/') not in visited_pages:
-                    visited_pages.add(cur.rstrip('/'))
-                    html = fetch(cur)
-                    new_count = 0
-                    for href, txt in collect_links(html, base, list_url=cur, collect_mode=collect_mode):
-                        href_norm = href.rstrip('/')
-                        if href_norm in seen:
-                            continue
-                        seen.add(href_norm)
-                        new_count += 1
-                        # 增量模式：已抓取过的 URL 直接跳过（不下载详情、不解析、不做 OCR）
-                        if is_incremental and href_norm in existing_urls:
-                            continue
-                        # 跳过源配置中明确排除的 URL（如宣讲会、整体规划等非讲座页面）
-                        if href_norm in exclude_urls:
-                            print(f'[SKIP] {name} exclude {href}')
-                            continue
-                        # 跳过指向本源其他列表页的链接（栏目入口，不是讲座详情）
-                        if href_norm in src_list_norm:
-                            continue
-                        d = fetch(href)
-                        if not d:
-                            continue
-                        try:
-                            rec = parse_detail(d, href, name, campus, year, list_title=txt)
-                        except Exception as e:
-                            print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
-                            continue
-                        # parse_detail 返回 None 表示命中新闻/回顾过滤，跳过不收录
-                        if rec is None:
-                            print(f'[SKIP-NEWS] {name} | {txt} | {href}')
-                            continue
-                        rec['listTitle'] = txt
-                        lectures[href] = rec
-                        print(f'[OK] {name} | {rec.get("lectureStart")} | {txt}')
-                    # 翻到下一页；优先用静态「下一页」链接，缺失时回退到 /N.html 顺序翻页
-                    nxt = _next_page_url(html, base) if html else None
-                    sequential = False
-                    if not nxt and new_count > 0:
-                        # 本页确有内容但无「下一页」锚点：多为 JS 注入分页器，
-                        # 尝试按 根目录/N.html 规律推导下一页（如 /xueshujiangzuo/2.html）。
-                        cand = _sequential_candidate(cur)
-                        if cand:
-                            nxt = cand
-                            sequential = True
-                    if (not nxt or nxt.rstrip('/') in visited_pages
-                            or nxt.rstrip('/') == cur.rstrip('/')):
-                        break
-                    # 顺序翻页越过末页后，下一页往往重定向回首页或为空页，
-                    # 此时本页没有新链接，及时停止，避免空转。
-                    if sequential and new_count == 0:
-                        break
-                    cur = nxt
-                    # 安全阀：极端情况下避免无限翻页
-                    if len(visited_pages) > 300:
-                        print(f'[WARN] {name} 分页超过 300 页，停止跟随')
-                        break
-            time.sleep(1)
-        except Exception as e:
-            # 单源异常不应拖垮整次抓取：记录后继续下一个源，已采数据照常写入
-            print(f'[ERROR] 信息源「{src.get("name")}」抓取失败：{e}', file=sys.stderr)
-            continue
+
+    # 并发抓取各信息源：源与源之间独立，大幅缩短 GitHub Actions 全量/增量耗时
+    max_workers = 1 if args.source else 5
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental): src for src in sources}
+        for future in as_completed(future_to_src):
+            src_name = future_to_src[future].get('name')
+            try:
+                local = future.result()
+                for url, rec in local.items():
+                    lectures[url] = rec
+            except Exception as e:
+                print(f'[ERROR] 合并信息源「{src_name}」结果失败：{e}', file=sys.stderr)
 
     # 同源去重：同一学院标题相似的只保留一条
     raw = list(lectures.values())
