@@ -123,17 +123,17 @@
                 </template>
               </div>
               <!-- 右侧筛选控件：固定不换行，避免输入时跳行 -->
-              <div class="flex items-center gap-2 flex-nowrap shrink-0">
+              <div class="flex items-center gap-2 flex-nowrap shrink-0 overflow-hidden">
                 <input v-model="query" type="search" :placeholder="searchPlaceholder"
-                  class="flex-1 min-w-0 sm:flex-none sm:w-44 px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                  class="w-20 sm:w-44 min-w-0 px-2 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 shrink-0" />
                 <!-- 搜索维度：与搜索框做 AND 组合（全部/单位/地点/题目） -->
-                <select v-model="searchField" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
+                <select v-model="searchField" class="w-14 sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
                   <option value="">全部</option>
                   <option value="college">单位</option>
                   <option value="location">地点</option>
                   <option value="topic">题目</option>
                 </select>
-                <select v-model="year" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
+                <select v-model="year" class="w-20 sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
                   <option value="">全部年份</option>
                   <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
                 </select>
