@@ -5,7 +5,7 @@ import datetime
 import requests
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
-from timeparse import parse_cn_time, _year_from_text
+from timeparse import parse_cn_time, _year_from_text, resolve_lecture_time
 
 def _clean_ocr_text(ocr_text):
     """清理图片 OCR 后常见的海报抬头、Logo、边框乱码等噪声。"""
@@ -428,6 +428,44 @@ def _split_location_time(loc):
     return clean or loc, (h0, m0, h1, m1)
 
 
+def _locate_publish_time(soup, content_div, body_text, full_text):
+    """R3 发布时间精确定位：标签 > 伴生词/class > 位置兜底。返回 (publish_time, level)。
+
+    level: 1=显式标签, 2=伴生词/class, 3=位置兜底。用于 R3 本质条款——
+    第 2/3 级兜底抓到的候选若等于权威讲座日，视为误抓讲座时间，作废该候选；
+    第 1 级标签值即使等于讲座日也保留（R5：同天发布同天讲属正常）。
+
+    本质条款（修 Bug A）：本函数只在"定位发布时间"这一动作里工作，绝不对讲座正文
+    做任何字符串删除——发布日排除只作用于此处，不影响正文日期解析。
+    """
+    PUB = r'(?:发布(?:时间|日期)?|发表时间|发布于|posted|date)\s*[：:]?\s*(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}(?::\d{2})?)?)'
+    # Level 1：显式标签（正文优先，整页兜底）
+    m = re.search(PUB, body_text, re.IGNORECASE)
+    if m:
+        return m.group(1).strip(), 1
+    m = re.search(PUB, full_text, re.IGNORECASE)
+    if m:
+        return m.group(1).strip(), 1
+    # Level 2：class 命中 .info/.meta/.article-info/.pub
+    if content_div:
+        for tag in content_div.find_all(class_=re.compile(r'info|meta|pub|article-info', re.I)):
+            mm = re.search(r'(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}(?::\d{2})?)?)', tag.get_text())
+            if mm:
+                return mm.group(1).strip(), 2
+    # Level 2：伴生词行（来源/点击/评论/浏览/作者）
+    m = re.search(r'(?:来源|点击|评论|浏览|作者)[：: ]*.*?(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)', body_text)
+    if m:
+        return m.group(1).strip(), 2
+    # Level 3：位置兜底（正文第一个日期）
+    m = re.search(r'(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}(?::\d{2})?)?)', body_text)
+    if m:
+        return m.group(1).strip(), 3
+    m = re.search(r'(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}(?::\d{2})?)?)', full_text)
+    if m:
+        return m.group(1).strip(), 3
+    return None, 0
+
+
 def parse_detail(html, url, college, campus, default_year=None, list_title=None):
     soup = BeautifulSoup(html, 'html.parser')
     # 列表页标题通常就是干净的讲座标题，优先使用；否则回退到详情页 h1/title
@@ -518,25 +556,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     if len(body_text) < 50:
         _do_ocr()
 
-    # 发布时间：优先在正文区域内匹配，避免整页导航/版权把日期带偏。
-    # 格式 1：发布：YYYY-MM-DD HH:MM[:SS]
-    # 格式 2：YYYY-MM-DD HH:MM[:SS]（常见于 CMS 顶部，常接「来源：」）
-    search_text = content_div.get_text(' ') if content_div else text
-    search_text = re.sub(r'\s+', ' ', search_text).strip()
-    publish_time = None
-    # 支持：发布 / 发布时间 / 发布日期 / 发表时间 / 发布于 + YYYY-MM-DD [HH:MM[:SS]]
-    PUB = r'(?:发布(?:时间|日期)?|发表时间|发布于)\s*[：:]?\s*(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}(?::\d{2})?)?)'
-    m = re.search(PUB, search_text)
-    if not m:
-        # CMS 顶部常见「2023-11-08 10:00 来源：」式时间戳
-        m = re.search(r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?)', search_text)
-    if not m:
-        # 兜底：整页前部（正文为图片时 content_div 为空，发布时间只在整页 soup text 中）
-        m = re.search(PUB, text)
-    if not m:
-        # 再兜底：CMS 顶部时间戳在整页中
-        m = re.search(r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?)', text)
-    publish_time = m.group(1).strip() if m else None
+    # R3 发布时间定位（标签 > 伴生词/class > 位置兜底）
+    publish_time, publish_level = _locate_publish_time(soup, content_div, body_text, text)
 
     # 从标题/URL 提取显式年份（标题兼容紧凑格式 20251204）
     title_year = _year_from_text(title) if title else None
@@ -562,66 +583,60 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         'publishTime': publish_time,
     }
 
-    # 高优先级：正文显式「时间：<完整年月日[时分]>」标注是讲座时间的权威来源，
-    # 直接解析该标注子串——避免被侧边栏「相关新闻/最新公告」等处的松散日期污染
-    # （如地理科学学院把旧讲座在 2025-03-16 批量重发，侧边栏日期会盖过正文的真实讲座日期）。
-    # 要求标注值以完整 4 位年份日期开头，才认定为权威；否则（如「时间：周四10:00」相对时间）走通用解析。
+    # ---- 讲座时间抽取 R1–R6（编排见 timeparse.resolve_lecture_time）----
+    # R3 本质条款：发布日排除只作用于定位 publish_time（已在上方完成），绝不删除正文日期（修 Bug A）。
+    # R2：通用解析只扫正文 body_text（content_div 去噪），不扫整页侧边栏/页脚。
+    # R5：讲座日 = 发布日属正常，不再因此置空或降级（原同天降级逻辑已删除）。
     t = None
-    m_time_label = re.search(
-        r'(?:讲座时间|报告时间|活动时间|时间)[：:\s]*((?:19|20)\d{2}\s*[-/年].{0,30})', text)
-    if m_time_label:
-        # 关键：标注值已含完整 4 位年份，是权威年份，绝不能再传 publish_time 触发
-        # 「解析年<发布年就抬年」的修正——否则旧讲座（如 2016 年）在 2025 年批量重发时，
-        # 会被发布年 2025 强行抬年。但标注子串本身若只含「月日」则无完整年份，仍需
-        # publish_time/url_year 作为年份回退，因此保留 publish_time 参数供底层回退使用。
-        t_label = parse_cn_time(m_time_label.group(1).strip(), default_year,
-                                 publish_time=publish_time,
-                                 title_year=title_year, url_year=url_year)
-        if t_label:
-            t = t_label
-    if not t:
-        t = parse_cn_time(text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
-    t_untrusted = False  # 时间来源是否不可信（URL 兜底 / 疑似发布日），供 T3 海报覆盖
-    # 正文（含 meta）未解析出日期，但正文含海报图片：对海报 OCR 后重试，
-    # 以恢复「时间待定」记录里海报上的真实日期。仅在此情形触发 OCR，
-    # 避免对正文较长、日期已在文字中的页面做无谓的 OCR 重抓。
+    t_untrusted = False
+    rt = resolve_lecture_time(
+        body_text=body_text,
+        title=title,
+        url_year=url_year,
+        title_year=title_year,
+        publish_time=publish_time,
+        publish_level=publish_level,
+        default_year=default_year,
+        list_title=list_title,
+    )
+    if rt and rt.get('start'):
+        t = {'start': datetime.datetime.fromisoformat(rt['start']),
+             'end': datetime.datetime.fromisoformat(rt['end']) if rt.get('end') else None,
+             'has_time': True}
+        result['timeConfidence'] = rt.get('confidence')
+        result['timeNote'] = rt.get('note')
+    # 正文未解析出日期且含海报图片：OCR 后重试（仅补缺失，不覆盖已有）
     if not t and imgs:
         _do_ocr()
         if ocr_text:
-            t = parse_cn_time(text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
-    # 若解析结果与发布时间同一天，很可能解析到的是发布日期而非讲座日期；
-    # 优先使用列表标题（通常包含真实讲座日期），其次尝试 OCR 中的明确「时间」标签。
-    if t and publish_time and t['start'].strftime('%Y-%m-%d') == publish_time[:10]:
-        if list_title:
-            t_lt = parse_cn_time(list_title, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
-            if t_lt and t_lt['start'].strftime('%Y-%m-%d') != publish_time[:10]:
-                t = t_lt
-        # 图片 OCR 场景：正文存在「时间」标签时，优先用标签后片段
-        if ocr_text:
-            tm = re.search(r'(?:时间|时闻)[：:\s]*(.{0,70})', text)
+            t_ocr = parse_cn_time(ocr_text, default_year, publish_time=publish_time,
+                                  title_year=title_year, url_year=url_year)
+            tm = re.search(r'(?:讲座)?时间[：:\s]*(.{0,40})', ocr_text)
             if tm:
-                t2 = parse_cn_time(tm.group(1).strip(), default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
-                if t2 and t2['start'].strftime('%Y-%m-%d') != publish_time[:10]:
-                    t = t2
-    # 仍与发布日同天（未被列表标题/OCR 纠正）→ 疑似解析到发布日期而非讲座日期，标记不可信
-    if t and publish_time and t['start'].strftime('%Y-%m-%d') == publish_time[:10]:
-        t_untrusted = True
+                t_label = parse_cn_time(tm.group(1).strip(), default_year,
+                                        publish_time=publish_time, title_year=title_year, url_year=url_year)
+                if t_label:
+                    t_ocr = t_label
+            if t_ocr:
+                t = t_ocr
+    if not t and list_title:
+        # 兜底：部分站点讲座日期只在列表标题里（如心理学院）
+        t = parse_cn_time(list_title, default_year, publish_time=publish_time,
+                          title_year=title_year, url_year=url_year)
     if not t:
-        # 兜底：部分站点（如心理学院）讲座日期只在列表标题里，正文仅有发布日期
-        if list_title:
-            t = parse_cn_time(list_title, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
-    # 最终兜底：正文、标题、OCR 都未找到日期时，从 URL 路径中的完整日期回退。
-    # 适用于旧站点（如物理学院 2010 年）或极简通知页（如北斗、阿伯丁），
-    # 这些页面正文只有「周四上午10:00」这类相对时间，URL 中的日期是唯一可用日期。
-    if not t:
+        # 最终兜底：URL 路径完整日期（旧站点/极简页）。不可信（常为发布日/通知日）。
         url_date = _date_from_url(url)
         if url_date:
             y, mo, d = url_date
             try:
                 t = {'start': datetime.datetime(y, mo, d, 0, 0), 'end': None}
-                t_untrusted = True  # URL 路径日期不可信（常为发布日/通知日），供 T3 海报覆盖
+                t_untrusted = True
             except ValueError:
                 t = None
+    # R3 本质条款：第 2/3 级兜底的发布时间若等于权威讲座日，视为误抓讲座时间，作废该候选
+    if (publish_time and publish_level in (2, 3) and t
+            and t['start'].strftime('%Y-%m-%d') == publish_time[:10]):
+        publish_time = None
     if t:
         result['lectureStart'] = t['start'].isoformat(sep=' ')
         result['lectureEnd'] = t['end'].isoformat(sep=' ') if t.get('end') else None
@@ -904,14 +919,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
             if not (ocr_text and len(ocr_text) > 50):
                 result['abstract'] = narrative['abstract']
 
-    # 新闻/回顾过滤：发布时间晚于讲座时间，视为对已结束讲座的报道，不纳入聚合
+    # 新闻/回顾处理（R5 政策变更，2026-07-18）：
+    # 之前把「发布晚于讲座」的回顾稿整条丢弃；现改为保留——它们也是真实开展过的讲座，
+    # 只是未提前预告。仅打标记供后续筛选/核验，不丢弃数据。
     if is_news_record(result):
-        return None
-
-    # 新闻/活动回顾稿识别：机构作主语的参与/举办回顾、署名审签块、回顾式总结等
-    # （与 is_news_record 互补，覆盖无显式发布时间戳的回顾稿）
+        result['retrospective'] = True
+        result['timeNote'] = (result.get('timeNote') or '') + ';news-publish-after-lecture'
+    # 新闻/活动回顾稿识别（与 is_news_record 互补，覆盖无显式发布时间戳的回顾稿）
     _news = is_news_article(title, body_text)
     if _news:
-        return None
+        result['retrospective'] = True
+        result['newsRule'] = _news
+        result['timeNote'] = (result.get('timeNote') or '') + ';news-article:' + _news
 
     return result

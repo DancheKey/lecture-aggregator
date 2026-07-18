@@ -133,7 +133,7 @@
                   <option value="location">地点</option>
                   <option value="topic">题目</option>
                 </select>
-                <select v-model="year" class="w-20 sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-0.5 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
+                <select v-model="year" class="w-24 sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-0.5 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
                   <option value="">全部年份</option>
                   <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
                 </select>
