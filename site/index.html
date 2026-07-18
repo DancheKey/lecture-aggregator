@@ -125,15 +125,15 @@
               <!-- 右侧筛选控件：固定不换行，避免输入时跳行 -->
               <div class="flex items-center gap-2 flex-nowrap shrink-0">
                 <input v-model="query" type="search" :placeholder="searchPlaceholder"
-                  class="w-32 sm:w-44 min-w-0 px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                  class="flex-1 min-w-0 sm:flex-none sm:w-44 px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                 <!-- 搜索维度：与搜索框做 AND 组合（全部/单位/地点/题目） -->
-                <select v-model="searchField" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                <select v-model="searchField" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
                   <option value="">全部</option>
                   <option value="college">单位</option>
                   <option value="location">地点</option>
                   <option value="topic">题目</option>
                 </select>
-                <select v-model="year" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                <select v-model="year" class="text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
                   <option value="">全部年份</option>
                   <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
                 </select>
@@ -152,11 +152,11 @@
               <article v-for="l in g.items" :key="l.sourceUrl"
                 class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
                 <!-- 元信息 -->
-                <div class="flex items-center gap-2 text-[11pt] text-slate-400 mb-1.5">
-                  <span class="font-medium text-slate-500">{{ l.college }}</span>
-                  <span class="text-slate-300">·</span>
-                  <span>{{ fmtDateTime(l.lectureStart) }}</span>
-                  <span :class="['ml-auto px-2 py-0.5 rounded text-[11pt] font-semibold', statusInfo(l.lectureStart).hot ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400']">{{ statusInfo(l.lectureStart).label }}</span>
+                <div class="flex items-center gap-2 text-[11pt] text-slate-400 mb-1.5 flex-nowrap">
+                  <span class="font-medium text-slate-500 truncate min-w-0 max-w-[45%]">{{ l.college }}</span>
+                  <span class="text-slate-300 shrink-0">·</span>
+                  <span class="whitespace-nowrap">{{ fmtDateTime(l.lectureStart) }}</span>
+                  <span :class="['ml-auto px-2 py-0.5 rounded text-[11pt] font-semibold shrink-0 whitespace-nowrap', statusInfo(l.lectureStart).hot ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400']">{{ statusInfo(l.lectureStart).label }}</span>
                 </div>
                 <!-- 标题 -->
                 <h2 class="text-[15pt] font-semibold leading-snug mb-2">
