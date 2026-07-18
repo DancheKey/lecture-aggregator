@@ -351,8 +351,11 @@ def _normalize_label_text(text):
 def _date_from_url(url):
     """从内容页 URL 路径提取完整日期 (year, month, day)，失败返回 None。
 
-    兼容：/a/20251201/xxx.html -> (2025, 12, 1)
-         /a/2025/0507/xxx.html -> (2025, 5, 7)
+    兼容：
+      - /a/20251201/xxx.html  -> (2025, 12, 1)
+      - /a/2025/0507/xxx.html -> (2025, 5, 7)
+      - /xxx/2025/1028/xxx.html -> (2025, 10, 28)  (汕尾校区等栏目)
+      - /xxx/2025/10/28/xxx.html -> (2025, 10, 28)  (部分老站/国际站)
     """
     if not url:
         return None
@@ -362,8 +365,20 @@ def _date_from_url(url):
         y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
         if 1 <= mo <= 12 and 1 <= d <= 31:
             return y, mo, d
-    # 匹配 /a/YYYY/MMDD/ 或 /YYYY/MM/DD/ 路径
+    # 匹配 /a/YYYY/MMDD/ 路径
     m = re.search(r'/a/(20\d{2})/(\d{2})(\d{2})/', url)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            return y, mo, d
+    # 匹配 /xxx/YYYY/MMDD/xxx.html（如汕尾校区 /collaborative/2022/1028/36.html）
+    m = re.search(r'/(20\d{2})/(\d{2})(\d{2})/[^/]+\.html?$', url)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            return y, mo, d
+    # 匹配 /xxx/YYYY/MM/DD/xxx.html（部分老站/国际站）
+    m = re.search(r'/(20\d{2})/(\d{1,2})/(\d{1,2})/[^/]+\.html?$', url)
     if m:
         y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
         if 1 <= mo <= 12 and 1 <= d <= 31:
@@ -557,11 +572,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     if m_time_label:
         # 关键：标注值已含完整 4 位年份，是权威年份，绝不能再传 publish_time 触发
         # 「解析年<发布年就抬年」的修正——否则旧讲座（如 2016 年）在 2025 年批量重发时，
-        # 会被发布年 2025 强行抬年。故此处不传 publish_time。
-        # 但 default_year 本身可能因当前系统时间而变成未来年（如 2026），若标注子串因
-        # 非常规结尾（"号"）等未被识别为完整日期，月份日会被错误填充为当前未来年。因此
-        # 仍把 title_year/url_year 作为年份回退提示传入，保持权威年份优先且避免未来年污染。
+        # 会被发布年 2025 强行抬年。但标注子串本身若只含「月日」则无完整年份，仍需
+        # publish_time/url_year 作为年份回退，因此保留 publish_time 参数供底层回退使用。
         t_label = parse_cn_time(m_time_label.group(1).strip(), default_year,
+                                 publish_time=publish_time,
                                  title_year=title_year, url_year=url_year)
         if t_label:
             t = t_label
