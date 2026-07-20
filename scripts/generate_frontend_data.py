@@ -108,8 +108,10 @@ def build_stats(data, updated_at):
             years_set.add(y)
         primary_url = item.get('sourceUrl') or ''
         sources = item.get('sources') or [item]
-        # 累加来源通知总数
-        s_count = item.get('sourceCount') or len(sources) or 1
+        # 累加来源通知总数。注意：显式 sourceCount=0（多讲座拆分出的非首条）应被尊重，
+        # 故不能写 `item.get('sourceCount') or ...`（0 会被 or 吞掉）。
+        sc = item.get('sourceCount')
+        s_count = sc if sc is not None else (len(sources) or 1)
         source_notice_count += s_count
         # 预计算矩阵：按去重后讲座计数（每个 item 只计一次，按主学院/主年份）
         primary_college = item.get('college') or '未分类'

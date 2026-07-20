@@ -149,7 +149,7 @@
                 <span class="w-1 h-5 rounded-full bg-blue-500"></span>
                 {{ g.key }}
               </div>
-              <article v-for="l in g.items" :key="l.sourceUrl"
+              <article v-for="l in g.items" :key="l.sourceUrl + (l.lectureIndex ? '#' + l.lectureIndex : '')"
                 class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
                 <!-- 元信息 -->
                 <div class="flex items-center gap-2 text-[11pt] text-slate-400 mb-1.5 flex-nowrap">
@@ -168,11 +168,15 @@
                   <div v-if="l.topic"><span class="text-slate-400">题目</span> <span class="text-slate-600">{{ truncate(l.topic, 120) }}</span></div>
                   <div v-if="l.location"><span class="text-slate-400">地点</span> <span class="text-slate-600">{{ l.location }}</span></div>
                   <div v-if="l.speaker"><span class="text-slate-400">主讲</span> <span class="text-slate-600">{{ l.speaker }}<span v-if="l.speakerAffiliation" class="text-slate-400">（{{ l.speakerAffiliation }}）</span></span></div>
+                  <div v-if="l.host"><span class="text-slate-400">主持</span> <span class="text-slate-600">{{ l.host }}</span></div>
+                  <div v-if="l.meetingId"><span class="text-slate-400">会议号</span> <span class="text-slate-600">{{ l.meetingPlatform ? l.meetingPlatform + ' ' : '' }}{{ l.meetingId }}</span></div>
+                  <div v-if="l.participants"><span class="text-slate-400">参与</span> <span class="text-slate-600">{{ l.participants }}</span></div>
+                  <div v-if="l.notes && l.notes.length" class="text-amber-600 text-[11pt]">⚠ {{ l.notes.join('；') }}</div>
                   <div v-if="l.speakerBio" class="text-slate-500 leading-relaxed">
                     <span class="text-slate-400">简介</span> {{ truncate(cleanFooter(l.speakerBio), 220) }}
                   </div>
                   <div v-if="abstractOf(l)" class="text-slate-500 leading-relaxed line-clamp-3">
-                    <span class="text-slate-400">内容摘要</span> {{ abstractOf(l) }}
+                    <span class="text-slate-400">摘要</span> {{ abstractOf(l) }}
                   </div>
                 </div>
                 <!-- 可点击 Tag + 点赞 -->

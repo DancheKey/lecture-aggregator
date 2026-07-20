@@ -199,11 +199,225 @@ def _normalize_title(title):
 
 
 def _completeness(r):
-    """记录字段完整度：非空关键字段越多越「完整」，去重时优先保留。"""
+    """记录字段完整度：非空关键字段越多越「完整」，去重/合并时优先保留。"""
     return sum(1 for v in [
         r.get('lectureStart'), r.get('location'), r.get('speaker'),
         r.get('speakerAffiliation'), r.get('topic'), r.get('speakerBio')
     ] if v)
+
+
+def _normalize_speaker(speaker):
+    """主讲人归一化：去掉职称后缀，用于跨源匹配。"""
+    if not speaker:
+        return ''
+    s = speaker.strip()
+    # 去掉常见职称
+    for suffix in ['教授', '副教授', '讲师', '研究员', '副研究员',
+                   '院士', '博士', '博士后', '博士生导师', '硕士生导师']:
+        if s.endswith(suffix) and len(s) > len(suffix):
+            s = s[:-len(suffix)]
+    return s.strip()
+
+
+def _is_valid_speaker_name(name):
+    """判断主讲人是否为真实姓名（排除「联系方式」「我校生命」等解析噪声）。
+
+    合法姓名特征：2~10 字符，不含明显非人名词汇。
+    """
+    if not name or len(name) < 2 or len(name) > 15:
+        return False
+    # 明确非法词（解析器常见噪声）
+    invalid_keywords = [
+        '联系方式', '报名', '投稿', '截止', '审核', '发布', '更新', '修改',
+        '创建', '我校', '学院', '中心', '研究院', '实验室', '办公室', '秘书处',
+        '组委会', '筹备组', '主办方', '承办方', '协办方', '通知', '公告',
+        '欢迎', '敬请', '详情', '咨询', '联系',
+    ]
+    name_lower = name.lower()
+    for kw in invalid_keywords:
+        if kw in name:
+            return False
+    # 纯数字或纯标点
+    if re.match(r'^[\d\s\W]+$', name):
+        return False
+    return True
+
+
+def _tokenize(text):
+    """中文文本分词（字符级 bigram + 长词兜底），用于相似度计算。
+
+    对中文文本比按标点切分更鲁棒：能容忍标点差异（如「以格局铸根基,以传统文化」
+    vs 「以格局铸根基以传统文化」），因为共享的字符序列仍会产生重叠 bigram。
+    """
+    if not text:
+        return set()
+    # 先去标点，保留纯文字
+    clean = re.sub(r'[\s,，。、；；：:！!？?·…—\-()（）\[\]【】""\'\'《》<>""／/]+', '', text)
+    if len(clean) < 2:
+        return set()
+    # 字符级 bigram（相邻两字一组）
+    bigrams = {clean[i:i+2] for i in range(len(clean) - 1)}
+    # 额外保留 4+ 字符的长片段作为补充信号
+    long_tokens = {m.group() for m in re.finditer(r'.{4,}', clean)}
+    return bigrams | long_tokens
+
+
+def _topic_similarity(a, b):
+    """两段文本的关键词重叠度（Jaccard 系数）。返回 0~1。"""
+    ta, tb = _tokenize(a), _tokenize(b)
+    if not ta or not tb:
+        return 0.0
+    return len(ta & tb) / len(ta | tb)
+
+
+def cross_source_dedup(records):
+    """跨源去重：不同学院发布的同一讲座合并为一条。
+
+    判定规则（两层）：
+      必须条件：同一主讲人（归一化后） + 同一讲座日期（精确到天）
+      充分条件：标题或 topic 的关键词 Jaccard 重叠度 ≥ 0.25
+
+    合并策略：
+      - 保留字段更完整的记录作为主记录（primary）
+      - 其他记录变为 sources 数组中的条目：{sourceUrl, college, campus, title}
+      - 主记录设置 merged=True, sourceCount=len(sources)+1（含自身）
+
+    为什么用「主讲人+日期」而不是纯标题相似：
+      同一讲座在不同学院的标题差异极大（如 psy 用短标题"5月31日 林崇德教授砺儒讲坛"，
+      skc 用正式长标题"华南师范大学砺儒讲坛第146讲：…"），但主讲人和日期一定一致。
+    """
+    # 第一轮：按 (speaker_normalized, date) 分组（仅合法姓名参与）
+    groups = {}
+    for rec in records:
+        spk = _normalize_speaker(rec.get('speaker') or '')
+        if not _is_valid_speaker_name(spk):
+            continue
+        date = (rec.get('lectureStart') or '')[:10]
+        if not date or date.startswith('0000'):
+            continue
+        key = (spk, date)
+        groups.setdefault(key, []).append(rec)
+
+    merged_urls = set()   # 已被合并进其他记录的 sourceUrl（需从最终列表中移除）
+    merge_count = 0
+
+    for key, group in groups.items():
+        if len(group) < 2:
+            continue
+
+        # 组内两两比较：找可合并的对
+        n = len(group)
+        # union-find 简化版：parent[i]=i 表示独立，否则指向主记录索引
+        parent = list(range(n))
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a, b):
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[rb] = ra
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                if find(i) == find(j):
+                    continue
+                ri, rj = group[i], group[j]
+                # 不同源才考虑合并（同源重复已由 dedup 处理）
+                if ri.get('sourceUrl', '').rstrip('/') == rj.get('sourceUrl', '').rstrip('/'):
+                    continue
+                # topic 或 title 相似度（含跨字段交叉比较：
+                # 有的源把实质内容放 topic、有的放 title，需四向全比）
+                ti_a = ri.get('topic', '') or ri.get('title', '')
+                ti_b = rj.get('topic', '') or rj.get('title', '')
+                sim = max(
+                    _topic_similarity(ri.get('topic', ''), rj.get('topic', '')),
+                    _topic_similarity(ri.get('title', ''), rj.get('title', '')),
+                    _topic_similarity(ti_a, ti_b),          # A有效文本 vs B有效文本
+                    _topic_similarity(ri.get('topic', ''), rj.get('title', '')),  # A topic vs B title
+                    _topic_similarity(ri.get('title', ''), rj.get('topic', '')),  # A title vs B topic
+                )
+                if sim >= 0.25:
+                    union(i, j)
+
+        # 按 find 结果聚簇执行合并
+        clusters = {}
+        for i in range(n):
+            root = find(i)
+            clusters.setdefault(root, []).append(i)
+
+        for root_idx, members in clusters.items():
+            if len(members) < 2:
+                continue
+
+            # 选字段最完整的做主记录
+            primary_idx = max(members, key=lambda idx: _completeness(group[idx]))
+            primary = group[primary_idx]
+
+            primary_college = primary.get('college', '')
+            seen_colleges = set()
+            sources_list = []
+            for idx in members:
+                if idx == primary_idx:
+                    continue
+                other = group[idx]
+                oc = other.get('college', '')
+                # 同学院的自我合并：跳过，保留为独立记录（不合并、不移除）
+                if oc == primary_college:
+                    continue
+                # 跨院从记录：合并进主记录，从最终列表移除
+                merged_urls.add(other.get('sourceUrl', '').rstrip('/'))
+                # 折叠重复学院（如社科处把同一场讲座发了两次 → 只计一次来源）
+                if oc in seen_colleges:
+                    continue
+                seen_colleges.add(oc)
+                sources_list.append({
+                    'sourceUrl': other.get('sourceUrl', ''),
+                    'college': oc,
+                    'campus': other.get('campus', ''),
+                    'title': other.get('title', ''),
+                })
+
+            # 去掉自我合并/重复后已无可合并的跨院来源 → 本簇不作为跨源合并
+            if not sources_list:
+                continue
+
+            # 如果主记录已有 sources（来自同源去重阶段），合并进去并去重
+            existing_sources = primary.get('sources') or []
+            all_sources = []
+            _seen = set()
+            for s in existing_sources + sources_list:
+                c = s.get('college', '')
+                if c == primary_college or c in _seen:
+                    continue
+                _seen.add(c)
+                all_sources.append(s)
+            primary['sources'] = all_sources
+            primary['merged'] = True
+            primary['sourceCount'] = len(all_sources) + 1  # 含自身
+            # 补全策略：用从记录的非空字段填补主记录的空字段
+            for field in ['speakerTitle', 'speakerAffiliation', 'location',
+                          'speakerBio', 'organizer']:
+                if not primary.get(field):
+                    for src_rec in [group[idx] for idx in members if idx != primary_idx]:
+                        val = src_rec.get(field)
+                        if val:
+                            primary[field] = val
+                            break
+            merge_count += len(members) - 1
+            print(f'[MERGE] {key[0]} @ {key[1]} → {len(members)} 条合并为 1 '
+                  f'(主记录: {primary["college"]} | 来源: {", ".join(s["college"] for s in sources_list)})')
+
+    if merge_count:
+        print(f'[MERGE] 跨源去重完成，共 {merge_count} 条被合并')
+
+    # 过滤掉已被合并的从记录
+    result = [r for r in records
+              if r.get('sourceUrl', '').rstrip('/') not in merged_urls]
+    return result
 
 
 def dedup(records):
@@ -288,16 +502,22 @@ def _process_source(src, year, existing_urls, is_incremental):
                     if not d:
                         continue
                     try:
-                        rec = parse_detail(d, href, name, campus, year, list_title=txt)
+                        recs = parse_detail(d, href, name, campus, year, list_title=txt)
                     except Exception as e:
                         print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
                         continue
-                    if rec is None:
+                    if recs is None:
                         print(f'[SKIP-NEWS] {name} | {txt} | {href}')
                         continue
-                    rec['listTitle'] = txt
-                    local[href] = rec
-                    print(f'[OK] {name} | {rec.get("lectureStart")} | {txt}')
+                    if not isinstance(recs, list):
+                        recs = [recs]
+                    for r in recs:
+                        r['listTitle'] = txt
+                        # 多讲座拆分后多条共享同一 sourceUrl，需用 期号 区分 key 防覆盖
+                        key = r['sourceUrl'] + (('#' + str(r['lectureIndex'])) if r.get('lectureIndex') else '')
+                        local[key] = r
+                        tag = f' (第{r["lectureIndex"]}期)' if r.get('lectureIndex') else ''
+                        print(f'[OK] {name} | {r.get("lectureStart")} | {txt}{tag}')
                 nxt = _next_page_url(html, base) if html else None
                 sequential = False
                 if not nxt and new_count > 0:
@@ -389,7 +609,16 @@ def main():
     if args.source:
         other_existing = [r for r in existing if r.get('college') != args.source]
         raw = other_existing + raw
+        # 安全拦截：--source 模式绝不应让总条数大幅缩水，否则大概率是 existing
+        # 加载失败（json.load 异常被静默吞掉 → existing=[]）导致用单源覆盖全量。
+        # 一旦产出 < 现有条数 50%，拒绝覆盖，避免误删其他学院数据。
+        if existing and len(raw) < len(existing) * 0.5:
+            print(f'[ABORT] --source 模式产出 {len(raw)} 条 < 现有 {len(existing)} 条的 50%，'
+                  f'疑似现有数据未正确合并，拒绝覆盖 data/lectures.json。', file=sys.stderr)
+            return
     out = dedup(raw)
+    # 跨源去重：不同学院发布的同一讲座合并为一条（同主讲+同日期+topic相似）
+    out = cross_source_dedup(out)
     out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)
     data_dir = os.path.join(ROOT, 'data')
     os.makedirs(data_dir, exist_ok=True)

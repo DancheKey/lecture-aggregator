@@ -251,9 +251,23 @@ createApp({
       return (s || '').replace(/(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved)[\s\S]*/i, '').trim();
     },
     abstractOf(l) {
-      if (l.abstract) return this.truncate(l.abstract, 300);
-      if (l.listTitle && l.listTitle !== l.title) return this.truncate(l.listTitle, 150);
-      return '';
+      const ab = (l.abstract || '').trim();
+      if (!ab) return '';
+      // 过滤：abstract 实际是主讲人简介（解析器常见误抽）则视为无摘要
+      // 检测依据：(a) 以「主讲人简介/报告人简介/嘉宾介绍」等前缀开头；
+      // (b) 内容与 speakerBio 高度重叠（去空格后互相包含）。
+      const bioPrefixes = ['主讲人简介', '报告人简介', '嘉宾介绍', '专家介绍',
+        '报告人介绍', '主讲人介绍', '演讲者简介', 'About the Speaker'];
+      for (const p of bioPrefixes) {
+        if (ab.startsWith(p)) return '';
+      }
+      const sb = (l.speakerBio || '').replace(/\s/g, '');
+      if (sb.length > 10 && sb.includes(ab.replace(/\s/g, ''))) return '';
+      // 过滤：abstract 是站点侧边栏「资讯及通知」模块的行政通知列表
+      // （如"关于征集国家社科基金...关于申报教育部..."），不是讲座摘要。
+      // 特征：含"资讯及通知"栏目标题，或 ≥2 条"关于…通知/公告/申报/征集"短语。
+      if (/资讯及通知|(?:关于.{2,40}(?:通知|公告|申报|征集|转发|招标|遴选).*){2,}/.test(ab)) return '';
+      return this.truncate(ab, 300);
     },
     // 安全链接：仅放行 http/https，阻断 javascript:/data: 等可执行协议，防止 XSS
     safeUrl(u) {
@@ -445,6 +459,9 @@ createApp({
       if (!l || !l.sources || !l.sources.length) return [l.college];
       const seen = new Set();
       const out = [];
+      // 主记录自身的学院
+      if (l.college && !seen.has(l.college)) { seen.add(l.college); out.push(l.college); }
+      // 合并来源的学院
       l.sources.forEach(s => {
         const c = s.college || l.college;
         if (!seen.has(c)) { seen.add(c); out.push(c); }
@@ -456,6 +473,9 @@ createApp({
       if (!l || !l.sources || !l.sources.length) return [l.campus];
       const seen = new Set();
       const out = [];
+      // 主记录自身的校区
+      if (l.campus && !seen.has(l.campus)) { seen.add(l.campus); out.push(l.campus); }
+      // 合并来源的校区
       l.sources.forEach(s => {
         const c = s.campus || l.campus;
         if (!seen.has(c)) { seen.add(c); out.push(c); }
