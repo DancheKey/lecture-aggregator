@@ -20,6 +20,9 @@ sources:
 - name: 马克思主义学院
   campus: 石牌
   base: http://mks.scnu.edu.cn
+  # 马克思主义学院学术预告栏：发布时间常晚于讲座时间。坚持统一原则——
+  # 发布时间晚于讲座时间即判为回顾稿（未起到预告目的），一律走通用新闻/回顾过滤剔除。
+  # 仅保留 is_non_lecture_title 拦截通知/招聘/答辩等非讲座内容。
   list_urls:
   - url: http://mks.scnu.edu.cn/academic/
     collect_mode: all_items

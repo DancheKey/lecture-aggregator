@@ -502,7 +502,8 @@ def _process_source(src, year, existing_urls, is_incremental):
                     if not d:
                         continue
                     try:
-                        recs = parse_detail(d, href, name, campus, year, list_title=txt)
+                        recs = parse_detail(d, href, name, campus, year, list_title=txt,
+                                            skip_news_filter=src.get('skip_news_filter', False))
                     except Exception as e:
                         print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
                         continue

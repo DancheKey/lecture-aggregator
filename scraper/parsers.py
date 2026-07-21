@@ -31,8 +31,8 @@ def _n1a_normalize(text, keep_word_boundaries=True):
     def _cjk_space(m):
         left, sp, right = m.group(1), m.group(2), m.group(3)
         if keep_word_boundaries and len(left) >= 2 and len(right) >= 2:
-            return sp  # 保留词块边界（仅 OCR 路径）
-        return ''      # 删除（单字间噪声 或 HTML 路径统一删除）
+            return left + sp + right  # 保留词块边界（仅 OCR 路径）
+        return left + right           # 删除空格但保留两侧汉字（修复：原返回 '' 会连汉字一起吞掉）
 
     return re.sub(r'([\u4e00-\u9fa5])(\s{1,2})([\u4e00-\u9fa5])', _cjk_space, text)
 
@@ -993,7 +993,7 @@ def _locate_publish_time(soup, content_div, body_text, full_text):
     return None, 0
 
 
-def parse_detail(html, url, college, campus, default_year=None, list_title=None):
+def parse_detail(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
     soup = BeautifulSoup(html, 'html.parser')
     # 列表页标题通常就是干净的讲座标题，优先使用；否则回退到详情页 h1/title
     if list_title:
@@ -1354,6 +1354,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
         if mm:
             result['speaker'] = sp_clean.split('（')[0].strip()
             aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm.group(2)).strip()
+            # 清除「现为/现任/现供职于/目前任职于」等状态前缀
+            aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
             result['speakerAffiliation'] = re.sub(r'\s+', '', aff)
         else:
             # 空格分隔的「姓名 职称 单位」或「姓名 单位」（如物理学院「郑炜 教授 中国科学技术大学」）
@@ -1366,6 +1368,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
             if mm2:
                 result['speaker'] = mm2.group(1).strip()
                 aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm2.group(2)).strip()
+                # 清除「现为/现任/现供职于/目前任职于」等状态前缀
+                aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
                 result['speakerAffiliation'] = re.sub(r'\s+', '', aff).strip()
             else:
                 # 最后兜底：从值头部提取纯中文人名（2~4 字），
@@ -1379,7 +1383,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
                     # 剩余部分（用截断后但未去职称的 sp，避免丢失单位首字）
                     rest = sp[nm.end():].strip()
                     if rest and len(rest) > 2:
-                        result['speakerAffiliation'] = re.sub(r'\s*(?:特聘教授|副教授|教授|讲师|院士|老师).*$', '', rest).strip()
+                        aff = re.sub(r'\s*(?:特聘教授|副教授|教授|讲师|院士|老师).*$', '', rest).strip()
+                        # 清除「现为/现任/现供职于/目前任职于」等状态前缀
+                        aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
+                        result['speakerAffiliation'] = aff
                 else:
                     result['speaker'] = sp_clean
 
@@ -1454,6 +1461,51 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
                 _new_tp = _tp[len(_sp):].strip(' ：:，,')
                 if _new_tp:
                     result['topic'] = _new_tp
+
+    # --- 马克思主义学院海报专用抽取（两类格式：① 顶部「唯实讲堂」用「地点：」标签；
+    #     ② 底部「学术研讨会」把地点放在末尾「华南师范大学XXX厅/楼N」、主讲人用「主讲嘉宾 姓名」）---
+    # 通用抽取对马院海报失效：① location 终止标签依赖「主讲人简介」完整出现，OCR 常把「主」漏识成
+    # 「讲人简介」导致 location 贪婪吞掉整段简介；② 简介位于「地点」之后被 _extract_speaker_from_ocr
+    # 的 region 截断挡在门外；③ 外文姓名含「·」或后接拉丁字母，通用 2–4 字正则截断失真。
+    # 此处用原始 OCR 直接按标签兜底解析，仅对马院生效。
+    if college == '马克思主义学院':
+        _mks_raw = ''
+        if imgs:
+            try:
+                _mks_raw = ' '.join(_img_to_text(im) for im in imgs[:3])
+            except Exception:
+                _mks_raw = ''
+        if _mks_raw:
+            # 地点：优先「(活动)地点：」标签截到首个礼堂词；否则兜底抓底部「华南师范大学XXX厅/楼N」
+            loc = ''
+            loc_m = re.search(r'(?:活动地点|地点)[：:]\s*([\s\S]*?(?:厅|室|场|房|馆))', _mks_raw)
+            if loc_m:
+                loc = loc_m.group(1).strip()
+                halls = list(re.finditer(r'(?:厅|室|场|房|馆)', loc))
+                if halls:
+                    loc = loc[:halls[-1].end()].strip()
+            else:
+                loc_m = re.search(r'华南师范大学\s*([\u4e00-\u9fa5\d]*(?:厅|室|楼|场|房|馆)[\u4e00-\u9fa5\d]*)', _mks_raw)
+                if loc_m:
+                    loc = '华南师范大学' + loc_m.group(1).strip()
+            if loc:
+                result['location'] = loc
+            # 主讲人（按出现频率排序）：主讲嘉宾 / 主讲人简介(含漏识"讲人简介") / 地点后紧跟姓名 /
+            # 顶部「姓名，单位」 / 底部「外文姓名 拉丁」；外文名(含·或后接拉丁)直接采用。
+            if not result.get('speaker'):
+                sm = (re.search(r'主讲嘉宾\s*([\u4e00-\u9fa5·]{2,4})', _mks_raw)
+                      or re.search(r'主讲人简介\s*([\u4e00-\u9fa5·]{2,4})', _mks_raw)
+                      or re.search(r'讲人简介\s*([\u4e00-\u9fa5·]{2,4})', _mks_raw)
+                      or re.search(r'地点[：:][\s\S]*?(?:厅|室|场|房|馆)\s*([\u4e00-\u9fa5·]{2,8})', _mks_raw)
+                      or re.search(r'([\u4e00-\u9fa5·]{2,4})[，,]\s*[\u4e00-\u9fa5]*(?:大学|学院|研究院|研究所)', _mks_raw)
+                      or re.search(r'([\u4e00-\u9fa5·]{2,8})\s*[A-Za-z]+\s*时间[：:]', _mks_raw))
+                if sm:
+                    cand = sm.group(1).strip()
+                    _nxt = _mks_raw[sm.end():sm.end() + 1] if sm.end() < len(_mks_raw) else ''
+                    if '·' in cand or re.search(r'[A-Za-z]', _nxt):
+                        result['speaker'] = cand          # 外籍姓名
+                    elif _looks_like_real_name(cand):
+                        result['speaker'] = cand
 
     # --- 简历/简介（优先在文章正文区域内搜索）---
     # body_text 已在函数开头构建（含可能的 OCR 文本）
@@ -1596,8 +1648,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None)
     # 两层判定：(1) is_news_record 时间判定（发布晚于讲座）；
     #          (2) is_news_article 语义判定（覆盖无显式发布时间戳的回顾稿）。
     # 命中即 return None，scraper 会打印 [SKIP-NEWS] 并跳过该 URL。
-    if is_non_lecture_title(title) or is_news_record(result) or is_news_article(title, body_text, result.get('lectureStart')):
+    if is_non_lecture_title(title) or (not skip_news_filter and (is_news_record(result) or is_news_article(title, body_text, result.get('lectureStart')))):
         return None
+    if skip_news_filter:
+        # 来源被显式标记为「跳过新闻过滤」（如整栏为讲座海报预告、发布晚于讲座时间），
+        # 记录标记以便后续清理脚本（clean_public.py）也不会误删。
+        result['newsFilterBypass'] = True
 
     # CV1/CV3 交叉校验（仅打 note，CV3 明显异常时修正）
     cv_notes = _cross_validate(result, url_date, ocr_text, publish_time, url_year)
@@ -1781,6 +1837,16 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
     return sessions
 
 
+# 主讲人姓名提取（MS4 逐块）：复姓感知。普通中文名 2–3 字；
+# 4 字仅允许复姓（欧阳/司马/…）+ 2 字名，避免把「网络空间安全」的单位首字并入姓名
+# （如「赵搏文网络空间安全」→ 旧 {2,4} 贪心抓成「赵搏文网」）。
+_SURNAME_2 = ('欧阳|司马|上官|诸葛|东方|令狐|皇甫|澹台|独孤|夏侯|宇文|慕容|'
+              '司徒|拓跋|尉迟|闻人|公孙|轩辕|长孙|鲜于|万俟|赫连|宗政|濮阳|'
+              '淳于|单于|太叔|申屠|仲孙|乐正|钟离|闾丘|梁丘|左丘|东郭|微生')
+_SPEAKER_NAME_RE = re.compile(
+    r'^((?:(?:' + _SURNAME_2 + r')[\u4e00-\u9fa5]{2}|[\u4e00-\u9fa5·]{2,3}))')
+
+
 def split_record_by_sessions(base, sessions, full_text=''):
     """把单条 base 记录按 sessions 拆成多条（MS4）。基底字段共享，逐块覆盖。"""
     out = []
@@ -1850,19 +1916,34 @@ def split_record_by_sessions(base, sessions, full_text=''):
         sp_m = re.search(rf'(?:主讲[人师]|报告人\d*)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
         if sp_m:
             cand = sp_m.group(1).strip()
+            # 提取职称（用于 speakerTitle）
+            title_m = re.search(
+                r'(特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
+                r'研究员|教授|讲师|博士后|博士|院士)', cand)
+            speaker_title = title_m.group(1) if title_m else ''
             # 先去掉尾部职称/单位后缀，再取姓名（避免「徐湘林教授」被截成「徐湘林教」）
             cand_clean = re.sub(
                 r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
                 r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', cand).strip()
-            nm = re.match(r'^([\u4e00-\u9fa5·]{2,4})', cand_clean)
+            nm = _SPEAKER_NAME_RE.match(cand_clean)
             if nm and _looks_like_real_name(nm.group(1)):
                 rec['speaker'] = nm.group(1)
                 rec['speakerSource'] = 'block'
-                rest = cand_clean[nm.end():].strip(' （(，,')
+                if speaker_title:
+                    rec['speakerTitle'] = speaker_title
+                rest = cand_clean[nm.end():].strip(' （(，,）)')
                 if rest:
-                    rec['speakerAffiliation'] = re.sub(
+                    # 清除「现为/现任/现供职于/目前任职于」等状态前缀，只保留单位名
+                    aff = re.sub(
+                        r'^\s*[（(]?\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', rest).strip()
+                    # 再清除尾部职称
+                    aff = re.sub(
                         r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-                        r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', rest).strip()
+                        r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', aff).strip()
+                    # 去掉首尾括号残留
+                    aff = aff.strip(' （()）')
+                    if aff:
+                        rec['speakerAffiliation'] = aff
             else:
                 # 值非人名（如「主持嘉宾：」粘连），继承前序
                 rec['speaker'] = prev_speaker
@@ -1883,18 +1964,34 @@ def split_record_by_sessions(base, sessions, full_text=''):
                 rec['speakerSource'] = 'inherited' if prev_speaker else None
         if participants:
             rec['participants'] = participants
-        # 共享地点：基底为空时从整页补「活动地点/地点」。
-        # 用排除字符类截断（遇空格/标点/腾讯会议/专题即止），避免把会议号一并吃进地点。
-        if not rec.get('location') and full_text:
+        # 地点：逐块「报告N地点」优先；其次整页「活动地点」；再次基底；最后清泄漏与房间号空格。
+        loc = ''
+        # 模式A：块内「报告N地点：」标签（避免基底抽取被「报告N」标签污染）
+        # 结束前瞻须含「报告摘要/报告人/报告时间」——CS 压缩标签「报告地点：X会议室报告摘要」
+        # 会把「报告」漏进地点（被「摘要」前瞻误匹配），故在此直接截断。
+        lm = re.search(r'报告\d*地点[：:]\s*([\u4e00-\u9fa5A-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告\d|报告摘要|报告人|报告时间|摘要|内容简介|$)', block)
+        if lm:
+            loc = lm.group(1).strip()
+        if not loc and full_text:
             for pat in (r'活动地点\s*[：:]?\s*([^，。；\s]{2,60})',
                         r'(?<!主)地点\s*[：:]?\s*([^，。；\s]{2,60})'):
-                lm = re.search(pat, full_text)
-                if lm:
-                    loc = lm.group(1).strip()
+                m = re.search(pat, full_text)
+                if m:
+                    cand_loc = m.group(1).strip()
                     # 仅当看起来像真实地点（含 校区/楼/室/学院/大学）才采用，避免误抓噪声
-                    if 2 <= len(loc) <= 60 and any(k in loc for k in ('校区', '楼', '室', '学院', '大学', '馆', '中心', '房', '场')):
-                        rec['location'] = loc
+                    if 2 <= len(cand_loc) <= 60 and any(k in cand_loc for k in ('校区', '楼', '室', '学院', '大学', '馆', '中心', '房', '场')):
+                        loc = cand_loc
                         break
+        if not loc and rec.get('location'):
+            loc = rec['location']
+        # 清理：去掉泄漏的「报告N…」标签，并合并 get_text 在标签边界插入的空格
+        # （地点里的空格永远是噪声，如「学院 1 01 会议室」→「学院101会议室」）
+        if loc:
+            loc = re.split(r'报告\d', loc)[0].strip()
+            loc = re.sub(r'\s+', '', loc)
+            loc = re.sub(r'报告(摘要|人|时间)?$', '', loc)  # 兜底去掉结尾泄漏的「报告…」标签
+            if loc:
+                rec['location'] = loc
         # 最终兜底：若本块未识别到主讲人，保留基底（避免误清空系列级主讲人）
         if not rec.get('speaker'):
             rec['speaker'] = prev_speaker or ''
