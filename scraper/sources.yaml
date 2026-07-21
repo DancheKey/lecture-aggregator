@@ -233,7 +233,8 @@ sources:
   list_urls:
   - url: http://ds.scnu.edu.cn/kexueyanjiu/xueshujiaoliu/
     collect_mode: all_items
-- name: 汕尾校区公共课教学部
+# 汕尾校区各学院讲座统一归入「汕尾校区」：源页 collaborative/ 实为校区级汇总，不止公共课教学部
+- name: 汕尾校区
   campus: 汕尾
   base: https://swc.scnu.edu.cn
   list_urls:
