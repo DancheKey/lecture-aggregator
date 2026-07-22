@@ -59,3 +59,12 @@ site/sources.html
 *.local
 secrets.*
 *token*.txt
+
+# ===== 临时调试/测试/备份文件（务必不要提交，避免泄露内部数据） =====
+_*.py
+_*.txt
+_*.md
+data/_*
+data/*.backup.json
+data/*.bak.*
+*.tmp

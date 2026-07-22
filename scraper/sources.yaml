@@ -54,7 +54,8 @@ sources:
   base: http://site.scnu.edu.cn
   list_urls:
   - url: http://site.scnu.edu.cn/kxyj/kydt/
-    collect_mode: all_items
+    collect_mode: auto
+
 - name: 数学科学学院
   campus: 石牌
   base: http://maths.scnu.edu.cn

@@ -266,11 +266,25 @@ def _extract_speaker_from_ocr(text):
             cut = i
     region = text[:cut]
     # 1) 标签式
-    m = re.search(r'(?:主讲人|主讲|报告人|主讲嘉宾|演讲人|报告专家|报告嘉宾|专家姓名'
+    m = re.search(r'(?:主讲人|主讲|报告人|主讲嘉宾|特邀嘉宾|特邀专家|演讲人|报告专家|报告嘉宾|专家姓名'
                   r'|Speaker|Presenter|Lecturer)\s*[：:]\s*((?:(?!' + _SPK_VAL_STOP + r')[^\n,，。.]){2,30})',
                   region)
     if m:
         v = re.split(r'[（(]', m.group(1).strip())[0].strip()
+        # 剥离常见职称/头衔（OCR 常识别出「陈建邦校长」「李洪修教授」等）
+        # 不用 $ 锚定，因为贪婪匹配可能取到「姓名职称+后续文本」的长串
+        v = re.sub(r'(?:校长|教授|副教授|讲师|研究员|副研究员|助理研究员|博士|院士'
+                  r'|特聘教授|特任教授|院长|系主任|处长|局长|老师|导师)', '', v).strip()
+        # 若剥离后仍非纯姓名，用「姓名+职称」精确模式重提取（仅取到职称为止）
+        if v and not _looks_like_real_name(v):
+            nm = re.match(r'^([\u4e00-\u9fa5·]{2,4})(?:校长|教授|副教授|讲师|研究员|副研究员|助理研究员|博士|院士'
+                      r'|特聘教授|特任教授|院长|系主任|处长|局长|老师|导师)', v)
+            if nm and _looks_like_real_name(nm.group(1)):
+                v = nm.group(1)
+            else:
+                # 最后兜底：取前2-3字（更保守，避免吃到后续词汇）
+                nm = re.match(r'^([\u4e00-\u9fa5·]{2,3})', v)
+                v = nm.group(1) if nm and _looks_like_real_name(nm.group(1)) else ''
         if _looks_like_real_name(v):
             return v, '', 'label'
     # 2) 无标签式：姓名紧邻职称（允许「/」或空格）
@@ -350,6 +364,95 @@ def _extract_speaker_from_ocr(text):
     if iso_m and _looks_like_real_name(iso_m.group(1)):
         return iso_m.group(1), '', 'pattern4'
     return '', '', None
+
+
+# ---------------------------------------------------------------------------
+# 地点字段清理（系统级规则）：剔除紧跟地点之后的会议号/密码/议程/报名/欢迎等
+# 噪声后缀，并折叠 OCR/解析产生的数字内部空格（如「1 09 报告厅」→「109报告厅」）。
+# 数据集内地点约定为无空格中文，故清理后整体去空格安全且符合约定。
+# 适用于：① 解析器最终产出（所有来源）；② 历史数据批量清洗（io 等含会议信息的通知）。
+_LOCATION_TERM = re.compile(
+    r'(?:线上培训|网络直播|直播链接|腾讯会议|会议号|会议密码|会议议程|报名表|'
+    r'报名|欢迎|咨询|联系电话|电话|二维码|扫码|议程|备注|网络会议|线上会议|'
+    r'内容|详细内容|主要内容|会议注册|讲座教授|特邀专家|面向对象|主持|'
+    r'职称|Tencent ?Meeting)'
+)
+def _clean_location(loc):
+    if not loc:
+        return ''
+    orig = loc
+    loc = loc.strip()
+    if not loc:
+        return ''
+    # 截断常见后缀噪声（会议号/密码/议程/报名/内容泄漏等紧跟地点之后）
+    m = _LOCATION_TERM.search(loc)
+    if m:
+        loc = loc[:m.start()].strip()
+    if not loc:
+        # 整段仅为线上会议号等、无实体地点：标注为线上
+        if re.search(r'(腾讯会议|线上|会议号|会议 ?ID|网络会议|直播|Tencent ?Meeting)', orig):
+            return '线上'
+        return ''
+    # 折叠数字内部、且紧贴中文的空格（OCR 把房间号拆开）：研究院 1 09 报告厅 → 研究院109报告厅
+    loc = re.sub(r'([\u4e00-\u9fa5])(\d)\s+(\d+)(?=[\u4e00-\u9fa5]|$)',
+                 lambda x: x.group(1) + x.group(2) + x.group(3), loc)
+    loc = re.sub(r'(\d)\s+(\d)(?=[\u4e00-\u9fa5]|$)', r'\1\2', loc)
+    # 数据集地点约定无内部空格，统一去除（同时清掉残留 CJK 间空格）
+    loc = re.sub(r'\s+', '', loc)
+    # 清理腾讯会议等截断后残留的后缀标点/连接词（『（』『：#』『+线上』等）
+    for _ in range(3):
+        new = re.sub(r'[（(：:；;，,+、#]+\s*$', '', loc)
+        new = re.sub(r'(?:线上|线下)[:：]?\s*$', '', new)
+        new = new.strip()
+        if new == loc:
+            break
+        loc = new
+    if not loc:
+        if re.search(r'(腾讯会议|线上|会议号|会议 ?ID|网络会议|直播|Tencent ?Meeting)', orig):
+            return '线上'
+        return ''
+    return loc
+
+
+# 从海报 OCR 文本提取指定主讲人的简介（bio）。
+# 海报常把多位嘉宾的「姓名+简介」顺序排布；给定姓名后，取其后的简介片段，
+# 直到下一个嘉宾/主题标签（特邀嘉宾/主题/主讲人）或文末。返回清理后的简介，
+# 提取不到返回 ''。仅在「姓名后出现中文逗号（简介起首标志「姓名，现为…」）」
+# 或姓名最后一次出现处截取，避免把「姓名+主题」误当简介。
+def _extract_bio_from_ocr(ocr_text, speaker):
+    if not ocr_text or not speaker:
+        return ''
+    _TITLE_RE = (r'(?:教授|副教授|讲师|研究员|副研究员|助理研究员|博士|院士|老师|'
+                 r'校长|院长|主任|特聘教授|特任教授|导师|嘉宾)?')
+    occ = [(m.start(), m.end())
+           for m in re.finditer(re.escape(speaker) + _TITLE_RE, ocr_text)]
+    if not occ:
+        return ''
+    # 优先：姓名后出现中文逗号（简介起首「姓名，现为/曾任…」）
+    best = None
+    for s, e in occ:
+        nxt = ocr_text[e:e + 1]
+        if nxt in ('，', ','):
+            best = e + 1
+            break
+    if best is None:
+        best = occ[-1][1]  # 否则取最后一次出现（简介通常在海报后部）
+    rest = ocr_text[best:]
+    cut = len(rest)
+    for kw in ('特邀嘉宾', '主讲嘉宾', '报告嘉宾', '主题（', '主题(', '主题:', '主题：',
+               '主讲人', '报告人', '主持人', '讲座时间', '时间', '地点', '腾讯会议',
+               '直播', '线上'):
+        i = rest.find(kw)
+        if 0 < i < cut:
+            cut = i
+    bio = rest[:cut].strip()
+    # 去掉开头紧邻的职称残留
+    bio = re.sub(r'^(?:教授|副教授|讲师|研究员|副研究员|博士|院士|老师|校长|院长|'
+                 r'主任|特聘教授|特任教授|导师)[，,；;：: ]*', '', bio)
+    bio = re.sub(r'\s+', ' ', bio).strip()
+    if len(bio) < 10 or len(bio) > 600:
+        return ''
+    return bio
 
 
 # 懒加载 RapidOCR 引擎：仅在遇到图片讲座时才初始化（ONNXRuntime 后端，
@@ -1114,7 +1217,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             text = _normalize_label_text((text + ' ' + ocr_text).strip())
 
     # 纯海报页（正文几乎为空）时直接 OCR；其余含图页面在字段提取后再按需 OCR 摘要/简介
-    if len(body_text) < 50:
+    poster_only = len(body_text) < 50
+    if poster_only:
         _do_ocr()
 
     # R3 发布时间定位（标签 > 伴生词/class > 位置兜底）
@@ -1633,6 +1737,47 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             # 若已有 OCR 文本且未提取到明确摘要标签，宁可让 abstract 留空。
             if not (ocr_text and len(ocr_text) > 50):
                 result['abstract'] = narrative['abstract']
+
+    # --- 通用后处理（narrative fallback 之后统一执行）---
+
+    # D-FINAL: 职级碎片最终守卫。narrative fallback 可能在 D 规则清空后重新设置 speaker
+    # （如 io 1916 的「办二级」），故在所有赋值路径结束后再拦截一次。
+    if result.get('speaker') and re.search(
+            r'(?:处|部|院|系|中心|公司|局|委|办|室|科|所|厅|署|集团|大学|学院|研究院|'
+            r'巡视员|科员|干事|二级|一级|三级)$', result['speaker']):
+        result['speaker'] = ''
+        result['speakerAffiliation'] = ''
+
+    # C1-UNIVERSAL: bio 归位通用化。原 C1 规则仅在 SUMMARY_LABELS 路径内生效，
+    # 但无摘要标签的页面走 narrative fallback 后，bio 文本可能被放入 abstract。
+    # 若 abstract 含 bio 特征词且不含讲座摘要特征词，且 speakerBio 为空，则迁移。
+    _BIO_SIG_U = ('任教', '所长', '现任', '毕业于', '博士（', '获', '主要从事',
+                  '研究方向', '个人著作', '学者', '简历', '供职于', '兼职')
+    _LEC_SIG_U = ('本报告', '本次讲座', '本期讲座', '将介绍', '主要内容',
+                   '我们', '讲座将', '本次报告', '报告将', '现将')
+    _abs_u = result.get('abstract') or ''
+    _bio_u = result.get('speakerBio') or ''
+    if (_abs_u and not _bio_u
+            and any(s in _abs_u for s in _BIO_SIG_U)
+            and not any(s in _abs_u for s in _LEC_SIG_U)
+            and len(_abs_u) > 30):
+        result['speakerBio'] = result.pop('abstract', '')
+
+    # 地点系统级清理：剔除会议号/密码/议程/报名等噪声后缀、折叠数字内部空格。
+    # 放在通用后处理（所有赋值路径之后）统一执行，覆盖 HTML 解析与 OCR 两条路径。
+    if result.get('location'):
+        result['location'] = _clean_location(result['location'])
+
+    # OCR 纯海报页：为已识别主讲人从 OCR 文本补全/修正简介（speakerBio），
+    # 覆盖原「整张海报文本（含标题/主题/多位嘉宾）直接塞进 speakerBio」的情况；
+    # 海报页无独立「摘要」且 abstract 含主讲人时一并清空。仅对纯海报页生效，
+    # 避免影响含 HTML 正文的页面（其 speakerBio 已由 HTML 路径正确提取）。
+    if poster_only and ocr_text and result.get('speaker'):
+        _bio_ocr = _extract_bio_from_ocr(ocr_text, result['speaker'])
+        if _bio_ocr:
+            result['speakerBio'] = _bio_ocr
+            if result['speaker'] in (_abs_u or ''):
+                result['abstract'] = ''
 
     # F3 补充：页面存在主讲人/专家姓名标签但值为空或无效（OCR 把值错置到下一行，
     # 常与「活动主题：姓名 描述」相邻），且主题形如「姓名 + 空格 + 描述」时，

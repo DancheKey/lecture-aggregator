@@ -61,13 +61,31 @@ def _decode_html(raw):
     return raw.decode('utf-8', errors='replace')
 
 
-def fetch(url):
-    try:
-        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-        return _decode_html(r.content)
-    except Exception as e:
-        print(f'[WARN] fetch failed {url}: {e}', file=sys.stderr)
-        return None
+def fetch(url, _retries=3):
+    """下载页面并鲁棒解码。
+
+    网络层异常（连接重置 ECONNRESET / 超时 / 断流 等 requests.RequestException）
+    做指数退避重试，避免偶发抖动被误判为死链而漏抓；死链（HTTP 4xx/5xx，
+    requests 不抛异常）直接返回解码文本，不重试。重试耗尽仍失败返回 None
+    （调用方按死链处理）。
+    """
+    import random
+    last_err = None
+    for _i in range(_retries):
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            return _decode_html(r.content)
+        except requests.exceptions.RequestException as e:
+            last_err = e
+            if _i < _retries - 1:
+                time.sleep(min(1.5 * (2 ** _i), 8) + random.uniform(0, 0.4))
+                continue
+            print(f'[WARN] fetch failed {url}: {last_err}', file=sys.stderr)
+            return None
+        except Exception as e:  # 非网络异常（如极端解码情况）：不重试，直接放弃
+            print(f'[WARN] fetch error {url}: {e}', file=sys.stderr)
+            return None
+    return None
 
 
 NAV_KW = ['首页', '主页', '上一页', '下一页', '尾页', '返回', '更多', '>>',
@@ -547,6 +565,8 @@ def main():
     parser.add_argument('--since', help='仅抓取该 ISO 时间之后的新信息（增量模式）')
     parser.add_argument('--full', action='store_true', help='全量抓取，忽略增量')
     parser.add_argument('--source', help='仅抓取指定名称的信息源（用于局部修复/测试）')
+    parser.add_argument('--out', help='将本源结果写入指定路径（而非合并进 data/lectures.json），'
+                                      '用于「并行多进程分批重抓 + 最后统一合并」的场景，避免空库并发写竞争')
     args = parser.parse_args()
 
     cfg_path = os.path.join(ROOT, 'scraper', 'sources.yaml')
@@ -606,8 +626,8 @@ def main():
 
     # 同源去重：同一学院标题相似的只保留一条
     raw = list(lectures.values())
-    # 局部修复模式（--source）：保留其他学院已有记录，仅替换指定学院的记录
-    if args.source:
+    # 局部修复模式（--source，且无 --out）：保留其他学院已有记录，仅替换指定学院的记录
+    if args.source and not args.out:
         other_existing = [r for r in existing if r.get('college') != args.source]
         raw = other_existing + raw
         # 安全拦截：--source 模式绝不应让总条数大幅缩水，否则大概率是 existing
@@ -618,11 +638,11 @@ def main():
                   f'疑似现有数据未正确合并，拒绝覆盖 data/lectures.json。', file=sys.stderr)
             return
     out = dedup(raw)
-    # 跨源去重：不同学院发布的同一讲座合并为一条（同主讲+同日期+topic相似）
-    out = cross_source_dedup(out)
+    # 跨源去重：不同学院发布的同一讲座合并为一条（同主讲+同日期+topic相似）。
+    # --out 模式由各源独立写出、最后由驱动脚本统一合并，故此处跳过跨源去重避免重复。
+    if not args.out:
+        out = cross_source_dedup(out)
     out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)
-    data_dir = os.path.join(ROOT, 'data')
-    os.makedirs(data_dir, exist_ok=True)
     import datetime
     # 用北京时间（Asia/Shanghai）记录更新时间，避免 GitHub Runner 默认 UTC 导致日期差一天
     try:
@@ -632,6 +652,14 @@ def main():
         # 回退：UTC+8 小时
         now_iso = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).isoformat(timespec='seconds')
     # 写入带更新时间戳的包裹格式：{updatedAt, data}；前端与后端均兼容旧版纯数组。
+    if args.out:
+        # 并行分批重抓：本源结果独立落盘，最后由驱动脚本汇总合并
+        with open(args.out, 'w', encoding='utf-8') as f:
+            json.dump({'updatedAt': now_iso, 'data': out}, f, ensure_ascii=False, indent=2)
+        print(f'[DONE] source={args.source} -> {args.out} ({len(out)} records)')
+        return
+    data_dir = os.path.join(ROOT, 'data')
+    os.makedirs(data_dir, exist_ok=True)
     with open(os.path.join(data_dir, 'lectures.json'), 'w', encoding='utf-8') as f:
         json.dump({'updatedAt': now_iso, 'data': out}, f, ensure_ascii=False, indent=2)
     # 局部修复模式不更新 last_scrape.json，避免影响下一次全量/定时增量调度

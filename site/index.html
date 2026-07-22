@@ -171,7 +171,7 @@
                   <div v-if="l.host"><span class="text-slate-400">主持</span> <span class="text-slate-600">{{ l.host }}</span></div>
                   <div v-if="l.meetingId"><span class="text-slate-400">会议号</span> <span class="text-slate-600">{{ l.meetingPlatform ? l.meetingPlatform + ' ' : '' }}{{ l.meetingId }}</span></div>
                   <div v-if="l.participants"><span class="text-slate-400">参与</span> <span class="text-slate-600">{{ l.participants }}</span></div>
-                  <div v-if="l.notes && l.notes.length" class="text-amber-600 text-[11pt]">⚠ {{ l.notes.join('；') }}</div>
+                  <div v-if="notesText(l)" class="text-amber-600 text-[11pt]">⚠ {{ notesText(l) }}</div>
                   <div v-if="l.speakerBio" class="text-slate-500 leading-relaxed">
                     <span class="text-slate-400">简介</span> {{ truncate(cleanFooter(l.speakerBio), 220) }}
                   </div>

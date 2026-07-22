@@ -374,7 +374,7 @@ def _cross_year(res, publish_time, title, body_text, year, url_year, publish_yea
 
 
 def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
-                         publish_level, default_year, list_title=None):
+                         publish_level, default_year, list_title=None, page_text=None):
     """R1–R6 编排层。返回 {'start':iso,'end':iso|None,'confidence','note'} 或 None。
 
     Args:
@@ -391,6 +391,12 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
         if ly:
             title_year = title_year or ly
     publish_year = int(publish_time[:4]) if publish_time else None
+
+    # A-修复：正文中「发布时间：YYYY-MM-DD HH:MM:SS」会被 R2 通用解析当成讲座时间的另一个端点，
+    # 污染 start/end（如生科院页面讲座时间行与发布时间行同处正文）。发布时间已由 _locate_publish_time
+    # 单独定位，此处从扫描文本中移除其 ISO 串（讲座信息用中文日期格式，ISO 串唯一对应发布时间）。
+    if publish_time and publish_time in body_text:
+        body_text = body_text.replace(publish_time, '')
 
     # ---- R1：权威标签扫描 ----
     hits = _label_scan(body_text)
@@ -462,6 +468,33 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
         return {'start': g['start'].isoformat(sep=' '),
                 'end': g['end'].isoformat(sep=' ') if g.get('end') else None,
                 'confidence': 'high', 'note': 'general-body-monthday-nopublish'}
+
+    # ---- Fix B：整页文本兜底重试 ----
+    # 当 content_div 命中的正文区域（body_text）未解析出日期时，用整页纯净文本
+    # （page_text，与 body_text 不同即说明 body_text 来自某 content_div 而非整页兜底）
+    # 再跑一次 R2。整页含导航噪声，但 _parse_segment 只认合规日期串，导航词不会凑成
+    # 「YYYY年M月D日」等格式，讲座日期（常含显式年）通常可正确提取。仅当 page_text 与
+    # body_text 不同（避免与 Fix A 的整页回退重复）且 body_text 确实未命中时触发。
+    if page_text and page_text.strip() and page_text != body_text:
+        pg = page_text
+        if publish_time and publish_time in pg:
+            pg = pg.replace(publish_time, '')
+        gb = _parse_segment(pg, eff, publish_time)
+        if gb:
+            if gb.get('from_full'):
+                return {'start': gb['start'].isoformat(sep=' '),
+                        'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                        'confidence': 'mid', 'note': 'general-page-full'}
+            year = gb['start'].year
+            if publish_time:
+                gb, conf, note = _cross_year(gb, publish_time, title, pg, year,
+                                             url_year, publish_year)
+                return {'start': gb['start'].isoformat(sep=' '),
+                        'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                        'confidence': conf, 'note': note}
+            return {'start': gb['start'].isoformat(sep=' '),
+                    'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                    'confidence': 'mid', 'note': 'general-page-monthday-nopublish'}
 
     # R2 回退：正文为空（纯海报且尚未 OCR）时返回 None，交由调用方走 OCR/URL 兜底
     return None
