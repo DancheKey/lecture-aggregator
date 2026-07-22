@@ -477,7 +477,7 @@ def dedup(records):
     return kept
 
 
-def _process_source(src, year, existing_urls, is_incremental):
+def _process_source(src, year, existing_urls, is_incremental, global_exclude=None):
     """处理单个信息源，返回 {url: rec} 字典。"""
     name = src['name']
     campus = src.get('campus', '')
@@ -511,7 +511,7 @@ def _process_source(src, year, existing_urls, is_incremental):
                     new_count += 1
                     if is_incremental and href_norm in existing_urls:
                         continue
-                    if href_norm in exclude_urls:
+                    if href_norm in exclude_urls or (global_exclude and href_norm in global_exclude):
                         print(f'[SKIP] {name} exclude {href}')
                         continue
                     if href_norm in src_list_norm:
@@ -611,10 +611,26 @@ def main():
             print(f'[ERROR] 未找到信息源「{args.source}」', file=sys.stderr)
             return
 
+    # 全局排除名单：被人工确认删除的非讲座/新闻类 URL，cron 增量与全量均跳过，避免污染。
+    # 由数据清洗时把「本地已删、cron 曾误加回」的 URL 写入 data/excluded_urls.json 生成。
+    global_excluded = set()
+    _ge_path = os.path.join(ROOT, 'data', 'excluded_urls.json')
+    if os.path.exists(_ge_path):
+        try:
+            _ge = json.load(open(_ge_path, encoding='utf-8'))
+            if isinstance(_ge, list):
+                global_excluded = {str(u).rstrip('/') for u in _ge}
+            elif isinstance(_ge, dict) and 'urls' in _ge:
+                global_excluded = {str(u).rstrip('/') for u in _ge['urls']}
+            if global_excluded:
+                print(f'[INFO] 已加载全局排除名单 {len(global_excluded)} 条')
+        except Exception as e:
+            print(f'[WARN] 加载全局排除名单失败：{e}', file=sys.stderr)
+
     # 并发抓取各信息源：源与源之间独立，大幅缩短 GitHub Actions 全量/增量耗时
     max_workers = 1 if args.source else 5
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental): src for src in sources}
+        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded): src for src in sources}
         for future in as_completed(future_to_src):
             src_name = future_to_src[future].get('name')
             try:

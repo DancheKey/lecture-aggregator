@@ -1768,6 +1768,23 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     if result.get('location'):
         result['location'] = _clean_location(result['location'])
 
+    # F-AFF: 单位字段职称守卫（系统级，覆盖所有提取路径）。
+    # speakerAffiliation 不应是纯职称（助理研究员/教授/研究员等），也不应残留悬挂括号
+    # （如数科院 8794「杨福林(助理研究员(」——原始「报告人：杨福林 助理研究员 (邀请人：范智杰)
+    # 北京雁栖湖…」，1478 兜底分支职称剥离列表漏「助理研究员」、且「邀请人」截断留下悬挂左括号，
+    # 导致 affiliation 残留「助理研究员 (」）。若去噪后纯为职称词则清空；否则清理悬挂括号与空格。
+    if result.get('speakerAffiliation'):
+        _aff_dn = re.sub(r'[\s（(）)]', '', result['speakerAffiliation'])
+        _TITLE_ONLY = re.compile(
+            r'^(?:特聘教授|特任教授|助理教授|副教授|副研究员|助理研究员|研究员|教授|讲师|'
+            r'博士后|博士|院士|老师|导师|先生|女士|主任|院长|所长|秘书长)+$')
+        if _TITLE_ONLY.fullmatch(_aff_dn):
+            result['speakerAffiliation'] = ''
+        else:
+            _aff2 = re.sub(r'^[（(）)]+', '', result['speakerAffiliation'].strip())
+            _aff2 = re.sub(r'[（(）)]+$', '', _aff2.strip())
+            result['speakerAffiliation'] = re.sub(r'\s+', '', _aff2)
+
     # OCR 纯海报页：为已识别主讲人从 OCR 文本补全/修正简介（speakerBio），
     # 覆盖原「整张海报文本（含标题/主题/多位嘉宾）直接塞进 speakerBio」的情况；
     # 海报页无独立「摘要」且 abstract 含主讲人时一并清空。仅对纯海报页生效，
