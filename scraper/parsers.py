@@ -655,11 +655,16 @@ def _narrative_process_is_retro(body):
     if not body or len(body) < 30:
         return False
     has_structured = bool(re.search(r'(时间|地点|主讲|主办|承办|讲座时间|讲座地点)[:：]', body))
+    # RT2g 仅针对「无结构化标签的流式回顾长文」。正文已含 时间/地点/主讲 等讲座结构化标签，
+    # 说明这是正规预告/通知而非回顾稿（回顾稿极少带未来讲座的结构化标签），直接判为非回顾，
+    # 避免「教学创新工作坊通知」等含「举办/开展」措辞的预告被误杀（如 gxb 第51期工作坊）。
+    if has_structured:
+        return False
     hit = set()
     for mk in _NARRATIVE_MARKERS:
         if mk in body:
             hit.add(mk)
-    threshold = 1 if (not has_structured and len(body) > 200) else 2
+    threshold = 1 if len(body) > 200 else 2
     return len(hit) >= threshold
 
 
@@ -1197,6 +1202,65 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     imgs = dated or imgs
     imgs = imgs[:3]
 
+    # PDF-INLINE: 部分站点（如工学部）正文仅含 <iframe> 嵌入 PDF 或 .pdf 下载链接，
+    # HTML 本身无结构化讲座信息。检测此类情况并自动下载 PDF 提取文本，
+    # 作为 body_text 的补充来源参与后续字段抽取（speaker/location/time/abstract 等）。
+    _pdf_text = ''
+    if len(body_text.strip()) < 150:
+        _pdf_url = None
+        # 策略1：从 iframe src 中提取 PDF URL（工学部用 viewer2.html#URL 格式）
+        for iframe in (content_div or soup).find_all('iframe'):
+            isrc = (iframe.get('src') or '')
+            if 'viewer' in isrc or '.pdf' in isrc.lower():
+                m = re.search(r'#(.+\.pdf)', isrc, re.I)
+                if m:
+                    _pdf_url = m.group(1)
+                    break
+                # 完整 PDF URL
+                if isrc.lower().endswith('.pdf'):
+                    _pdf_url = isrc
+                    break
+        # 策略2：从 <a> 标签的 href 中找 .pdf 链接（文件下载）
+        if not _pdf_url:
+            for a in (content_div or soup).find_all('a', href=True):
+                href = a.get('href', '')
+                if href.lower().endswith('.pdf') and '通知' in a.get_text():
+                    _pdf_url = href
+                    break
+        if _pdf_url:
+            try:
+                _abs_pdf = urljoin(url, _pdf_url) if not _pdf_url.startswith('http') else _pdf_url
+                if _abs_pdf.startswith('//'):
+                    _abs_pdf = 'http:' + _abs_pdf
+                import urllib.request as _urllib_req, ssl as _ssl
+                _pdf_req = _urllib_req.Request(_abs_pdf, headers={'User-Agent': 'Mozilla/5.0'})
+                _pdf_ctx = _ssl.create_default_context()
+                _pdf_ctx.check_hostname = False
+                _pdf_ctx.verify_mode = _ssl.CERT_NONE
+                _pdf_resp = _urllib_req.urlopen(_pdf_req, timeout=20, context=_pdf_ctx)
+                _pdf_data = _pdf_resp.read()
+                if _pdf_data[:5] == b'%PDF-':
+                    import io
+                    try:
+                        import fitz as _fitz
+                        _doc = _fitz.open(stream=io.BytesIO(_pdf_data), filetype='pdf')
+                        _pages_text = []
+                        for _pg in _doc:
+                            _t = _pg.get_text()
+                            if _t.strip():
+                                _pages_text.append(_t)
+                        _doc.close()
+                        _pdf_text = '\n'.join(_pages_text)
+                        if _pdf_text:
+                            body_text = body_text + '\n' + _pdf_text
+                            text = text + '\n' + _pdf_text
+                    except ImportError:
+                        pass  # PyMuPDF 未安装时静默跳过
+                    except Exception:
+                        pass  # PDF 解析失败时不阻塞主流程
+            except Exception:
+                pass  # PDF 下载失败时不阻塞
+
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
         nonlocal ocr_text, body_text, text
@@ -1360,6 +1424,11 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # STOP 终止符：字段标签、伴随噪声词（点击/浏览/评论/供稿，常出现在发布时间行尾）、
     # 以及方括号（【/ [ 多为栏目/来源标记）；'$' 兼容文末。
     STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|$))'
+    # LOC-STOP：PDF/海报内文本常含换行，地点值独占一行（如「课程地点：…\n面向对象：…」）。
+    # 通用 STOP 的 `$` 在「值行末到文末之间存在换行」时无法命中，且 `.` 不跨换行，
+    # 导致 (.+?) 永远到不了下一行的终止标签。故 location 专用终止符在 STOP 基础上
+    # 追加行尾（\n|$），使「值行尾」成为自然截断点（单行场景下 STOP 仍优先生效）。
+    LOC_STOP = rf'(?={STOP}|\n|$)'
 
     # --- 题目/主题（兼容「题目/主题/讲座主题/报告题目/演讲题目/报告主题」+ 英文 Topic/Title）---
     topic_pat = rf'(?:讲座题目|题目|主题|讲座主题|报告题目|演讲题目|报告主题|Topic|Title)[：:]\s*(.+?){STOP}'
@@ -1380,8 +1449,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             if len(topic_candidate) > 3:
                 result['topic'] = topic_candidate
 
-    # --- 地点（兼容「地点」+ 英文 Venue/Location）---
-    m = re.search(rf'(?:地点|Venue|Location)[：:]\s*(.+?){STOP}', text)
+    # --- 地点（兼容「地点/课程地点/讲座地点/工作坊地点」+ 英文 Venue/Location）---
+    # 值捕获用 [^\n]+?（不跨换行）+ LOC_STOP：单行场景靠字段标签截断，PDF/多行场景靠行尾截断。
+    m = re.search(rf'(?:课程地点|讲座地点|教学工作坊地点|地点|Venue|Location)[：:]\s*([^\n]+?){LOC_STOP}', text)
+    # LOC-Fallback: 若主正则未命中或值为空，用宽松终止符重试（覆盖 PDF 内嵌等边界）。
+    if not m or not m.group(1).strip():
+        m2 = re.search(
+            rf'(?:课程地点|讲座地点|教学工作坊地点|地点|Venue|Location)[：:]\s*'
+            r'([^\n]+?)(?:\n\n|\n[一二三四五六七八九十]|面向对象|主讲人简介|报名|联系方式)',
+            text)
+        if m2 and m2.group(1).strip():
+            m = m2
     if m:
         loc = m.group(1).strip()
         # 美术学院等页面：地点后常粘连「主办单位/上一篇/下一篇/Tags/版权」等噪声，优先截断
@@ -1430,6 +1508,21 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         rf'|Speaker|Presenter|Lecturer)\s*[：:]\s*(.+?){STOP}'
     )
     m = re.search(speaker_pat, text)
+    # F2-OCR-SP: OCR 海报常把标签与值之间的冒号和空格全部识丢，
+    # 变成零分隔符粘连（如工学部海报「主办单位:华南师范大学工学部主讲人马於光院士」）。
+    # 若上述带冒号正则未命中，尝试零宽/纯空格的「标签+姓名」格式；
+    # 值截取到下一个字段标签或非名字字符为止，限长防溢出。
+    if not m:
+        _ocr_sp_pat = (
+            rf'(?:主讲嘉宾|报告嘉宾|主讲人(?!简介|简历|介绍)|主讲师(?!简介|简历)'
+            rf'|主讲(?!《|简介|简历)(?:专家)?'
+            rf'|报告人(?!简介|简历)|演讲人|报告专家|专家姓名)'
+            rf'\s*(?:[：:]|\s*)\s*'
+            rf'([\u4e00-\u9fa5·]{{2,4}}(?:院士|教授|研究员|讲师|博士|特聘教授|特任教授|副教授|助理教授)?){STOP}'
+        )
+        m = re.search(_ocr_sp_pat, text)
+        if m:
+            speaker_label_found = True
     if m:
         speaker_label_found = True
         sp = m.group(1).strip()
@@ -1864,6 +1957,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
 _TOPIC_DELIM_RE = re.compile(
     r'(?:报告[一二三四五六七八九十百零0-9]+\s*[题目主题]'
     r'|专题[一二三四五六七八九十百零0-9]+\s*[题目主题]'
+    r'|主题[0-9]+'
     r'|讲座题目|题目|主题|讲座主题|报告题目|演讲题目|报告主题|Topic|Title)[：:]')
 # 主题值终止符：遇到下一个字段标签、中文日期/时段、块结尾即止。
 # 「报告」后的时间/数字/人/地点/摘要 可能与其间被 get_text(' ') 插入的空格隔开，
