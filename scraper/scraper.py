@@ -456,7 +456,11 @@ def dedup(records):
         url = str(rec.get('sourceUrl', '')).rstrip('/')
         ntitle = _normalize_title(rec.get('title', ''))
         ls = (rec.get('lectureStart') or '')[:10]   # 仅取日期部分，忽略具体时分
-        key = (rec.get('college', ''), ntitle, ls, url)
+        # 多讲座拆分：同 sourceUrl 多条（lectureIndex 不同）必须视为不同讲座，
+        # 否则会被当成「同 URL 真重复」压成 1 条（如 cs 5708 一页两场）。
+        li = rec.get('lectureIndex')
+        multi_key = ('#' + str(li)) if (rec.get('isMultiLecture') and li) else ''
+        key = (rec.get('college', ''), ntitle, ls, url + multi_key)
         if key not in groups:
             groups[key] = []
         groups[key].append(rec)
@@ -602,7 +606,11 @@ def main():
         for r in existing:
             u = r.get('sourceUrl')
             if u:
-                lectures[u] = r
+                # 多讲座拆分：同 sourceUrl 多条用 (url, lectureIndex) 区分，
+                # 避免两条互相覆盖只剩 1 条（与 _process_source 的 key 保持一致）
+                li = r.get('lectureIndex')
+                key = u + (('#' + str(li)) if li else '')
+                lectures[key] = r
 
     sources = cfg['sources']
     if args.source:
