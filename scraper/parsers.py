@@ -722,6 +722,13 @@ def _narrative_process_is_retro(body):
     # 避免「教学创新工作坊通知」等含「举办/开展」措辞的预告被误杀（如 gxb 第51期工作坊）。
     if has_structured:
         return False
+    # 讲座预告特征词守卫：正文同时含"摘要"+ 职称关键词 + "简介/介绍"等，
+    # 说明是带详细主讲人简介的讲座预告页（如 ose 光电学院、部分 io 源），
+    # 不是回顾稿。回顾稿不会同时具备这三个特征。
+    if (re.search(r'摘要', body) and
+        re.search(r'(教授|研究员|博士|院士)', body) and
+        re.search(r'(简介|介绍|个人简介)', body)):
+        return False
     hit = set()
     for mk in _NARRATIVE_MARKERS:
         if mk in body:
@@ -1911,8 +1918,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 从 title 派生 topic（去掉系列/通用后缀，保留核心主题）
     if not result.get('topic') and title and len(title) > 8:
         tp = re.sub(r'^[\s"「]*', '', title).strip()
-        # 去掉系列讲座编号（"第N场""第N期""第一场"等）
-        tp = re.sub(r'^[\""]?[^"]*?(?:系列讲座|系列活动?)\s*第[一二三四五六七八九十\d]+[场期讲]\s*[—–-—]\s*', '', tp).strip()
+        # 去掉系列讲座编号（"第N场""第N期""第一场"等）及紧跟的 dash（含双 em-dash "——"）
+        tp = re.sub(r'^[\""]?[^"]*?(?:系列讲座|系列活动?)\s*第[一二三四五六七八九十\d]+[场期讲]\s*[—–-—]{1,2}\s*', '', tp).strip()
         # 去掉尾部通用词
         tp = re.sub(r'(?:讲座|报告|讲坛|通知|预告)\s*$', '', tp).strip()
         if len(tp) >= 4:
@@ -2056,8 +2063,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             if not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', candidate):
                 result['speaker'] = candidate
         elif not result.get('speaker'):
-            # 模式2："姓名 职称/头衔..."（空格分隔）
-            m_name2 = re.match(r'^([\u4e00-\u9fa5]{2,4})\s+((?:教授|研究员|博士|院长|主任|讲师|院士|博导|处长|司长|局长|书记|会长|秘书长|理事))', bio)
+            # 模式2："姓名 职称/头衔..."（允许连写如"李志远教授"）
+            m_name2 = re.match(r'^([\u4e00-\u9fa5]{2,4})\s*((?:教授|研究员|博士|院长|主任|讲师|院士|博导|处长|司长|局长|书记|会长|秘书长|理事))', bio)
             if m_name2 and _looks_like_real_name(m_name2.group(1)):
                 result['speaker'] = m_name2.group(1)
 
