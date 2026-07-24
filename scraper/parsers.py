@@ -388,6 +388,28 @@ def _clean_location(loc):
     m = _LOCATION_TERM.search(loc)
     if m:
         loc = loc[:m.start()].strip()
+    # 截断内容泄漏：地点值后吸入的日期/简介/正文开头等非地点文字
+    # 典型场景：BS4 把换行变空格后 "地点：石牌校区研究生院111 研究生院 2018年4月8日 学校简介：..."
+    # 匹配顺序由严格到宽松，避免误伤正常地名中的子串
+    _loc_leak = re.compile(
+        r'(?:\d{4}\s*年\s*\d{1,2}\s*月'           # 2018年4月 / 2018 年 4 月
+        r'(?:\d{0,2}\s*日?)?'                        # 可选日
+        r'|(?:学校|学院|研究院|系)\s*简介)'          # 学校简介 / 学院简介
+    )
+    m2 = _loc_leak.search(loc)
+    if m2 and m2.start() > 3:  # 确保不把整个短地点都截掉
+        loc = loc[:m2.start()].strip()
+    # 正文邀请类词（诚挚邀请/欢迎/感兴趣）也属泄漏信号
+    _loc_leak2 = re.compile(r'(?:诚挚|请|欢迎|感兴趣|师生参加|参加！)')
+    m3 = _loc_leak2.search(loc)
+    if m3 and m3.start() > 5:
+        loc = loc[:m3.start()].strip()
+    # location 中吸入的讲座主题/主讲人内容（无换行分隔时 BS4 把后续行粘进地点值）
+    # 特征：含冒号+长描述（"主题:详细内容..."）或 人名籍贯模式（"姓名,省份,YYYY"）
+    _loc_topic_leak = re.compile(r'[：:][^\s:：]{8,}|[\u4e00-\u9fa5]{2,4},[\u4e00-\u9fa5]{2,6},\d{4}')
+    m4 = _loc_topic_leak.search(loc)
+    if m4 and m4.start() > 5:
+        loc = loc[:m4.start()].strip()
     if not loc:
         # 整段仅为线上会议号等、无实体地点：标注为线上
         if re.search(r'(腾讯会议|线上|会议号|会议 ?ID|网络会议|直播|Tencent ?Meeting)', orig):
@@ -399,9 +421,10 @@ def _clean_location(loc):
     loc = re.sub(r'(\d)\s+(\d)(?=[\u4e00-\u9fa5]|$)', r'\1\2', loc)
     # 数据集地点约定无内部空格，统一去除（同时清掉残留 CJK 间空格）
     loc = re.sub(r'\s+', '', loc)
-    # 清理腾讯会议等截断后残留的后缀标点/连接词（『（』『：#』『+线上』等）
+    # 清理腾讯会议等截断后残留的后缀标点/连接词（『（』『：#』『+线上』『;三』等）
     for _ in range(3):
         new = re.sub(r'[（(：:；;，,+、#]+\s*$', '', loc)
+        new = re.sub(r';[一二三四五六七八九十百千万\d]\s*$', '', new)  # ";三"、";2" 等换行序号泄漏
         new = re.sub(r'(?:线上|线下)[:：]?\s*$', '', new)
         new = new.strip()
         if new == loc:
@@ -600,6 +623,41 @@ def is_non_lecture_title(title):
     if not title:
         return False
     return any(k in title for k in _NON_LECTURE_KW)
+
+
+# ---- 行政/培训通知识别（与 is_non_lecture_title 互补）----
+# 覆盖「关于举办XX培训/行前/征集/评选…通知」等面向内部或特定对象的行政通知，
+# 以及含报名表/扫码/会议议程等非公开学术讲座内容。
+# AD1: 标题含「关于举办/开展…通知」+ 行政特征词（培训/行前/征集/评选/申报）
+# AD2: 正文含内部发文对象或报名/扫码/议程等行政特征
+# AD2-EX: 有明确主讲人姓名时保留（真讲座预告）
+_ADMIN_NOTICE_TITLE_KW = ('培训', '行前', '报名表', '征集', '评选', '申报',
+                           '推荐', '选拔', '遴选', '答辩', '开题')
+_ADMIN_NOTICE_BODY_KW = ('各学院、各单位', '全体教师', '请.*参加培训',
+                          '报名表', '微信扫码', '长按识别', '会议议程',
+                          '会议密码', '腾讯会议号')
+
+
+def is_admin_notice(title, body=''):
+    """AD1+AD2：检测行政/培训类通知（非公开学术讲座）。"""
+    if not title:
+        return False
+    # AD1: 标题必须含「关于举办/开展…通知/公告」框架 + 至少一个行政特征词
+    if not re.search(r'关于(举办|开展|组织).*?(通知|公告)', title):
+        return False
+    if not any(k in title for k in _ADMIN_NOTICE_TITLE_KW):
+        return False
+    # AD2-EX 豁免：正文含明确主讲人姓名 → 真讲座预告，不剔除
+    if body and re.search(r'主讲[人师][:：]\s*[\u4e00-\u9fa5]{2,4}', body):
+        return False
+    # AD2: 正文强化确认（有 body 时才检查）
+    if body and any(k in body for k in _ADMIN_NOTICE_BODY_KW):
+        return True
+    # 仅标题命中也判为疑似（保守策略：宁可留不可误杀讲座预告）
+    # 但若标题已含强行政词（培训会/行前/报名表）则直接判为通知
+    if any(k in title for k in ('培训会', '行前培训', '报名表')):
+        return True
+    return False
 
 
 # ---- 新闻/活动回顾稿识别（与 is_news_record 互补）----
@@ -1435,8 +1493,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     m = re.search(topic_pat, text)
     if m:
         tp = m.group(1).strip()
-        # 清除尾部粘连的「摘要」「主讲人」「预告」等非正文词
-        tp = re.sub(r'\s*(?:摘要|主讲人|报告人|预告)\s*[:：]?.*$', '', tp).strip()
+        # 清除尾部粘连的「摘要」「主讲人」「预告」「特邀专家」等非正文词（换行后字段值泄漏）
+        tp = re.sub(r'\s*(?:摘要|主讲人?|报告人|预告|讲座特邀专家|特邀专家|特邀嘉宾|讲座嘉宾)\s*[:：]?.*$', '', tp).strip()
         result['topic'] = tp
 
     # 标题格式兜底：「2026年7月2日学术讲座：主题」或「学术讲座：主题」
@@ -1841,6 +1899,32 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         result['speaker'] = ''
         result['speakerAffiliation'] = ''
 
+    # D-ORG: speaker 命中组织名后缀时清空；speaker 为空时也尝试从
+    # 「特邀专家/专家:姓名」补充提取。
+    # 典型场景：io 1563 正文写「主讲 法学会」（实为主办单位缩写），
+    # 真正主讲人在「讲座特邀专家：高之国」。
+    _ORG_SUFFIX = re.compile(
+        r'^(?:法学会|学会|协会|研究会|联合会|基金会|中心|委员会|'
+        r'团队|联盟|工作组|办公室|编辑部|理事会|组委会)$')
+    if result.get('speaker') and _ORG_SUFFIX.match(result['speaker'].strip()):
+        result['speaker'] = ''
+    if not result.get('speaker'):
+        # 尝试从 text/topic/abstract 提取「特邀专家/特邀嘉宾/专家: 姓名」
+        for _src in (text, result.get('topic') or '', result.get('abstract') or ''):
+            if not _src:
+                continue
+            _m2 = re.search(
+                r'(?:讲座)?(?:特邀专家|特邀嘉宾|报告专家|演讲嘉宾)'
+                r'[：:\s]*(\S{2,4})(?:[，,。\s]|$)', _src)
+            if _m2:
+                result['speaker'] = _m2.group(1).strip()
+                break
+            # 也试「专家[：:]姓名」但不匹配「专家简介」「专家委员会」等
+            _m3 = re.search(r'专家[：:]\s*(\S{2,4})(?=[，,。\s]|$)', _src)
+            if _m3 and not re.search(r'(简介|委员|主任|成员)', _src[_m3.start():_m3.start()+10]):
+                result['speaker'] = _m3.group(1).strip()
+                break
+
     # C1-UNIVERSAL: bio 归位通用化。原 C1 规则仅在 SUMMARY_LABELS 路径内生效，
     # 但无摘要标签的页面走 narrative fallback 后，bio 文本可能被放入 abstract。
     # 若 abstract 含 bio 特征词且不含讲座摘要特征词，且 speakerBio 为空，则迁移。
@@ -1903,8 +1987,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 两层判定：(1) is_news_record 时间判定（发布晚于讲座）；
     #          (2) is_news_article 语义判定（覆盖无显式发布时间戳的回顾稿）。
     # 命中即 return None，scraper 会打印 [SKIP-NEWS] 并跳过该 URL。
-    if is_non_lecture_title(title) or (not skip_news_filter and (is_news_record(result) or is_news_article(title, body_text, result.get('lectureStart')))):
-        return None
+    if is_non_lecture_title(title) or is_admin_notice(title, body_text) or (not skip_news_filter and (is_news_record(result) or is_news_article(title, body_text, result.get('lectureStart')))):
+        return None  # [SKIP-NEWS] / [SKIP-ADMIN]
     if skip_news_filter:
         # 来源被显式标记为「跳过新闻过滤」（如整栏为讲座海报预告、发布晚于讲座时间），
         # 记录标记以便后续清理脚本（clean_public.py）也不会误删。
