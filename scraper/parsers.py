@@ -1839,7 +1839,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         if result['topic'] and result['topic'] in clean:
             idx = clean.find(result['topic'])
             clean = clean[idx + len(result['topic']):].strip()
-        # 如果清理后只剩元信息（开头即报告人/主讲人/主持人/时间/地点/报告人简介/院校抬头），说明海报没有讲座摘要
+        # 若清理后只剩元信息头部（主讲人/主持人/时间/地点等），说明锚点截断后
+        # 剩余的是结构化字段而非摘要。对纯海报页这属于正常情况（无独立摘要段落），
+        # abstract 保持为空即可，不必强制用主讲人简介填充（那与 speakerBio 重复）。
         if re.match(r'^(报告人|主讲人|主持人|时间|地点|时闻|报告人简介|主讲人简介|20\d{2}年|華南|华南|大学|学院|UNIVERSITY|COLLEGE|SOUTH|CHINA|大讲堂|论坛|生命科学|木棉|1933|20\d{2})', clean.strip()):
             clean = ''
         # 若 OCR 明确区分「报告简介/讲座简介」等，直接取该部分
@@ -1862,7 +1864,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         topic_candidate = re.sub(r'^(20\d{6}\s+|20\d{2}[-/]\d{2}[-/]\d{2}\s+|\d{1,2}月\d{1,2}日\s*)', '', title).strip()
         # 去掉末尾的"学术讲座"/"讲座"等通用词，保留具体主题
         topic_candidate = re.sub(r'(?:教授|老师|先生|女士)\s*(学术讲座|讲座|报告|讲坛)$', '', topic_candidate).strip()
-        if topic_candidate and topic_candidate != title and len(topic_candidate) > 3:
+        # 允许 topic_candidate == title（title 本身就是有效主题时直接使用）
+        if topic_candidate and len(topic_candidate) > 3:
             result['topic'] = topic_candidate
 
     # 图片 OCR 场景下，「简介」二字常被标题误触发，导致 speakerBio 变成整段海报文字。
@@ -1964,13 +1967,20 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
 
     # OCR 纯海报页：为已识别主讲人从 OCR 文本补全/修正简介（speakerBio），
     # 覆盖原「整张海报文本（含标题/主题/多位嘉宾）直接塞进 speakerBio」的情况；
-    # 海报页无独立「摘要」且 abstract 含主讲人时一并清空。仅对纯海报页生效，
-    # 避免影响含 HTML 正文的页面（其 speakerBio 已由 HTML 路径正确提取）。
-    if poster_only and ocr_text and result.get('speaker'):
+    # 从 OCR 提取主讲人简介（若有 OCR 文本且已识别到 speaker 但尚无 bio）。
+    # 原限制 poster_only 导致 body_text 略超 50 字符时整条 bio 提取被跳过（如 lswh 海报页）。
+    # 加 not result.get('speakerBio') 守卫，避免覆盖 HTML 正文路径已正确提取的 bio。
+    if ocr_text and result.get('speaker') and not result.get('speakerBio'):
         _bio_ocr = _extract_bio_from_ocr(ocr_text, result['speaker'])
         if _bio_ocr:
             result['speakerBio'] = _bio_ocr
-            if result['speaker'] in (_abs_u or ''):
+            # 仅当 abstract 以 speaker 名字开头且长度接近 bio 时才判定为重复并清空
+            # （海报页的 abstract 常为简介片段含名字，不应误杀）
+            _abs = result.get('abstract') or ''
+            _bio = result.get('speakerBio') or ''
+            if (result['speaker'] in (_abs or '')
+                and len(_abs) > 0
+                and abs(len(_abs) - len(_bio)) < 30):
                 result['abstract'] = ''
 
     # F3 补充：页面存在主讲人/专家姓名标签但值为空或无效（OCR 把值错置到下一行，
