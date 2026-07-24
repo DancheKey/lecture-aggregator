@@ -712,7 +712,11 @@ def _narrative_process_is_retro(body):
     """
     if not body or len(body) < 30:
         return False
-    has_structured = bool(re.search(r'(时间|地点|主讲|主办|承办|讲座时间|讲座地点)[:：]', body))
+    # 结构化标签检测：标签后可跟冒号、空格、中文标点，或直接连数字/汉字（如 io 源的
+    # "● 时间10月15日""地点华南师范大学""主讲人介绍"格式）。回顾稿极少同时含多个此类标签。
+    has_structured = bool(re.search(
+        r'(时间|地点|主讲|主办|承办|讲座时间|讲座地点)'
+        r'(?=[\s:：:．·\d\u4e00-\u9fa5])', body))
     # RT2g 仅针对「无结构化标签的流式回顾长文」。正文已含 时间/地点/主讲 等讲座结构化标签，
     # 说明这是正规预告/通知而非回顾稿（回顾稿极少带未来讲座的结构化标签），直接判为非回顾，
     # 避免「教学创新工作坊通知」等含「举办/开展」措辞的预告被误杀（如 gxb 第51期工作坊）。
@@ -907,6 +911,19 @@ def _clean_title(t):
         t = t.split(' - ')[0].strip()
     if '｜' in t:
         t = t.split('｜')[0].strip()
+    # 去掉 io 源等常见的通用前缀：「【讲座通知】""讲座通知""讲座通知 |""讲座通知（"
+    # 分步处理避免字符类中 ] 的转义问题
+    t = re.sub(r'^[\s【\[]*讲座通知[\s】]', '', t).strip()
+    t = re.sub(r'^[\s｜|：:]*', '', t).strip()
+    t = re.sub(r'^讲座通知[｜|（(]', '', t).strip()
+    # 去掉标题两侧的中文引号（io 源标题常带 "实际标题" 格式）
+    if len(t) > 4 and t.startswith('"') and t.endswith('"'):
+        t = t[1:-1].strip()
+    if len(t) > 4 and t.startswith('"') and t.endswith('"'):
+        t = t[1:-1].strip()
+    # ���掉前导的 | （分割符残留）、尾部孤括号
+    t = re.sub(r'^[｜|\s]+', '', t).strip()
+    t = re.sub(r'[）)]$', '', t).strip()
     # 列表页锚文本常把发布日期前缀粘进标题（如「2024-05-21艺术乡建…」「2023年12月24日红树林…」）。
     # 去掉标题开头的日期前缀，仅保留真实讲座标题。日期本身已由时间解析单独处理。
     t = re.sub(r'^\s*(?:19|20)\d{2}\s*[-/年\.]\s*\d{1,2}\s*[-/月\.]\s*\d{1,2}\s*[日号]?\s*', '', t).strip()
@@ -1162,12 +1179,29 @@ def _locate_publish_time(soup, content_div, body_text, full_text):
 def parse_detail(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
     soup = BeautifulSoup(html, 'html.parser')
     # 列表页标题通常就是干净的讲座标题，优先使用；否则回退到详情页 h1/title
+    # 注意：部分站点（如 io 国际交流合作处）的 <h1> 是栏目名（"通知公告"）而非文章标题，
+    # 真正标题在 <h3> 或 <title> 标签中。需检测并跳过栏目名。
+    _SECTION_NAME_RE = re.compile(
+        r'^(?:通知公告|新闻动态|学术讲座|新闻详情|通知|公告|新闻|动态|'
+        r'首页|主页|关于我们|联系我们|列表|详情)$'
+    )
     if list_title:
         title = _clean_title(list_title)
     else:
         h1 = soup.find('h1') or soup.find('h2')
         if h1:
-            title = h1.get_text(strip=True)
+            h1_text = h1.get_text(strip=True)
+            # h1 是短栏目名（≤6字且命中常见栏目词）→ 跳过，尝试 h3 或 <title>
+            if len(h1_text) <= 6 or _SECTION_NAME_RE.match(h1_text):
+                h3 = soup.find('h3') or soup.find('h4')
+                if h3:
+                    title = h3.get_text(strip=True)
+                elif soup.title:
+                    title = soup.title.get_text(strip=True)
+                else:
+                    title = h1_text
+            else:
+                title = h1_text
         elif soup.title:
             title = soup.title.get_text(strip=True)
         else:
@@ -1822,6 +1856,11 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         # 截断页面噪声/侧边栏
         abstract = re.split(rf'(?:{NOISE_MARKERS})', abstract)[0].strip()
         if len(abstract) > 5:
+            # 去掉尾部时间/地点/报名等元信息（io 源正文常把"时间:... 地点:..."粘到摘要末尾）
+            abstract = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', abstract).strip()
+            abstract = re.sub(r'\s*地点\s*[:：\s].*$', '', abstract).strip()
+            abstract = re.sub(r'\s*20\d{2}年\s*\d{1,2}月\s*\d{1,2}日.*$', '', abstract).strip()
+            abstract = re.sub(r'\s*(?:欢迎|诚挚邀请|敬请|请各位|欢迎广大).*$', '', abstract).strip()
             result['abstract'] = abstract
 
     # 兜底：若正文来自图片 OCR 且没有明确「摘要」标签，把 OCR 文本清理后作为摘要
@@ -1867,6 +1906,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         # 允许 topic_candidate == title（title 本身就是有效主题时直接使用）
         if topic_candidate and len(topic_candidate) > 3:
             result['topic'] = topic_candidate
+
+    # 非 OCR 场景：若 title 已清理前缀且长度>8（含实质内容），topic 仍为空时，
+    # 从 title 派生 topic（去掉系列/通用后缀，保留核心主题）
+    if not result.get('topic') and title and len(title) > 8:
+        tp = re.sub(r'^[\s"「]*', '', title).strip()
+        # 去掉系列讲座编号（"第N场""第N期""第一场"等）
+        tp = re.sub(r'^[\""]?[^"]*?(?:系列讲座|系列活动?)\s*第[一二三四五六七八九十\d]+[场期讲]\s*[—–-—]\s*', '', tp).strip()
+        # 去掉尾部通用词
+        tp = re.sub(r'(?:讲座|报告|讲坛|通知|预告)\s*$', '', tp).strip()
+        if len(tp) >= 4:
+            result['topic'] = tp
 
     # 图片 OCR 场景下，「简介」二字常被标题误触发，导致 speakerBio 变成整段海报文字。
     # 若 speakerBio 来自 OCR 且包含时间/地点等结构化信息，说明不是真正的主讲人简介，清空。
@@ -1990,13 +2040,45 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         tp = (result.get('topic') or '').strip()
         m = re.match(r'^([\u4e00-\u9fa5·]{2,4})\s+(.{4,})$', tp)
         if m and _looks_like_real_name(m.group(1)):
-            result['speaker'] = m.group(1).strip()
+            # 排除"第N场""第一场"等系列场次编号被误识为人名（io 源系列讲座常见）
+            if not re.match(r'^第[一二三四五六七八九十\d]+[场期讲]', m.group(1)):
+                result['speaker'] = m.group(1).strip()
+
+    # F4 补充：speaker 仍为空但 bio 以"姓名,职称..."或"姓名 职称..."开头时，
+    # 从 bio 开头提取主讲人姓名。覆盖 io 源等 speaker 未从正文标签提取到的场景。
+    if (not result.get('speaker')) and result.get('speakerBio'):
+        bio = result['speakerBio'].strip()
+        # 模式1："姓名, ..."（逗号分隔的简介）
+        m_name = re.match(r'^([\u4e00-\u9fa5]{2,4})(?:[,，]|(?:\s+[，,]))', bio)
+        if m_name and _looks_like_real_name(m_name.group(1)):
+            candidate = m_name.group(1)
+            # 排除机构名（学院/中心/学会等）
+            if not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', candidate):
+                result['speaker'] = candidate
+        elif not result.get('speaker'):
+            # 模式2："姓名 职称/头衔..."（空格分隔）
+            m_name2 = re.match(r'^([\u4e00-\u9fa5]{2,4})\s+((?:教授|研究员|博士|院长|主任|讲师|院士|博导|处长|司长|局长|书记|会长|秘书长|理事))', bio)
+            if m_name2 and _looks_like_real_name(m_name2.group(1)):
+                result['speaker'] = m_name2.group(1)
 
     # 新闻/回顾处理（R5 政策确认，2026-07-19；回退 2026-07-18 的"保留标记"）：
     # 事后才报道的讲座（新闻/回顾稿）不属于预告类聚合，整条剔除、不入库。
     # 两层判定：(1) is_news_record 时间判定（发布晚于讲座）；
     #          (2) is_news_article 语义判定（覆盖无显式发布时间戳的回顾稿）。
     # 命中即 return None，scraper 会打印 [SKIP-NEWS] 并跳过该 URL。
+    # 通用 abstract 尾部清理（无论 abstract 从哪条路径赋值，统一截断时间/地点/邀请语）
+    # io 源正文常把"时间:... 地点:... 诚挚邀请..."粘到摘要尾部
+    _abs = result.get('abstract') or ''
+    if _abs:
+        _abs = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', _abs).strip()
+        _abs = re.sub(r'\s*地点\s*[:：\s].*$', '', _abs).strip()
+        _abs = re.sub(r'\s*20\d{2}年\s*\d{1,2}月\s*\d{1,2}日.*$', '', _abs).strip()
+        _abs = re.sub(r'\s*(?:欢迎|诚挚邀请|敬请|请各位|欢迎广大|感兴趣).*$', '', _abs).strip()
+        if len(_abs) > 3:
+            result['abstract'] = _abs
+        else:
+            result['abstract'] = ''
+
     if is_non_lecture_title(title) or is_admin_notice(title, body_text) or (not skip_news_filter and (is_news_record(result) or is_news_article(title, body_text, result.get('lectureStart')))):
         return None  # [SKIP-NEWS] / [SKIP-ADMIN]
     if skip_news_filter:
