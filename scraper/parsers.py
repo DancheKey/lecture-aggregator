@@ -1679,10 +1679,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                     # 剩余部分（用截断后但未去职称的 sp，避免丢失单位首字）
                     rest = sp[nm.end():].strip()
                     if rest and len(rest) > 2:
-                        aff = re.sub(r'\s*(?:特聘教授|副教授|教授|讲师|院士|老师).*$', '', rest).strip()
-                        # 清除「现为/现任/现供职于/目前任职于」等状态前缀
-                        aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
-                        result['speakerAffiliation'] = aff
+                        result['speakerAffiliation'] = _extract_affiliation(rest)
                 else:
                     result['speaker'] = sp_clean
 
@@ -1867,7 +1864,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             abstract = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', abstract).strip()
             abstract = re.sub(r'\s*地点\s*[:：\s].*$', '', abstract).strip()
             abstract = re.sub(r'\s*20\d{2}年\s*\d{1,2}月\s*\d{1,2}日.*$', '', abstract).strip()
-            abstract = re.sub(r'\s*(?:欢迎|诚挚邀请|敬请|请各位|欢迎广大).*$', '', abstract).strip()
+            # 仅剔除「邀请类」尾部，不误伤正文合法的「受到欢迎」「广受欢迎」等
+            abstract = re.sub(r'\s*(?:诚挚邀请|敬请|请各位|欢迎\s*(?:广大|各位|师生|同学|莅临|参加|光临|届时|踊跃|提出|关注)|感兴趣).*$', '', abstract).strip()
             result['abstract'] = abstract
 
     # 兜底：若正文来自图片 OCR 且没有明确「摘要」标签，把 OCR 文本清理后作为摘要
@@ -2080,7 +2078,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         _abs = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', _abs).strip()
         _abs = re.sub(r'\s*地点\s*[:：\s].*$', '', _abs).strip()
         _abs = re.sub(r'\s*20\d{2}年\s*\d{1,2}月\s*\d{1,2}日.*$', '', _abs).strip()
-        _abs = re.sub(r'\s*(?:欢迎|诚挚邀请|敬请|请各位|欢迎广大|感兴趣).*$', '', _abs).strip()
+        # 仅剔除「邀请类」尾部（欢迎广大/欢迎各位/欢迎师生/诚挚邀请/敬请/请各位/感兴趣…），
+        # 不误伤正文合法的「受到欢迎」「广受欢迎」等表述（原 bare「欢迎」会截断摘要中部）。
+        _abs = re.sub(r'\s*(?:诚挚邀请|敬请|请各位|欢迎\s*(?:广大|各位|师生|同学|莅临|参加|光临|届时|踊跃|提出|关注)|感兴趣).*$', '', _abs).strip()
         if len(_abs) > 3:
             result['abstract'] = _abs
         else:
@@ -2153,6 +2153,129 @@ _BLOCK_FIELD_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点
                       r'\d{4}年|\d{1,2}月\d{1,2}日|上午|下午|晚上))')
 
 
+def _detect_field_list_sessions(text, default_year=None, publish_time=None,
+                                title_year=None, url_year=None):
+    """候选3：字段列表型多报告（cs 5400 等）。
+
+    页面把每场讲座的「报告题目/报告人/报告时间/报告摘要」拆成独立标签交错单列：
+      …报告题目:A 报告人:古天龙,地点…时间:3月18日9:00-12:00 报告时间:9:20-10:00
+        报告题目:A 报告摘要:A 报告人:古天龙,暨南大学… 报告时间:10:00-10:40 报告题目:B…
+    候选1 按「报告题目」分块后，一个块只含单字段、该场的时间/摘要落在相邻块，
+    逐块 parse_cn_time 取不到本场时间→整页返回 SINGLE，4 场只展现 1 场。
+
+    本函数以「报告时间」为槽位锚点还原每场：每场时间对应其【前最近报告题目】作标题、
+    【后最近报告摘要】作摘要、【后最近报告人】作主讲；并截取 [标题位置, 下一标题位置)
+    作为该场 block，供 split_record_by_sessions 逐块抽取 speaker/bio。
+    """
+    def _collect(label):
+        out = []
+        for m in re.finditer(re.escape(label), text):
+            nxt = re.search(r'报告题目|报告人|报告时间|报告摘要|报告地点|地点|时间|摘要|简介',
+                            text[m.end():])
+            end = m.end() + nxt.start() if nxt else len(text)
+            out.append((m.start(), text[m.end():end].strip()))
+        return out
+    times = _collect('报告时间:')
+    titles = _collect('报告题目:')
+    abstracts = _collect('报告摘要:')
+    speakers = _collect('报告人:')
+    if len(times) < 2 or len(titles) < 2 or len(abstracts) < 2:
+        return []
+    # 各报告槽的「报告时间:9:20-10:00」常缺日期（日期在页眉，如「时间:3月18日 9:00-12:00」），
+    # 故先解析整页日期作为每段时间的兜底日期前缀。
+    _page_dt = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
+                             title_year=title_year, url_year=url_year)
+    _page_date_str = ''
+    if _page_dt and _page_dt.get('start'):
+        _d = _page_dt['start']
+        _page_date_str = f'{_d.year}年{_d.month}月{_d.day}日 '
+    cand = []
+    for tpos, _ in times:
+        dt = parse_cn_time(_page_date_str + text[tpos:], default_year=default_year,
+                           publish_time=publish_time, title_year=title_year, url_year=url_year)
+        if not dt or not dt.get('start'):
+            continue
+        st = dt['start']
+        if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
+            continue
+        # 标题：该报告时间【之后最近】出现的报告题目（字段列表型中报告题目常排在
+        # 报告时间之后与本场配套；之前可能是上一场的重复/目录标题，勿误取）。
+        title = ''
+        for p, v in titles:
+            if p >= tpos:
+                title = v
+                break
+        if not title or len(title) < 2:
+            continue
+        # 摘要：之后最近报告摘要；主讲：之后最近报告人
+        abstract = ''
+        for p, v in abstracts:
+            if p >= tpos:
+                abstract = v
+                break
+        speaker = ''
+        for p, v in speakers:
+            if p >= tpos:
+                speaker = v
+                break
+        # block：从【后最近报告题目】到下一个报告题目位置（含本场全部字段，避免误吞上一场报告人）
+        block_start = None
+        for p, v in titles:
+            if p >= tpos:
+                block_start = p
+                break
+        block_end = len(text)
+        _started = False
+        for p, v in titles:
+            if _started:
+                block_end = p
+                break
+            if p == block_start:
+                _started = True
+        cand.append({'topic': title, 'start': dt['start'], 'end': dt.get('end'),
+                     'block': text[block_start:block_end],
+                     'speaker': speaker, 'abstract': abstract})
+    return cand
+
+
+def _extract_affiliation(rest):
+    """从主讲人值中拆出的「姓名之后残余文本」里提取单位名。
+
+    覆盖「姓名,党员,学位,单位」式（单位在学位之后）的坑：直接 trim 首个「博士/教授」
+    会把「陈莉,中共党员,工学博士,西北大学二级教授…」截成「中共党员,工学」，误删真实单位。
+    策略：优先取「单位关键词(大学/学院/研究院/研究所/中心/实验室/学系)」之后的片段为单位名，
+    再清尾部职称/学位/党派噪声；无单位关键词且过短（如「新加」这类被下个标签截断的残缺片段）
+    则清空，避免把垃圾当单位展示。
+    """
+    if not rest:
+        return ''
+    # 优先匹配「完整单位名」（含前缀，如「暨南大学」「北京大学计算机学院」），避免只取
+    # 关键词「大学」而漏掉前缀「暨南/北京大学」。非贪婪匹配单位关键词前的最少汉字。
+    _UNIT_RE = re.compile(
+        r'([\u4e00-\u9fa5A-Za-z·]{0,12}?(?:大学|学院|研究院|研究所|研究中心|实验室|学系|分校|学校)'
+        r'(?:[\u4e00-\u9fa5]{0,8}?(?:大学|学院|研究院|研究所|学系))?)')
+    m = _UNIT_RE.search(rest)
+    if m:
+        aff = m.group(1)
+    else:
+        aff = re.sub(r'^\s*[（(]?\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', rest).strip()
+    aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
+    aff = re.sub(
+        r'\s*(?:特聘教授|特任教授|长聘教授|讲座教授|讲席教授|客座教授|名誉教授|兼职教授|'
+        r'青年教授|卓越教授|二级教授|三级教授|四级教授|一级教授|'
+        r'副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|硕士|学士|'
+        r'院士|老师|导师|先生|女士|'
+        r'中共党员|共产党员|党员|九三学社|民进|民盟|民建|致公党|农工党|台盟|无党派).*$',
+        '', aff).strip()
+    aff = aff.strip(' （()）')
+    aff = re.sub(r'^[，、；\s]+', '', aff)
+    # 无单位关键词且过短 → 视为残缺片段（如「新加」），清空
+    if not re.search(r'(大学|学院|研究院|研究所|研究中心|实验室|学系|分校|学校|公司|企业|所|部|中心|医院|学会|协会)', aff):
+        if len(aff) < 6:
+            return ''
+    return aff
+
+
 def _parse_title_no_range(title):
     """从标题解析「第A-B期」连续期号范围，返回 (start, end) 或 None。"""
     m = re.search(r'第\s*(\d{1,3})\s*-\s*(\d{1,3})\s*期', title or '')
@@ -2210,6 +2333,75 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
             continue
         sessions.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
                          'block': block})
+    # 候选2（新增，CS 源常见格式）：离散「报告N/专题N」分场标记——
+    # 正文形如「报告一\n时间：9:00\n题目：X\n摘要：…\n报告二\n时间：10:00\n题目：Y…」，
+    # 「报告N」与「题目」被时间/换行隔开，候选1的「报告N题目」连续标签匹配不到。
+    # 整页常有页眉级「时间:3月11日 9:00-11:30」被每段重复包含，若用候选1的分块会
+    # 把各场时间都误解析成页眉时间→时间相同→distinct-time 检查失败。故当存在 ≥2 个
+    # 「报告N」标记时，优先用候选2（按报告N干净分段，每场含独立时间）替换候选1。
+    # 注意：不能用 \b 作边界——Python3 re 的 \b 是 Unicode 词边界，而 _n1a_normalize
+    # 会删掉「报告二」「时间」之间的 CJK 内空格（单字相连），使「报告二时间」连写后
+    # 失去词边界，\b 直接失效、标记清零；且「报告一」本就直接接「时」，从未靠 \b 匹配。
+    # 改用「后续不是数字/汉字」的负向预查作为边界，兼容连写与带空格两种形态。
+    _REPORT_SESSION_RE = re.compile(
+        r'报告\s*[一二三四五六七八九十百零0-9]+(?![题目主题摘要人师])(?![一二三四五六七八九十百零0-9])')
+    markers = list(_REPORT_SESSION_RE.finditer(text))
+    # 同一「报告N」可能既出现在页眉总览又出现在正文章节（如 cs 5388：顶部总览先出现，
+    # 其后才是「报告一」正文章节），造成重复标记。每个序号只保留最后一次出现，跳过靠前的
+    # 页眉/目录版本，使分段落在真正含该场独立时间/摘要的章节内容上（否则会多拆出一场
+    # 09:00-11:30 的页眉总览伪场）。保持按位置排序。
+    _dedup_idx = {}
+    _markers_ordered = []
+    for _m in markers:
+        _num = re.search(r'[一二三四五六七八九十百零0-9]+', _m.group())
+        _key = _num.group() if _num else _m.group()
+        if _key in _dedup_idx:
+            _markers_ordered[_dedup_idx[_key]] = _m
+        else:
+            _dedup_idx[_key] = len(_markers_ordered)
+            _markers_ordered.append(_m)
+    markers = _markers_ordered
+    if len(markers) >= 2:
+        # 各报告段只含「时间：9:00-9:50」而缺日期（日期在页眉，位于报告一之前），
+        # 故先从整页解析出讲座日期，作为每段时间的兜底日期前缀。
+        _page_dt = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
+                                 title_year=title_year, url_year=url_year)
+        _page_date_str = ''
+        if _page_dt and _page_dt.get('start'):
+            _d = _page_dt['start']
+            _page_date_str = f'{_d.year}年{_d.month}月{_d.day}日 '
+        cand2 = []
+        for i, mk in enumerate(markers):
+            seg = text[mk.start(): markers[i + 1].start() if i + 1 < len(markers) else len(text)]
+            tm = re.search(
+                r'(?:报告题目|题目|主题|报告主题|专题题目)[：:]\s*'
+                r'(.+?)(?=\s*(?:摘要|简介|报告人|主讲人|讲者|时间|地点|报告时间|报告地点|$))',
+                seg)
+            if not tm:
+                continue
+            topic = tm.group(1).strip()
+            topic = re.sub(r'\s*(?:主讲人|报告人|预告)\s*[:：]?.*$', '', topic).strip()
+            if not topic or len(topic) < 2:
+                continue
+            dt = parse_cn_time(_page_date_str + seg, default_year=default_year, publish_time=publish_time,
+                                title_year=title_year, url_year=url_year)
+            if not dt or not dt.get('start'):
+                continue
+            st = dt['start']
+            if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
+                continue
+            cand2.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                          'block': seg})
+        if len(cand2) >= 2:
+            sessions = cand2
+    # 候选3（兜底）：字段列表型多报告（cs 5400 等）。候选1 按「报告题目」分块、候选2 按
+    # 「报告N」分块均失败（前者逐块取不到本场时间、后者无离散报告N标记）时，用字段锚点聚合。
+    if len(sessions) < 2:
+        cand3 = _detect_field_list_sessions(
+            text, default_year=default_year, publish_time=publish_time,
+            title_year=title_year, url_year=url_year)
+        if len(cand3) >= 2:
+            sessions = cand3
     # 去重：同 (topic, start) 视为同一场（顶部「题目」常与首期「主题/报告N题目」重复出现）。
     # topic 比较前去掉所有空白，避免正文数学符号/排版导致的「ℤ_{2^k}」与「ℤ _{2^k}」式微差误判为不同场。
     # 同 key 的多块中保留「信息更完整」者（含主讲人/报告人/摘要/参与者等子字段的块优先），
@@ -2352,7 +2544,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
         participants = _extract_block_field(block, r'参与者')
         is_roundtable = bool(participants) or bool(re.search(r'圆桌|座谈', block))
         # 主讲人（逐块优先；缺失继承前序；圆桌且无主讲人→置空）
-        sp_m = re.search(rf'(?:主讲[人师]|报告人\d*)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
+        sp_m = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*|讲者简介)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
         if sp_m:
             cand = sp_m.group(1).strip()
             # 提取职称（用于 speakerTitle）
@@ -2364,23 +2556,18 @@ def split_record_by_sessions(base, sessions, full_text=''):
             cand_clean = re.sub(
                 r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
                 r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', cand).strip()
-            nm = _SPEAKER_NAME_RE.match(cand_clean)
+            nm = _SPEAKER_NAME_RE.match(cand)
             if nm and _looks_like_real_name(nm.group(1)):
                 rec['speaker'] = nm.group(1)
                 rec['speakerSource'] = 'block'
                 if speaker_title:
                     rec['speakerTitle'] = speaker_title
-                rest = cand_clean[nm.end():].strip(' （(，,）)')
+                # 用原始 cand（勿用 cand_clean）计算姓名之后残余：cand_clean 会从首个
+                # 「博士/教授」截断到文末，而「姓名,党员,工学博士,西北大学」中博士位于中间，
+                # 会把真实单位一并截掉，导致 affiliation 丢失。
+                rest = cand[nm.end():].strip(' （(，,）)')
                 if rest:
-                    # 清除「现为/现任/现供职于/目前任职于」等状态前缀，只保留单位名
-                    aff = re.sub(
-                        r'^\s*[（(]?\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', rest).strip()
-                    # 再清除尾部职称
-                    aff = re.sub(
-                        r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-                        r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', aff).strip()
-                    # 去掉首尾括号残留
-                    aff = aff.strip(' （()）')
+                    aff = _extract_affiliation(rest)
                     if aff:
                         rec['speakerAffiliation'] = aff
             else:
@@ -2403,26 +2590,64 @@ def split_record_by_sessions(base, sessions, full_text=''):
                 rec['speakerSource'] = 'inherited' if prev_speaker else None
         if participants:
             rec['participants'] = participants
-        # 地点：逐块「报告N地点」优先；其次整页「活动地点」；再次基底；最后清泄漏与房间号空格。
+        # 每场独立 abstract / speakerBio（解决整页解析时 abstract 泄漏、bio 错位）：
+        # 仅当块内含对应标签时才覆盖，避免把基底已有值清空。
+        _abs_m = re.search(
+            r'(?:报告摘要|摘要)[：:]\s*'
+            r'(.+?)(?=\s*(?:讲者简介|报告人简介|主讲人简介|个人简介|简介|专家介绍|'
+            r'报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|报告题目|报告摘要|$))',
+            block, re.S)
+        if _abs_m:
+            _a = _abs_m.group(1).strip()
+            if len(_a) > 5:
+                # 复用通用尾部清理（不误伤「受到欢迎」等合法表述）
+                _a = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', _a).strip()
+                _a = re.sub(r'\s*地点\s*[:：\s].*$', '', _a).strip()
+                _a = re.sub(r'\s*20\d{2}年\s*\d{1,2}月\s*\d{1,2}日.*$', '', _a).strip()
+                _a = re.sub(r'\s*(?:诚挚邀请|敬请|请各位|欢迎\s*(?:广大|各位|师生|同学|'
+                            r'莅临|参加|光临|届时|踊跃|提出|关注)|感兴趣).*$', '', _a).strip()
+                if len(_a) > 5:
+                    rec['abstract'] = _a
+        _bio_m = re.search(
+            r'(?:讲者简介|报告人简介|主讲人简介|个人简介|简介)[：:]\s*'
+            r'(.+?)(?=\s*(?:报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|'
+            r'报告题目|报告摘要|$))', block, re.S)
+        if _bio_m:
+            _b = _bio_m.group(1).strip()
+            # 去掉姓名前缀（已在 speaker 提取），保留简介正文
+            _b = re.sub(r'^[\u4e00-\u9fa5·]{2,4}\s*[,，]\s*', '', _b).strip()
+            if len(_b) >= 10:
+                rec['speakerBio'] = _b
+                # bio 起首为姓名且本块 speaker 为空时，用 F4 思路回填 speaker
+                if not rec.get('speaker'):
+                    _nm = re.match(r'^([\u4e00-\u9fa5·]{2,4})', _bio_m.group(1))
+                    if _nm and _looks_like_real_name(_nm.group(1)) and \
+                            not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', _nm.group(1)):
+                        rec['speaker'] = _nm.group(1)
+                        rec['speakerSource'] = 'block-bio'
+        # 地点：逐块「报告N地点」优先；其次基底（已清洗的共享地点）；再次全页兜底；
+        # 最后清泄漏与房间号空格。注意 CS 多报告页地点为全页共享（在页眉「报告地点：X」），
+        # 各报告小节通常不含独立地点，故优先用基底干净值，避免被全页「地点：X时间:…报告一…」
+        # 这类无分隔的压缩文本污染（原顺序把全页兜底放在基底之前，导致干净基底被泄漏值覆盖）。
         loc = ''
         # 模式A：块内「报告N地点：」标签（避免基底抽取被「报告N」标签污染）
-        # 结束前瞻须含「报告摘要/报告人/报告时间」——CS 压缩标签「报告地点：X会议室报告摘要」
-        # 会把「报告」漏进地点（被「摘要」前瞻误匹配），故在此直接截断。
-        lm = re.search(r'报告\d*地点[：:]\s*([\u4e00-\u9fa5A-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告\d|报告摘要|报告人|报告时间|摘要|内容简介|$)', block)
+        # 结束前瞻须含「报告摘要/报告人/报告时间/时间/题目」——CS 压缩标签「报告地点：X会议室
+        # 报告摘要」会把「报告」漏进地点，且「报告地点：X时间:3月11日」须遇裸「时间」即截断。
+        lm = re.search(r'报告\d*地点[：:]\s*([\u4e00-\u9fa5A-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告\d|报告摘要|报告人|报告时间|报告题目|时间|题目|主题|摘要|内容简介|$)', block)
         if lm:
             loc = lm.group(1).strip()
+        if not loc and rec.get('location'):
+            loc = rec['location']
         if not loc and full_text:
-            for pat in (r'活动地点\s*[：:]?\s*([^，。；\s]{2,60})',
-                        r'(?<!主)地点\s*[：:]?\s*([^，。；\s]{2,60})'):
+            for pat in (r'活动地点\s*[：:]?\s*([^，。；\s]{2,40})',
+                        r'(?<!主)地点\s*[：:]?\s*([^，。；\s]{2,40})'):
                 m = re.search(pat, full_text)
                 if m:
                     cand_loc = m.group(1).strip()
                     # 仅当看起来像真实地点（含 校区/楼/室/学院/大学）才采用，避免误抓噪声
-                    if 2 <= len(cand_loc) <= 60 and any(k in cand_loc for k in ('校区', '楼', '室', '学院', '大学', '馆', '中心', '房', '场')):
+                    if 2 <= len(cand_loc) <= 40 and any(k in cand_loc for k in ('校区', '楼', '室', '学院', '大学', '馆', '中心', '房', '场')):
                         loc = cand_loc
                         break
-        if not loc and rec.get('location'):
-            loc = rec['location']
         # 清理：去掉泄漏的「报告N…」标签，并合并 get_text 在标签边界插入的空格
         # （地点里的空格永远是噪声，如「学院 1 01 会议室」→「学院101会议室」）
         if loc:
