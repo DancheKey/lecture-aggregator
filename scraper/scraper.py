@@ -316,7 +316,10 @@ def cross_source_dedup(records):
         key = (spk, date)
         groups.setdefault(key, []).append(rec)
 
-    merged_urls = set()   # 已被合并进其他记录的 sourceUrl（需从最终列表中移除）
+    # 已被合并进其他记录的 (sourceUrl, lectureIndex) 对（需从最终列表中移除）。
+    # 使用 (url, li) 元组而非裸 url：多讲座页面的不同期号共享同一 sourceUrl，
+    # 裸 url 会导致同页其他未被合并的期号被连带删除（致命丢数据）。
+    merged_urls = set()
     merge_count = 0
 
     for key, group in groups.items():
@@ -387,7 +390,8 @@ def cross_source_dedup(records):
                 if oc == primary_college:
                     continue
                 # 跨院从记录：合并进主记录，从最终列表移除
-                merged_urls.add(other.get('sourceUrl', '').rstrip('/'))
+                _li = other.get('lectureIndex')
+                merged_urls.add((other.get('sourceUrl', '').rstrip('/'), _li))
                 # 折叠重复学院（如社科处把同一场讲座发了两次 → 只计一次来源）
                 if oc in seen_colleges:
                     continue
@@ -434,7 +438,7 @@ def cross_source_dedup(records):
 
     # 过滤掉已被合并的从记录
     result = [r for r in records
-              if r.get('sourceUrl', '').rstrip('/') not in merged_urls]
+              if (r.get('sourceUrl', '').rstrip('/'), r.get('lectureIndex')) not in merged_urls]
     return result
 
 
@@ -513,7 +517,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     seen.add(href_norm)
                     new_count += 1
-                    if is_incremental and href_norm in existing_urls:
+                    if is_incremental and (href_norm, None) in existing_urls:
                         continue
                     if href_norm in exclude_urls or (global_exclude and href_norm in global_exclude):
                         print(f'[SKIP] {name} exclude {href}')
@@ -598,7 +602,19 @@ def main():
             existing = raw.get('data', []) if isinstance(raw, dict) else raw
         except Exception:
             existing = []
-    existing_urls = {str(r.get('sourceUrl', '')).rstrip('/') for r in existing if r.get('sourceUrl')}
+    # 已抓 URL 集合：(sourceUrl, lectureIndex) 元组。
+    # 多讲座记录（isMultiLecture=True 且有 lectureIndex）只加入 (url, li) 而不加 (url, None)；
+    # 非多讲座记录加入 (url, None)。增量模式下只检查 (url, None) 是否在集合中，
+    # 这样多讲座页面不会被跳过，允许解析器改进后重新检测补拆漏期。
+    existing_urls = set()
+    for r in existing:
+        u = str(r.get('sourceUrl', '')).rstrip('/')
+        if not u:
+            continue
+        if r.get('isMultiLecture') and r.get('lectureIndex'):
+            existing_urls.add((u, r.get('lectureIndex')))
+        else:
+            existing_urls.add((u, None))
 
     lectures = {}
     if is_incremental:

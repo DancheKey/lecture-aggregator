@@ -257,7 +257,10 @@ def _extract_speaker_from_ocr(text):
     """
     if not text:
         return '', '', None
-    # 只在结构化标签之前的部分找主讲人，避免把简介/bio 中的被介绍者误抓
+    # 区域截断：仅用于无标签式模糊匹配（Pattern 2-5），避免把 bio 中的被介绍者误抓。
+    # 标签式匹配（Pattern 1）使用完整文本——因为「主讲人：」是精确标签、不会误匹配 bio 区域，
+    # 且部分海报的主讲人信息排在时间/地点之后（如 ose 146：时间→地点→邀请人→简介→主讲人→摘要），
+    # 若用时间/地点做硬截断会把「主讲人：xxx」排除在搜索区域外导致漏抓。
     cut = len(text)
     for kw in ('时间', '地点', '时闻', '摘要', '简介', '主讲人简介', '报告人简介', '主办',
                '讲座简介', '报告简介'):
@@ -265,10 +268,11 @@ def _extract_speaker_from_ocr(text):
         if 0 < i < cut:
             cut = i
     region = text[:cut]
-    # 1) 标签式
+    # 1) 标签式 —— 在完整文本中搜索（精确标签不怕误匹配，且覆盖主讲人在时间/地点之后的海报格式）
+    # 值捕获排除空格：中文「主讲人：」后的姓名紧邻冒号、不含内部空格；遇到空格即越界到下一行/字段。
     m = re.search(r'(?:主讲人|主讲|报告人|主讲嘉宾|特邀嘉宾|特邀专家|演讲人|报告专家|报告嘉宾|专家姓名'
-                  r'|Speaker|Presenter|Lecturer)\s*[：:]\s*((?:(?!' + _SPK_VAL_STOP + r')[^\n,，。.]){2,30})',
-                  region)
+                  r'|Speaker|Presenter|Lecturer)\s*[：:]\s*((?:(?!' + _SPK_VAL_STOP + r')[^\n,，。\s]){2,12})',
+                  text)
     if m:
         v = re.split(r'[（(]', m.group(1).strip())[0].strip()
         # 剥离常见职称/头衔（OCR 常识别出「陈建邦校长」「李洪修教授」等）
@@ -285,6 +289,16 @@ def _extract_speaker_from_ocr(text):
                 # 最后兜底：取前2-3字（更保守，避免吃到后续词汇）
                 nm = re.match(r'^([\u4e00-\u9fa5·]{2,3})', v)
                 v = nm.group(1) if nm and _looks_like_real_name(nm.group(1)) else ''
+        # 防御：OCR 两行粘连导致「姓名+下行词首」连写（如「孙正龙题组」）。
+        # 若值 >4 字但通过校验（因全汉字+不在禁止列表），尝试剥离尾部常见非人名双字词。
+        if len(v) > 4 and _looks_like_real_name(v):
+            for suffix in ('题组','课题组','小组','团队','实验室','中心','研究所',
+                           '学院','研究室','工作室','项目'):
+                if v.endswith(suffix) and len(v) - len(suffix) >= 2:
+                    candidate = v[:-len(suffix)]
+                    if _looks_like_real_name(candidate):
+                        v = candidate
+                        break
         if _looks_like_real_name(v):
             return v, '', 'label'
     # 2) 无标签式：姓名紧邻职称（允许「/」或空格）
@@ -377,7 +391,7 @@ _LOCATION_TERM = re.compile(
     r'内容|详细内容|主要内容|会议注册|讲座教授|特邀专家|面向对象|主持|'
     r'职称|Tencent ?Meeting)'
 )
-def _clean_location(loc):
+def _clean_location(loc, title=None):
     if not loc:
         return ''
     orig = loc
@@ -410,6 +424,30 @@ def _clean_location(loc):
     m4 = _loc_topic_leak.search(loc)
     if m4 and m4.start() > 5:
         loc = loc[:m4.start()].strip()
+    # location 尾部吸入完整讲座标题（lswh 等源：BS4 把换行后标题行粘进地点值）
+    # 特征：loc 尾部长子串(>=6字) 与 title 完全匹配（允许全/半角标点差异）
+    if title and len(title) >= 6:
+        t_clean = title.strip()
+        # 标准化全/半角标点后再比较
+        _norm = lambda s: s.replace('：', ':').replace('（', '(').replace('）', ')').replace('——', '--')
+        t_norm = _norm(t_clean)
+        loc_norm = _norm(loc)
+        if loc_norm.endswith(t_norm) and len(loc) > len(t_clean):
+            loc = loc[:-(len(loc) - len(loc_norm) + len(t_norm))].strip()
+        elif len(t_clean) > 10 and t_norm in loc_norm and loc_norm.index(t_norm) > 3:
+            cut = loc_norm.index(t_norm)
+            loc = loc[:cut].strip()
+        else:
+            # 前缀重叠：标题行只粘了开头、未粘全（如「一课北904经典解释与宗教中国化」+
+            # 标题「经典解释与宗教中国化：道安…」）。若 loc 在 offset>3 处开始包含标题的
+            # 较长前缀(>=6字)，从该前缀起点截断，保留真实地点部分。
+            # 从最长(<=12)到最短(6)尝试，避免过早截断；offset>3 保护真实地点前缀不被误删。
+            for k in range(min(12, len(t_norm)), 5, -1):
+                pref = t_norm[:k]
+                pos = loc_norm.find(pref, 3)
+                if pos > 3:
+                    loc = loc[:pos].strip()
+                    break
     if not loc:
         # 整段仅为线上会议号等、无实体地点：标注为线上
         if re.search(r'(腾讯会议|线上|会议号|会议 ?ID|网络会议|直播|Tencent ?Meeting)', orig):
@@ -543,8 +581,10 @@ LECTURE_KW = ['学术讲座', '讲座', '学术报告', '学术沙龙', '讲坛'
 #   （改期通知按 reschedule_notice 处理更合理，但本期仅放开拦截，不做同名时间更新）
 # - 「报名」收窄为「报名截止」「报名结束」：保留「报名通知」等含预告信息的列表项
 # - 新增纪实/侧记/花絮/速递/快讯：均属新闻回顾类，列表阶段直接跳过
+# - 新增征文/征稿/招募：与讲座关键词可能共现（如"学术讲座征文通知"），列表阶段拦截
 EXCLUDE_KW = ['回顾', '总结', '新闻', '喜报', '招聘', '招生', '答辩', '公示',
-              '报名截止', '报名结束', '获奖', '申请表', '纪实', '侧记', '花絮', '速递', '快讯']
+              '报名截止', '报名结束', '获奖', '申请表', '纪实', '侧记', '花絮', '速递', '快讯',
+              '征文', '征稿', '招募']
 
 
 def is_lecture(title):
@@ -615,6 +655,8 @@ _NON_LECTURE_KW = [
     '答辩', '开题', '中期考核',
     '公示名单',
     '改期', '延期', '暂停举办', '暂缓举行',
+    # 与 EXCLUDE_KW 对齐（仅加明确的新闻类词，不放"招生"等语境词——讲座主题里可能出现）：
+    '纪实', '侧记', '花絮', '速递', '快讯',
 ]
 
 
@@ -1379,10 +1421,15 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             body_text = _normalize_label_text((body_text + ' ' + ocr_text).strip())
             text = _normalize_label_text((text + ' ' + ocr_text).strip())
 
-    # 纯海报页（正文几乎为空）时直接 OCR；其余含图页面在字段提取后再按需 OCR 摘要/简介
-    poster_only = len(body_text) < 50
+    # 纯海报页（正文几乎为空 / 正文虽长但全是 CMS 元信息无结构化讲座标签）
+    # body_text < 150 → 几乎可确认是海报页。阈值从 50 放宽至 150，覆盖 skc/abdn 等
+    # HTML 包裹层有文本但无「时间:/地点:/主讲人:」标签的页面，避免坐等失败。
+    poster_only = (len(body_text) < 150
+                   and not re.search(r'(?:时间|地点|主讲[人师]|报告人)[：:]', body_text))
     if poster_only:
         _do_ocr()
+        if ocr_text:
+            result['ocrExtracted'] = True
 
     # R3 发布时间定位（标签 > 伴生词/class > 位置兜底）
     publish_time, publish_level = _locate_publish_time(soup, content_div, body_text, text)
@@ -1583,6 +1630,15 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             loc_times.append(loc_time)
         result['location'] = loc
 
+    # LOC-OCR: 主正则未命中/值为空且 OCR 文本可用时，在原始 ocr_text 中
+    # 以「地点/地点标签后 2-40 字」宽松搜索（多行场景下不需要 LOC_STOP 的 $ 锚点）。
+    if not result.get('location') and ocr_text:
+        loc_ocr = re.search(
+            r'(?:课程地点|讲座地点|教学工作坊地点|地点'
+            r'|Venue|Location)[：:]\s*([^：:\n]{2,40})', ocr_text)
+        if loc_ocr and len(loc_ocr.group(1).strip()) >= 2:
+            result['location'] = loc_ocr.group(1).strip()
+
     # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
     # 注意：排除「主讲《…》」（正文里「主讲《课程名》」是动宾短语，不是主讲人标签），
     # 否则会把书名号后的课程名误当主讲人（如汕尾校区海报 bio 中的「主讲《动物组织学与胚胎学》」）。
@@ -1607,6 +1663,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         rf'|Speaker|Presenter|Lecturer)\s*[：:]\s*(.+?){STOP}'
     )
     m = re.search(speaker_pat, text)
+    # 连写多主讲人标记：报告人字段以「[头衔]姓名职称」拼接多位主讲人时置为 segments 列表
+    multi_speakers = None
     # F2-OCR-SP: OCR 海报常把标签与值之间的冒号和空格全部识丢，
     # 变成零分隔符粘连（如工学部海报「主办单位:华南师范大学工学部主讲人马於光院士」）。
     # 若上述带冒号正则未命中，尝试零宽/纯空格的「标签+姓名」格式；
@@ -1641,58 +1699,98 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             if _en_aff:
                 result['speakerAffiliation'] = _en_aff
         else:
-            # 如果值太长，截断到第一个非 speaker/affiliation 的分隔符处
-            if len(sp) > 25:
-                # 优先按中文标点截断（常规结构化页面）
-                cut = re.search(r'[，、；。]', sp[4:])
-                # 其次按其他字段标签前截断（含无空格直接粘连的情况，
-                # 如 ggy 页面"副教授主持嘉宾:"中 主持嘉宾 紧跟前文无空格）
-                if not cut:
-                    cut = re.search(r'(?:\s*)?(?:主持嘉宾|评论嘉宾|讲座时间|Zoom|Passcode|参会|主办单位|承办单位|主讲人简介)', sp[4:])
-                # 兜底：按空格+大写字母或空格+常见字段词截断
-                if not cut:
-                    cut = re.search(r'\s+[A-Z]|\s+\d{4}', sp[4:])
-                if cut:
-                    sp = sp[:4 + cut.start()].strip()
-            # 去掉尾部职称后缀
-            sp_clean = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', sp).strip()
-            # 尝试拆分姓名+单位（括号形式）
-            mm = re.match(r'(.+?)\s*[（(]([^）)]{2,40})[）)]', sp)
-            if mm:
-                result['speaker'] = sp_clean.split('（')[0].strip()
-                aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm.group(2)).strip()
-                # 清除「现为/现任/现供职于/目前任职于」等状态前缀
-                aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
-                result['speakerAffiliation'] = re.sub(r'\s+', '', aff)
+            # 连写多主讲人 / 荣誉头衔前缀（2026-07-24 修复：cs 4145 论坛
+            # 「报告人：国家杰青刘梦赤教授长江学者陈建二教授长江学者卢晓中教授」——
+            # 真实姓名在头衔之后、职称之前，原抽取把头衔当名字、职称当 title）。
+            # 仅当值含已知荣誉头衔前缀、或能拆出 ≥2 个「姓名+职称」段时才走此分支，
+            # 避免误伤常规「姓名 职称 单位」单主讲人（其 affiliation 须由后续 mm2 逻辑提取）。
+            _raw_segs = _SPEAKER_SEG_RE.findall(sp)
+            # 仅检查括号「之前」的姓名部分：lswh 等面包屑把单位放在半角/全角括号内，
+            # 单位里常含「特聘教授/长江学者」等荣誉词，若对整串 sp 判定 _has_honor 会误触发
+            # 连贯多主讲人解析（_parse_concat_speakers），把单位当「头衔+姓名」连写串，
+            # 产出『特聘』『雅特聘』等职称碎片（如 晏绍祥(首都师范大学历史学院教授、教育部长江学者特聘教授...)）。
+            # 真实连贯格式（国家杰青刘梦赤教授长江学者陈建二教授…）无括号，整串即姓名部分，不受影响。
+            _has_honor = re.search(_HONORIFICS, re.split(r'[（(]', sp, 1)[0])
+            _segs = None
+            # 不变量：含括号的「姓名(单位)」格式绝不可能是连贯多主讲人连写串
+            # （连贯格式如「国家杰青刘梦赤教授长江学者陈建二教授」本身无括号）。
+            # lswh 面包屑「晏绍祥(首都师范大学历史学院教授、…特聘教授…会长)」含半角括号，
+            # 若进入 _parse_concat_speakers 会把括号内单位误解析成姓名碎片『特聘』。
+            if (_has_honor or len(_raw_segs) >= 2) and '(' not in sp and '（' not in sp:
+                _segs = _parse_concat_speakers(sp)
+            if _segs:
+                if len(_segs) >= 2:
+                    # 多主讲人论坛：先置首位为主讲人，整页字段构建完后按主讲人拆分多条
+                    result['speaker'] = _segs[0]['name']
+                    result['speakerSource'] = 'label'
+                    result['speakerTitle'] = _segs[0]['honorific'] or (sp_title or '')
+                    sp_title = None  # 防 1716 行职称后缀覆盖（荣誉头衔优先）
+                    multi_speakers = _segs
+                else:
+                    result['speaker'] = _segs[0]['name']
+                    result['speakerSource'] = 'label'
+                    result['speakerTitle'] = _segs[0]['honorific'] or (sp_title or '')
+                    sp_title = None
             else:
-                # 空格分隔的「姓名 职称 单位」或「姓名 单位」（如物理学院「郑炜 教授 中国科学技术大学」）
-                _TITLES = r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师)'
-                # 先处理「姓名 职称，单位」逗号分隔（生命科学学院常见：报告人：肖媛 博士，清华大学）
-                sp_normalized = re.sub(r'[，,]', ' ', sp)
-                mm2 = re.match(rf'^([\u4e00-\u9fa5·]{{2,5}})\s+[\u4e00-\u9fa5]{{0,4}}{_TITLES}\s+([\u4e00-\u9fa5A-Za-z].{{2,40}})$', sp_normalized)
-                if not mm2:
-                    mm2 = re.match(r'^([\u4e00-\u9fa5·]{2,5})\s+([\u4e00-\u9fa5]{4,40})$', sp_normalized)
-                if mm2:
-                    result['speaker'] = mm2.group(1).strip()
-                    aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm2.group(2)).strip()
+                # 如果值太长，截断到第一个非 speaker/affiliation 的分隔符处
+                if len(sp) > 25:
+                    # 优先按中文标点截断（常规结构化页面）
+                    cut = re.search(r'[，、；。]', sp[4:])
+                    # 其次按其他字段标签前截断（含无空格直接粘连的情况，
+                    # 如 ggy 页面"副教授主持嘉宾:"中 主持嘉宾 紧跟前文无空格）
+                    if not cut:
+                        cut = re.search(r'(?:\s*)?(?:主持嘉宾|评论嘉宾|讲座时间|Zoom|Passcode|参会|主办单位|承办单位|主讲人简介)', sp[4:])
+                    # 兜底：按空格+大写字母或空格+常见字段词截断
+                    if not cut:
+                        cut = re.search(r'\s+[A-Z]|\s+\d{4}', sp[4:])
+                    if cut:
+                        sp = sp[:4 + cut.start()].strip()
+                # 先压缩内部空白：网页常把「副教授」排版成「副 教授」（换行/空格断开），
+                # 导致后续职称剥离正则（连续字符串匹配）无法命中。
+                # 仅对 CJK 值执行（英文姓名可能含合法空格；此处已确认走中文路径）。
+                if re.search(r'[\u4e00-\u9fa5]', sp):
+                    sp = re.sub(r'\s+', '', sp)
+                # 去掉尾部职称后缀
+                sp_clean = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', sp).strip()
+                # 尝试拆分姓名+单位（括号形式）
+                mm = re.match(r'(.+?)\s*[（(]([^）)]{2,40})[）)]', sp)
+                if mm:
+                    result['speaker'] = sp_clean.split('（')[0].split('(')[0].strip()
+                    aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm.group(2)).strip()
                     # 清除「现为/现任/现供职于/目前任职于」等状态前缀
                     aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
-                    result['speakerAffiliation'] = re.sub(r'\s+', '', aff).strip()
+                    result['speakerAffiliation'] = re.sub(r'\s+', '', aff)
                 else:
-                    # 最后兜底：从值头部提取纯中文人名（2~4 字），
-                    # 覆盖"姓名单位/职称"粘连无法用上述模式拆分的情况（如 ggy 的"洪源远密歇根大学..."）
-                    # 名字在遇到单位关键词（大学/学院/研究员/教授等）时应停止
-                    nm = re.match(r'^([\u4e00-\u9fa5]{2,3})(?=[^a-zA-Z0-9]*?(?:大学|学院|研究院|研究所|教授|副教授|讲师|博士|院士|中心|实验室))', sp_clean)
-                    if not nm:
-                        nm = re.match(r'^([\u4e00-\u9fa5]{2,4})', sp_clean)
-                    if nm and _looks_like_real_name(nm.group(1)):
-                        result['speaker'] = nm.group(1)
-                        # 剩余部分（用截断后但未去职称的 sp，避免丢失单位首字）
-                        rest = sp[nm.end():].strip()
-                        if rest and len(rest) > 2:
-                            result['speakerAffiliation'] = _extract_affiliation(rest)
+                    # 空格分隔的「姓名 职称 单位」或「姓名 单位」（如物理学院「郑炜 教授 中国科学技术大学」）
+                    _TITLES = r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师)'
+                    # 先处理「姓名 职称，单位」逗号分隔（生命科学学院常见：报告人：肖媛 博士，清华大学）
+                    sp_normalized = re.sub(r'[，,]', ' ', sp)
+                    mm2 = re.match(rf'^([\u4e00-\u9fa5·]{{2,5}})\s+[\u4e00-\u9fa5]{{0,4}}{_TITLES}\s+([\u4e00-\u9fa5A-Za-z].{{2,40}})$', sp_normalized)
+                    if not mm2:
+                        # group1 限定 2~4 字（中文姓名上限），避免贪婪把「姓名+职称」里的职称吃进名字
+                        # （如「何洁副教授 南洋理工大学」原本被 {2,5} 吞成「何洁副教授」）。
+                        mm2 = re.match(r'^([\u4e00-\u9fa5·]{2,4})\s+([\u4e00-\u9fa5]{4,40})$', sp_normalized)
+                    if mm2:
+                        result['speaker'] = mm2.group(1).strip()
+                        aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm2.group(2)).strip()
+                        # 清除「现为/现任/现供职于/目前任职于」等状态前缀
+                        aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
+                        result['speakerAffiliation'] = re.sub(r'\s+', '', aff).strip()
                     else:
-                        result['speaker'] = sp_clean
+                        # 最后兜底：从值头部提取纯中文人名（2~4 字），
+                        # 覆盖"姓名单位/职称"粘连无法用上述模式拆分的情况（如 ggy 的"洪源远密歇根大学..."）
+                        # 名字在遇到单位关键词（大学/学院/研究员/教授等）时应停止
+                        nm = re.match(r'^([\u4e00-\u9fa5]{2,3})(?=[^a-zA-Z0-9]*?(?:大学|学院|研究院|研究所|教授|副教授|讲师|博士|院士|中心|实验室))', sp_clean)
+                        if not nm:
+                            nm = re.match(r'^([\u4e00-\u9fa5]{2,4})', sp_clean)
+                        if nm and _looks_like_real_name(nm.group(1)):
+                            result['speaker'] = nm.group(1)
+                            # 剩余部分（用截断后但未去职称的 sp，避免丢失单位首字）
+                            rest = sp[nm.end():].strip()
+                            if rest and len(rest) > 2:
+                                result['speakerAffiliation'] = _extract_affiliation(rest)
+                        else:
+                            result['speaker'] = sp_clean
 
     # 兜底：从标题括号中提取主讲人，如「（朱英教授）」
     if not result['speaker']:
@@ -1727,6 +1825,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     need_ocr = bool(imgs) and (missing_key or (title_is_lecture and (t_untrusted or not result.get('location'))))
     if need_ocr and not ocr_text:
         _do_ocr()
+        if ocr_text:
+            result['ocrExtracted'] = True
     # T3 覆盖：讲座类标题 + 含图 + OCR 抽到日期 → 以海报日期为准覆盖 lectureStart/End。
     # 海报是讲座时间的权威源，故不再强依赖 t_untrusted（发布日未被识别时会漏判）；
     # 覆盖条件收敛为「OCR 日期与现有不同 / OCR 补出了时间 / OCR 补出了结束时间」，
@@ -2012,7 +2112,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 地点系统级清理：剔除会议号/密码/议程/报名等噪声后缀、折叠数字内部空格。
     # 放在通用后处理（所有赋值路径之后）统一执行，覆盖 HTML 解析与 OCR 两条路径。
     if result.get('location'):
-        result['location'] = _clean_location(result['location'])
+        result['location'] = _clean_location(result['location'], result.get('title') or result.get('topic'))
 
     # F-AFF: 单位字段职称守卫（系统级，覆盖所有提取路径）。
     # speakerAffiliation 不应是纯职称（助理研究员/教授/研究员等），也不应残留悬挂括号
@@ -2137,6 +2237,14 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             return None
         return kept
 
+    # ---- 多主讲人连写拆分（同一公告含多位主讲人，报告人字段以「[头衔]姓名职称」拼接）----
+    # 例如 cs 4145 论坛「报告人：国家杰青刘梦赤教授长江学者陈建二教授长江学者卢晓中教授」。
+    # 与多讲座拆分（按时间/主题分块）互斥：此处各主讲人共享同一题目/时间/地点，仅主讲人不同。
+    if not sessions and multi_speakers and len(multi_speakers) >= 2:
+        _sp_recs = _split_by_speakers(result, multi_speakers)
+        if _sp_recs:
+            return _sp_recs
+
     return result
 
 
@@ -2255,6 +2363,73 @@ def _detect_field_list_sessions(text, default_year=None, publish_time=None,
     return cand
 
 
+def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
+                                    title_year=None, url_year=None):
+    """候选4：阿拉伯数字编号的「题目N：/报告题目N：」型多报告（cs 4268 等）。
+
+    形如 题目1：CrowdOS… 报告人1：於志文… 学术报告简介:…
+          题目2：… 报告人2：… 学术报告简介:…
+    各场常共用页眉时间（如 '时间：2019年11月29日（星期五）14:30'），块内无独立时间，
+    故从整页解析日期作每段兜底前缀。
+
+    注意：同一编号可能既出现在页眉总览（'题目1：CrowdOS…学术报告 时间：…地点：…'）
+    又出现在正文章节（'题目1：CrowdOS：… 报告人1：…'），造成重复块。这里每个编号
+    只保留最后一次出现（位置最靠后的正文章节），跳过页眉总览，避免多拆伪场。
+    """
+    _NUM_TOPIC_RE = re.compile(
+        r'(?:报告题目|讲座题目|专题题目|报告专题|题目|主题)\s*[0-9]+\s*[：:]')
+    labels = list(_NUM_TOPIC_RE.finditer(text))
+    if len(labels) < 2:
+        return []
+    # 同编号只保留最后一次出现（页眉总览 vs 正文章节去重）
+    _dedup_idx = {}
+    _ordered = []
+    for _m in labels:
+        _num = re.search(r'[0-9]+', _m.group())
+        _key = _num.group() if _num else _m.group()
+        if _key in _dedup_idx:
+            _ordered[_dedup_idx[_key]] = _m
+        else:
+            _dedup_idx[_key] = len(_ordered)
+            _ordered.append(_m)
+    labels = _ordered
+    if len(labels) < 2:
+        return []
+    # 页眉日期+时间兜底前缀（各场共用开场时间，块内无独立日期/时钟，
+    # 故把页眉解析出的完整时间一并带入，否则 parse_cn_time 只能取到 00:00）。
+    _page_dt = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
+                             title_year=title_year, url_year=url_year)
+    _page_date_str = ''
+    if _page_dt and _page_dt.get('start'):
+        _d = _page_dt['start']
+        _page_date_str = f'{_d.year}年{_d.month}月{_d.day}日 {_d.hour:02d}:{_d.minute:02d} '
+    cand = []
+    for i, lab in enumerate(labels):
+        blk_start = lab.end()
+        blk_end = labels[i + 1].start() if i + 1 < len(labels) else len(text)
+        block = text[blk_start:blk_end]
+        tv = re.match(r'\s*(.+?)\s*' + _TOPIC_VAL_STOP, block)
+        if not tv:
+            tv = re.match(r'\s*(.+?)(?=\s*(?:报告人|主讲人|演讲人|讲者|报告专家))', block)
+        if not tv:
+            continue
+        topic = tv.group(1).strip()
+        topic = re.sub(r'\s*(?:主讲人|报告人|预告)\s*[:：]?.*$', '', topic).strip()
+        topic = re.sub(r'形式[:：].*$', '', topic).strip()
+        if not topic or len(topic) < 2:
+            continue
+        dt = parse_cn_time(_page_date_str + block, default_year=default_year,
+                           publish_time=publish_time, title_year=title_year, url_year=url_year)
+        if not dt or not dt.get('start'):
+            continue
+        st = dt['start']
+        if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
+            continue
+        cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                     'block': block, '_numbered': True})
+    return cand
+
+
 def _extract_affiliation(rest):
     """从主讲人值中拆出的「姓名之后残余文本」里提取单位名。
 
@@ -2334,12 +2509,70 @@ def _split_english_speaker(sp):
                      r'助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|'
                      r'先生|女士)\s*$', '', aff).strip()
         # 整段像职称（Professor/Dr./院士）而非单位，或起始即讲座关键词（无单位信息）→ 放弃
-        if (re.match(r'(?:报告|讲座|题目|学术|时间|地点|主讲)', aff)
-                or re.fullmatch(r'(?:Professor|Dr\.?|Mr\.?|Ms\.?|Mrs\.?|Associate\s+Professor|'
-                                r'Full\s+Professor|Distinguished[\s\w]*|Chair|院士|教授|副教授|'
-                                r'研究员|副研究员|讲师|博士)', aff, re.I)):
-            aff = ''
+    if (re.match(r'(?:报告|讲座|题目|学术|时间|地点|主讲)', aff)
+            or re.fullmatch(r'(?:Professor|Dr\.?|Mr\.?|Ms\.?|Mrs\.?|Associate\s+Professor|'
+                            r'Full\s+Professor|Distinguished[\s\w]*|Chair|院士|教授|副教授|'
+                            r'研究员|副研究员|讲师|博士)', aff, re.I)):
+        aff = ''
     return name, aff
+
+
+# 荣誉头衔（出现在姓名之前的「前缀型」人才称号，区别于跟在姓名后的职称「教授/研究员」）。
+# 仅收录确为「前缀」的称号；特聘教授/讲座教授/客座教授等通常后置，不列入，避免误判。
+_HONORIFICS = (
+    '国家杰青|长江学者|国家优青|优秀青年|万人计划|百人计划|青年千人|千人计划|'
+    '中科院院士|中国工程院院士|973首席|国家万人|杰青|优青'
+)
+# 连写多主讲人：每段 = (荣誉头衔)? 姓名(2~3字) 职称。姓名与头衔/职称之间可能零空格（如
+# 「国家杰青刘梦赤教授」），故头衔与姓名、姓名与职称之间用 \s* 兼容连写。
+_SPEAKER_SEG_RE = re.compile(
+    rf'(?:({_HONORIFICS}))?\s*'
+    rf'([\u4e00-\u9fa5·]{{2,3}})\s*'
+    rf'(教授|研究员|副教授|助理教授|副研究员|助理研究员|讲师|院士|博士)'
+)
+
+
+def _parse_concat_speakers(sp):
+    """从「报告人」标签值拆出连写的 (姓名, 荣誉头衔, 职称) 列表。
+
+    用于「[头衔]姓名职称」无分隔拼接多位主讲人的场景（如 cs 4145 论坛：
+    「国家杰青刘梦赤教授长江学者陈建二教授长江学者卢晓中教授」）。原中文抽取路径
+    会把开头的头衔（国家杰青）当成名字、把末尾职称（教授）当成 title，真实姓名全丢。
+    返回 [{name, honorific, title}, ...]；姓名非真实人名则跳过。无头衔的单人名也返回 1 条。
+    """
+    if not sp:
+        return []
+    out = []
+    for m in _SPEAKER_SEG_RE.finditer(sp):
+        name = m.group(2)
+        if not _looks_like_real_name(name):
+            continue
+        out.append({'name': name, 'honorific': m.group(1) or '', 'title': m.group(3) or ''})
+    return out
+
+
+def _split_by_speakers(base, speakers):
+    """把单条 base 记录按多位主讲人拆成多条（连写多主讲人场景）。
+
+    基底字段（题目/时间/地点/摘要/简介）共享，逐条覆盖主讲人信息；标记 isMultiLecture，
+    sourceCount 仅首条计 1，统计页不膨胀。
+    """
+    out = []
+    n = len(speakers)
+    for i, spk in enumerate(speakers):
+        rec = dict(base)
+        rec['speaker'] = spk['name']
+        rec['speakerTitle'] = spk['honorific'] or ''
+        rec['speakerAffiliation'] = spk.get('aff') or ''
+        rec['speakerSource'] = 'label'
+        rec['isMultiLecture'] = True
+        rec['lectureIndex'] = i + 1
+        rec['lectureCount'] = n
+        # 来源通知计数：同一公告拆出的 N 条共享 1 个来源页，仅首条计 1，其余计 0
+        rec['sourceCount'] = 1 if i == 0 else 0
+        rec['notes'] = []
+        out.append(rec)
+    return out
 
 
 def _parse_title_no_range(title):
@@ -2371,9 +2604,11 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
       [{'no','topic','start','end','block'}, ...]
     """
     labels = list(_TOPIC_DELIM_RE.finditer(text))
-    if len(labels) < 2:
-        return []
     sessions = []
+    if len(labels) < 2:
+        # 候选1 分块标记不足（如纯「题目N：」编号型、单场页）：不在此早退，
+        # 交由后续候选2/3/4 兜底，避免阻断多报告页拆分（见 cs 4268）。
+        pass
     for i, lab in enumerate(labels):
         blk_start = lab.end()
         blk_end = labels[i + 1].start() if i + 1 < len(labels) else len(text)
@@ -2468,6 +2703,54 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
             title_year=title_year, url_year=url_year)
         if len(cand3) >= 2:
             sessions = cand3
+    # 候选4（兜底）：阿拉伯数字编号的「题目N：/报告题目N：」型多报告（cs 4268 等）。
+    # 候选1/2/3 均无法处理：候选1 的 _TOPIC_DELIM_RE 不支持「题目N：」编号格式、
+    # 且分块后块内无时间（共用页眉）会全部跳过；候选2 靠「报告N」离散标记（此页为「题目N」）；
+    # 候选3 靠 ≥2 个「报告时间:」（此页仅页眉 1 个）。命中即视为 N 场独立讲座。
+    if len(sessions) < 2:
+        cand4 = _detect_numbered_topic_sessions(
+            text, default_year=default_year, publish_time=publish_time,
+            title_year=title_year, url_year=url_year)
+        if len(cand4) >= 2:
+            sessions = cand4
+    # 候选5（兜底，abdn / 系列讲坛等）：用「第N讲/第N场」做分段标记。
+    # 页面正文可能以 第7讲\n时间：…\n主讲：…\n\n第8讲\n… 形式排列，
+    # 通用候选1-4（按题目/主题标签）抓不到这类无结构化标签的系列页。
+    if len(sessions) < 2:
+        _JIANG_SESSION_RE = re.compile(
+            r'(?:第)\s*[一二三四五六七八九十百零0-9]+\s*(?:讲|场|期)'
+            r'(?![题主报人目介摘])(?![一二三四五六七八九十百零0-9])')
+        j_markers = list(_JIANG_SESSION_RE.finditer(text))
+        if len(j_markers) >= 2:
+            _page_dt5 = parse_cn_time(text, default_year=default_year,
+                                       publish_time=publish_time,
+                                       title_year=title_year, url_year=url_year)
+            _page_date_str5 = ''
+            if _page_dt5 and _page_dt5.get('start'):
+                _d5 = _page_dt5['start']
+                _page_date_str5 = f'{_d5.year}年{_d5.month}月{_d5.day}日 '
+            cand5 = []
+            for i, mk in enumerate(j_markers):
+                seg = text[mk.end():
+                           j_markers[i + 1].start() if i + 1 < len(j_markers)
+                           else len(text)]
+                # 从分段中提取题目（冒号或换行后的第一个有效文字块）
+                tm5 = re.search(r'[:：]\s*([^\n：:]{3,40})', seg)
+                if not tm5:
+                    tm5 = re.match(r'\s*([^\n]{3,40})', seg)
+                topic5 = tm5.group(1).strip() if tm5 else '讲座' + mk.group()
+                dt5 = parse_cn_time(_page_date_str5 + seg,
+                                     default_year=default_year,
+                                     publish_time=publish_time,
+                                     title_year=title_year, url_year=url_year)
+                if not dt5 or not dt5.get('start'):
+                    continue
+                st5 = dt5['start']
+                cand5.append({'topic': topic5, 'start': dt5['start'],
+                              'end': dt5.get('end'), 'block': seg,
+                              '_no': mk.group()})
+            if len(cand5) >= 2:
+                sessions = cand5
     # 去重：同 (topic, start) 视为同一场（顶部「题目」常与首期「主题/报告N题目」重复出现）。
     # topic 比较前去掉所有空白，避免正文数学符号/排版导致的「ℤ_{2^k}」与「ℤ _{2^k}」式微差误判为不同场。
     # 同 key 的多块中保留「信息更完整」者（含主讲人/报告人/摘要/参与者等子字段的块优先），
@@ -2522,11 +2805,14 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
                 lect_anchor += 1
         if lect_anchor >= len(sessions):
             return []
-    # 时间互不相同才拆（避免把同一讲座的多个子环节误拆）
-    distinct = {(s['start'].year, s['start'].month, s['start'].day,
-                 s['start'].hour, s['start'].minute) for s in sessions}
-    if len(distinct) < 2:
-        return []
+    # 时间互不相同才拆（避免把同一讲座的多个子环节误拆）。
+    # 例外：显式阿拉伯编号型多报告（候选4，_numbered=True）常共用开场时间，跳过该检查
+    # （如 cs 4268 三场均 14:30 开场，但「题目1/2/3」编号明确为 N 场独立讲座）。
+    if not all(s.get('_numbered') for s in sessions):
+        distinct = {(s['start'].year, s['start'].month, s['start'].day,
+                     s['start'].hour, s['start'].minute) for s in sessions}
+        if len(distinct) < 2:
+            return []
     # 期号后缀：优先用标题「第A-B期」范围，否则顺序编号
     no_range = _parse_title_no_range(title)
     for i, s in enumerate(sessions):
@@ -2576,11 +2862,9 @@ def split_record_by_sessions(base, sessions, full_text=''):
         rec['topic'] = s['topic']
         rec['lectureStart'] = s['start'].isoformat(sep=' ')
         rec['lectureEnd'] = s['end'].isoformat(sep=' ') if s.get('end') else None
-        # 标题：原标题（第X期）— 该块主题（已含期号便于对应原文，又直接显示主题）
-        if '（第' not in base_title:
-            rec['title'] = f"{base_title}（第{s['no']}期）— {s['topic']}"
-        else:
-            rec['title'] = f"{base_title}— {s['topic']}"
+        # 标题：原标题 — 该块主题（拆分序号（第N期）不再嵌入 title，统一交由前端 span 后缀展示，
+        # 避免与真实系列期号如「第53期学术报告」混淆或重复显示）
+        rec['title'] = f"{base_title}— {s['topic']}"
         rec['isMultiLecture'] = True
         rec['lectureIndex'] = int(s['no'])
         rec['lectureCount'] = len(sessions)
@@ -2670,7 +2954,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
         # 每场独立 abstract / speakerBio（解决整页解析时 abstract 泄漏、bio 错位）：
         # 仅当块内含对应标签时才覆盖，避免把基底已有值清空。
         _abs_m = re.search(
-            r'(?:报告摘要|摘要)[：:]\s*'
+            r'(?:学术报告简介|报告简介|内容简介|讲座简介|报告摘要|摘要)[：:]\s*'
             r'(.+?)(?=\s*(?:讲者简介|报告人简介|主讲人简介|个人简介|简介|专家介绍|'
             r'报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|报告题目|报告摘要|$))',
             block, re.S)
