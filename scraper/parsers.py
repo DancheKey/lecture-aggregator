@@ -1630,58 +1630,69 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         mt_title = re.search(r'(助理研究员|副研究员|助理研究员|研究员|特聘教授|特任教授|长聘教授|副教授|助理教授|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)+$', sp)
         if mt_title:
             sp_title = mt_title.group(1).strip()
-        # 如果值太长，截断到第一个非 speaker/affiliation 的分隔符处
-        if len(sp) > 25:
-            # 优先按中文标点截断（常规结构化页面）
-            cut = re.search(r'[，、；。]', sp[4:])
-            # 其次按其他字段标签前截断（含无空格直接粘连的情况，
-            # 如 ggy 页面"副教授主持嘉宾:"中 主持嘉宾 紧跟前文无空格）
-            if not cut:
-                cut = re.search(r'(?:\s*)?(?:主持嘉宾|评论嘉宾|讲座时间|Zoom|Passcode|参会|主办单位|承办单位|主讲人简介)', sp[4:])
-            # 兜底：按空格+大写字母或空格+常见字段词截断
-            if not cut:
-                cut = re.search(r'\s+[A-Z]|\s+\d{4}', sp[4:])
-            if cut:
-                sp = sp[:4 + cut.start()].strip()
-        # 去掉尾部职称后缀
-        sp_clean = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', sp).strip()
-        # 尝试拆分姓名+单位（括号形式）
-        mm = re.match(r'(.+?)\s*[（(]([^）)]{2,40})[）)]', sp)
-        if mm:
-            result['speaker'] = sp_clean.split('（')[0].strip()
-            aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm.group(2)).strip()
-            # 清除「现为/现任/现供职于/目前任职于」等状态前缀
-            aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
-            result['speakerAffiliation'] = re.sub(r'\s+', '', aff)
+        # 英文/拉丁姓名快路径（2026-07-24 修复：cs 5294「Yan Zhang, University of Oslo」
+        # 原中文抽取路径只匹配 CJK、英文全落空，被守卫清空）。命中则直接落库并跳过 CJK 路径。
+        _en_name, _en_aff = _split_english_speaker(sp)
+        if _en_name:
+            result['speaker'] = _en_name
+            result['speakerSource'] = 'label'
+            if sp_title:
+                result['speakerTitle'] = sp_title
+            if _en_aff:
+                result['speakerAffiliation'] = _en_aff
         else:
-            # 空格分隔的「姓名 职称 单位」或「姓名 单位」（如物理学院「郑炜 教授 中国科学技术大学」）
-            _TITLES = r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师)'
-            # 先处理「姓名 职称，单位」逗号分隔（生命科学学院常见：报告人：肖媛 博士，清华大学）
-            sp_normalized = re.sub(r'[，,]', ' ', sp)
-            mm2 = re.match(rf'^([\u4e00-\u9fa5·]{{2,5}})\s+[\u4e00-\u9fa5]{{0,4}}{_TITLES}\s+([\u4e00-\u9fa5A-Za-z].{{2,40}})$', sp_normalized)
-            if not mm2:
-                mm2 = re.match(r'^([\u4e00-\u9fa5·]{2,5})\s+([\u4e00-\u9fa5]{4,40})$', sp_normalized)
-            if mm2:
-                result['speaker'] = mm2.group(1).strip()
-                aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm2.group(2)).strip()
+            # 如果值太长，截断到第一个非 speaker/affiliation 的分隔符处
+            if len(sp) > 25:
+                # 优先按中文标点截断（常规结构化页面）
+                cut = re.search(r'[，、；。]', sp[4:])
+                # 其次按其他字段标签前截断（含无空格直接粘连的情况，
+                # 如 ggy 页面"副教授主持嘉宾:"中 主持嘉宾 紧跟前文无空格）
+                if not cut:
+                    cut = re.search(r'(?:\s*)?(?:主持嘉宾|评论嘉宾|讲座时间|Zoom|Passcode|参会|主办单位|承办单位|主讲人简介)', sp[4:])
+                # 兜底：按空格+大写字母或空格+常见字段词截断
+                if not cut:
+                    cut = re.search(r'\s+[A-Z]|\s+\d{4}', sp[4:])
+                if cut:
+                    sp = sp[:4 + cut.start()].strip()
+            # 去掉尾部职称后缀
+            sp_clean = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', sp).strip()
+            # 尝试拆分姓名+单位（括号形式）
+            mm = re.match(r'(.+?)\s*[（(]([^）)]{2,40})[）)]', sp)
+            if mm:
+                result['speaker'] = sp_clean.split('（')[0].strip()
+                aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm.group(2)).strip()
                 # 清除「现为/现任/现供职于/目前任职于」等状态前缀
                 aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
-                result['speakerAffiliation'] = re.sub(r'\s+', '', aff).strip()
+                result['speakerAffiliation'] = re.sub(r'\s+', '', aff)
             else:
-                # 最后兜底：从值头部提取纯中文人名（2~4 字），
-                # 覆盖"姓名单位/职称"粘连无法用上述模式拆分的情况（如 ggy 的"洪源远密歇根大学..."）
-                # 名字在遇到单位关键词（大学/学院/研究员/教授等）时应停止
-                nm = re.match(r'^([\u4e00-\u9fa5]{2,3})(?=[^a-zA-Z0-9]*?(?:大学|学院|研究院|研究所|教授|副教授|讲师|博士|院士|中心|实验室))', sp_clean)
-                if not nm:
-                    nm = re.match(r'^([\u4e00-\u9fa5]{2,4})', sp_clean)
-                if nm and _looks_like_real_name(nm.group(1)):
-                    result['speaker'] = nm.group(1)
-                    # 剩余部分（用截断后但未去职称的 sp，避免丢失单位首字）
-                    rest = sp[nm.end():].strip()
-                    if rest and len(rest) > 2:
-                        result['speakerAffiliation'] = _extract_affiliation(rest)
+                # 空格分隔的「姓名 职称 单位」或「姓名 单位」（如物理学院「郑炜 教授 中国科学技术大学」）
+                _TITLES = r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师)'
+                # 先处理「姓名 职称，单位」逗号分隔（生命科学学院常见：报告人：肖媛 博士，清华大学）
+                sp_normalized = re.sub(r'[，,]', ' ', sp)
+                mm2 = re.match(rf'^([\u4e00-\u9fa5·]{{2,5}})\s+[\u4e00-\u9fa5]{{0,4}}{_TITLES}\s+([\u4e00-\u9fa5A-Za-z].{{2,40}})$', sp_normalized)
+                if not mm2:
+                    mm2 = re.match(r'^([\u4e00-\u9fa5·]{2,5})\s+([\u4e00-\u9fa5]{4,40})$', sp_normalized)
+                if mm2:
+                    result['speaker'] = mm2.group(1).strip()
+                    aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm2.group(2)).strip()
+                    # 清除「现为/现任/现供职于/目前任职于」等状态前缀
+                    aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
+                    result['speakerAffiliation'] = re.sub(r'\s+', '', aff).strip()
                 else:
-                    result['speaker'] = sp_clean
+                    # 最后兜底：从值头部提取纯中文人名（2~4 字），
+                    # 覆盖"姓名单位/职称"粘连无法用上述模式拆分的情况（如 ggy 的"洪源远密歇根大学..."）
+                    # 名字在遇到单位关键词（大学/学院/研究员/教授等）时应停止
+                    nm = re.match(r'^([\u4e00-\u9fa5]{2,3})(?=[^a-zA-Z0-9]*?(?:大学|学院|研究院|研究所|教授|副教授|讲师|博士|院士|中心|实验室))', sp_clean)
+                    if not nm:
+                        nm = re.match(r'^([\u4e00-\u9fa5]{2,4})', sp_clean)
+                    if nm and _looks_like_real_name(nm.group(1)):
+                        result['speaker'] = nm.group(1)
+                        # 剩余部分（用截断后但未去职称的 sp，避免丢失单位首字）
+                        rest = sp[nm.end():].strip()
+                        if rest and len(rest) > 2:
+                            result['speakerAffiliation'] = _extract_affiliation(rest)
+                    else:
+                        result['speaker'] = sp_clean
 
     # 兜底：从标题括号中提取主讲人，如「（朱英教授）」
     if not result['speaker']:
@@ -2018,7 +2029,13 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         else:
             _aff2 = re.sub(r'^[（(）)]+', '', result['speakerAffiliation'].strip())
             _aff2 = re.sub(r'[（(）)]+$', '', _aff2.strip())
-            result['speakerAffiliation'] = re.sub(r'\s+', '', _aff2)
+            # 中文单位（含汉字）：折叠 OCR 插入的内部空格（如「暨 南 大学」→「暨南大学」），
+            # 符合数据集中文无空格约定；英文单位（纯拉丁，如 "University of Oslo"）须保留词间空格，
+            # 否则会被误并成 "UniversityofOslo"。故按是否含汉字区分处理。
+            if re.search(r'[\u4e00-\u9fa5]', _aff2):
+                result['speakerAffiliation'] = re.sub(r'\s+', '', _aff2)
+            else:
+                result['speakerAffiliation'] = re.sub(r'\s+', ' ', _aff2).strip()
 
     # OCR 纯海报页：为已识别主讲人从 OCR 文本补全/修正简介（speakerBio），
     # 覆盖原「整张海报文本（含标题/主题/多位嘉宾）直接塞进 speakerBio」的情况；
@@ -2274,6 +2291,55 @@ def _extract_affiliation(rest):
         if len(aff) < 6:
             return ''
     return aff
+
+
+def _split_english_speaker(sp):
+    """从「报告人/主讲人」标签值中抽取英文/拉丁姓名与单位。
+
+    中文抽取路径的正则只匹配 CJK 姓名（[\\u4e00-\\u9fa5]）：英文姓名（如
+    "Yan Zhang, University of Oslo"）会整体落空、最终被 _looks_like_real_name 守卫清空
+    （cs 5294 即此坑）。这里在中文路径之前单独处理：仅当值以「首字母大写英文名 + 空格 +
+    首字母大写英文名」开头才生效（2–4 个大写词），避免误伤中文名或单位串。
+    返回 (name, affiliation)；未命中返回 ('', '')。
+    """
+    if not sp:
+        return '', ''
+    s = sp.strip()
+    m = re.match(r'^([A-Z][a-z]+(?:\s+[A-Z][a-z\.]+){1,3})', s)
+    if not m:
+        return '', ''
+    name = m.group(1).strip()
+    if not _looks_like_real_name(name):
+        return '', ''
+    after = s[m.end():].strip()
+    aff = ''
+    # 括号形式：Yan Zhang (University of Oslo)
+    pm = re.match(r'^[，,\s]*[（(]\s*([^）)]{2,40}?)\s*[)）]', after)
+    if pm:
+        aff = pm.group(1).strip()
+    else:
+        # 逗号/空格分隔的单位片段（"Yan Zhang, University of Oslo" → "University of Oslo"）。
+        # 用贪婪 [^,，]{2,40} 取到下一个逗号为止（非贪婪会只咬 2 字符变成 "Un"）。
+        cm = re.match(r'^[，,\s]*([^,，]{2,40})', after)
+        if cm:
+            aff = cm.group(1).strip()
+    if aff:
+        # 截到下一个讲座关键词（值可能尾随「学术报告 —计算机学院第 52 期」等噪声）
+        aff = re.split(r'(?:报告|讲座|题目|时间|地点|主讲|简介|摘要|期|—)', aff)[0].strip()
+        # 截掉中部的说明性括号（如「教授（相当于北美首席教授…）」注释，非单位信息）
+        aff = re.split(r'[（(]', aff)[0].strip()
+        aff = aff.strip(' ,，（）()')
+        # 去掉尾部职称词（归入 speakerTitle，与中文路径一致），如「…信息技术学院教授」→「…信息技术学院」
+        aff = re.sub(r'(?:特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|'
+                     r'助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|'
+                     r'先生|女士)\s*$', '', aff).strip()
+        # 整段像职称（Professor/Dr./院士）而非单位，或起始即讲座关键词（无单位信息）→ 放弃
+        if (re.match(r'(?:报告|讲座|题目|学术|时间|地点|主讲)', aff)
+                or re.fullmatch(r'(?:Professor|Dr\.?|Mr\.?|Ms\.?|Mrs\.?|Associate\s+Professor|'
+                                r'Full\s+Professor|Distinguished[\s\w]*|Chair|院士|教授|副教授|'
+                                r'研究员|副研究员|讲师|博士)', aff, re.I)):
+            aff = ''
+    return name, aff
 
 
 def _parse_title_no_range(title):
@@ -2571,11 +2637,22 @@ def split_record_by_sessions(base, sessions, full_text=''):
                     if aff:
                         rec['speakerAffiliation'] = aff
             else:
-                # 值非人名（如「主持嘉宾：」粘连），继承前序
-                rec['speaker'] = prev_speaker
-                rec['speakerAffiliation'] = prev_aff
-                rec['speakerTitle'] = prev_title
-                rec['speakerSource'] = 'inherited' if prev_speaker else None
+                # 英文/拉丁姓名兜底（2026-07-24）：_SPEAKER_NAME_RE 仅匹配 CJK，
+                # 多报告页英文主讲人（如 "Yan Zhang, University of Oslo"）会落到这里，尝试英文抽取。
+                _en_name, _en_aff = _split_english_speaker(cand)
+                if _en_name:
+                    rec['speaker'] = _en_name
+                    rec['speakerSource'] = 'block'
+                    if speaker_title:
+                        rec['speakerTitle'] = speaker_title
+                    if _en_aff:
+                        rec['speakerAffiliation'] = _en_aff
+                else:
+                    # 值非人名（如「主持嘉宾：」粘连），继承前序
+                    rec['speaker'] = prev_speaker
+                    rec['speakerAffiliation'] = prev_aff
+                    rec['speakerTitle'] = prev_title
+                    rec['speakerSource'] = 'inherited' if prev_speaker else None
         else:
             if is_roundtable:
                 rec['speaker'] = None
