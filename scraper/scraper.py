@@ -145,9 +145,12 @@ def collect_links(html, base, list_url=None, collect_mode='auto'):
             tlow = txt.lower()
             if any(k in tlow for k in NAV_KW):
                 continue
-            # 排除标题命中负向关键词的非讲座条目（通知/招聘/比赛/培训等）
-            if any(k in txt for k in EXCLUDE_TITLE_KW):
-                continue
+            # 若标题本身明显是讲座（含讲座关键词，如「学者讲坛第2讲丨全英课程学习策略」），
+            # 不受 EXCLUDE_TITLE_KW 误杀——避免"课程"等词把真讲座不当作讲座过滤掉。
+            # 仅当标题不含任何讲座关键词时，才用 EXCLUDE_TITLE_KW 拦截通知/招聘/培训等。
+            if not is_lecture(txt):
+                if any(k in txt for k in EXCLUDE_TITLE_KW):
+                    continue
             # 排除过短文本（导航常见）
             if len(txt) < 4:
                 continue
@@ -303,7 +306,36 @@ def cross_source_dedup(records):
     为什么用「主讲人+日期」而不是纯标题相似：
       同一讲座在不同学院的标题差异极大（如 psy 用短标题"5月31日 林崇德教授砺儒讲坛"，
       skc 用正式长标题"华南师范大学砺儒讲坛第146讲：…"），但主讲人和日期一定一致。
+
+    同单位（同学院）系列分期特例：
+      同一张系列海报分期发布（如钱捷《人文精神概论》5 讲，首期页预告全部、后续各期
+      发同一张海报的当期预告）。这些记录同主讲、同日、同单位，本就是「同一报告的
+      系列预告/更新」，应强制合并为一条（不依赖文本相似度，避免通用系列名 vs 具体
+      题目相似度不足而漏合并留下重复），且主记录优先选「listTitle 期号与自身场次
+      匹配」的那条（即该页正是讲这期），使每讲归属其当期页、标题正确；不标记 merged。
     """
+    _CN_NUM = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7,
+               '八': 8, '九': 9, '十': 10, '零': 0, '两': 2}
+
+    def _session_num(text):
+        if not text:
+            return None
+        # 第X讲 / 第X期 / 第X场
+        m = re.search(r'第\s*([0-9]+|[一二三四五六七八九十零两]+)\s*[讲期场]', text or '')
+        if m:
+            tok = m.group(1)
+            return int(tok) if tok.isdigit() else _CN_NUM.get(tok)
+        # 讲座X（不带「第」，如「系列讲座一」） / （第X期）
+        m = re.search(r'讲座\s*([0-9]+|[一二三四五六七八九十零两]+)', text or '')
+        if m:
+            tok = m.group(1)
+            return int(tok) if tok.isdigit() else _CN_NUM.get(tok)
+        m = re.search(r'（第\s*([0-9]+|[一二三四五六七八九十零两]+)\s*期）', text or '')
+        if m:
+            tok = m.group(1)
+            return int(tok) if tok.isdigit() else _CN_NUM.get(tok)
+        return None
+
     # 第一轮：按 (speaker_normalized, date) 分组（仅合法姓名参与）
     groups = {}
     for rec in records:
@@ -350,6 +382,12 @@ def cross_source_dedup(records):
                 # 不同源才考虑合并（同源重复已由 dedup 处理）
                 if ri.get('sourceUrl', '').rstrip('/') == rj.get('sourceUrl', '').rstrip('/'):
                     continue
+                # 同单位（同学院）系列分期：同一张系列海报分期发布，同主讲同日即视为
+                # 同一报告的系列预告/更新，强制合并（不依赖文本相似度，避免通用系列名
+                # vs 具体题目相似度不足而漏合并留下重复）。跨单位仍走下方相似度判定。
+                if ri.get('college', '') and ri.get('college') == rj.get('college'):
+                    union(i, j)
+                    continue
                 # topic 或 title 相似度（含跨字段交叉比较：
                 # 有的源把实质内容放 topic、有的放 title，需四向全比）
                 ti_a = ri.get('topic', '') or ri.get('title', '')
@@ -374,8 +412,25 @@ def cross_source_dedup(records):
             if len(members) < 2:
                 continue
 
-            # 选字段最完整的做主记录
-            primary_idx = max(members, key=lambda idx: _completeness(group[idx]))
+            # 选主记录：字段完整度优先；若 title 已包含 topic，再加分，
+            # 避免 Qian Jie 系列等多源合并后主记录 title 与实际讲座不符。
+            def _primary_score(r):
+                score = _completeness(r)
+                topic = r.get('topic', '')
+                title = r.get('title', '')
+                if topic and topic in title:
+                    score += 3
+                # 同单位系列分期：优先选 listTitle 期号与自身场次匹配的记录
+                # （该页正是讲这期），使每讲归属其当期页、标题不被张冠李戴。
+                sn = _session_num(r.get('listTitle', '')) or _session_num(r.get('sessionNumber', ''))
+                own = _session_num(r.get('sessionNumber', ''))
+                if own is None and r.get('isMultiLecture') and r.get('lectureIndex'):
+                    own = r.get('lectureIndex')
+                if sn and own and sn == own:
+                    score += 5
+                return score
+
+            primary_idx = max(members, key=lambda idx: _primary_score(group[idx]))
             primary = group[primary_idx]
 
             primary_college = primary.get('college', '')
@@ -386,10 +441,8 @@ def cross_source_dedup(records):
                     continue
                 other = group[idx]
                 oc = other.get('college', '')
-                # 同学院的自我合并：跳过，保留为独立记录（不合并、不移除）
-                if oc == primary_college:
-                    continue
-                # 跨院从记录：合并进主记录，从最终列表移除
+                # 同 URL 已在前面排除；这里允许同学院不同 URL 的重复合并。
+                # 跨院/同学院从记录：合并进主记录，从最终列表移除
                 _li = other.get('lectureIndex')
                 merged_urls.add((other.get('sourceUrl', '').rstrip('/'), _li))
                 # 折叠重复学院（如社科处把同一场讲座发了两次 → 只计一次来源）
@@ -403,8 +456,29 @@ def cross_source_dedup(records):
                     'title': other.get('title', ''),
                 })
 
+            # 补全策略：用从记录的非空字段填补主记录的空字段（同/跨院都做）
+            for field in ['speakerTitle', 'speakerAffiliation', 'location',
+                          'speakerBio', 'organizer']:
+                if not primary.get(field):
+                    for src_rec in [group[idx] for idx in members if idx != primary_idx]:
+                        val = src_rec.get(field)
+                        if val:
+                            primary[field] = val
+                            break
+
             # 去掉自我合并/重复后已无可合并的跨院来源 → 本簇不作为跨源合并
             if not sources_list:
+                merge_count += len(members) - 1
+                continue
+
+            # 跨院合并才标记 merged / 记录 sources（真正的多信息源）；
+            # 同单位（同学院）的系列分期（同一张系列海报分期发布）属于正常系列更新，
+            # 只保留主记录、剔除冗余的同期预告，不标记「多来源提醒」（用户 2026-07-27 明确）。
+            cross_college = any(s['college'] != primary_college for s in sources_list)
+            if not cross_college:
+                merge_count += len(members) - 1
+                print(f'[MERGE-SAME-UNIT] {key[0]} @ {key[1]} → {len(members)} 条合并为 1 '
+                      f'(同单位 {primary_college}，不标记多来源)')
                 continue
 
             # 如果主记录已有 sources（来自同源去重阶段），合并进去并去重
@@ -420,15 +494,6 @@ def cross_source_dedup(records):
             primary['sources'] = all_sources
             primary['merged'] = True
             primary['sourceCount'] = len(all_sources) + 1  # 含自身
-            # 补全策略：用从记录的非空字段填补主记录的空字段
-            for field in ['speakerTitle', 'speakerAffiliation', 'location',
-                          'speakerBio', 'organizer']:
-                if not primary.get(field):
-                    for src_rec in [group[idx] for idx in members if idx != primary_idx]:
-                        val = src_rec.get(field)
-                        if val:
-                            primary[field] = val
-                            break
             merge_count += len(members) - 1
             print(f'[MERGE] {key[0]} @ {key[1]} → {len(members)} 条合并为 1 '
                   f'(主记录: {primary["college"]} | 来源: {", ".join(s["college"] for s in sources_list)})')
@@ -669,6 +734,14 @@ def main():
     # 局部修复模式（--source，且无 --out）：保留其他学院已有记录，仅替换指定学院的记录
     if args.source and not args.out:
         other_existing = [r for r in existing if r.get('college') != args.source]
+        # 按源安全保护：列表页抓取失败/网络超时会使本源新结果骤减甚至为空，
+        # 此时不应清掉该源已有数据。新产出 < 旧产出 50% 时保留旧该源数据，避免误删。
+        old_src = [r for r in existing if r.get('college') == args.source]
+        new_src = [r for r in raw if r.get('college') == args.source]
+        if old_src and len(new_src) < len(old_src) * 0.5:
+            print(f'[WARN] --source {args.source} 新产出 {len(new_src)} 条 < 旧 {len(old_src)} 条的 50%，'
+                  f'疑似列表页抓取失败，保留该源旧数据不覆盖。', file=sys.stderr)
+            raw = raw + old_src
         raw = other_existing + raw
         # 安全拦截：--source 模式绝不应让总条数大幅缩水，否则大概率是 existing
         # 加载失败（json.load 异常被静默吞掉 → existing=[]）导致用单源覆盖全量。

@@ -286,6 +286,34 @@ const app = createApp({
       const s = String(u).trim();
       return /^https?:\/\//i.test(s) ? s : '#';
     },
+    // 判断标题里是否已经包含当前分期的期/讲/场号，避免前端重复追加「（第X期）」
+    // 支持：第3讲 / 第3期 / 讲座三 / 三讲 / 3讲 / 第III期 等
+    titleHasSession(title, idx) {
+      if (!title || !idx) return false;
+      const n = parseInt(idx, 10);
+      if (!n || n <= 0) return false;
+      const arabic = String(n);
+      // 中文数字 1-99
+      const units = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+      let chinese;
+      if (n <= 10) {
+        chinese = n === 10 ? '十' : units[n];
+      } else if (n < 20) {
+        chinese = '十' + units[n % 10];
+      } else {
+        chinese = units[Math.floor(n / 10)] + '十' + units[n % 10];
+      }
+      const t = String(title);
+      const patterns = [
+        new RegExp('第\\s*' + arabic + '\\s*[场期讲]'),
+        new RegExp('第\\s*' + chinese + '\\s*[场期讲]'),
+        new RegExp('讲座\\s*' + arabic),
+        new RegExp('讲座\\s*' + chinese),
+        new RegExp(arabic + '\\s*讲'),
+        new RegExp(chinese + '\\s*讲'),
+      ];
+      return patterns.some(re => re.test(t));
+    },
 
     /* ---------- 本地点赞（同一浏览器去重） ---------- */
     loadLikes() {

@@ -39,6 +39,8 @@ EVALUATION.md
 # 不应提交到仓库（公网为静态托管也不读取）。
 data/visits.json
 data/lecture_stats.json
+# VLM（智谱等）海报结构化提取结果缓存：按图片 URL 哈希存，重跑幂等、省额度，不入库
+data/.vlm_cache.json
 
 # 访问量「每年每月」报告：由 scripts/gen_visits_report.py 生成的产物，
 # 随时可重跑得到，不入库（数据来源 data/visits.json 本身已 gitignore）。
