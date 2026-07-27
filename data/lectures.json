@@ -66523,6 +66523,31 @@
       "timeNote": "general-body-full",
       "abstract": "论坛聚焦学科交叉与融合创新,重点推动文理工学科在社会科学领域的深度对话与协同研究,体现 \" 新文科 \" 建设与交叉学科发展的时代特色,以期实现搭建交叉交流平台、培育重大项目与平台、支持人才引育三大目标。二、 组织机制科研院社科处负责系列论坛的统筹组织工作,人力资源处支持人才政策宣讲、人才引育工作。每期论坛由相关学院或研究平台具体承办,负责论坛议题细化、专家邀请、会务组织、宣传报道等具体工作。",
       "listTitle": "关于申报2026年度华南师范大学“砺儒新社科”交叉学科论坛选题的通知"
+    },
+    {
+      "sourceUrl": "http://life.scnu.edu.cn/a/20260725/6792.html",
+      "title": "学术讲座：Improved gene editing technologies revealed unexpected auxin signaling mechanisms",
+      "topic": "Improved gene editing technologies revealed unexpected auxin signaling mechanisms",
+      "listTitle": "学术讲座：Improved gene editing technologies revealed unexpected auxin signaling mechanisms",
+      "speaker": "赵云德",
+      "speakerAffiliation": "美国加州大学圣迭戈分校",
+      "speakerTitle": "",
+      "speakerBio": "赵云德，美国加州大学圣迭戈分校（UCSD）教授，美国国家发明家科学院院士、美国植物生物学家学会会士，国际著名植物学期刊《Plant Physiology》主编。长期致力于植物生长素的合成、修饰、转运及信号转导的分子机理研究，在该领域取得了一系列具有国际影响力的重要成果。同时，在基因编辑工具研发方面贡献突出，开发了多种基因编辑技术、核酸介导的引导RNA生成技术，以及转基因自杀CRISPR系统等。创制的新型报告基因RUBY，大幅简化了转基因植株的可视化筛选流程。自2019年起连续多年入选科睿唯安“高被引科学家”榜单，学术成果总被引次数逾2.6万，H指数达76。",
+      "lectureStart": "2026-07-28 14:30:00",
+      "lectureEnd": null,
+      "location": "生命科学学院138会议室",
+      "abstract": null,
+      "college": "生命科学学院",
+      "campus": "石牌",
+      "organizer": "生命科学学院",
+      "inviter": "",
+      "publishTime": "2026-07-25 08:37:00",
+      "publishTimeSource": "label",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "ocrExtracted": false
     }
   ]
 }
