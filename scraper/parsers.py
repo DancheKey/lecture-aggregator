@@ -1474,6 +1474,44 @@ def _clean_session_topic(t):
     return t.strip()
 
 
+# 噪声伪场次主题：导航/页脚/章节标题类，不应被当作独立讲座场次。
+# 用于 detect_multi_session 末尾过滤，避免把单讲座通知的面包屑、发布时间、
+# 章节标题（如 CTLD 通知页的「来源 / 一、工作坊安排」）误判为多场。
+_SESSION_NOISE_TOPIC = (
+    '来源', '点击数', '收藏本文', '当前位置', '首页', '上一篇', '下一篇',
+    '相关链接', '快速导航', '站内搜索', '关于我们', '联系我们', '资讯',
+    '通知公告', '最新公告', '相关新闻', '推荐阅读', '网友评论', '分享',
+    '标签', '相关推荐', '附件下载', '近期活动', '教师发展中心',
+    '华南师范大学教师发展中心', '正文', '返回',
+)
+_SESSION_SECTION_WORDS = (
+    '工作坊安排', '参与方式', '面向对象', '具体安排', '内容简介', '报名',
+    '注意事项', '联系方式', '活动时间', '活动地点', '培训安排', '会议安排',
+    '讲座安排', '流程', '议程', '安排', '要求', '说明', '培训内容',
+    '课程安排', '时间地点', '培训目标', '主讲人简介', '讲座简介',
+)
+
+
+def _is_noise_session_topic(topic):
+    """True 表示该 topic 是导航/页脚/章节标题类伪场次，应剔除。"""
+    t = (topic or '').strip()
+    if not t:
+        return True
+    if t in _SESSION_NOISE_TOPIC:
+        return True
+    # 中文数字序号 + 顿号 + 短章节名（一、工作坊安排 / 二、参与方式 …）
+    m = re.match(r'^[一二三四五六七八九十百零]+[、.．](.*)$', t)
+    if m:
+        tail = m.group(1).strip()
+        if any(tail.endswith(w) for w in _SESSION_SECTION_WORDS) or len(t) <= 6:
+            return True
+    # 注意：不要在此拦截独立的「第N期/讲」式主题——候选5 的多讲系列正以「第N讲」为分段标记，
+    # 其每段 topic 经 _clean_session_topic 后可能即为「第N讲」本身（无后续标题时），
+    # 误拦会把真实多期讲座合并回单条，造成数据丢失。候选1 的 topic 值在「第N期」前已终止，
+    # 不会产出此类主题，故该分支既无必要又有风险，已删除。
+    return False
+
+
 def _abstract_is_nav_noise(ab):
     """判断 abstract 是否被页面导航/页脚垃圾污染（如「学术交流/评论/点击/收藏」）。"""
     ab = ab or ''
@@ -2758,7 +2796,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     )
 
     bio_pat = rf'(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介|Bio)[\s:：]*'
-    m = re.search(rf'{bio_pat}(.+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|$))', body_text)
+    m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|$))', body_text)
     if m:
         bio = m.group(1).strip()
         # 清理版权声明等尾部噪声
@@ -2794,13 +2832,13 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # abstract 值应在下一个字段标签/噪声标记前停止，避免把后续主讲人介绍、时间地点等元信息吞入。
     m = re.search(
         rf'{abs_pat}'
-        r'(.+?)'
+        r'([\s\S]+?)'
         rf'(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|'
         r'主讲人|报告人|主讲|主持人|时间|地点|题目|主题|单位|邀请人|'
         r'主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))',
         body_text)
     if m:
-        abstract = m.group(1).strip()
+        abstract = (m.group(1) or '').strip()
         # 清理版权噪声和图片
         abstract = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', abstract).strip()
         abstract = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', abstract).strip()
@@ -3705,11 +3743,23 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
             if _page_dt5 and _page_dt5.get('start'):
                 _d5 = _page_dt5['start']
                 _page_date_str5 = f'{_d5.year}年{_d5.month}月{_d5.day}日 '
+            # 段内须含独立时间或日期，才算真实场次边界：
+            # 排除仅凭页眉日期前缀被凑成「00:00 伪场」的段落（如 CTLD 1341 正文对
+            # 「第23期」的前言散文引用，自身无时间/日期，却因页眉日期被误判为一场；
+            # genuine 系列页（如 4391）每场段落各自带「16:00/09:00」等时间，不受影响）。
+            # 时间/日期格式兼容中文与常见 ISO 写法，避免误伤正规系列页。
+            _HAS_TIME = re.compile(
+                r'\d{1,2}\s*[:：点]\s*\d{1,2}|\d{1,2}\s*时')
+            _HAS_DATE = re.compile(
+                r'20\d{2}\s*年|20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|'
+                r'\d{1,2}\s*月\s*\d{1,2}\s*日|\d{1,2}[-/.]\d{1,2}')
             cand5 = []
             for i, mk in enumerate(j_markers):
                 seg = text[mk.end():
                            j_markers[i + 1].start() if i + 1 < len(j_markers)
                            else len(text)]
+                if not (_HAS_TIME.search(seg) or _HAS_DATE.search(seg)):
+                    continue
                 # 从分段中提取题目（冒号或换行后的第一个有效文字块）
                 tm5 = re.search(r'[:：]\s*([^\n：:]{3,40})', seg)
                 if not tm5:
@@ -3758,6 +3808,11 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
         seen[key] = s
         deduped.append(s)
     sessions = deduped
+    # 噪声伪场次过滤：候选1-4 可能把单讲座通知页的页脚「来源」、章节标题「一、工作坊安排」、
+    # 通知前言等当成独立场次。这些伪场次没有真实讲座主题，剔除后再判断是否需要拆分，
+    # 可避免 CTLD 等单讲座通知被误拆成多场（如 539/704/892/952/1341/4391/592/841）。
+    # 注意：仅按 topic 文本判断，不触碰候选5 以「第N讲」为标记的真实多期系列。
+    sessions = [s for s in sessions if not _is_noise_session_topic(s.get('topic'))]
     if len(sessions) < 2:
         return []
     # MS3-2：所有有效块主题完全相同 → 同讲座多时段，不拆（取首场即可）
