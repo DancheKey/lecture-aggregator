@@ -140,6 +140,9 @@ const app = createApp({
         };
         const sa = seriesNo(a.title), sb = seriesNo(b.title);
         if (sa && sb && sa !== sb) return sb - sa;
+        // 同页拆分的多期讲座（有lectureIndex）按期数倒序，让第5期在第4期之上
+        const ia = a.lectureIndex || 0, ib = b.lectureIndex || 0;
+        if (ia && ib && ia !== ib) return ib - ia;
         // 否则按完整时间倒序
         return tb.localeCompare(ta);
       });

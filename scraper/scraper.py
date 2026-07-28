@@ -18,6 +18,14 @@ TIMEOUT = 15
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _atomic_write_json(path, obj, indent=2):
+    """原子写 JSON：先写 .tmp 再 os.replace，避免中途崩溃/被杀留下截断 JSON。"""
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(obj, f, ensure_ascii=False, indent=indent)
+    os.replace(tmp, path)
+
+
 def _decode_html(raw):
     """鲁棒解码 HTML：优先 <meta charset> 声明，其次 UTF-8 严格，再次 GB18030 兜底。
 
@@ -665,8 +673,9 @@ def main():
             raw = json.load(open(data_path, encoding='utf-8'))
             # 兼容新版包裹格式 {updatedAt, data} 与旧版纯数组
             existing = raw.get('data', []) if isinstance(raw, dict) else raw
-        except Exception:
-            existing = []
+        except Exception as e:
+            print(f'[ABORT] 读取 data/lectures.json 失败：{e}。为避免覆盖丢失数据，已中止。', file=sys.stderr)
+            return
     # 已抓 URL 集合：(sourceUrl, lectureIndex) 元组。
     # 多讲座记录（isMultiLecture=True 且有 lectureIndex）只加入 (url, li) 而不加 (url, None)；
     # 非多讲座记录加入 (url, None)。增量模式下只检查 (url, None) 是否在集合中，
@@ -773,13 +782,12 @@ def main():
         return
     data_dir = os.path.join(ROOT, 'data')
     os.makedirs(data_dir, exist_ok=True)
-    with open(os.path.join(data_dir, 'lectures.json'), 'w', encoding='utf-8') as f:
-        json.dump({'updatedAt': now_iso, 'data': out}, f, ensure_ascii=False, indent=2)
+    _atomic_write_json(os.path.join(data_dir, 'lectures.json'),
+                       {'updatedAt': now_iso, 'data': out})
     # 局部修复模式不更新 last_scrape.json，避免影响下一次全量/定时增量调度
     if not args.source:
-        with open(last_scrape_path, 'w', encoding='utf-8') as f:
-            json.dump({'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'},
-                      f, ensure_ascii=False, indent=2)
+        _atomic_write_json(last_scrape_path,
+                           {'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'})
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
           f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
 

@@ -19,6 +19,14 @@
     .date-sticky { top: 57px; }
     .fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
     .fade-enter-from, .fade-leave-to { opacity: 0; }
+    /* 搜索框：隐藏浏览器原生的 ×，改用自定义清除按钮，文字与按钮之间留出空间 */
+    input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+    input[type="search"]::-ms-clear { display: none; width: 0; height: 0; }
+    @media (min-width: 640px) {
+      .search-pad { padding-left: .625rem !important; padding-right: 2.25rem !important; }
+      .search-clear { position: absolute; right: .5rem; top: 50%; transform: translateY(-50%); width: 1.25rem; height: 1.25rem; display: flex; align-items: center; justify-content: center; border-radius: 9999px; color: #64748b; font-size: .875rem; line-height: 1; cursor: pointer; }
+      .search-clear:hover { color: #1e293b; background-color: #e2e8f0; }
+    }
     /* 讲座卡片：边框 + 悬停抬升，参考 RSS 阅读器信息流视觉 */
     .lecture-card {
       transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
@@ -124,8 +132,13 @@
               </div>
               <!-- 右侧筛选控件：固定不换行，避免输入时跳行 -->
               <div class="flex items-center gap-2 flex-nowrap shrink-0 overflow-hidden">
-                <input v-model="query" type="search" :placeholder="searchPlaceholder"
-                  class="w-8 sm:w-44 min-w-0 px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 shrink-0" />
+                <div class="relative shrink-0">
+                  <input v-model="query" type="search" :placeholder="searchPlaceholder"
+                    class="w-8 sm:w-44 min-w-0 px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 shrink-0 search-pad" />
+                  <button v-if="query" type="button" @click="query = ''"
+                    class="hidden sm:flex search-clear"
+                    aria-label="清空搜索" title="清空搜索">×</button>
+                </div>
                 <!-- 搜索维度：与搜索框做 AND 组合（全部/单位/地点/题目） -->
                 <select v-model="searchField" class="w-10 sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-0.5 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
                   <option value="">全部</option>
@@ -160,7 +173,7 @@
                 </div>
                 <!-- 标题 -->
                 <h2 class="text-[15pt] font-semibold leading-snug mb-2">
-                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}<span v-if="l.isMultiLecture && l.lectureIndex && !titleHasSession(l.title, l.lectureIndex)" class="font-normal">（第{{ l.lectureIndex }}期）</span></a>
+                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}<span v-if="l.isMultiLecture && l.lectureIndex && !titleHasSession(l.topic, l.lectureIndex)" class="font-normal">（第{{ l.lectureIndex }}期）</span></a>
                 </h2>
                 <!-- 结构化详情：题目/地点/主讲/简介/内容摘要 -->
                 <div v-if="l.topic || l.location || l.speaker || l.speakerBio || abstractOf(l)"

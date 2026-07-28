@@ -11,6 +11,7 @@
 运行：python server.py  （默认端口 8000，可用 PORT 环境变量覆盖）
 """
 import os
+import re
 import sys
 import json
 import time
@@ -57,20 +58,54 @@ def _load_stat_files():
         _lecture_stats = {}
 
 
+def _atomic_write_json(path, obj):
+    """原子写 JSON：先写 .tmp 再 os.replace，避免中途崩溃留下半份文件。"""
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(obj, f, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
 def _save_visits():
     try:
-        with open(VISITS_PATH, 'w', encoding='utf-8') as f:
-            json.dump(_site_visits, f, ensure_ascii=False)
+        _atomic_write_json(VISITS_PATH, _site_visits)
     except Exception:
         pass
 
 
 def _save_lecture_stats():
     try:
-        with open(LECTURE_STATS_PATH, 'w', encoding='utf-8') as f:
-            json.dump(_lecture_stats, f, ensure_ascii=False)
+        _atomic_write_json(LECTURE_STATS_PATH, _lecture_stats)
     except Exception:
         pass
+
+
+# 讲座 sourceUrl 白名单（按 lectures.json mtime 缓存）：写统计接口仅接受已知讲座，
+# 防止任意 url 撑大 _lecture_stats / 伪造访问与点赞。
+_lecture_urls_cache = {'mtime': 0.0, 'urls': frozenset()}
+
+
+def _known_lecture_urls():
+    path = os.path.join(DATA_DIR, 'lectures.json')
+    try:
+        mt = os.path.getmtime(path)
+    except OSError:
+        return _lecture_urls_cache['urls']
+    if mt != _lecture_urls_cache['mtime']:
+        urls = set()
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+            rows = raw.get('data', []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
+            for r in rows:
+                u = r.get('sourceUrl')
+                if u:
+                    urls.add(str(u).rstrip('/'))
+        except Exception:
+            pass
+        _lecture_urls_cache['mtime'] = mt
+        _lecture_urls_cache['urls'] = frozenset(urls)
+    return _lecture_urls_cache['urls']
 
 
 _load_stat_files()
@@ -146,8 +181,10 @@ class Handler(SimpleHTTPRequestHandler):
             return yaml.safe_load(f) or {'sources': []}
 
     def _save_sources(self, data):
-        with open(SOURCES_PATH, 'w', encoding='utf-8') as f:
+        tmp = SOURCES_PATH + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
             yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        os.replace(tmp, SOURCES_PATH)
 
     def _api_sources_get(self):
         data = self._load_sources()
@@ -214,11 +251,20 @@ class Handler(SimpleHTTPRequestHandler):
         return None
 
     def _client_ip(self):
-        """尽量还原真实客户端 IP（兼容反向代理透传）。"""
-        xff = self.headers.get('X-Forwarded-For')
-        if xff:
-            return xff.split(',')[0].strip()
+        """客户端 IP。本机直连无反代，直接用连接地址；不信任可由客户端伪造的 X-Forwarded-For。"""
         return self.client_address[0]
+
+    def _is_local_origin(self):
+        """写接口 CSRF 防护：Origin/Referer 缺失放行（curl/本机脚本）；
+        存在时必须指向 127.0.0.1/localhost，拒绝跨站表单/fetch 触发本机写接口。"""
+        for h in ('Origin', 'Referer'):
+            v = (self.headers.get(h) or '').strip()
+            if not v:
+                continue
+            if re.match(r'^https?://(127\.0\.0\.1|localhost)(:\d+)?(/|$)', v, re.I):
+                return True
+            return False
+        return True
 
     # ---- 访问量 / 点赞统计 ----
 
@@ -262,6 +308,8 @@ class Handler(SimpleHTTPRequestHandler):
         url = (body.get('url') or '').strip()
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
+        if url.rstrip('/') not in _known_lecture_urls():
+            return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
         ip = self._client_ip()
         now = time.time()
         with _stat_lock:
@@ -281,6 +329,8 @@ class Handler(SimpleHTTPRequestHandler):
         url = (body.get('url') or '').strip()
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
+        if url.rstrip('/') not in _known_lecture_urls():
+            return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
         with _stat_lock:
             st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
             st['likes'] = st.get('likes', 0) + 1
@@ -293,6 +343,8 @@ class Handler(SimpleHTTPRequestHandler):
         url = (body.get('url') or '').strip()
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
+        if url.rstrip('/') not in _known_lecture_urls():
+            return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
         with _stat_lock:
             st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
             st['likes'] = max(0, st.get('likes', 0) - 1)
@@ -335,9 +387,15 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path.split('?')[0] == '/api/sources':
             return self._api_sources_get()
+        # 屏蔽切片原子写留下的 *.tmp（写入窗口内可被读到半份 JSON）
+        if self.path.split('?')[0].endswith('.tmp'):
+            self.send_error(404, '临时文件不可访问')
+            return
         super().do_GET()
 
     def do_POST(self):
+        if not self._is_local_origin():
+            return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         base = self.path.split('?')[0]
         if base == '/api/scrape':
             if not _scrape_lock.acquire(blocking=False):
@@ -368,7 +426,8 @@ class Handler(SimpleHTTPRequestHandler):
                 mtime = os.path.getmtime(path) if os.path.exists(path) else 0
                 if os.path.exists(path):
                     with open(path, 'r', encoding='utf-8') as f:
-                        count = len(json.load(f))
+                        raw = json.load(f)
+                    count = len(raw.get('data', [])) if isinstance(raw, dict) else len(raw)
                 self._send_json({'ok': True, 'count': count, 'mtime': mtime, 'message': '抓取完成'})
             except subprocess.TimeoutExpired:
                 self._send_json({'ok': False, 'message': '抓取超时（>10 分钟）'}, 500)
@@ -388,6 +447,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_PUT(self):
+        if not self._is_local_origin():
+            return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         base = self.path.split('?')[0]
         m = self._match_sources_index(base)
         if isinstance(m, int) and m >= 0:
@@ -395,6 +456,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_DELETE(self):
+        if not self._is_local_origin():
+            return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         base = self.path.split('?')[0]
         m = self._match_sources_index(base)
         if isinstance(m, int) and m >= 0:

@@ -13,7 +13,12 @@ server.log
 data/*.backup.json
 data/*.bak
 data/*.bak.*
+data/*.bak*
 *.bak.json
+data/.backups/
+data/powershell.txt
+# 一次性修复脚本（fix_5708.py 等），不入库
+fix_*.py
 
 # ===== 本地调试/开发工具（仅本地使用，不推送公网） =====
 # tools/ 下均为一次性诊断/回填/OCR 基准脚本，网站运行（爬虫+前端切片）不依赖它们；

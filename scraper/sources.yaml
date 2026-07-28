@@ -314,7 +314,8 @@ sources:
   campus: 校级
   base: http://ctld.scnu.edu.cn
   list_urls:
-  - http://ctld.scnu.edu.cn/jiaoxuezixun/jiaoshifazhanluntan/
+  - url: http://ctld.scnu.edu.cn/jinqihuodong/
+    collect_mode: all_items
 - name: 人文社会科学高等研究院
   campus: 校级
   base: http://iashss.scnu.edu.cn
