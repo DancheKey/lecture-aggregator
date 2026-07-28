@@ -964,6 +964,8 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
         if vlm_session and not result.get('sessionNumber'):
             result['sessionNumber'] = vlm_session
 
+    _vlm_speaker = (f.get('speaker') or '').strip()
+    _vlm_speaker_valid = bool(_vlm_speaker and _looks_like_real_name(_vlm_speaker))
     _MAP = [
         ('title', 'title'), ('topic', 'topic'),
         ('speaker', 'speaker'), ('speakerTitle', 'speakerTitle'),
@@ -975,6 +977,10 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
         v = (f.get(src) or '').strip()
         if dst in ('title', 'topic'):
             v = _clean_title(v)
+        # VLM 未识别到主讲人时，其 speakerTitle/speakerAffiliation/speakerBio 常为
+        # 「教授」等幻觉碎片（如 psy 2941），不可信，跳过。
+        if dst in ('speakerTitle', 'speakerAffiliation', 'speakerBio') and not _vlm_speaker_valid:
+            continue
         if v and not result.get(dst):
             result[dst] = v
     # 主讲人清洗守卫（与 OCR 路径一致）：仅保留像人名的字符
@@ -1343,15 +1349,45 @@ def _extract_narrative(body_text, title):
         if cm:
             result['topic'] = cm.group(1).strip()
 
-    # 摘要：取正文第一句之后的 1-3 句，过滤图片说明
-    sentences = [p.strip() for p in re.split(r'[。\n]+', body_text) if len(p.strip()) > 20]
+    # 摘要：取正文第一句之后的 1-3 句，过滤图片说明。
+    # 英文摘要常以英文句号结尾，仅按中文句号分割会导致英文摘要与后续主讲人介绍粘连成一句，
+    # 进而在 start_idx 守卫里被误跳过后把 bio 当摘要。这里同时按「英文句号+空格」分割，
+    # 并避开常见缩写（Dr./Prof./Mr./Ms./Mrs./PhD/Ph.D/etc./vs./i.e./e.g./vol./No.）。
+    _ABBREV_SPLIT_RE = re.compile(
+        r'[。\n]+|'
+        r'(?<!\b(?:Dr|Mr|Ms|No|vs))(?<!\b(?:Mrs|PhD|etc|vol|i\.e|e\.g))'
+        r'(?<!\bProf)(?<!\bPh\.D)\.\s+'
+    )
+    sentences = [p.strip() for p in _ABBREV_SPLIT_RE.split(body_text) if len(p.strip()) > 20]
     if sentences:
         start_idx = 0
-        # 首句若只含时间/地点/主讲元信息，则跳过
-        if (re.search(r'(?:月|日|晚|召开|举行|举办|主讲|由)', sentences[0]) and
-                len(sentences) > 1):
-            start_idx = 1
+        # 跳过以字段标签或 CMS 元信息开头的句子，避免把页面顶部的
+        # "题目:... 主讲人:... 时间:..."骨架当成摘要（如心理学院 2950）。
+        _META_PREFIX_RE = re.compile(
+            r'^(?:题目|主题|主讲人|报告人|时间|地点|摘要|简介|'
+            r'主讲人介绍|报告人简介|主讲人简介|主讲人简历|主讲介绍|'
+            r'单位|邀请人|来源|编辑|审核|发布|点击|收藏本文|'
+            r'当前位置|首页|新闻资讯|通知公告|来源：|'
+            r'\d{4}[-/年]\d{1,2}[-/日]|\d{4}年\s*\d{1,2}月\s*\d{1,2}日)'
+        )
+        while (start_idx < len(sentences)
+               and _META_PREFIX_RE.search(sentences[start_idx])):
+            start_idx += 1
+        # 首句若只含时间/地点/主讲元信息，则跳过；但若首句明显是英文学术摘要
+        # （含 ≥10 个英文单词），说明已有真实讲座内容，不应跳过。
+        if start_idx < len(sentences):
+            _first = sentences[start_idx]
+            _en_word_count = len(re.findall(r'[A-Za-z]+', _first))
+            _is_english_abstract = _en_word_count >= 10
+            if (re.search(r'(?:月|日|晚|召开|举行|举办|主讲|由)', _first) and
+                    start_idx + 1 < len(sentences) and not _is_english_abstract):
+                start_idx += 1
         abstract = '。'.join(sentences[start_idx:start_idx + 3]) + '。'
+        # 截断到无序列表符号或主讲人简介/专家简介等 bio 标记，避免把后续履历当摘要。
+        # 同时截断 "姓名 : *" 式列表开头（seri 页面报告内容后紧接主讲人履历）。
+        abstract = re.split(r'\s+[*＊•·]\s+', abstract)[0].strip()
+        abstract = re.split(r'(?:主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|专家简介|简历|Bio)', abstract)[0].strip()
+        abstract = re.split(r'\s+[A-Z][a-z]+(?:\s+[A-Z][a-z\.]+){1,2}\s*[:：](?=\s*$|\s+[*＊•·\-\d])', abstract)[0].strip()
         abstract = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', abstract).strip()
         abstract = re.sub(r'图\s*\d+\s*[：:].*?(?=(?:图\s*\d+|$))', '', abstract).strip()
         abstract = re.sub(r'\s*图\s*\d+\s*.*$', '', abstract).strip()
@@ -2208,7 +2244,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     )
     # STOP 终止符：字段标签、伴随噪声词（点击/浏览/评论/供稿，常出现在发布时间行尾）、
     # 以及方括号（【/ [ 多为栏目/来源标记）；'$' 兼容文末。
-    STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|$))'
+    # STOP 终止符：字段标签、伴随噪声词、方括号栏目标记、无序列表符号「*」
+    # （seri 页面用 "*" 开启主讲人简介列表）、以及 bio/介绍类关键词。
+    STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|[*＊•·]|主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))'
     # LOC-STOP：PDF/海报内文本常含换行，地点值独占一行（如「课程地点：…\n面向对象：…」）。
     # 通用 STOP 的 `$` 在「值行末到文末之间存在换行」时无法命中，且 `.` 不跨换行，
     # 导致 (.+?) 永远到不了下一行的终止标签。故 location 专用终止符在 STOP 基础上
@@ -2222,6 +2260,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         tp = m.group(1).strip()
         # 清除尾部粘连的「摘要」「主讲人」「预告」「特邀专家」等非正文词（换行后字段值泄漏）
         tp = re.sub(r'\s*(?:摘要|主讲人?|报告人|预告|讲座特邀专家|特邀专家|特邀嘉宾|讲座嘉宾)\s*[:：]?.*$', '', tp).strip()
+        # 截断到 "姓名 :" 式列表/履历开头，避免 topic 吸进主讲人履历（seri 页面）。
+        # 要求姓名后紧跟冒号（且冒号后为结尾或列表符号），避免误伤正常主题里的英文人名。
+        tp = re.split(r'\s+[A-Z][a-z]+(?:\s+[A-Z][a-z\.]+){1,2}\s*[:：](?=\s*$|\s+[*＊•·\-\d])', tp)[0].strip()
         result['topic'] = tp
 
     # 标题格式兜底：「2026年7月2日学术讲座：主题」或「学术讲座：主题」
@@ -2236,7 +2277,19 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
 
     # --- 地点（兼容「地点/课程地点/讲座地点/工作坊地点」+ 英文 Venue/Location）---
     # 值捕获用 [^\n]+?（不跨换行）+ LOC_STOP：单行场景靠字段标签截断，PDF/多行场景靠行尾截断。
-    m = re.search(rf'(?:课程地点|讲座地点|教学工作坊地点|地点|Venue|Location)[：:]\s*([^\n]+?){LOC_STOP}', text)
+    _loc_pat = rf'(?:课程地点|讲座地点|教学工作坊地点|地点|Venue|Location)[：:]\s*([^\n]+?){LOC_STOP}'
+    m = re.search(_loc_pat, text)
+    # 跳过空值或被下一个字段标签填充的伪匹配（如 seri 页面"地点: 时间:"）
+    _search_loc = text
+    while m:
+        loc_val = m.group(1).strip()
+        if loc_val and not re.match(
+                r'^(?:时间|报告人|主讲人|主讲|摘要|简介|内容简介|讲座简介|报告简介|'
+                r'主题|题目|单位|邀请人)[：:]',
+                loc_val):
+            break
+        _search_loc = _search_loc[m.end():]
+        m = re.search(_loc_pat, _search_loc)
     # LOC-Fallback: 若主正则未命中或值为空，用宽松终止符重试（覆盖 PDF 内嵌等边界）。
     if not m or not m.group(1).strip():
         m2 = re.search(
@@ -2308,6 +2361,18 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         rf'|Speaker|Presenter|Lecturer)\s*[：:]\s*(.+?){STOP}'
     )
     m = re.search(speaker_pat, text)
+    # 跳过空值或被下一个字段标签填充的伪匹配；部分页面顶部有"报告人: 地点: 时间:"
+    # 等空字段骨架，真实值在后续重复标签中（如 seri 11.html）。
+    _search_text = text
+    while m:
+        sp = m.group(1).strip()
+        if sp and not re.match(
+                r'^(?:地点|时间|主题|题目|摘要|简介|内容简介|讲座简介|报告简介|'
+                r'报告人|主讲人|主讲|主持人|单位|邀请人)[：:]',
+                sp):
+            break
+        _search_text = _search_text[m.end():]
+        m = re.search(speaker_pat, _search_text)
     if m:
         speaker_label_found = True
         sp = m.group(1).strip()
@@ -2723,9 +2788,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                     break
 
     # --- 摘要/内容（优先从正文区域提取完整版）---
-    # 把「讲座内容提要/讲座内容/报告摘要」等内容摘要类字段统一作为 abstract
-    abs_pat = rf'(?:{SUMMARY_LABELS})[：:]\s*'
-    m = re.search(rf'{abs_pat}(.+)', body_text)
+    # 把「讲座内容提要/讲座内容/报告摘要」等内容摘要类字段统一作为 abstract。
+    # 兼容「摘要」后无冒号（部分院系页面如心理学院 2026-05 讲座仅用空格分隔）。
+    abs_pat = rf'(?:{SUMMARY_LABELS})[：:]\s*|摘要\s*'
+    # abstract 值应在下一个字段标签/噪声标记前停止，避免把后续主讲人介绍、时间地点等元信息吞入。
+    m = re.search(
+        rf'{abs_pat}'
+        r'(.+?)'
+        rf'(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|'
+        r'主讲人|报告人|主讲|主持人|时间|地点|题目|主题|单位|邀请人|'
+        r'主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))',
+        body_text)
     if m:
         abstract = m.group(1).strip()
         # 清理版权噪声和图片
@@ -2819,10 +2892,22 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         if not result['speaker'] and not speaker_label_found and narrative.get('speaker'):
             result['speaker'] = narrative['speaker']
         if not result.get('abstract') and narrative.get('abstract'):
-            # OCR 场景下，叙事兜底容易把主讲人简介当成讲座摘要；
-            # 若已有 OCR 文本且未提取到明确摘要标签，宁可让 abstract 留空。
-            if not (ocr_text and len(ocr_text) > 50):
-                result['abstract'] = narrative['abstract']
+            _narr_abs = narrative['abstract']
+            _bio = result.get('speakerBio') or ''
+            # 若叙事兜底拿到的「摘要」明显是主讲人简介（与已有 speakerBio 重合，或以
+            # 履历特征词开头），则不应污染 abstract；仅在 speakerBio 为空时迁移过去。
+            _BIO_SIG_START = ('现任', '曾任', '毕业于', '获', '主要从事', '研究方向',
+                              '个人简介', '专家简介', '学者简介')
+            _is_bio = (_bio and (_narr_abs in _bio or _bio in _narr_abs
+                                 or any(_narr_abs.startswith(s) for s in _BIO_SIG_START)))
+            if _is_bio:
+                if not _bio:
+                    result['speakerBio'] = _narr_abs
+            else:
+                # OCR 场景下，叙事兜底容易把主讲人简介当成讲座摘要；
+                # 若已有 OCR 文本且未提取到明确摘要标签，宁可让 abstract 留空。
+                if not (ocr_text and len(ocr_text) > 50):
+                    result['abstract'] = _narr_abs
 
     # --- 通用后处理（narrative fallback 之后统一执行）---
 
@@ -3003,6 +3088,28 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         else:
             result['speaker'] = ''
             result['speakerAffiliation'] = ''
+
+    # F3-EN 标题英文主讲人兜底：纯海报英文讲座页（如 psy 2940/2941）正文无
+    # 结构化标签，但页面标题含 "Professor Bryan Strange 学术讲座"。从标题抽取英文姓名，
+    # 避免把 "Professor" 误当职称，也不依赖对海报图 OCR/VLM。
+    if not result.get('speaker'):
+        for _title_src in (title, list_title or ''):
+            if not _title_src:
+                continue
+            _en_name, _en_aff = _split_english_speaker(_title_src)
+            if _en_name:
+                result['speaker'] = _en_name
+                result['speakerSource'] = 'title'
+                if _en_aff:
+                    result['speakerAffiliation'] = _en_aff
+                # 识别姓名前荣誉头衔（Professor/Associate Professor/Dr. 等）
+                _prefix_m = re.search(
+                    r'^(Associate\s+Professor|Full\s+Professor|Professor|'
+                    r'Ph\.D\.?|PhD|Dr\.?|Doctor)\s+',
+                    _title_src, re.I)
+                if _prefix_m:
+                    result['speakerTitle'] = _prefix_m.group(1).strip()
+                break
 
     # ---- 多讲座公告拆分（MS1–MS5）----
     # 用 body_text（已合并OCR的正文文本）而非完整 text，避免把页眉/导航/页脚里的
@@ -3310,14 +3417,28 @@ def _split_english_speaker(sp):
 
     中文抽取路径的正则只匹配 CJK 姓名（[\\u4e00-\\u9fa5]）：英文姓名（如
     "Yan Zhang, University of Oslo"）会整体落空、最终被 _looks_like_real_name 守卫清空
-    （cs 5294 即此坑）。这里在中文路径之前单独处理：仅当值以「首字母大写英文名 + 空格 +
-    首字母大写英文名」开头才生效（2–4 个大写词），避免误伤中文名或单位串。
+    （cs 5294 即此坑）。这里在中文路径之前单独处理：允许值以中文头衔/单位前缀开头，
+    搜索其中「首字母大写英文名 + 空格 + 首字母大写英文名」片段（2–4 个大写词），且
+    姓名后须为职称/边界，避免误抓正文英文短语。
     返回 (name, affiliation)；未命中返回 ('', '')。
     """
     if not sp:
         return '', ''
     s = sp.strip()
-    m = re.match(r'^([A-Z][a-z]+(?:\s+[A-Z][a-z\.]+){1,3})', s)
+    # 先剥离前导英文荣誉头衔，避免把 "Professor Bryan Strange" 整体当姓名。
+    s = re.sub(r'^(Associate\s+Professor|Full\s+Professor|Professor|'
+               r'Ph\.D\.?|PhD|Dr\.?|Doctor)\s+', '', s, flags=re.I)
+    # 兼容 "ES&T副主编、加州大学河滨分校Daniel Schlenck教授" 等中文前缀+英文姓名
+    m = re.search(
+        r'(?<![A-Za-z])'
+        r'([A-Z][a-z]+(?:\s+[A-Z][a-z\.]+){1,3})'
+        r'(?=\s*(?:的|之)?'
+        r'(?:学术讲座|讲座|报告|学术报告|演讲|专场|工作坊|沙龙|讲坛|论坛|会议|'
+        r'研讨会|分享会|座谈会|讨论会|大讲堂|开讲|讲座预告|通知|启事|预告|'
+        r'教授|副教授|助理教授|研究员|博士|院士|老师|导师|先生|女士|'
+        r'Professor|Associate\s+Professor|Full\s+Professor|Dr\.?|Ph\.?D\.?|'
+        r'，|,|。|;|；|\s|$))',
+        s)
     if not m:
         return '', ''
     name = m.group(1).strip()
@@ -3341,15 +3462,19 @@ def _split_english_speaker(sp):
         # 截掉中部的说明性括号（如「教授（相当于北美首席教授…）」注释，非单位信息）
         aff = re.split(r'[（(]', aff)[0].strip()
         aff = aff.strip(' ,，（）()')
-        # 去掉尾部职称词（归入 speakerTitle，与中文路径一致），如「…信息技术学院教授」→「…信息技术学院」
+        # 去掉尾部职称词（归入 speakerTitle，与中文路径一致），如「…信息技术学院教授」→「…信息技术学院」。
+        # 允许职称后跟句号/逗号等标点（seri 11 "Daniel Schlenck教授。"）。
         aff = re.sub(r'(?:特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|'
                      r'助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|'
-                     r'先生|女士)\s*$', '', aff).strip()
+                     r'先生|女士)\s*[。，.,]?$', '', aff).strip()
+        # 去职称后只剩标点/空白 → 清空
+        if re.fullmatch(r'[。，.,\s]+', aff):
+            aff = ''
         # 整段像职称（Professor/Dr./院士）而非单位，或起始即讲座关键词（无单位信息）→ 放弃
     if (re.match(r'(?:报告|讲座|题目|学术|时间|地点|主讲)', aff)
             or re.fullmatch(r'(?:Professor|Dr\.?|Mr\.?|Ms\.?|Mrs\.?|Associate\s+Professor|'
                             r'Full\s+Professor|Distinguished[\s\w]*|Chair|院士|教授|副教授|'
-                            r'研究员|副研究员|讲师|博士)', aff, re.I)):
+                            r'研究员|副研究员|讲师|博士|[。，.,\s]+)', aff, re.I)):
         aff = ''
     return name, aff
 
