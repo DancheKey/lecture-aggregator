@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-30 00:05:15",
+  "updatedAt": "2026-07-30T07:15:28+08:00",
   "data": [
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20260725/6792.html",
@@ -75797,6 +75797,29 @@
       "sourceCount": 0,
       "notes": [],
       "splitMode": "table-session"
+    },
+    {
+      "sourceUrl": "http://maths.scnu.edu.cn/a/20260729/8800.html",
+      "images": [],
+      "college": "数学科学学院",
+      "campus": "石牌",
+      "title": "勷勤数学•专家报告-李迅",
+      "topic": "Dynamic mean--variance portfolio selection with no-shorting constraints and unknown investment opportunity sets",
+      "lectureStart": "2026-07-29 16:00:00",
+      "lectureEnd": "2026-07-29 17:00:00",
+      "location": "数科院东楼401",
+      "speaker": "李迅",
+      "speakerTitle": "",
+      "speakerAffiliation": "",
+      "inviter": "骆其伦) 香港理工大学",
+      "speakerBio": "Xun Li received BSc from Department of Mathematics at Shanghai University of Science and Technology in 1992, and obtained MSc in Department of Mathematics at Shanghai University in",
+      "organizer": "数学科学学院",
+      "publishTime": null,
+      "publishTimeSource": "url_proxy",
+      "timeConfidence": "high",
+      "timeNote": "same-day-normal",
+      "abstract": "This work is the first to treat constrained continuous-time MV portfolio selection in the realm of reinforcement learning. We study continuous-time mean--variance portfolio selection with no-shorting constraints and unknown investment opportunity sets from a reinforcement learning (RL) perspective. The problem is a constrained stochastic linear--quadratic control problem for which the entropy-regularized exploratory formulation of Wang et al. (2020) leads to difficulty in theoretical analysis, because enforcing the constraint on the support of randomized policies nullifies the tractable Gaussian exploration. To tackle this challenge, we introduce an auxiliary exploratory problem without entropy in which exploratory policies are still Gaussian whose samples may violate the no-shorting requirement but their means satisfy it. We then prove that, for a suitable choice of exploration variance, the mean of the optimal Gaussian policy of the auxiliary problem coincides with the optimal policy of the original problem. Motivated by this theoretical result, we develop a model-free RL algorithm that learns the optimal policy of the auxiliary (and hence the original) problem directly from trajectory data without estimating the investment opportunity set. A numerical example demonstrates the performance of the proposed algorithm. (Joint with Yutian Wang and Xun Yu Zhou.) 欢迎老师、同学们参加、交流！",
+      "listTitle": "勷勤数学•专家报告-李迅"
     }
   ]
 }
