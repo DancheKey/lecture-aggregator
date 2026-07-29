@@ -228,6 +228,30 @@ def _looks_like_real_name(s):
     return False
 
 
+# 粘连切分（无空格两姓名合并成一段，如「陈家文刘磊明」）时，对每段姓名做更严格的
+#  plausibility 校验：2–3 字走常规 _looks_like_real_name；4 字仅接受「复姓+2字」
+# （欧阳/司马/…）或含 ·/字母的少数民族/音译名。否则像「文刘磊明」这类 4 字粘连误读
+# 会被 _looks_like_real_name 误放（首字「文」属百家姓、无禁用子串），导致在 cut=2 处
+# 错切成「陈家 / 文刘磊明」。
+_COMPOUND_SURNAMES = (
+    '欧阳', '司马', '上官', '诸葛', '东方', '独孤', '南宫', '令狐', '皇甫',
+    '慕容', '司徒', '轩辕', '宇文', '长孙', '拓拔', '鲜于', '尉迟', '公羊',
+    '赫连', '万俟', '澹台', '夏侯', '闻人', '端木', '巫马', '钟离', '梁丘',
+)
+def _is_plausible_han_name(s):
+    if not s:
+        return False
+    if 2 <= len(s) <= 3:
+        return _looks_like_real_name(s)
+    if len(s) == 4:
+        if s[:2] in _COMPOUND_SURNAMES:
+            return _looks_like_real_name(s)
+        if re.search(r'[·A-Za-z]', s):
+            return True
+        return False
+    return False
+
+
 # F3 补充：主讲人职称词（用于「姓名 紧邻职称」式无标签主讲人识别，如海报「曾碧卿 /教授」）。
 # 不含「院长/主任/主席」等职务词——这些常出现在 bio 正文里、前面并非主讲人姓名，
 # 纳入会导致把简介里被介绍的人误当主讲人。
@@ -440,6 +464,17 @@ def _clean_location(loc, title=None):
     m5 = _loc_en_leak.search(loc)
     if m5 and m5.start() > 3:
         loc = loc[:m5.start()].strip()
+    # location 后吸入内容类标签（报告摘要/报告内容/讲座内容/摘要/参与方式…）：
+    # BS4 把换行变空格后「地点：X会议室 报告摘要The talk…」「地点：X 参与方式：…」
+    # 被粘进地点值。这些词绝不会出现在真实地点里，匹配即截断。
+    _loc_content_leak = re.compile(
+        r'(?:报告摘要|报告内容|讲座内容|主要内容|学术报告简介|报告简介|'
+        r'内容简介|讲座简介|内容提要|讲座概要|摘要|Abstract|Synopsis|'
+        r'参与方式|报名方式|面向对象|联系方式)'
+    )
+    m6 = _loc_content_leak.search(loc)
+    if m6 and m6.start() > 3:
+        loc = loc[:m6.start()].strip()
     # location 尾部吸入完整讲座标题（lswh 等源：BS4 把换行后标题行粘进地点值）
     # 特征：loc 尾部长子串(>=6字) 与 title 完全匹配（允许全/半角标点差异）
     if title and len(title) >= 6:
@@ -2298,10 +2333,19 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     LOC_STOP = rf'(?={STOP}|\n|$)'
 
     # --- 题目/主题（兼容「题目/主题/讲座主题/报告题目/演讲题目/报告主题」+ 英文 Topic/Title）---
-    topic_pat = rf'(?:讲座题目|题目|主题|讲座主题|报告题目|演讲题目|报告主题|Topic|Title)[：:]\s*(.+?){STOP}'
-    m = re.search(topic_pat, text)
+    # 裸「主题」必须是章节标签位置（前接 、/空格/（/行首），如「一、主题X」「主题：X」），
+    # 否则排除散文/导航里的「主题教育」「为主题内容」「活动主题为」等假阳性。
+    # 分隔符可选：兼容「主题：X」（冒号）与「一、主题X」（无冒号，BS4 单行化后标签与值直接相连）。
+    # 复合标签（讲座主题/沙龙主题/工作坊主题/报告主题）多为「X主题：Y」格式，须紧跟冒号，
+    # 避免「本次讲座主题…」等散文误匹配；「题目」类同理必须冒号。
+    _topic_pat_a = rf'(?:(?:(?<=、)|(?<= )|(?<=（)|^)主题)\s*[：:]?\s*(.+?){STOP}'
+    _topic_pat_b = rf'(?:讲座主题|沙龙主题|工作坊主题|报告主题|讲座题目|题目|报告题目|演讲题目|Topic|Title)[：:]\s*(.+?){STOP}'
+    m = re.search(_topic_pat_a, text) or re.search(_topic_pat_b, text)
     if m:
-        tp = m.group(1).strip()
+        tp = (m.group(1) or m.group(2) or '').strip()
+        # 清除首尾可能粘连的章节序号（「一、主题」式结构里值后可能带「二、」下一节序号）
+        tp = re.sub(r'^\s*[一二三四五六七八九十百零0-9]+[、.．]\s*', '', tp).strip()
+        tp = re.sub(r'\s*[一二三四五六七八九十百零0-9]+[、.．].*$', '', tp).strip()
         # 清除尾部粘连的「摘要」「主讲人」「预告」「特邀专家」等非正文词（换行后字段值泄漏）
         tp = re.sub(r'\s*(?:摘要|主讲人?|报告人|预告|讲座特邀专家|特邀专家|特邀嘉宾|讲座嘉宾)\s*[:：]?.*$', '', tp).strip()
         # 截断到 "姓名 :" 式列表/履历开头，避免 topic 吸进主讲人履历（seri 页面）。
@@ -2452,10 +2496,13 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
            not re.search(r'(特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)', _sp_orig):
             for cut in range(2, 5):
                 a, b = _sp_orig[:cut], _sp_orig[cut:]
-                if (2 <= len(b) <= 4 and _looks_like_real_name(a) and _looks_like_real_name(b)
+                if (2 <= len(b) <= 4 and _is_plausible_han_name(a) and _is_plausible_han_name(b)
                         and _SURNAME_RE.match(a[:1]) and _SURNAME_RE.match(b[:1])):
-                    _names = [a, b]
-                    break
+                    # 取最均衡（两段长度差最小）的切分：避免「陈家文刘磊明」在 cut=2
+                    # 处错切成「陈家 / 文刘磊明」（b=4 字被 _is_plausible_han_name 拒后，
+                    # 自然落到 cut=3 的「陈家文 / 刘磊明」）。
+                    if _names is None or abs(len(a) - len(b)) < abs(len(_names[0]) - len(_names[1])):
+                        _names = [a, b]
         if _names and all(_looks_like_real_name(n) for n in _names):
             result['speaker'] = '、'.join(_names)
             result['speakerSource'] = 'label'
@@ -2830,8 +2877,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         '通知公告|最新公告|站内搜索|快速导航'
     )
 
+    # bio 专属终止符：简介正文在遇到这些结构标记时应截断（避免把「二、报名方式」
+    # 「三、时间地点」「联系方式」「面向对象」等后续章节整段吸进主讲人简介）。
+    # 章节序号「一二三四…、」用于截断「主讲人简介：… 二、报名方式：…」式粘连。
+    BIO_STOP = (
+        r'[一二三四五六七八九十百零0-9]+[、.．]|二、|三、|四、|五、|六、|七、|八、|九、|十、|'
+        r'报名方式|报名截止|联系方式|面向对象|参与方式|注意事项|交通指引|温馨提示|'
+        r'会议时间|会议地点|报名|咨询'
+    )
+
     bio_pat = rf'(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介|Bio)[\s:：]*'
-    m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|$))', body_text)
+    m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|{BIO_STOP}|$))', body_text)
     if m:
         bio = m.group(1).strip()
         # 清理版权声明等尾部噪声
@@ -4013,9 +4069,17 @@ def _extract_bio_map(full_text, speakers=None):
     """
     if not full_text:
         return {}
+    # 每场独立简介结构：全文出现 ≥2 个 bio 标签（如 psy899 蔡清/库逸轩 各带「主讲人简介：」），
+    # 应交还 split_record_by_sessions 按块提取（块内 _bio_m 逐场截取），避免把后一场 bio
+    # 误并入前一场、或只扫描首段导致另一场 bio 缺失。仅当全文恰有 1 个 bio 标签（共享并列简介，
+    # 如 CTLD 4407/4409「主讲人简介：卢晓中，…赵淦森，…」）才走姓名锚定路径。
+    if len(re.findall(r'(?:主讲人简介|报告人简介|讲者简介|个人简介|专家介绍)\s*[：:]', full_text)) >= 2:
+        return {}
     m = re.search(
         r'(?:主讲人简介|报告人简介|讲者简介|个人简介|简介)\s*[：:]\s*\n?'
-        r'([\s\S]*?)(?=(?:\n\s*)?(?:[一二三四五六七八九十百零0-9]+[、.．]|时间|地点|日期|'
+        r'([\s\S]*?)(?=(?:\n\s*)?(?:主讲人简介|报告人简介|讲者简介|个人简介|专家介绍|'
+        r'主讲人[：:]|报告人[：:]|'
+        r'[一二三四五六七八九十百零0-9]+[、.．]|时间|地点|日期|'
         r'联系人|主办|承办|邀请人|参与者|【|$)|\Z)', full_text)
     if not m:
         return {}
@@ -4255,7 +4319,9 @@ def split_record_by_sessions(base, sessions, full_text=''):
             _bio_m = re.search(
                 r'(?:讲者简介|报告人简介|主讲人简介|主讲人介绍|个人简介|专家介绍)[：:]\s*'
                 r'(.+?)(?=\s*(?:题目\d*|报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|'
-                r'报告题目|报告摘要|$))', block, re.S)
+                r'报告题目|报告摘要|主讲人简介|报告人简介|讲者简介|个人简介|专家介绍|'
+                r'主讲人[：:]|报告人[：:]|'
+                r'[一二三四五六七八九十百零0-9]+[、.．]|报名方式|联系方式|面向对象|参与方式|$))', block, re.S)
             if _bio_m:
                 _b = _bio_m.group(1).strip()
                 # 去掉姓名前缀（已在 speaker 提取），保留简介正文
