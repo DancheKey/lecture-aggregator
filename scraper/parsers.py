@@ -1867,8 +1867,86 @@ def _locate_publish_time(soup, content_div, body_text, full_text):
     return None, 0
 
 
+# ===== 补丁4 (P0-5): HTML 讲座日程表格 → 字段文本行 =====
+def _despace_cjk_digits(s):
+    """去除 CJK/数字/冒号/连字符内部被排版插入的空格，如「1 1 月 15 日」→「11月15日」、
+    「穆 肃 教授」→「穆肃教授」、「9 : 0 0」→「9:00」。仅删相邻 CJK/数字/标点间的空格，
+    不破坏英文单词内部（英文字母不在删除字符集内）。"""
+    if not s:
+        return s
+    return re.sub(r'(?<=[\u4e00-\u9fff0-9:：\-—.])\s+(?=[\u4e00-\u9fff0-9:：\-—.])', '', s)
+
+
+def _replace_schedule_tables_with_text(soup):
+    """补丁4 (P0-5): 将 HTML 讲座日程表格**就地替换**为干净的「字段：值」文本节点。
+
+    为什么是替换而非追加：
+    1) 原始表格单元格含排版空格（「1 1 月 15 日」「第 86 期」），其中 workshop 编号
+       「第86期/第87期」会被候选5(nth-session)误当成「第N期」系列讲座，抽出生垃圾
+       topic（如「0- 17」）；替换可彻底消除该噪声。
+    2) 字段按「主题→主讲人→时间→地点」排序，使候选1(repeated-label)在「主题：」到下一个
+       「主题：」的块内能解析到**本场**时间（时间位于主题之后），正确拆出多期。
+
+    仅激活于明确的讲座日程表（表头含≥2个核心字段标签 + ≥2数据行 + 多行主题/主讲人相异），
+    避免误伤导航/页脚/说明类表格。返回是否发生过替换。"""
+    replaced = False
+    for tb in soup.find_all('table'):
+        rows = tb.find_all('tr')
+        if len(rows) < 3:  # 表头 + ≥2 数据行
+            continue
+        header_cells = [c.get_text(' ', strip=True) for c in rows[0].find_all(['th', 'td'])]
+        field_map = {}
+        for idx, h in enumerate(header_cells):
+            hh = _n1_normalize(h)
+            if re.search(r'时间|日期', hh):
+                field_map[idx] = '时间'
+            elif re.search(r'主题|题目|报告题目|讲座题目|讲题|报告内容', hh):
+                field_map[idx] = '主题'
+            elif re.search(r'主讲|报告人|演讲人', hh):
+                field_map[idx] = '主讲人'
+            elif re.search(r'地点|场所|教室|会议室|报告地点', hh):
+                field_map[idx] = '地点'
+        # 至少 2 个讲座核心字段才视为日程表
+        if sum(1 for v in field_map.values() if v in ('时间', '主题', '主讲人', '地点')) < 2:
+            continue
+        data_rows = []
+        for r in rows[1:]:
+            cells = [c.get_text(' ', strip=True) for c in r.find_all(['td', 'th'])]
+            if len(cells) < len(header_cells):
+                continue
+            parts = {}
+            for idx, fname in field_map.items():
+                if fname not in ('时间', '主题', '主讲人', '地点'):
+                    continue
+                val = _despace_cjk_digits(cells[idx] if idx < len(cells) else '')
+                if val:
+                    parts[fname] = f'{fname}：{val}'
+            if parts:
+                data_rows.append(parts)
+        if len(data_rows) < 2:
+            continue
+        # 多行主题或主讲人相异，确认是多场独立讲座而非单事件重复行
+        _topics = {d['主题'] for d in data_rows if '主题' in d}
+        _speakers = {d['主讲人'] for d in data_rows if '主讲人' in d}
+        if len(_topics) < 2 and len(_speakers) < 2:
+            continue
+        # 构造有序文本（主题→主讲人→时间→地点），主题块内含本场时间
+        lines = []
+        for d in data_rows:
+            seq = [d[k] for k in ('主题', '主讲人', '时间', '地点') if k in d]
+            lines.append(' '.join(seq))
+        new_div = soup.new_tag('div')
+        new_div.string = ' ' + ' '.join(lines) + ' '
+        tb.replace_with(new_div)
+        replaced = True
+    return replaced
+
+
 def parse_detail(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
     soup = BeautifulSoup(html, 'html.parser')
+    # 补丁4 (P0-5): 讲座日程表格就地替换为干净「字段：值」文本（消除原始表格噪声、
+    # 修正字段顺序），须在后续 get_text / 字段抽取之前完成。
+    _replace_schedule_tables_with_text(soup)
     # 列表页标题通常就是干净的讲座标题，优先使用；否则回退到详情页 h1/title
     # 注意：部分站点（如 io 国际交流合作处）的 <h1> 是栏目名（"通知公告"）而非文章标题，
     # 真正标题在 <h3> 或 <title> 标签中。需检测并跳过栏目名。
@@ -4370,6 +4448,10 @@ def split_record_by_sessions(base, sessions, full_text=''):
         if not rec.get('speaker'):
             rec['speaker'] = prev_speaker or ''
             rec['speakerAffiliation'] = prev_aff or ''
+        # 补丁16（闸6）：丢弃「无 speaker 且无 topic」的退化场次（如表格/海报解析残次行、
+        # 主通知误拆出的占位块），保留至少有主讲人或题目的有效场次。
+        if not (rec.get('speaker') or '').strip() and not (rec.get('topic') or '').strip():
+            continue
         out.append(rec)
         # 更新继承链（圆桌置空不更新，避免影响后续块）
         if rec.get('speaker'):
