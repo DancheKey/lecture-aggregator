@@ -630,7 +630,7 @@ const app = createApp({
       // 加载阶段：线性慢速增长，明确是「加载中占位」而非真实数据；
       // 不封顶在像真实值的数字上，避免误导。完整数据到达后由 finalize 快速滚到真实值。
       const SPEED = 65;       // 每秒约 65，视觉上慢慢滚但不会定格成假数字
-      const LOADING_CAP = 2000;  // 加载占位上限：避免超过真实值后「先超后落」
+      const LOADING_CAP = 50000;  // 加载占位上限：数据量>3000 后不会停在 2000
       const t0 = performance.now();
       const tick = (now) => {
         if (!this._finalized) {

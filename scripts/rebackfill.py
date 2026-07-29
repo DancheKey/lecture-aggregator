@@ -62,9 +62,11 @@ def load_html(url):
         return raw.decode('gb18030', errors='replace')
 
 
-def parse_one(url):
+def parse_one(url, old_rec=None):
     html = load_html(url)
-    recs = P.parse_detail(html, url, college='', campus='', default_year=None)
+    list_title = old_rec.get('listTitle') if old_rec else None
+    recs = P.parse_detail(html, url, college='', campus='', default_year=None,
+                          list_title=list_title)
     return recs if isinstance(recs, list) else [recs]
 
 
@@ -126,15 +128,16 @@ def main():
     review = []           # (url, field, old, new, lectureIndex)  疑似退化，需人工确认
 
     for url in urls:
+        idxs = by_url.get(url, [])
+        old_rec = data[idxs[0]] if idxs else None
         try:
-            new_recs = parse_one(url)
+            new_recs = parse_one(url, old_rec)
         except Exception as e:
             skipped.append((url, f'parse error: {type(e).__name__} {e}'))
             continue
         if not new_recs:
             skipped.append((url, 'parser returned empty'))
             continue
-        idxs = by_url.get(url, [])
         if not idxs:
             skipped.append((url, 'not in data/lectures.json'))
             continue

@@ -1596,12 +1596,18 @@ def _clean_title(t):
         t = t[1:-1].strip()
     # ���掉前导的 | （分割符残留）、尾部孤括号
     t = re.sub(r'^[｜|\s]+', '', t).strip()
-    t = re.sub(r'[）)]$', '', t).strip()
+    # 仅当末尾右括号没有对应左括号时才清理，避免去掉「主题（主讲人）」的闭合括号。
+    if t.endswith(')') and t.count('(') <= t.count(')'):
+        t = t[:-1].strip()
+    if t.endswith('）') and t.count('（') <= t.count('）'):
+        t = t[:-1].strip()
     # 列表页锚文本常把发布日期前缀粘进标题（如「2024-05-21艺术乡建…」「2023年12月24日红树林…」）。
     # 去掉标题开头的日期前缀，仅保留真实讲座标题。日期本身已由时间解析单独处理。
     t = re.sub(r'^\s*(?:19|20)\d{2}\s*[-/年\.]\s*\d{1,2}\s*[-/月\.]\s*\d{1,2}\s*[日号]?\s*', '', t).strip()
     # 去掉 8 位连写日期前缀，如「20250911 讲座标题」
     t = re.sub(r'^\s*(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s+', '', t).strip()
+    # 去掉无前导年份的「10月29日」「6月6日」等日期前缀（常见于 skc 砺儒讲坛列表页）。
+    t = re.sub(r'^\s*\d{1,2}\s*月\s*\d{1,2}\s*日\s*', '', t).strip()
     # 多场拆分偶发把首个章节头粘进标题（如教师发展中心「— 一、工作坊安排」「— 一、培训安排」
     # 「— 一、沙龙安排」），去掉标题尾部这种非标题的章节安排标记。
     t = re.sub(r'\s*[—\-－]\s*一、[一二三四五六七八九十百零0-9]*期?\s*(?:工作坊|培训|沙龙|讲坛|报告|讲座)?安排\s*$', '', t).strip()
@@ -3081,34 +3087,51 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         if topic_candidate and len(topic_candidate) > 3:
             result['topic'] = topic_candidate
 
-    # 补丁9/10: 标题含「第N讲：具体主题」/「（第N场）：具体主题」结构（skc 砺儒讲坛、
-    # CTLD 通识课等），块内无独立 topic 时，从标题提取冒号后的具体内容作为 topic，
-    # 冒号前的讲座序号/系列名保留为 title（title=系列名，topic=单场题目，符合拆分规则）。
-    # 仅当 topic 尚未提取时启用；已有正确 topic 的页面不受影响。
+    # 补丁9/10: 标题/list_title 含「第N讲：具体主题」/「（第N场）：具体主题」结构
+    # （skc 砺儒讲坛、CTLD 通识课等），当正文中未提取到独立 topic，或提取的 topic
+    # 被截断（如缺闭合括号）时，从 list_title/title 提取冒号后的具体内容补全 topic。
+    # 对于单场讲座（isMultiLecture 尚未 True），title 也提升为具体主题，避免前端
+    # 大标题只显示「砺儒讲坛」系列名。
     if title:
         _lec_colon = re.compile(
             r'第[一二三四五六七八九十百零\d]+\s*[场期讲讲]\s*[）)】]?\s*[：:]')
-        _m = _lec_colon.search(title)
+        # 优先用原始 list_title：它通常保留完整讲题与主讲人括号，比被 _clean_title
+        # 处理过的 title 信息更全（如 skc 511 的 list_title 仍含「11月27日」前缀）。
+        _srcs = [title]
+        if list_title and list_title != title:
+            _srcs.insert(0, list_title)
+        _m = None
+        for _src in _srcs:
+            _m = _lec_colon.search(_src)
+            if _m:
+                break
         if _m:
-            _post = title[_m.end():].strip()
-            _pre = title[:_m.start()].strip()
-            # 「（第N场）：」结构下，前导标题会残留悬空开括号「（」(原「（第N场）」的左括号)；
-            # 剥掉它，若此后末尾残留破折号（——/—/–）一并清掉，避免「砺儒讲坛（」这类脏 title。
+            _post = _src[_m.end():].strip()
+            _pre = _src[:_m.start()].strip()
+            # 「（第N场）：」结构下，前导标题会残留悬空开括号，剥掉并清尾部破折号
             _pre = re.sub(r'[（(]\s*$', '', _pre).strip()
             _pre = re.sub(r'[\s—–-]+$', '', _pre).strip()
-            # 守卫：冒号后为具体主题（长度 4~80，排除极短噪声与整段正文），
-            # 「第N讲：」结构本身已是强信号，不要求 post 短于 pre（如「月X日砺儒讲坛第N讲：长主题」）。
-            if _post and 4 <= len(_post) <= 80:
-                _cur_topic = result.get('topic') or ''
-                # 仅当 topic 为空时，用标题后缀填充 topic（避免覆盖块内已正确提取的 topic）
-                if not _cur_topic:
+            # 去掉末尾主讲人/嘉宾括号，如「稳外资…（陈钊）」「汉字…（李国英）」
+            _post = re.sub(r'\s*[（(][^）)]*?[）)]$', '', _post).strip()
+            # 去掉尾部通用词
+            _post = re.sub(r'(?:学术讲座|讲座|报告|讲坛)\s*$', '', _post).strip()
+            # 守卫：冒号后为具体主题（长度 4~120）
+            if _post and 4 <= len(_post) <= 120:
+                _cur_topic = (result.get('topic') or '').strip()
+                # 当 topic 为空，或 list_title 主题以当前 topic 开头且更长
+                # （修复括号截断/半角标点等导致的 topic 不完整）
+                if (not _cur_topic
+                        or (_post.startswith(_cur_topic[:10]) and len(_post) > len(_cur_topic))):
                     result['topic'] = _post
-                # 标题剥离为「序号/系列名」部分（title=系列名，不含具体主题）：
-                # 当 topic 为空，或标题后缀恰好等于已有 topic（冗余重复）时执行；
-                # 若块内已有不同 topic（如 1095 正文「题目：」提取的精简 topic ≠ 标题后缀含（教授）），
-                # 则不改动 title，避免影响已正确的其余砺儒讲坛记录。
-                if not _cur_topic or _post == _cur_topic:
-                    result['title'] = _pre
+                # 对单场讲座：若当前 title 只是系列名或日期残留，提升 title 为具体主题
+                _cur_title = (result.get('title') or '').strip()
+                _is_series_only = bool(re.search(
+                    r'^(?:\d{1,2}\s*月\s*\d{1,2}\s*日\s*)?'
+                    r'(?:华南师范大学)?'
+                    r'(?:砺儒讲坛|学术讲座|学术报告|讲座通知|讲座预告|系列讲座|教师发展中心)',
+                    _cur_title))
+                if _is_series_only and not result.get('isMultiLecture'):
+                    result['title'] = _post
 
     # 非 OCR 场景：若 title 已清理前缀且长度>8（含实质内容），topic 仍为空时，
     # 从 title 派生 topic（去掉系列/通用后缀，保留核心主题）
