@@ -1400,29 +1400,21 @@ def _extract_narrative(body_text, title):
     )
     sentences = [p.strip() for p in _ABBREV_SPLIT_RE.split(body_text) if len(p.strip()) > 20]
     if sentences:
-        start_idx = 0
-        # 跳过以字段标签或 CMS 元信息开头的句子，避免把页面顶部的
-        # "题目:... 主讲人:... 时间:..."骨架当成摘要（如心理学院 2950）。
+        # 收集「不以字段标签/CMS 元信息开头」的句子作为摘要候选，避免把页面顶部
+        # CMS 骨架（如"[每周一课]…来源:…收藏本文"）或登录提示（"登录教师发展中心网站…"）
+        # 误当摘要。仅以「句首字段标签/元信息」为排除依据——含"月/日"等字符的内容句
+        # （如"本次讲座将于3月10日举行"）不应因此被跳过；旧逻辑用 re.search 命中散落的
+        # "月"字会错误丢弃真实首句，且只跳过句首连续 META 句会让后续"登录…"句泄漏进来。
         _META_PREFIX_RE = re.compile(
             r'^(?:题目|主题|主讲人|报告人|时间|地点|摘要|简介|'
             r'主讲人介绍|报告人简介|主讲人简介|主讲人简历|主讲介绍|'
             r'单位|邀请人|来源|编辑|审核|发布|点击|收藏本文|'
             r'当前位置|首页|新闻资讯|通知公告|来源：|'
+            r'登录|收看方式|参与方式|收看|'
             r'\d{4}[-/年]\d{1,2}[-/日]|\d{4}年\s*\d{1,2}月\s*\d{1,2}日)'
         )
-        while (start_idx < len(sentences)
-               and _META_PREFIX_RE.search(sentences[start_idx])):
-            start_idx += 1
-        # 首句若只含时间/地点/主讲元信息，则跳过；但若首句明显是英文学术摘要
-        # （含 ≥10 个英文单词），说明已有真实讲座内容，不应跳过。
-        if start_idx < len(sentences):
-            _first = sentences[start_idx]
-            _en_word_count = len(re.findall(r'[A-Za-z]+', _first))
-            _is_english_abstract = _en_word_count >= 10
-            if (re.search(r'(?:月|日|晚|召开|举行|举办|主讲|由)', _first) and
-                    start_idx + 1 < len(sentences) and not _is_english_abstract):
-                start_idx += 1
-        abstract = '。'.join(sentences[start_idx:start_idx + 3]) + '。'
+        _cand = [s for s in sentences if not _META_PREFIX_RE.search(s)]
+        abstract = '。'.join(_cand[:3]) + '。' if _cand else ''
         # 截断到无序列表符号或主讲人简介/专家简介等 bio 标记，避免把后续履历当摘要。
         # 同时截断 "姓名 : *" 式列表开头（seri 页面报告内容后紧接主讲人履历）。
         abstract = re.split(r'\s+[*＊•·]\s+', abstract)[0].strip()
@@ -2416,11 +2408,14 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 分隔符可选：兼容「主题：X」（冒号）与「一、主题X」（无冒号，BS4 单行化后标签与值直接相连）。
     # 复合标签（讲座主题/沙龙主题/工作坊主题/报告主题）多为「X主题：Y」格式，须紧跟冒号，
     # 避免「本次讲座主题…」等散文误匹配；「题目」类同理必须冒号。
-    _topic_pat_a = rf'(?:(?:(?<=、)|(?<= )|(?<=（)|^)主题)\s*[：:]?\s*(.+?){STOP}'
+    # 边界+可选冒号：「一、主题X」「 主题：X」「（主题：X」
+    _topic_pat_a = rf'(?:^|(?<=、)|(?<= )|(?<=（)|(?<=\n))主题\s*[：:]?\s*(.+?){STOP}'
+    # 任意位置+必须冒号：解决 collapsed text 中「303室主题：X」无边界空格的情况
+    _topic_pat_a2 = rf'主题[：:]\s*(.+?){STOP}'
     _topic_pat_b = rf'(?:讲座主题|沙龙主题|工作坊主题|报告主题|讲座题目|题目|报告题目|演讲题目|Topic|Title)[：:]\s*(.+?){STOP}'
-    m = re.search(_topic_pat_a, text) or re.search(_topic_pat_b, text)
+    m = re.search(_topic_pat_a, text) or re.search(_topic_pat_a2, text) or re.search(_topic_pat_b, text)
     if m:
-        tp = (m.group(1) or m.group(2) or '').strip()
+        tp = (m.group(1) or m.group(2) or m.group(3) or '').strip()
         # 清除首尾可能粘连的章节序号（「一、主题」式结构里值后可能带「二、」下一节序号）
         tp = re.sub(r'^\s*[一二三四五六七八九十百零0-9]+[、.．]\s*', '', tp).strip()
         tp = re.sub(r'\s*[一二三四五六七八九十百零0-9]+[、.．].*$', '', tp).strip()
@@ -2943,6 +2938,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 内容摘要类标签：出现这些说明主讲人简介已结束、讲座内容介绍开始
     # N1e/英文：补充 Abstract/Synopsis。
     SUMMARY_LABELS = (
+        '讲座内容简介|课程内容简介|培训内容简介|工作坊内容简介|'
         '讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|报告简介|讲座简介|'
         '讲座主题简介|讲座内容|讲座简介|报告内容|讲座概要|内容概要|摘要|主要内容'
         '|Abstract|Synopsis'
@@ -2997,13 +2993,29 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # --- 摘要/内容（优先从正文区域提取完整版）---
     # 把「讲座内容提要/讲座内容/报告摘要」等内容摘要类字段统一作为 abstract。
     # 兼容「摘要」后无冒号（部分院系页面如心理学院 2026-05 讲座仅用空格分隔）。
-    abs_pat = rf'(?:{SUMMARY_LABELS})[：:]\s*|摘要\s*'
+    # 摘要标签后接内容：按标签类型分三种分隔策略——
+    # (1) 无歧义「节标题」类（含简介/提要/摘要/概要/内容，几乎不在散文出现）：
+    #     允许「冒号+空白」或「零分隔符」，因为归一化链（_normalize_label_text）会把
+    #     "讲座内容简介 运用" 的空格折叠成 "讲座内容简介运用"，强制分隔会漏匹配（如 ctld 1128）。
+    # (2) 讲座内容：可能出现在散文（"本次讲座内容非常丰富"），仅允许「冒号或空白」分隔，
+    #     防散文误判为标签。
+    # (3) 摘要：保留历史「零分隔符也可」行为（"摘要本讲座…" 旧逻辑即匹配），不退化。
+    _SEC_LABELS = ('讲座内容简介|课程内容简介|培训内容简介|工作坊内容简介|'
+                   '讲座内容提要|讲座内容摘要|内容提要|内容摘要|内容简介|报告简介|'
+                   '讲座简介|讲座主题简介|报告内容|讲座概要|内容概要|主要内容|'
+                   'Abstract|Synopsis')
+    abs_pat = (
+        rf'(?:(?:{_SEC_LABELS})(?:[：:]\s*|\s*)'   # (1) 节标题：允许零分隔（修 ctld 空格折叠；内层 (?:…) 包裹全部标签，后缀才对每词生效）
+        rf'|讲座内容(?:[：:]\s*|\s+)'               # (2) 防散文误判
+        rf'|摘要(?:[：:]\s*|\s*))'                  # (3) 保留历史零分隔（整体包一层非捕获组，
+                                                    #     使后续 ([\s\S]+?) 对所有分支生效）
+    )
     # abstract 值应在下一个字段标签/噪声标记前停止，避免把后续主讲人介绍、时间地点等元信息吞入。
     m = re.search(
         rf'{abs_pat}'
         r'([\s\S]+?)'
         rf'(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|'
-        r'主讲人|报告人|主讲|主持人|时间|地点|题目|主题|单位|邀请人|'
+        r'主讲人|报告人|主讲|主持人|时间|地点|题目[：:]|主题[：:]|单位|邀请人|'
         r'主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))',
         body_text)
     if m:
@@ -3146,6 +3158,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                     result['abstract'] = _narr_abs
 
     # --- 通用后处理（narrative fallback 之后统一执行）---
+
+    # AD-TITLE: 行政通知标题壳清洗。列表页 title 常是「关于举办“XXX”专题工作坊（第N期）的通知」
+    # 这类行政壳；提取引号/书名号内的真实讲座名称作为 title，避免前端卡片显示冗长通知标题。
+    # 对单讲座页，引号内即具体题目；对多讲座系列页，引号内即系列名（各场次 topic 已独立提取）。
+    _title = result.get('title') or ''
+    if _title.startswith('关于') and '通知' in _title:
+        _ad_title_m = re.search(
+            r'^关于(?:举办|开展|组织|举行)\s*[“"「《]([^”"」》]{3,})[”"」》]\s*.*的?\s*通知\s*$',
+            _title)
+        if _ad_title_m:
+            result['title'] = _ad_title_m.group(1).strip()
 
     # D-FINAL: 职级碎片最终守卫。narrative fallback 可能在 D 规则清空后重新设置 speaker
     # （如 io 1916 的「办二级」），故在所有赋值路径结束后再拦截一次。
