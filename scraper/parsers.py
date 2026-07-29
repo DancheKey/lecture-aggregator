@@ -4015,12 +4015,16 @@ def _extract_bio_map(full_text, speakers=None):
         return {}
     m = re.search(
         r'(?:主讲人简介|报告人简介|讲者简介|个人简介|简介)\s*[：:]\s*\n?'
-        r'([\s\S]*?)(?=\n\s*(?:[一二三四五六七八九十百零0-9]+[、.．]|时间|地点|日期|'
+        r'([\s\S]*?)(?=(?:\n\s*)?(?:[一二三四五六七八九十百零0-9]+[、.．]|时间|地点|日期|'
         r'联系人|主办|承办|邀请人|参与者|【|$)|\Z)', full_text)
     if not m:
         return {}
     region = m.group(1).strip()
     if not region or not speakers:
+        return {}
+    # 若简介区内仍出现多个「主讲人简介/报告人简介」等引导标签，说明是各场独立简介（非共享并列），
+    # 应交还给 split_record_by_sessions 按块提取，避免把后一场的摘要/简介吃进前一场 bio。
+    if len(re.findall(r'(?:主讲人简介|报告人简介|讲者简介|个人简介)\s*[：:]', region)) >= 1:
         return {}
     bio_map = {}
     for sp in speakers:
@@ -4091,11 +4095,9 @@ def split_record_by_sessions(base, sessions, full_text=''):
         rec['topic'] = s['topic']
         rec['lectureStart'] = s['start'].isoformat(sep=' ')
         rec['lectureEnd'] = s['end'].isoformat(sep=' ') if s.get('end') else None
-        # 标题：原标题 — 该块主题（拆分序号（第N期）不再嵌入 title，统一交由前端 span 后缀展示，
-        # 避免与真实系列期号如「第53期学术报告」混淆或重复显示）
-        _t = _clean_session_topic(s.get('topic') or '')
-        # base_title 已含完整主题时不再重复拼接（避免「第13讲丨X— X」式冗余）
-        rec['title'] = f"{base_title}— {_t}" if (_t and _t not in base_title) else base_title
+        # title 保留原始列表标题/系列名，topic 存每场真实题目；不把 topic 拼进 title，
+        # 避免破坏前端分组与统计（规则：title=listTitle/系列名，topic=单场题目）。
+        rec['title'] = base_title
         rec['isMultiLecture'] = True
         rec['lectureIndex'] = int(s['no'])
         rec['lectureCount'] = len(sessions)
@@ -4251,8 +4253,8 @@ def split_record_by_sessions(base, sessions, full_text=''):
                         rec['speakerSource'] = 'block-bio'
         else:
             _bio_m = re.search(
-                r'(?:讲者简介|报告人简介|主讲人简介|个人简介|简介)[：:]\s*'
-                r'(.+?)(?=\s*(?:报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|'
+                r'(?:讲者简介|报告人简介|主讲人简介|主讲人介绍|个人简介|专家介绍)[：:]\s*'
+                r'(.+?)(?=\s*(?:题目\d*|报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|'
                 r'报告题目|报告摘要|$))', block, re.S)
             if _bio_m:
                 _b = _bio_m.group(1).strip()
