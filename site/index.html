@@ -173,7 +173,7 @@
                 </div>
                 <!-- 标题 -->
                 <h2 class="text-[15pt] font-semibold leading-snug mb-2">
-                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}<span v-if="l.isMultiLecture && l.lectureIndex && !titleHasSession(l.topic, l.lectureIndex)" class="font-normal">（第{{ l.lectureIndex }}期）</span></a>
+                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}<span v-if="l.isMultiLecture && l.lectureIndex != null && !titleHasSession(l.topic, l.lectureIndex)" class="font-normal">（第{{ l.lectureIndex }}期）</span></a>
                 </h2>
                 <!-- 结构化详情：题目/地点/主讲/简介/内容摘要 -->
                 <div v-if="l.topic || l.location || l.speaker || l.speakerBio || abstractOf(l)"

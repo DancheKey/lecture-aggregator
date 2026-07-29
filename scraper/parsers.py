@@ -2472,10 +2472,39 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 if re.search(r'[\u4e00-\u9fa5]', sp):
                     sp = re.sub(r'\s+', '', sp)
                 sp_clean = re.sub(r'\s*(?:高级实验师|高级讲师|高级教师|高级工程师|高级会计师|高级经济师|实验师|工程师|会计师|经济师|特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', sp).strip()
-                nm = re.match(r'^([\u4e00-\u9fa5]{2,4})', sp_clean)
-                if nm and _looks_like_real_name(nm.group(1)):
-                    result['speaker'] = nm.group(1)
+                # 从 4 字到 2 字降序尝试，取最长有效姓名。
+                # 原「{2,4}」贪婪匹配后只做一次守卫：当 4 字无效时无法回退到 3 字/2 字，
+                # 导致「陈玺上海大学…」被整个当成 speaker。
+                nm = None
+                _max_len = min(4, len(sp_clean))
+                for _l in range(_max_len, 1, -1):
+                    _nm = re.match(rf'^([\u4e00-\u9fa5]{{{_l}}})', sp_clean)
+                    if _nm and _looks_like_real_name(_nm.group(1)):
+                        nm = _nm
+                        break
+                if nm:
+                    name = nm.group(1)
                     rest = sp[nm.end():].strip()
+                    # 守卫：避免把「陈玺上海大学…」中的「陈玺上」当姓名，
+                    # 导致 affiliation 被截成「海大学…」。
+                    # 当姓名≥3字、且 name 末字 + rest 前字构成常见地名（省/市简称），
+                    # 同时 rest 后续紧接「大学/学院/研究院…」等单位关键词时，
+                    # 说明姓名多吞了单位首字；回退到更短的姓名（仍须通过守卫）。
+                    if len(name) >= 3 and rest and len(rest) >= 2:
+                        # 常见省/市名（双字），用于检测「姓名末字+rest首字」是否误吞了地名前缀。
+                        _CITIES = {'上海', '北京', '天津', '重庆', '黑龙江', '吉林', '辽宁', '河北', '山西',
+                                   '陕西', '甘肃', '青海', '山东', '河南', '江苏', '安徽', '浙江', '福建',
+                                   '江西', '湖北', '湖南', '广东', '广西', '海南', '四川', '贵州', '云南',
+                                   '西藏', '宁夏', '新疆', '内蒙古', '香港', '澳门', '台湾'}
+                        _city_candidate = name[-1] + rest[0]
+                        if (_city_candidate in _CITIES and
+                                re.match(r'^(?:大学|学院|研究院|研究所|研究中心|实验室|学系|分校|学校)',
+                                         rest[1:])):
+                            shorter = name[:-1]
+                            if _looks_like_real_name(shorter):
+                                name = shorter
+                                rest = sp[len(name):].strip()
+                    result['speaker'] = name
                     if rest and len(rest) > 2:
                         result['speakerAffiliation'] = _extract_affiliation(rest)
                 elif sp_clean:
@@ -4116,15 +4145,35 @@ def split_record_by_sessions(base, sessions, full_text=''):
             cand_core = re.sub(
                 r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
                 r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', cand).strip()
-            nm = _SPEAKER_NAME_RE.match(cand_core)
-            if nm and _looks_like_real_name(nm.group(1)):
-                rec['speaker'] = nm.group(1)
+            # 从 3 字到 2 字降序取最长有效姓名；避免「陈玺上海大学…」被贪婪匹配成「陈玺上」。
+            nm = None
+            for _l in range(min(3, len(cand_core)), 1, -1):
+                _nm = re.match(rf'^([\u4e00-\u9fa5]{{{_l}}})', cand_core)
+                if _nm and _looks_like_real_name(_nm.group(1)):
+                    nm = _nm
+                    break
+            if nm:
+                name = nm.group(1)
+                rest2 = cand_core[nm.end():].strip(' （(，,）)')
+                # 城市名守卫：若 name 末字 + rest2 首字构成省/市名，且 rest2[1:] 紧接单位关键词，回退。
+                if len(name) >= 3 and rest2 and len(rest2) >= 2:
+                    _CITIES = {'上海', '北京', '天津', '重庆', '黑龙江', '吉林', '辽宁', '河北', '山西',
+                               '陕西', '甘肃', '青海', '山东', '河南', '江苏', '安徽', '浙江', '福建',
+                               '江西', '湖北', '湖南', '广东', '广西', '海南', '四川', '贵州', '云南',
+                               '西藏', '宁夏', '新疆', '内蒙古', '香港', '澳门', '台湾'}
+                    if (name[-1] + rest2[0]) in _CITIES and \
+                            re.match(r'^(?:大学|学院|研究院|研究所|研究中心|实验室|学系|分校|学校)', rest2[1:]):
+                        shorter = name[:-1]
+                        if _looks_like_real_name(shorter):
+                            name = shorter
+                            rest2 = cand_core[len(name):].strip(' （(，,）)')
+                rec['speaker'] = name
                 rec['speakerSource'] = 'block'
                 if speaker_title:
                     rec['speakerTitle'] = speaker_title
                 # 用 cand_core（已删尾部职称后缀）计算姓名之后残余，避免把删掉的
                 # 「教授」等又塞回 rest；中间单位（如「姓名,工学博士,西北大学」）得以保留。
-                rest = cand_core[nm.end():].strip(' （(，,）)')
+                rest = cand_core[len(name):].strip(' （(，,）)')
                 if rest:
                     aff = _extract_affiliation(rest)
                     if aff:
