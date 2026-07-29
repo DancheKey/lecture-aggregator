@@ -3780,6 +3780,47 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
                               '_no': mk.group()})
             if len(cand5) >= 2:
                 sessions = cand5
+    # 候选6（兜底，CTLD「智能升级」系列通识课等）：正文以「专题一：…专题二：…」式
+    # 裸并列专题排列——每个专题含独立题目与主讲人，但时间/地点统一写在块外的
+    # 「一、培训安排」段（位于首专题之前），故候选1 逐块解析不到时间而全跳过、
+    # 候选5 因单页仅同一期号命中 MS5-GUARD 而清空。此类并列专题视为 N 场独立讲座，
+    # 用页眉日期时间兜底、打 _numbered=True 豁免末尾 distinct-time 检查（N 场共享同一开场时间）。
+    # 仅当候选1-5 均不足 2 段时才启用，影响面受控；裸「专题N：」与候选1的带后缀
+    # 「专题N题目」分工明确，互不冲突。
+    if len(sessions) < 2:
+        _ZHUANTI_RE = re.compile(r'专题\s*[一二三四五六七八九十百零0-9]+\s*[：:]')
+        z_markers = list(_ZHUANTI_RE.finditer(text))
+        if len(z_markers) >= 2:
+            _page_dt6 = parse_cn_time(text, default_year=default_year,
+                                      publish_time=publish_time,
+                                      title_year=title_year, url_year=url_year)
+            cand6 = []
+            for i, mk in enumerate(z_markers):
+                seg = text[mk.end():
+                           z_markers[i + 1].start() if i + 1 < len(z_markers)
+                           else len(text)]
+                # topic：专题N：之后到「主讲人/（/(/摘要/简介」前的首个有效文本块
+                tm6 = re.search(
+                    r'\s*([^\n（(主讲报告]{3,60}?)'
+                    r'(?=\s*(?:主讲[人师]|报告人|\(|（|摘要|简介|$))', seg)
+                topic6 = _clean_session_topic(tm6.group(1).strip()) if tm6 else ''
+                if not topic6 or len(topic6) < 2:
+                    continue
+                # 时间：并列专题的讲座时间统一写在块外（「一、培训安排」段），
+                # 段内只含「报名截止时间」等噪声时间，故强制用页眉讲座时间（含时钟），
+                # 避免把报名截止日误当讲座时间；页眉无时间再退段内解析。
+                dt6 = _page_dt6
+                if (not dt6 or not dt6.get('start')):
+                    dt6 = parse_cn_time(seg, default_year=default_year,
+                                        publish_time=publish_time,
+                                        title_year=title_year, url_year=url_year)
+                if not dt6 or not dt6.get('start'):
+                    continue
+                cand6.append({'topic': topic6, 'start': dt6['start'],
+                              'end': dt6.get('end'), 'block': seg,
+                              '_numbered': True, '_no': mk.group()})
+            if len(cand6) >= 2:
+                sessions = cand6
     # 去重：同 (topic, start) 视为同一场（顶部「题目」常与首期「主题/报告N题目」重复出现）。
     # topic 比较前去掉所有空白，避免正文数学符号/排版导致的「ℤ_{2^k}」与「ℤ _{2^k}」式微差误判为不同场。
     # 同 key 的多块中保留「信息更完整」者（含主讲人/报告人/摘要/参与者等子字段的块优先），
@@ -3942,20 +3983,20 @@ def split_record_by_sessions(base, sessions, full_text=''):
                 r'(特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
                 r'研究员|教授|讲师|博士后|博士|院士)', cand)
             speaker_title = title_m.group(1) if title_m else ''
-            # 先去掉尾部职称/单位后缀，再取姓名（避免「徐湘林教授」被截成「徐湘林教」）
-            cand_clean = re.sub(
+            # 先去掉尾部职称/单位后缀，再取姓名（避免「徐湘林教授」被截成「徐湘林教」，
+            # 也避免「穆肃教授」连写被 {2,3} 正则吞掉「教」字成「穆肃教」）
+            cand_core = re.sub(
                 r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
                 r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', cand).strip()
-            nm = _SPEAKER_NAME_RE.match(cand)
+            nm = _SPEAKER_NAME_RE.match(cand_core)
             if nm and _looks_like_real_name(nm.group(1)):
                 rec['speaker'] = nm.group(1)
                 rec['speakerSource'] = 'block'
                 if speaker_title:
                     rec['speakerTitle'] = speaker_title
-                # 用原始 cand（勿用 cand_clean）计算姓名之后残余：cand_clean 会从首个
-                # 「博士/教授」截断到文末，而「姓名,党员,工学博士,西北大学」中博士位于中间，
-                # 会把真实单位一并截掉，导致 affiliation 丢失。
-                rest = cand[nm.end():].strip(' （(，,）)')
+                # 用 cand_core（已删尾部职称后缀）计算姓名之后残余，避免把删掉的
+                # 「教授」等又塞回 rest；中间单位（如「姓名,工学博士,西北大学」）得以保留。
+                rest = cand_core[nm.end():].strip(' （(，,）)')
                 if rest:
                     aff = _extract_affiliation(rest)
                     if aff:
