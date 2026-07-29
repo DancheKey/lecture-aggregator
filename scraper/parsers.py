@@ -3861,6 +3861,23 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
 
     返回 [] 表示单讲座；否则返回 session 列表（含块文本供拆分时逐块提取）：
       [{'no','topic','start','end','block'}, ...]
+
+    ── 候选瀑布契约（Q1 决策：维持「增强瀑布」，不引入评分）──
+    以下候选严格按 1→2→3→4→5→6 顺序，**仅当上游不足 2 段时才由下游兜底**
+    （每段以 `if len(sessions) < 2` 守卫），故下游不会抢占上游已正确拆出的场次；
+    不引入"按标记可靠性评分"等打分机制——评分更难调试且易产生隐性回归。
+    各候选的「专属触发形态」（互斥分工，避免相互抢段）：
+      · 候选1 repeated-label：连续「题目/主题：X」标签，每段自带独立时钟（块内含本场时间）。
+      · 候选2 report-n：离散「报告N」分场标记且 ≥2（CS 源），按报告N干净分段，每段含独立时间；
+            用于解决候选1 把页眉总览时间误当各场时间的问题。
+      · 候选3 field-list：字段列表型多报告（≥2 个「报告时间:」等字段锚点）。
+      · 候选4 numbered-prefix：阿拉伯编号「题目N：/报告题目N：」型（cs 4268）。
+      · 候选5 nth-session：「第N讲/场/期」分段（abdn/系列讲坛），段内须含独立时间/日期；
+            含 MS5-GUARD：marker 号全在 title 里→视为模板重复，清空。
+      · 候选6 bare-topic：裸「专题N：」并列（CTLD 通识课），时间统一在块外「培训安排」段，
+            用页眉时间兜底、_numbered=True 豁免末尾 distinct-time；仅候选1-5 不足 2 段时启用。
+    守卫（对全部候选生效）：块内时间须为明确时钟或含结束时间（仅 00:00 日期不足区分场次）；
+    多讲座拆分路径末尾还有「空场次丢弃」闸6（无 speaker 且无 topic 的退化场次丢弃）。
     """
     labels = list(_TOPIC_DELIM_RE.finditer(text))
     sessions = []

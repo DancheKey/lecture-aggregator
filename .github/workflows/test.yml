@@ -1,0 +1,21 @@
+name: Parser golden tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: pip install requests beautifulsoup4
+      - name: Run golden-case regression tests
+        run: python tests/test_parser_golden.py
