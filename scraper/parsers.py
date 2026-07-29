@@ -3069,6 +3069,35 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         if topic_candidate and len(topic_candidate) > 3:
             result['topic'] = topic_candidate
 
+    # 补丁9/10: 标题含「第N讲：具体主题」/「（第N场）：具体主题」结构（skc 砺儒讲坛、
+    # CTLD 通识课等），块内无独立 topic 时，从标题提取冒号后的具体内容作为 topic，
+    # 冒号前的讲座序号/系列名保留为 title（title=系列名，topic=单场题目，符合拆分规则）。
+    # 仅当 topic 尚未提取时启用；已有正确 topic 的页面不受影响。
+    if title:
+        _lec_colon = re.compile(
+            r'第[一二三四五六七八九十百零\d]+\s*[场期讲讲]\s*[）)】]?\s*[：:]')
+        _m = _lec_colon.search(title)
+        if _m:
+            _post = title[_m.end():].strip()
+            _pre = title[:_m.start()].strip()
+            # 「（第N场）：」结构下，前导标题会残留悬空开括号「（」(原「（第N场）」的左括号)；
+            # 剥掉它，若此后末尾残留破折号（——/—/–）一并清掉，避免「砺儒讲坛（」这类脏 title。
+            _pre = re.sub(r'[（(]\s*$', '', _pre).strip()
+            _pre = re.sub(r'[\s—–-]+$', '', _pre).strip()
+            # 守卫：冒号后为具体主题（长度 4~80，排除极短噪声与整段正文），
+            # 「第N讲：」结构本身已是强信号，不要求 post 短于 pre（如「月X日砺儒讲坛第N讲：长主题」）。
+            if _post and 4 <= len(_post) <= 80:
+                _cur_topic = result.get('topic') or ''
+                # 仅当 topic 为空时，用标题后缀填充 topic（避免覆盖块内已正确提取的 topic）
+                if not _cur_topic:
+                    result['topic'] = _post
+                # 标题剥离为「序号/系列名」部分（title=系列名，不含具体主题）：
+                # 当 topic 为空，或标题后缀恰好等于已有 topic（冗余重复）时执行；
+                # 若块内已有不同 topic（如 1095 正文「题目：」提取的精简 topic ≠ 标题后缀含（教授）），
+                # 则不改动 title，避免影响已正确的其余砺儒讲坛记录。
+                if not _cur_topic or _post == _cur_topic:
+                    result['title'] = _pre
+
     # 非 OCR 场景：若 title 已清理前缀且长度>8（含实质内容），topic 仍为空时，
     # 从 title 派生 topic（去掉系列/通用后缀，保留核心主题）
     if not result.get('topic') and title and len(title) > 8:
@@ -3252,7 +3281,14 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # io 源正文常把"时间:... 地点:... 诚挚邀请..."粘到摘要尾部
     _abs = result.get('abstract') or ''
     if _abs:
-        _abs = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', _abs).strip()
+        # 补丁5: 摘要被站点面包屑/导航文本污染（如物理学院「首页 » 科学研究 » 学术活动 »
+        # 学术报告 » 日期 … 来源：… 点击：收藏本文」整段，或含「当前位置：」导航），
+        # 这类整页正文被误当摘要且不含真实讲座摘要内容 → 直接清空。
+        if ('»' in _abs or '首页' in _abs or '当前位置' in _abs
+                or _abs.strip().startswith('科学研究') or _abs.strip().startswith('学术活动')):
+            _abs = ''
+        else:
+            _abs = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', _abs).strip()
         _abs = re.sub(r'\s*地点\s*[:：\s].*$', '', _abs).strip()
         _abs = re.sub(r'\s*20\d{2}年\s*\d{1,2}月\s*\d{1,2}日.*$', '', _abs).strip()
         # 仅剔除「邀请类」尾部（欢迎广大/欢迎各位/欢迎师生/诚挚邀请/敬请/请各位/感兴趣…），
@@ -4356,19 +4392,23 @@ def split_record_by_sessions(base, sessions, full_text=''):
         # 每场独立 abstract / speakerBio（解决整页解析时 abstract 泄漏、bio 错位）：
         # 仅当块内含对应标签时才覆盖，避免把基底已有值清空。
         _abs_m = re.search(
-            r'(?:学术报告简介|报告简介|内容简介|讲座简介|报告摘要|摘要)[：:]\s*'
+            r'(?:学术报告简介|报告简介|内容简介|讲座简介|报告摘要|摘要)[：:]?\s*'
             r'(.+?)(?=\s*(?:讲者简介|报告人简介|主讲人简介|个人简介|简介|专家介绍|'
             r'报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|报告题目|报告摘要|$))',
             block, re.S)
         if _abs_m:
             _a = _abs_m.group(1).strip()
             if len(_a) > 5:
-                # 复用通用尾部清理（不误伤「受到欢迎」等合法表述）
-                _a = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', _a).strip()
-                _a = re.sub(r'\s*地点\s*[:：\s].*$', '', _a).strip()
-                _a = re.sub(r'\s*20\d{2}年\s*\d{1,2}月\s*\d{1,2}日.*$', '', _a).strip()
-                _a = re.sub(r'\s*(?:诚挚邀请|敬请|请各位|欢迎\s*(?:广大|各位|师生|同学|'
-                            r'莅临|参加|光临|届时|踊跃|提出|关注)|感兴趣).*$', '', _a).strip()
+                # 补丁5: 块内摘要若仍吸入面包屑/导航（极少数整页噪声漏入块），清空
+                if ('»' in _a or '首页' in _a or '当前位置' in _a):
+                    _a = ''
+                else:
+                    # 复用通用尾部清理（不误伤「受到欢迎」等合法表述）
+                    _a = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', _a).strip()
+                    _a = re.sub(r'\s*地点\s*[:：\s].*$', '', _a).strip()
+                    _a = re.sub(r'\s*20\d{2}年\s*\d{1,2}月\s*\d{1,2}日.*$', '', _a).strip()
+                    _a = re.sub(r'\s*(?:诚挚邀请|敬请|请各位|欢迎\s*(?:广大|各位|师生|同学|'
+                                r'莅临|参加|光临|届时|踊跃|提出|关注)|感兴趣).*$', '', _a).strip()
                 if len(_a) > 5:
                     rec['abstract'] = _a
         if _bio_map:
