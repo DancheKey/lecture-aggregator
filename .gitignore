@@ -34,6 +34,16 @@ site/screenshots/
 信息源网址清单.md
 EVALUATION.md
 需求规格说明书.md
+# 本地安全审查报告：不公开（D+E）
+docs/SECURITY.md
+代码审查报告*.html
+
+# ===== docs/ 个人学习/测试/评审产物（不公开，避免推到公网仓库） =====
+# 注意：deploy.md 与 PARSING_RULES.md 是项目核心文档，刻意保留在仓库，不在此列
+docs/从零搭建讲座聚合网站.md
+docs/OCR_RULES_CURRENT.md
+docs/lecture_split_rules_review.html
+docs/rules_docx*_review.html
 
 # ===== 运行时 / 增量状态 =====
 # 注意：data/last_scrape.json 必须入库！GitHub Actions 每日定时抓取依赖它在
