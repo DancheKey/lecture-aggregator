@@ -558,6 +558,42 @@ def dedup(records):
     return kept
 
 
+def _norm_url(u):
+    """归一化来源 URL：去尾斜杠，用于增量合并时基底/新增的键比对。"""
+    return str(u or '').rstrip('/')
+
+
+def incremental_merge(existing, new_records):
+    """增量模式合并：existing 基底原样锁定（不再重新去重/跨源合并），
+    new_records 仅做同源去重后追加。跳过对全量的 cross_source_dedup，
+    避免每日增量把人工/VLM 精修的已有记录退化或重组。
+
+    跨源去重（不同学院发布同一讲座合并）改为仅 --full 手动重构或人工介入时执行，
+    不在每日增量中自动重跑。
+    """
+    base_map = {}
+    for r in existing:
+        u = _norm_url(r.get('sourceUrl'))
+        if not u:
+            continue
+        li = r.get('lectureIndex')
+        key = u + ('#' + str(li) if li else '')
+        base_map[key] = r
+    seen = set(base_map.keys())
+    new_deduped = []
+    for r in new_records:
+        u = _norm_url(r.get('sourceUrl'))
+        if not u:
+            continue
+        li = r.get('lectureIndex')
+        key = u + ('#' + str(li) if li else '')
+        if key in seen:
+            continue
+        seen.add(key)
+        new_deduped.append(r)
+    return list(base_map.values()) + new_deduped
+
+
 def _process_source(src, year, existing_urls, is_incremental, global_exclude=None):
     """处理单个信息源，返回 {url: rec} 字典。"""
     name = src['name']
@@ -727,6 +763,7 @@ def main():
 
     # 并发抓取各信息源：源与源之间独立，大幅缩短 GitHub Actions 全量/增量耗时
     max_workers = 1 if args.source else 5
+    all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded): src for src in sources}
         for future in as_completed(future_to_src):
@@ -735,6 +772,7 @@ def main():
                 local = future.result()
                 for url, rec in local.items():
                     lectures[url] = rec
+                    all_fetched.append(rec)
             except Exception as e:
                 print(f'[ERROR] 合并信息源「{src_name}」结果失败：{e}', file=sys.stderr)
 
@@ -759,11 +797,16 @@ def main():
             print(f'[ABORT] --source 模式产出 {len(raw)} 条 < 现有 {len(existing)} 条的 50%，'
                   f'疑似现有数据未正确合并，拒绝覆盖 data/lectures.json。', file=sys.stderr)
             return
-    out = dedup(raw)
-    # 跨源去重：不同学院发布的同一讲座合并为一条（同主讲+同日期+topic相似）。
-    # --out 模式由各源独立写出、最后由驱动脚本统一合并，故此处跳过跨源去重避免重复。
-    if not args.out:
-        out = cross_source_dedup(out)
+    if is_incremental and not args.source and not args.out:
+        # 增量模式：基底(existing)原样锁定，仅对新增记录做同源去重后追加，
+        # 不再对全量重跑 cross_source_dedup（避免每日增量退化/重组已有精修数据）。
+        out = incremental_merge(existing, all_fetched)
+    else:
+        out = dedup(raw)
+        # 跨源去重：不同学院发布的同一讲座合并为一条（同主讲+同日期+topic相似）。
+        # --out 模式由各源独立写出、最后由驱动脚本统一合并，故此处跳过跨源去重避免重复。
+        if not args.out:
+            out = cross_source_dedup(out)
     out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)
     import datetime
     # 用北京时间（Asia/Shanghai）记录更新时间，避免 GitHub Runner 默认 UTC 导致日期差一天
