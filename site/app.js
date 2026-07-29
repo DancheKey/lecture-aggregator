@@ -59,8 +59,12 @@ const app = createApp({
     totalCount() { return this.all.length; },
 
     // 来源通知总数（合并后按各讲座的 sourceCount 求和），用于首页说明与统计一致性
+    // 口径与 stats.js / generate_frontend_data.py 统一：sourceCount 缺失时回退到 sources 长度
     sourceNoticeCount() {
-      return this.all.reduce((a, l) => a + (l.sourceCount != null ? l.sourceCount : 1), 0);
+      return this.all.reduce((a, l) => {
+        const fb = (Array.isArray(l.sources) && l.sources.length) ? l.sources.length : 1;
+        return a + (l.sourceCount != null ? l.sourceCount : fb);
+      }, 0);
     },
 
     // 数据中出现过的年份（倒序，字符串便于与下拉值比较）
@@ -289,9 +293,10 @@ const app = createApp({
       const s = String(u).trim();
       return /^https?:\/\//i.test(s) ? s : '#';
     },
-    // 判断标题里是否已经包含当前分期的期/讲/场号，避免前端重复追加「（第X期）」
+    // 判断讲座题目(topic)里是否已经包含当前分期的期/讲/场号，避免前端重复追加「（第X期）」
+    // 注意：传入的是 topic（单场题目），而非 title（系列名）；故命名为 topicHasSession。
     // 支持：第3讲 / 第3期 / 讲座三 / 三讲 / 3讲 / 第III期 等
-    titleHasSession(title, idx) {
+    topicHasSession(title, idx) {
       if (!title || !idx) return false;
       const n = parseInt(idx, 10);
       if (!n || n <= 0) return false;
@@ -346,6 +351,9 @@ const app = createApp({
       } catch (e) { /* ignore quota/storage errors */ }
     },
     likeCount(url) {
+      // 后端 lectureStats 为权威（与统计页同源）；无后端时回退本机 this.likes
+      const s = this.lectureStats[url];
+      if (s && typeof s.likes === 'number') return s.likes;
       return this.likes[url] || 0;
     },
     hasLiked(url) {
@@ -353,33 +361,37 @@ const app = createApp({
     },
     toggleLike(url) {
       if (!url) return;
-      if (this.hasLiked(url)) {
-        // 偶数次点击：取消当次点赞
-        this.likes[url] = Math.max(0, (this.likes[url] || 0) - 1);
-        this.likedUrls.delete(url);
-        this.saveLikes();
-        this.bumpLocalStat(url, 'likes', -1);
-        this.showToast('已取消点赞');
-        // 同步到后端（累减）；失败不影响本机
-        fetch('/api/lecture/unlike', {
-          method: 'POST', cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url }),
-        }).catch(() => {});
-      } else {
-        // 奇数次点击：点赞
-        this.likes[url] = (this.likes[url] || 0) + 1;
-        this.likedUrls.add(url);
-        this.saveLikes();
-        this.bumpLocalStat(url, 'likes', 1);
-        this.showToast('点赞成功');
-        // 同步到后端（累加）；失败不影响本机
-        fetch('/api/lecture/like', {
-          method: 'POST', cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url }),
-        }).catch(() => {});
-      }
+      const willLike = !this.hasLiked(url);
+      // 本地 UI 立即切换（乐观更新），保证点击即时反馈
+      if (willLike) { this.likedUrls.add(url); } else { this.likedUrls.delete(url); }
+      this.saveLikes();
+      const delta = willLike ? 1 : -1;
+      // 乐观更新展示计数；后端返回真实值后会被覆盖（统一数据源，消除首页/统计页不一致）
+      const cur = (this.lectureStats[url] && this.lectureStats[url].likes) || this.likes[url] || 0;
+      const next = Math.max(0, cur + delta);
+      this.likes[url] = next;
+      if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
+      this.lectureStats[url].likes = next;
+      this.saveLocalStats();
+      this.showToast(willLike ? '点赞成功' : '已取消点赞');
+      const endpoint = willLike ? 'like' : 'unlike';
+      fetch('/api/lecture/' + endpoint, {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+        .then(r => r.json())
+        .then(j => {
+          if (j && j.ok && typeof j.likes === 'number') {
+            // 后端权威值覆盖本机乐观值
+            if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
+            this.lectureStats[url].likes = j.likes;
+            this.likes[url] = j.likes;
+            this.saveLocalStats();
+          }
+          // 后端失败 / 被节流：保留本机乐观值（无后端时即为真实值）
+        })
+        .catch(() => { /* 离线：保留本机值 */ });
     },
 
     /* ---------- 讲座级访问/点赞统计 ---------- */
@@ -406,14 +418,15 @@ const app = createApp({
         s.lastVisit = now;
         this.lectureStats[url] = s;
         this.saveLocalStats();
+        // 仅在本机未节流时才通知后端（后端自身也有节流，此为双重防护，并避免无意义请求）
+        fetch('/api/lecture/visit', {
+          method: 'POST', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        }).catch(() => {});
       }
-      fetch('/api/lecture/visit', {
-        method: 'POST', cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      }).catch(() => {});
     },
-    // 加载站点访问量：优先级 本地后端 > countapi.xyz > 不蒜子
+    // 加载站点访问量：优先级 本地后端 > 不蒜子
     // 避免公网静态版因不蒜子偶发不可用而长期显示 0；首页/统计页同 origin 共享缓存，保证两页一致
     loadSiteVisits() {
       // 0) 优先读共享缓存（任一页面成功获取后写入），避免第三方接口偶发失败显示 0
@@ -424,15 +437,9 @@ const app = createApp({
         .then(r => r.json())
         .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; this._persistVisits(j.total); } else throw new Error('no-total'); })
         .catch(() => {
-          // 2) 公网静态版：countapi.xyz（CORS 友好、无需密钥，两页共用同一命名空间保证一致）
-          fetch('https://api.countapi.xyz/hit/lecture-aggregator/site', { cache: 'no-store' })
-            .then(r => r.json())
-            .then(j => { if (j && typeof j.value === 'number') { this.siteVisits = j.value; this.hasBackend = true; this._persistVisits(j.value); } else throw new Error('no-value'); })
-            .catch(() => {
-              // 3) 最终回退不蒜子。注意：不要再把 hasBackend 设为 false，否则模板会显示 0；
-              // 保持当前已有显示（缓存值），后台加载不蒜子，成功后再更新 siteVisits。
-              this._loadBusuanzi();
-            });
+          // 2) 公网静态版无本地后端时，最终回退到不蒜子（第三方计数服务，best-effort，可能偶发不可用）。
+          //    注：原 countapi.xyz 分支已下线（服务停运），其回退永远失败，故删除，避免无意义的外部请求。
+          this._loadBusuanzi();
         });
     },
     _persistVisits(v) {
@@ -618,20 +625,24 @@ const app = createApp({
       // 加载阶段：线性慢速增长，明确是「加载中占位」而非真实数据；
       // 不封顶在像真实值的数字上，避免误导。完整数据到达后由 finalize 快速滚到真实值。
       const SPEED = 65;       // 每秒约 65，视觉上慢慢滚但不会定格成假数字
+      const LOADING_CAP = 2000;  // 加载占位上限：避免超过真实值后「先超后落」
       const t0 = performance.now();
       const tick = (now) => {
         if (!this._finalized) {
           const elapsed = (now - t0) / 1000;
-          const v = Math.max(1, Math.floor(1 + SPEED * elapsed));
+          const v = Math.min(LOADING_CAP, Math.max(1, Math.floor(1 + SPEED * elapsed)));
           this.displayTotal = v;
-          this.displaySource = Math.max(1, Math.floor(v * 1.02));
+          this.displaySource = Math.min(LOADING_CAP, Math.max(1, Math.floor(v * 1.02)));
           this._countRAF = requestAnimationFrame(tick);
         } else {
           // 数据到达后快速（300ms）滚到真实值，营造「最后冲刺」感
           const dt = Math.min((now - this._finalStart) / 300, 1);
           const e = 1 - Math.pow(1 - dt, 3);
-          this.displayTotal = Math.round(this._fromTotal + e * (this._toTotal - this._fromTotal));
-          this.displaySource = Math.round(this._fromSource + e * (this._toSource - this._fromSource));
+          // 关键：起始值不超过目标值，保证动画只向上、绝不「先超后落」
+          const fromT = Math.min(this._fromTotal, this._toTotal);
+          const fromS = Math.min(this._fromSource, this._toSource);
+          this.displayTotal = Math.round(fromT + e * (this._toTotal - fromT));
+          this.displaySource = Math.round(fromS + e * (this._toSource - fromS));
           if (dt >= 1) {
             this.displayTotal = this._toTotal;
             this.displaySource = this._toSource;

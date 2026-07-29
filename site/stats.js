@@ -412,7 +412,7 @@ createApp({
             });
         });
     },
-    // 加载站点总访问量：优先级 本地后端 > countapi.xyz > 不蒜子
+    // 加载站点总访问量：优先级 本地后端 > 不蒜子
     // 避免公网静态版因不蒜子偶发不可用而长期显示 0；首页/统计页同 origin 共享缓存，保证两页一致
     loadSiteVisits() {
       // 0) 优先读共享缓存（任一页面成功获取后写入），避免第三方接口偶发失败显示 0
@@ -423,15 +423,9 @@ createApp({
         .then(r => r.json())
         .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; this._persistVisits(j.total); } else throw new Error('no-total'); })
         .catch(() => {
-          // 2) 公网静态版：countapi.xyz（CORS 友好、无需密钥，两页共用同一命名空间保证一致）
-          fetch('https://api.countapi.xyz/hit/lecture-aggregator/site', { cache: 'no-store' })
-            .then(r => r.json())
-            .then(j => { if (j && typeof j.value === 'number') { this.siteVisits = j.value; this.hasBackend = true; this._persistVisits(j.value); } else throw new Error('no-value'); })
-            .catch(() => {
-              // 3) 最终回退不蒜子。注意：不要再把 hasBackend 设为 false，否则模板会显示 0；
-              // 保持当前已有显示（缓存值），后台加载不蒜子，成功后再更新 siteVisits。
-              this._loadBusuanzi();
-            });
+          // 2) 公网静态版无本地后端时，最终回退到不蒜子（第三方计数服务，best-effort，可能偶发不可用）。
+          //    注：原 countapi.xyz 分支已下线（服务停运），其回退永远失败，故删除，避免无意义的外部请求。
+          this._loadBusuanzi();
         });
     },
     _persistVisits(v) {

@@ -37,7 +37,9 @@ _site_visits = {'total': 0}            # 站点总访问量
 _lecture_stats = {}                     # url -> {"visits": N, "likes": M}
 _recent_site_ip = {}                   # ip -> 最近一次计数的时间戳（站点访问防刷）
 _recent_lecture = {}                   # (ip, url) -> 时间戳（单讲座访问防刷）
+_recent_like_action = {}               # (ip, url) -> (时间戳, 'like'|'unlike')（点赞防刷，区分动作）
 VISIT_THROTTLE = 180                   # 同一 IP / 同一讲座 3 分钟内只计 1 次
+LIKE_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同点赞动作只接受一次（允许 like↔unlike 交替）
 
 
 def _load_stat_files():
@@ -115,10 +117,17 @@ def _find_scraper_python():
     """选择一个能 import 爬虫依赖（requests/bs4）的 Python 解释器。
 
     server.py 自身可能用没装这些依赖的解释器启动（例如某些环境默认的 3.13），
-    直接用它跑 scraper 会 ImportError -> 抓取失败。这里自动探测一个可用解释器：
-    优先尝试 sys.executable，再回退到本机已知装齐依赖的路径与 PATH 中的 python。
+    直接用它跑 scraper 会 ImportError -> 抓取失败。这里按可移植的顺序自动探测：
+      1) 环境变量 SCRAPER_PYTHON（显式指定，便于在不同机器 / CI 部署）
+      2) 当前解释器 sys.executable
+      3) PATH 中的 python3 / python
+    不再硬编码本机绝对路径，避免换环境即崩溃。
     """
-    candidates = [sys.executable, r'D:\Tools\Python 312\python.exe']
+    candidates = []
+    env_py = os.environ.get('SCRAPER_PYTHON')
+    if env_py:
+        candidates.append(env_py)
+    candidates.append(sys.executable)
     try:
         import shutil
         for w in ('python3', 'python'):
@@ -324,30 +333,54 @@ class Handler(SimpleHTTPRequestHandler):
             return self._send_json({'ok': True, 'visits': cur.get('visits', 0)})
 
     def _api_lecture_like_post(self):
-        """记录一次点赞：前端已做本机 toggle（奇数次赞、偶数次取消），这里直接累加。"""
+        """记录一次点赞：前端已做本机 toggle（奇数次赞、偶数次取消）。
+
+        防刷：同一 IP 对同一讲座在 LIKE_THROTTLE 秒内重复「点赞」动作只计一次，
+        防止脚本无限刷赞；允许 like↔unlike 交替（即正常用户切换点赞状态）。
+        """
         body = self._read_body_json()
         url = (body.get('url') or '').strip()
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
         if url.rstrip('/') not in _known_lecture_urls():
             return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
+        ip = self._client_ip()
+        now = time.time()
         with _stat_lock:
+            key = (ip, url)
+            last = _recent_like_action.get(key)
+            if last and last[1] == 'like' and now - last[0] < LIKE_THROTTLE:
+                # 短时间内重复点赞：视为刷量，直接返回当前值，不累加
+                cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
+                return self._send_json({'ok': True, 'likes': cur.get('likes', 0), 'throttled': True})
             st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
             st['likes'] = st.get('likes', 0) + 1
+            _recent_like_action[key] = (now, 'like')
             _save_lecture_stats()
             return self._send_json({'ok': True, 'likes': st.get('likes', 0)})
 
     def _api_lecture_unlike_post(self):
-        """取消一次点赞：前端偶数次点击触发，这里累减（最小 0）。"""
+        """取消一次点赞：前端偶数次点击触发，这里累减（最小 0）。
+
+        防刷：同一 IP 对同一讲座在 LIKE_THROTTLE 秒内重复「取消」动作只计一次。
+        """
         body = self._read_body_json()
         url = (body.get('url') or '').strip()
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
         if url.rstrip('/') not in _known_lecture_urls():
             return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
+        ip = self._client_ip()
+        now = time.time()
         with _stat_lock:
+            key = (ip, url)
+            last = _recent_like_action.get(key)
+            if last and last[1] == 'unlike' and now - last[0] < LIKE_THROTTLE:
+                cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
+                return self._send_json({'ok': True, 'likes': cur.get('likes', 0), 'throttled': True})
             st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
             st['likes'] = max(0, st.get('likes', 0) - 1)
+            _recent_like_action[key] = (now, 'unlike')
             _save_lecture_stats()
             return self._send_json({'ok': True, 'likes': st.get('likes', 0)})
 
@@ -465,11 +498,37 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
 
+def _prune_throttles():
+    """定期清理防刷字典中超出窗口的旧条目，避免内存无限增长（内存泄漏）。
+
+    三个防刷字典只增不减：_recent_site_ip / _recent_lecture / _recent_like_action。
+    每 60 秒惰性删除已超过对应节流窗口的条目。
+    """
+    while True:
+        time.sleep(60)
+        now = time.time()
+        try:
+            with _stat_lock:
+                for k, t in list(_recent_site_ip.items()):
+                    if now - t >= VISIT_THROTTLE:
+                        _recent_site_ip.pop(k, None)
+                for k, t in list(_recent_lecture.items()):
+                    if now - t >= VISIT_THROTTLE:
+                        _recent_lecture.pop(k, None)
+                for k, v in list(_recent_like_action.items()):
+                    if now - v[0] >= LIKE_THROTTLE:
+                        _recent_like_action.pop(k, None)
+        except Exception:
+            pass
+
+
 def main():
     port = int(os.environ.get('PORT', '8000'))
     # 安全默认：仅绑定本机回环地址，避免把带写操作（/api/scrape、/api/sources 增删改）
     # 的后台意外暴露到局域网/公网。如确需局域网访问，显式设置 HOST=0.0.0.0（自担风险）。
     host = os.environ.get('HOST', '127.0.0.1')
+    # 启动防刷字典清理线程（守护线程，随主进程退出）
+    threading.Thread(target=_prune_throttles, daemon=True).start()
     srv = ThreadingHTTPServer((host, port), Handler)
     print(f'[server] 华师讲座聚合已启动：http://localhost:{port}  （Ctrl+C 退出）')
     try:
