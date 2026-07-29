@@ -403,6 +403,11 @@ def _clean_location(loc, title=None):
     m = _LOCATION_TERM.search(loc)
     if m:
         loc = loc[:m.start()].strip()
+    # 截断被吸入的「专题N：」讲座子标题（CTLD 通识课：地点行后紧跟「专题一：…」泄漏）
+    _loc_zhuanti = re.compile(r'专题\s*[一二三四五六七八九十百零0-9]+\s*[：:]')
+    mz = _loc_zhuanti.search(loc)
+    if mz and mz.start() > 3:
+        loc = loc[:mz.start()].strip()
     # 截断内容泄漏：地点值后吸入的日期/简介/正文开头等非地点文字
     # 典型场景：BS4 把换行变空格后 "地点：石牌校区研究生院111 研究生院 2018年4月8日 学校简介：..."
     # 匹配顺序由严格到宽松，避免误伤正常地名中的子串
@@ -2158,6 +2163,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 partial['vlmExtracted'] = True
                 partial['imageParseMethod'] = 'vlm'
                 partial['hasPosterImage'] = True
+                partial['splitMode'] = 'vlm-poster'
                 if len(applied) > 1:
                     partial['isMultiLecture'] = True
                     partial['lectureIndex'] = i
@@ -3227,6 +3233,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 result['hasPosterImage'] = True
             break
 
+    # ---- 单讲座：角色标签白名单提取（补丁8）----
+    # 到达此处说明未走多讲座拆分 / 连写多主讲人 / VLM 多场路径，即单场讲座。
+    # 从正文提取主持人/点评人/评议人/与谈人/嘉宾（报告人已是 speaker，不重复）。
+    # 仅白名单精确匹配，避免把主持人误当第二主讲人。
+    for _role, _field in (('host', 'host'), ('reviewer', 'reviewer'),
+                          ('discussant', 'discussant'), ('guest', 'guest')):
+        if not result.get(_field):
+            _v = _extract_role(body_text, _role)
+            if _v:
+                result[_field] = _v
+
     return result
 
 
@@ -3258,6 +3275,49 @@ _TOPIC_VAL_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点|�
 _BLOCK_FIELD_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点|题目|主题|摘要|简介|'
                       r'主办|承办|邀请人|参与者|$|【|第[一二三四五六七八九十百零0-9]+期|'
                       r'\d{4}年|\d{1,2}月\d{1,2}日|上午|下午|晚上))')
+
+
+# 角色标签白名单（补丁8）：精确匹配，互不交叉。
+# 仅「报告人/主讲人/主讲」算 speaker（拆分触发依据）；「主持人」算 host；
+# 点评人/评议人/评论人→reviewer；与谈人/对谈人→discussant；嘉宾/特邀嘉宾→guest。
+# 各角色用完整词精确匹配，前置 (?:...) 非捕获组确保「点评人」不匹配「报告人/主持人」；
+# 前瞻断言列尽所有已知角色标签，确保提取值不会溢出到下一个角色字段。
+_ROLE_LABELS = {
+    'speaker': r'(?:报告人|主讲人|主讲)',
+    'host': r'主持人',
+    'reviewer': r'(?:点评人|评议人|评论人)',
+    'discussant': r'(?:与谈人|对谈人)',
+    'guest': r'(?:特邀嘉宾|嘉宾)',
+}
+_ROLE_STOP = (r'(?=\s*(?:报告人|主讲人|主讲|主持人|点评人|评议人|评论人|'
+              r'与谈人|对谈人|嘉宾|特邀嘉宾|时间|地点|题目|主题|摘要|简介|'
+              r'主办|承办|邀请人|参与者|$|【|第[一二三四五六七八九十百零0-9]+期|'
+              r'\d{4}年|\d{1,2}月\d{1,2}日|上午|下午|晚上))')
+
+
+def _extract_role(text, role):
+    """按角色白名单从文本提取某角色的值（补丁8）。返回清洗后的姓名/字符串。
+
+    仅用白名单精确匹配，绝不使用「人[：:]」等模糊模式，避免把「主持人」误当主讲人。
+    提取到的值先剥尾部职称碎片再取姓名；无法识别为姓名时保留原值（如机构组合名）。
+    """
+    lab = _ROLE_LABELS.get(role)
+    if not lab:
+        return ''
+    # 折叠 CJK 内部空格（部分站点「主 持 人」「点 评 人」带零散空格，归一化未覆盖），
+    # 保证白名单标签可稳定命中。
+    _t = re.sub(r'([\u4e00-\u9fa5])\s{1,2}([\u4e00-\u9fa5])', r'\1\2', text)
+    m = re.search(rf'{lab}[：:]\s*(.+?){_ROLE_STOP}', _t)
+    if not m:
+        return ''
+    val = m.group(1).strip()
+    cand_core = re.sub(
+        r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
+        r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', val).strip()
+    nm = _SPEAKER_NAME_RE.match(cand_core)
+    if nm and _looks_like_real_name(nm.group(1)):
+        return nm.group(1)
+    return val
 
 
 def _detect_field_list_sessions(text, default_year=None, publish_time=None,
@@ -3341,7 +3401,7 @@ def _detect_field_list_sessions(text, default_year=None, publish_time=None,
                 _started = True
         cand.append({'topic': title, 'start': dt['start'], 'end': dt.get('end'),
                      'block': text[block_start:block_end],
-                     'speaker': speaker, 'abstract': abstract})
+                     'speaker': speaker, 'abstract': abstract, 'splitMode': 'field-list'})
     return cand
 
 
@@ -3408,7 +3468,7 @@ def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
         if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
             continue
         cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
-                     'block': block, '_numbered': True})
+                     'block': block, '_numbered': True, 'splitMode': 'numbered-prefix'})
     return cand
 
 
@@ -3634,7 +3694,7 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
         if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
             continue
         sessions.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
-                         'block': block})
+                         'block': block, 'splitMode': 'repeated-label'})
     # 候选2（新增，CS 源常见格式）：离散「报告N/专题N」分场标记——
     # 正文形如「报告一\n时间：9:00\n题目：X\n摘要：…\n报告二\n时间：10:00\n题目：Y…」，
     # 「报告N」与「题目」被时间/换行隔开，候选1的「报告N题目」连续标签匹配不到。
@@ -3694,7 +3754,7 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
             if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
                 continue
             cand2.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
-                          'block': seg})
+                          'block': seg, 'splitMode': 'report-n'})
         if len(cand2) >= 2:
             sessions = cand2
     # 候选3（兜底）：字段列表型多报告（cs 5400 等）。候选1 按「报告题目」分块、候选2 按
@@ -3751,7 +3811,7 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
             _HAS_TIME = re.compile(
                 r'\d{1,2}\s*[:：点]\s*\d{1,2}|\d{1,2}\s*时')
             _HAS_DATE = re.compile(
-                r'20\d{2}\s*年|20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|'
+                r'20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|'
                 r'\d{1,2}\s*月\s*\d{1,2}\s*日|\d{1,2}[-/.]\d{1,2}')
             cand5 = []
             for i, mk in enumerate(j_markers):
@@ -3777,7 +3837,7 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
                 st5 = dt5['start']
                 cand5.append({'topic': topic5, 'start': dt5['start'],
                               'end': dt5.get('end'), 'block': seg,
-                              '_no': mk.group()})
+                              '_no': mk.group(), 'splitMode': 'nth-session'})
             if len(cand5) >= 2:
                 sessions = cand5
     # 候选6（兜底，CTLD「智能升级」系列通识课等）：正文以「专题一：…专题二：…」式
@@ -3818,7 +3878,8 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
                     continue
                 cand6.append({'topic': topic6, 'start': dt6['start'],
                               'end': dt6.get('end'), 'block': seg,
-                              '_numbered': True, '_no': mk.group()})
+                              '_numbered': True, '_no': mk.group(),
+                              'splitMode': 'bare-topic'})
             if len(cand6) >= 2:
                 sessions = cand6
     # 去重：同 (topic, start) 视为同一场（顶部「题目」常与首期「主题/报告N题目」重复出现）。
@@ -3856,9 +3917,13 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
     sessions = [s for s in sessions if not _is_noise_session_topic(s.get('topic'))]
     if len(sessions) < 2:
         return []
-    # MS3-2：所有有效块主题完全相同 → 同讲座多时段，不拆（取首场即可）
+    # MS3-2：所有有效块主题完全相同 且 同一日历日多时段 → 同讲座多时段，不拆（取首场即可）。
+    # 跨日期同主题系列（如 xz 289：4 场同主题但日期 09-11/12/13/18 不同）须保留拆分，
+    # 故仅在「同主题 且 同日历日」时才抑制，避免把跨日期系列误并成单条。
     if len({s['topic'] for s in sessions}) == 1:
-        return []
+        _days = {(s['start'].year, s['start'].month, s['start'].day) for s in sessions}
+        if len(_days) == 1:
+            return []
     # MS3-3：列表页列举（内容区内含 ≥ 场次数的「讲座类」详情链接 → 视为列表页，不拆）
     # 注意：详情页自身也含大量导航/页脚链接，故只统计「链接文本含讲座类关键词」的详情链接，
     # 避免把详情页误判为列表页（如 ggy 5666 含许多导航链接但主题是纯文本，不应触发）。
@@ -3954,10 +4019,17 @@ def split_record_by_sessions(base, sessions, full_text=''):
         rec['sourceCount'] = 1 if i == 0 else 0
         rec['notes'] = []
         block = s.get('block', '')
-        # 主持人（逐块）
-        host = _extract_block_field(block, r'主持人')
-        if host:
-            rec['host'] = host
+        # 角色标签白名单（补丁8）：逐块精确提取 host/reviewer/discussant/guest。
+        # 仅 speaker 标签参与模式F 拆分触发（在 detect_multi_session 内判定），
+        # host/reviewer/discussant/guest 不计入。
+        for _role, _field in (('host', 'host'), ('reviewer', 'reviewer'),
+                              ('discussant', 'discussant'), ('guest', 'guest')):
+            _v = _extract_role(block, _role)
+            if _v:
+                rec[_field] = _v
+        # splitMode 落库标记（补丁2）：沿用本场次所属候选打出的模式
+        if s.get('splitMode'):
+            rec['splitMode'] = s['splitMode']
         # 会议号 + 平台：优先逐块「会议号/Meeting ID」标签；否则用全文「腾讯会议专题X:ID」映射
         mid_m = re.search(r'(?:会议号|会议ID|腾讯会议号|Meeting ID|会议号码)[：:\s]*([0-9][0-9\s]{5,})', block)
         if mid_m:
