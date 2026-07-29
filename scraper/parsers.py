@@ -3974,6 +3974,49 @@ _SPEAKER_NAME_RE = re.compile(
     r'^((?:(?:' + _SURNAME_2 + r')[\u4e00-\u9fa5]{2}|[\u4e00-\u9fa5·]{2,3}))')
 
 
+def _extract_bio_map(full_text, speakers=None):
+    """补丁7 姓名锚定简介：从全文「简介」区按「姓名，」切分多人物简介，返回 {姓名: 简介正文}。
+
+    适用场景：多讲座页有一段「主讲人简介：\\n卢晓中，…\\n赵淦森，…」式共享并列简介（如 CTLD
+    4407/4409）。若不锚定，split_record_by_sessions 会把整段共享简介误归因到某一场（最后一块），
+    造成「一人吃进另一人简介、另一人空缺」。仅当检测到≥2个人物起点（确为共享并列）才返回非空，
+    避免把单场简介误当共享结构。
+    """
+    if not full_text:
+        return {}
+    m = re.search(
+        r'(?:主讲人简介|报告人简介|讲者简介|个人简介|简介)\s*[：:]\s*\n?'
+        r'([\s\S]*?)(?=\n\s*(?:[一二三四五六七八九十百零0-9]+[、.．]|时间|地点|日期|'
+        r'联系人|主办|承办|邀请人|参与者|【|$)|\Z)', full_text)
+    if not m:
+        return {}
+    region = m.group(1).strip()
+    if not region or not speakers:
+        return {}
+    bio_map = {}
+    for sp in speakers:
+        if not sp or len(sp) < 2:
+            continue
+        # 锚点：speaker 姓名后跟 逗号/冒号（「卢晓中，」或「卢晓中：」）
+        sm = re.search(re.escape(sp) + r'\s*[,，:：]', region)
+        if not sm:
+            continue
+        start = sm.end()
+        end = len(region)
+        # 结束锚点：其它 speaker 姓名（在 region[start:] 中首个出现处）
+        for other in speakers:
+            if other == sp or not other:
+                continue
+            om = re.search(re.escape(other) + r'\s*[,，:：]', region[start:])
+            if om:
+                end = start + om.start()
+                break
+        bio = region[start:end].strip()
+        if len(bio) >= 10:
+            bio_map[sp] = bio
+    return bio_map
+
+
 def split_record_by_sessions(base, sessions, full_text=''):
     """把单条 base 记录按 sessions 拆成多条（MS4）。基底字段共享，逐块覆盖。"""
     out = []
@@ -3981,6 +4024,19 @@ def split_record_by_sessions(base, sessions, full_text=''):
     prev_aff = base.get('speakerAffiliation') or ''
     prev_title = base.get('speakerTitle') or ''
     base_title = base.get('title') or ''
+    # 补丁7：收集各场次主讲人姓名，用于在共享简介区按姓名锚定各自的简介
+    _all_speakers = []
+    for s in sessions:
+        _blk = s.get('block', '') or ''
+        _spm = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*)\s*[：:]\s*(.+?){_BLOCK_FIELD_STOP}', _blk)
+        if _spm:
+            _cand = re.sub(
+                r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
+                r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', _spm.group(1)).strip()
+            _nm = _SPEAKER_NAME_RE.match(_cand)
+            if _nm:
+                _all_speakers.append(_nm.group(1))
+    _bio_map = _extract_bio_map(full_text, _all_speakers) if _all_speakers else {}
 
     # 会议号映射：「腾讯会议专题一:562395609 专题二:…」式布局——全文末尾按专题序号列出，
     # 各专题块内无会议号。解析为 {专题序号: ID}，按 session 在文档中的顺序（位置 1..N）映射。
@@ -4122,23 +4178,46 @@ def split_record_by_sessions(base, sessions, full_text=''):
                             r'莅临|参加|光临|届时|踊跃|提出|关注)|感兴趣).*$', '', _a).strip()
                 if len(_a) > 5:
                     rec['abstract'] = _a
-        _bio_m = re.search(
-            r'(?:讲者简介|报告人简介|主讲人简介|个人简介|简介)[：:]\s*'
-            r'(.+?)(?=\s*(?:报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|'
-            r'报告题目|报告摘要|$))', block, re.S)
-        if _bio_m:
-            _b = _bio_m.group(1).strip()
-            # 去掉姓名前缀（已在 speaker 提取），保留简介正文
-            _b = re.sub(r'^[\u4e00-\u9fa5·]{2,4}\s*[,，]\s*', '', _b).strip()
-            if len(_b) >= 10:
+        if _bio_map:
+            # 补丁7：检测到共享并列简介（如 CTLD 4409「主讲人简介：卢晓中，…赵淦森，…」）→
+            # 清空 base 共享继承并按本场 speaker 姓名锚定，避免整段被误归因到某一场。
+            rec['speakerBio'] = ''
+            _sp = rec.get('speaker') or ''
+            _b = ''
+            if _sp in _bio_map:
+                _b = _bio_map[_sp]
+            else:
+                for _nm2, _bb in _bio_map.items():
+                    if _sp and (_sp in _nm2 or _nm2 in _sp):
+                        _b = _bb
+                        break
+            if _b:
                 rec['speakerBio'] = _b
                 # bio 起首为姓名且本块 speaker 为空时，用 F4 思路回填 speaker
                 if not rec.get('speaker'):
-                    _nm = re.match(r'^([\u4e00-\u9fa5·]{2,4})', _bio_m.group(1))
+                    _nm = re.match(r'^([\u4e00-\u9fa5·]{2,4})', _b)
                     if _nm and _looks_like_real_name(_nm.group(1)) and \
                             not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', _nm.group(1)):
                         rec['speaker'] = _nm.group(1)
                         rec['speakerSource'] = 'block-bio'
+        else:
+            _bio_m = re.search(
+                r'(?:讲者简介|报告人简介|主讲人简介|个人简介|简介)[：:]\s*'
+                r'(.+?)(?=\s*(?:报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|'
+                r'报告题目|报告摘要|$))', block, re.S)
+            if _bio_m:
+                _b = _bio_m.group(1).strip()
+                # 去掉姓名前缀（已在 speaker 提取），保留简介正文
+                _b = re.sub(r'^[\u4e00-\u9fa5·]{2,4}\s*[,，]\s*', '', _b).strip()
+                if len(_b) >= 10:
+                    rec['speakerBio'] = _b
+                    # bio 起首为姓名且本块 speaker 为空时，用 F4 思路回填 speaker
+                    if not rec.get('speaker'):
+                        _nm = re.match(r'^([\u4e00-\u9fa5·]{2,4})', _bio_m.group(1))
+                        if _nm and _looks_like_real_name(_nm.group(1)) and \
+                                not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', _nm.group(1)):
+                            rec['speaker'] = _nm.group(1)
+                            rec['speakerSource'] = 'block-bio'
         # 地点：逐块「报告N地点」优先；其次基底（已清洗的共享地点）；再次全页兜底；
         # 最后清泄漏与房间号空格。注意 CS 多报告页地点为全页共享（在页眉「报告地点：X」），
         # 各报告小节通常不含独立地点，故优先用基底干净值，避免被全页「地点：X时间:…报告一…」
