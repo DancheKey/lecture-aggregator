@@ -121,16 +121,18 @@
           <!-- 统计 + 筛选工具栏：同一行，筛选时左侧文字切换为"当前筛选"，避免控件跳行 -->
           <div v-if="!loading" class="mb-5">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <!-- 左侧统计文字：筛选时显示"当前筛选"，否则显示"更新于" -->
+              <!-- 左侧统计文字：筛选时显示"当前筛选"，否则显示"更新于"；搜索时隐藏"覆盖N条来源通知"以腾出空间 -->
               <div class="text-[12pt] text-slate-500 flex flex-wrap items-center gap-1">
                 共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
-                <span class="text-slate-300">·</span>
-                覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知
+                <template v-if="!hasActiveFilter">
+                  <span class="text-slate-300">·</span>
+                  覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知
+                </template>
                 <template v-if="filtered.length !== totalCount">
                   <span class="text-slate-300">·</span>
                   当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
                 </template>
-                <template v-else-if="updatedAt">
+                <template v-else-if="updatedAt && !hasActiveFilter">
                   <span class="text-slate-300">·</span>
                   更新于 {{ updatedAt.slice(0, 10) }}
                 </template>
@@ -155,6 +157,10 @@
                   <option value="">全部年份</option>
                   <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
                 </select>
+                <!-- 清除筛选：仅在有任何筛选时显示 -->
+                <button v-if="hasActiveFilter" @click="clearFilters()"
+                  class="shrink-0 px-2 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition whitespace-nowrap"
+                  title="清除所有筛选条件">✕ 清除</button>
               </div>
             </div>
           </div>

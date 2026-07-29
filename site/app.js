@@ -91,6 +91,11 @@ const app = createApp({
       }[this.searchField] || '搜索…';
     },
 
+    // 是否有任何筛选条件激活（控制"清除"按钮显示）
+    hasActiveFilter() {
+      return !!(this.campus || this.college || this.year || this.query || this.showLikedOnly);
+    },
+
     // 复合筛选 + 按讲座时间倒序
     filtered() {
       const q = this.query.trim().toLowerCase();
