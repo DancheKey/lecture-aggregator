@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-29T19:21:03",
+  "updatedAt": "2026-07-29 23:35:54",
   "data": [
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20260725/6792.html",
@@ -75759,6 +75759,34 @@
       "sourceCount": 0,
       "notes": [],
       "splitMode": "table-session"
+    },
+    {
+      "sourceUrl": "http://life.scnu.edu.cn/a/20231129/6000.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/life/2023/1129/1701227688596557.jpg"
+      ],
+      "college": "生命科学学院",
+      "campus": "石牌",
+      "title": "学术讲座： 细胞生物学助力作物农艺性状分子设计---Seeing is believing !",
+      "topic": "细胞生物学助力作物农艺性状分子设计---Seeing is believing !",
+      "lectureStart": "2023-12-01 14:30:00",
+      "lectureEnd": null,
+      "location": "生命科学学院102会议室",
+      "speaker": "孔照胜",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "山西农业大学",
+      "inviter": "",
+      "speakerBio": "孔照胜，研究员，国家杰出青年科学基金获得者，国家重点研发项目首席科学家，山西省后稷实验室（杂粮生物育种山西省实验室）主任，农业农村部杂粮种质创新与分子育种重点实验室主任。2006年在中国科学院遗传与发育生物学研究所获博士学位；2007年-2012年，在美国加州大学戴维斯分校从事博士后研究；2011年入职中国科学院微生物研究所，任创新课题组组长、所学术委员会副主任。2012年入选中科院“百人计划”，2017年终期评估获优秀。2021年任山西农业大学（省农科院）党委常委、副校（院）长。孔照胜研究员长期致力于细胞生物学视角下作物农艺性状的分子设计研究，取得了多项原创性研究成果，引领了相关领域的活体细胞、实时动态研究，并为作物分子改良提供了重要理论依据。相关研究成果发表在Nature Plants、EMBO Journal、Current Biology、eLife、Plant Cell、Molecular Plant、New Phytologist等国际主流学术刊物；部分原创成果编入生命科学领域国际经典教科书《Molecular Biology of the Cell》(第7版)中。入选Faculty member of F1000Prime；兼任《mLife》、《Modem Agriculture》和《植物学报》编委。培养研究生多次荣获国家奖学金等重要奖项以及“北京市优秀毕业生”等荣誉称号。",
+      "organizer": "生命科学学院",
+      "publishTime": "2023-11-29 11:13:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "sessionNumber": "第十二讲",
+      "vlmExtracted": true,
+      "timeConfidence": "high",
+      "timeNote": "general-body-full",
+      "listTitle": "2023年12月1日学术讲座： 细胞生物学助力作物农艺性状分子设计---Seeing is believing !"
     }
   ]
 }
