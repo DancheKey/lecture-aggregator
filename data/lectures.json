@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-30T10:18:45.019012+08:00",
+  "updatedAt": "2026-07-30T11:56:00",
   "data": [
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20260725/6792.html",
@@ -45445,7 +45445,7 @@
       "sourceUrl": "http://gxb.scnu.edu.cn/a/20220930/615.html",
       "college": "工学部",
       "campus": "佛山",
-      "title": "关于举办工学部“高校科技成果转化专题报告会”的通知",
+      "title": "工学部“高校科技成果转化专题报告会”",
       "topic": "1.《高校科技成果转化案例分享》,",
       "lectureStart": "2022-10-10 15:00:00",
       "lectureEnd": null,
@@ -45461,7 +45461,7 @@
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "abstract": "届时将邀请广东高校科技成果转化中心领导及工作人员进行宣讲与交流。现将会议有关内容通知如下: 一、会议时间:2022年10月10日(周一)15:00; 二、会议地点:南海校区行政楼317会议室; 三、报告主题:1.《高校科技成果转化案例分享》,主讲人:广东高校科技成果转化中心项目部部长程富平。2.《佛山市人才团队政策宣讲》,主讲人:广东高校科技成果转化中心资深技术经理人张红泉; 四、参会人员:工学部对科技成果转化工作有兴趣的教师; 五、报名方式:本次报告会采取预约报名制,请感兴趣的教师扫描(或长按)下方二维码报名参加; 五、联系人:陈荣芳,15217691001。",
-      "listTitle": "关于举办工学部“高校科技成果转化专题报告会”的通知"
+      "listTitle": "工学部“高校科技成果转化专题报告会”"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20221008/12116.html",
@@ -45945,7 +45945,7 @@
       "sourceUrl": "http://gxb.scnu.edu.cn/a/20220921/606.html",
       "college": "工学部",
       "campus": "佛山",
-      "title": "关于举办“对外交流大讲堂”专题讲座的通知",
+      "title": "“对外交流大讲堂”专题讲座",
       "topic": "",
       "lectureStart": "2022-09-23 15:00:00",
       "lectureEnd": null,
@@ -45961,7 +45961,7 @@
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "abstract": "现将有关事项通知如下: 一、讲座时间2022年9月23日(星期五)下午15:00 二、讲座形式主会场现场讲座+腾讯会议线上直播。线上直播腾讯会议号:398-217-635,会议链接:https://meeting.tencent.com/dw/Kv0HJlsZQSCU,入会密码:0923。三、参与方式本次培训采取预约报名制 ,请各单位相关老师扫描(或长按)下方二维码报名参加。",
-      "listTitle": "关于举办“对外交流大讲堂”专题讲座的通知"
+      "listTitle": "“对外交流大讲堂”专题讲座"
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2022/0922/26.html",
@@ -48716,7 +48716,7 @@
       "sourceUrl": "http://gxb.scnu.edu.cn/a/20211122/125.html",
       "college": "工学部",
       "campus": "佛山",
-      "title": "关于举办“教学型教师的专业发展途径” 教学创新工作坊（第50期）的通知",
+      "title": "“教学型教师的专业发展途径” 教学创新工作坊（第50期）",
       "topic": "教学型教师的专业发展途径",
       "lectureStart": "2021-11-25 14:30:00",
       "lectureEnd": null,
@@ -48729,7 +48729,7 @@
       "organizer": "工学部",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "listTitle": "关于举办“教学型教师的专业发展途径” 教学创新工作坊（第50期）的通知",
+      "listTitle": "“教学型教师的专业发展途径” 教学创新工作坊（第50期）",
       "sources": [
         {
           "sourceUrl": "http://ctld.scnu.edu.cn/a/20211123/1437.html",
@@ -48770,10 +48770,25 @@
       "isMultiLecture": true,
       "lectureIndex": 1,
       "lectureCount": 2,
-      "sourceCount": 1,
+      "sourceCount": 2,
       "notes": [],
       "speakerSource": "block",
-      "listTitle": "“教师教学技能提升和发展”教学创新工作坊 （第49期）"
+      "listTitle": "“教师教学技能提升和发展”教学创新工作坊 （第49期）",
+      "merged": true,
+      "sources": [
+        {
+          "sourceUrl": "http://gxb.scnu.edu.cn/a/20211122/124.html",
+          "college": "工学部",
+          "title": "“教师教学技能提升和发展”教学创新工作坊（第49期）",
+          "sourceCount": 1,
+          "publishTime": null,
+          "lectureStart": "2021-11-24 14:30:00",
+          "speaker": "刘晓斌",
+          "topic": "新媒体、新技术支持的外语教学与研究",
+          "location": "石牌校区文科楼832多媒体室",
+          "campus": "佛山"
+        }
+      ]
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20211123/1436.html",
@@ -48804,11 +48819,26 @@
       "isMultiLecture": true,
       "lectureIndex": 2,
       "lectureCount": 2,
-      "sourceCount": 0,
+      "sourceCount": 2,
       "notes": [],
       "host": "徐曼菲教授面向对象: 外国语言文化学院教师及对该",
       "speakerSource": "block",
-      "listTitle": "“教师教学技能提升和发展”教学创新工作坊 （第49期）"
+      "listTitle": "“教师教学技能提升和发展”教学创新工作坊 （第49期）",
+      "merged": true,
+      "sources": [
+        {
+          "sourceUrl": "http://gxb.scnu.edu.cn/a/20211122/124.html",
+          "college": "工学部",
+          "title": "“教师教学技能提升和发展”教学创新工作坊（第49期）",
+          "sourceCount": 1,
+          "publishTime": null,
+          "lectureStart": "2021-11-24 16:00:00",
+          "speaker": "黄丽燕",
+          "topic": "教学成果的培育与评奖申报书的撰写",
+          "location": "石牌校区文科楼832多媒体室",
+          "campus": "佛山"
+        }
+      ]
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20211122/190.html",
@@ -49824,7 +49854,7 @@
       "sourceUrl": "http://gxb.scnu.edu.cn/a/20211008/22.html",
       "college": "工学部",
       "campus": "佛山",
-      "title": "关于举办“公文写作培训”木铎教师沙龙（第26期）的通知",
+      "title": "“公文写作培训”木铎教师沙龙（第26期）",
       "topic": "公文写作培训",
       "lectureStart": "2021-10-12 15:00:00",
       "lectureEnd": "2021-10-12 17:00:00",
@@ -49839,7 +49869,7 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "listTitle": "关于举办“公文写作培训”木铎教师沙龙（第26期）的通知",
+      "listTitle": "“公文写作培训”木铎教师沙龙（第26期）",
       "sources": [
         {
           "sourceUrl": "http://ctld.scnu.edu.cn/a/20210930/1417.html",
@@ -58918,37 +58948,6 @@
       "ocrExtracted": false
     },
     {
-      "sourceUrl": "http://ctld.scnu.edu.cn/a/20190620/999.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/ctld/2019/0620/1561039879399937.jpg",
-        "http://statics.scnu.edu.cn/pics/ctld/2019/0620/1561039960854223.jpg"
-      ],
-      "college": "教师发展中心",
-      "campus": "校级",
-      "title": "关于“融合 创新 质量粤港澳高校‘金课’建设高峰论坛”直播指引",
-      "topic": "",
-      "lectureStart": "2019-06-21 08:00:00",
-      "lectureEnd": null,
-      "location": "",
-      "speaker": "",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "教师发展中心",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
-      "timeConfidence": "high",
-      "timeNote": "same-day-normal",
-      "ocrExtracted": false,
-      "imageParseMethod": "vlm",
-      "hasPosterImage": true,
-      "abstract": "6月21日直播二维码 6月22日直播二维码",
-      "listTitle": "关于“融合 创新 质量粤港澳高校‘金课’建设高峰论坛”直播指引",
-      "__idx": 2455,
-      "vlmExtracted": true
-    },
-    {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20190617/997.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/ctld/2019/0617/1560734536125695.jpg"
@@ -64137,61 +64136,6 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1
-    },
-    {
-      "sourceUrl": "http://ctld.scnu.edu.cn/a/20171206/495.html",
-      "images": [],
-      "college": "教师发展中心",
-      "campus": "校级",
-      "title": "关于广东省本科高校教学名师讲坛暨教师教学发展中心建设经验交流活动的相关指引",
-      "topic": "",
-      "lectureStart": "2017-12-07 08:00:00",
-      "lectureEnd": null,
-      "location": "教育信息技术学院一楼讲学厅西侧;12月8日上午",
-      "speaker": "",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "教师发展中心",
-      "publishTime": "2017-12-06 17:08",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "same-year",
-      "abstract": "签到成功,按返回信息,到指定签到台领取会议资料,到指定区域入座;如签到不成功,请到3号签到台人工签到。12月7日上午8:20-9:00签到",
-      "listTitle": "关于广东省本科高校教学名师讲坛暨教师教学发展中心建设经验交流活动的相关指引",
-      "__idx": 2674
-    },
-    {
-      "sourceUrl": "http://ctld.scnu.edu.cn/a/20171205/493.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/ctld/2017/1206/1512542519175655.png",
-        "http://statics.scnu.edu.cn/pics/ctld/2017/1206/1512542451259868.png"
-      ],
-      "college": "教师发展中心",
-      "campus": "校级",
-      "title": "关于广东省本科高校教学名师讲坛直播公告",
-      "topic": "",
-      "lectureStart": "2017-12-07 08:00:00",
-      "lectureEnd": null,
-      "location": "",
-      "speaker": "",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "教师发展中心",
-      "publishTime": "2017-12-05 16:29",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "same-year",
-      "ocrExtracted": false,
-      "imageParseMethod": "vlm",
-      "hasPosterImage": true,
-      "abstract": "教学名师讲坛直播师 CNU",
-      "listTitle": "关于广东省本科高校教学名师讲坛直播公告",
-      "__idx": 2675,
-      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20171201/492.html",
@@ -74109,7 +74053,7 @@
       "sourceUrl": "http://gxb.scnu.edu.cn/a/20220916/604.html",
       "college": "工学部",
       "campus": "佛山",
-      "title": "关于举办“教学成果凝炼与成果奖申报”第57期教学创新工作坊的通知",
+      "title": "“教学成果凝炼与成果奖申报”第57期教学创新工作坊",
       "topic": "教学成果凝炼与成果奖申报",
       "lectureStart": "2022-09-22 15:00:00",
       "lectureEnd": null,
@@ -74124,7 +74068,7 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "listTitle": "关于举办“教学成果凝炼与成果奖申报”第57期教学创新工作坊的通知",
+      "listTitle": "“教学成果凝炼与成果奖申报”第57期教学创新工作坊",
       "sources": [
         {
           "sourceUrl": "https://physics.scnu.edu.cn/a/20220920/12097.html",
@@ -74277,56 +74221,6 @@
       ],
       "merged": true,
       "sourceCount": 2
-    },
-    {
-      "sourceUrl": "http://gxb.scnu.edu.cn/a/20211122/124.html",
-      "college": "工学部",
-      "campus": "佛山",
-      "title": "关于举办“教师教学技能提升和发展”教学创新工作坊（第49期）的通知",
-      "topic": "教学成果的培育与评奖申报书的撰写",
-      "lectureStart": "2021-11-24 16:00:00",
-      "lectureEnd": "2021-11-24 17:30:00",
-      "location": "石牌校区文科楼832多媒体室",
-      "speaker": "黄丽燕",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "华南师范大学外国语言文化学院教授、博士生导师、副院长。英国兰卡斯特大学语言测试 方向博士、中山大学博士后。主要研究方向为测试与评估、二语习得和教师教育。兼任中国教育发展战 略学会教师发展专委会学术委员会副主任兼常务理事、中国英汉语比较研究语言测试与评价专业委员会 常务理事、广东省高校人文社科重点研究基地“语言认知与测试研究中心”主任及“英语教育与评价”省级教 学团队负责人。在SSCI、CSSCI、EI收录期刊全国中文核心等国内外期刊发表文章40余篇。主持国家 社科基金一般项目等10项省部级以上课题和项目。获国家级及省级教学成果奖8项。全国教育硕士优秀 教师、华南师范大学教学名师。",
-      "organizer": "工学部",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
-      "listTitle": "关于举办“教师教学技能提升和发展”教学创新工作坊（第49期）的通知",
-      "isMultiLecture": true,
-      "lectureIndex": 2,
-      "lectureCount": 2,
-      "sourceCount": 0,
-      "notes": [],
-      "speakerSource": "block"
-    },
-    {
-      "sourceUrl": "http://gxb.scnu.edu.cn/a/20211122/124.html",
-      "college": "工学部",
-      "campus": "佛山",
-      "title": "关于举办“教师教学技能提升和发展”教学创新工作坊（第49期）的通知",
-      "topic": "新媒体、新技术支持的外语教学与研究",
-      "lectureStart": "2021-11-24 14:30:00",
-      "lectureEnd": "2021-11-24 16:00:00",
-      "location": "石牌校区文科楼832多媒体室",
-      "speaker": "刘晓斌",
-      "speakerTitle": "副教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "华南师范大学外国语言文化学院副教授，硕士生导师，英语系主任，华南师范大学外语教 育信息化研究中心主任，华南师范大学广东省高考综合改革研究院首届聘任专家，南粤优秀教师，中国 英汉语比较研究会外语教育技术专业委员会理事，广东省高等教育学会教育技术专业委员会常务理事， 外研版全国统编高中英语教材《英语选修一》核心编委，广东省精品在线开放课程评审专家，主持国家 精品开放课程一门，主持省部级项目6项，获广东省教学成果奖一等奖3项、二等奖1项。",
-      "organizer": "工学部",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
-      "listTitle": "关于举办“教师教学技能提升和发展”教学创新工作坊（第49期）的通知",
-      "isMultiLecture": true,
-      "lectureIndex": 1,
-      "lectureCount": 2,
-      "sourceCount": 1,
-      "notes": [],
-      "speakerSource": "block"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211018/11736.html",
