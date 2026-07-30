@@ -853,6 +853,24 @@ def _normalize_vlm_keys(f):
     return out
 
 
+def _vlm_fields_useful(f):
+    """VLM 返回字段是否「有用」（至少含一个非空关键字段）。
+
+    全字段为空的 dict（VLM 实际未识别到任何内容）必须视为失败，放行文本/OCR 兜底与
+    回溯重抽——否则空 dict 在 Python 里为 truthy，会被误判为「VLM 成功」：既设
+    vlmExtracted:true、又旁路文本多讲座拆分器、又让 rebackfill 跳过该记录，导致
+    多讲座表格页（如 ctld/4290）被永久卡死、永远不拆。
+    """
+    if not f:
+        return False
+    if isinstance(f, list):
+        return any(_vlm_fields_useful(x) for x in f)
+    if not isinstance(f, dict):
+        return False
+    _KEYS = ('speaker', 'title', 'topic', 'lectureStart', 'location', 'abstract', 'speakerBio')
+    return any((f.get(k) or '').strip() for k in _KEYS)
+
+
 def _parse_vlm_json(text):
     """从模型返回文本中提取 JSON 对象（或数组，支持多场讲座）。容错：去 ```json 围栏、整体解析、截取兜底。"""
     if not text:
@@ -915,7 +933,7 @@ def _vlm_extract_fields(img_urls, cfg):
         return None
     key = _hash.md5('|'.join(sorted(img_urls)).encode('utf-8')).hexdigest()
     cached = _vlm_cache_get(key)
-    if cached is not None:
+    if cached is not None and _vlm_fields_useful(cached):
         return cached
     contents = []
     for u in img_urls[:2]:
@@ -948,7 +966,7 @@ def _vlm_extract_fields(img_urls, cfg):
             resp = r.json()
             txt = resp['choices'][0]['message']['content']
             fields = _parse_vlm_json(txt)
-            if fields:
+            if fields and _vlm_fields_useful(fields):
                 _vlm_cache_set(key, fields)
                 _time.sleep(1.5)  # 主动限速，串行调用避免触发 RPM 限流
                 return fields
@@ -2315,7 +2333,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     )
     # VLM 优先路径：海报经多模态模型结构化提取，成功则填字段并旁路 OCR 补字段。
     # 支持多讲座海报：VLM 返回 list 时对每场讲座生成独立记录（isMultiLecture/lectureIndex/lectureCount）。
-    if vlm_fields:
+    # 注：空字段的 VLM 结果（VLM 实际未识别到内容）视为失败，须放行文本/OCR 兜底与多讲座拆分。
+    if vlm_fields and _vlm_fields_useful(vlm_fields):
         applied = _apply_vlm_to_result(result, vlm_fields, default_year, publish_time,
                                        title_year, url_year, poster_only=poster_only)
         if isinstance(vlm_fields, list) and isinstance(applied, list):
