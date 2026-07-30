@@ -188,7 +188,7 @@ _NAME_FORBIDDEN = (
 # 主讲人候选词首字须为常见姓氏，避免把 星期二/本科/智能 等非人名空格孤立词误抓。
 # 少数民族名/外文音译名首字可能不在集合内，作为 mid 兜底宁可少抓（仍可走 Pattern4/人工核验）。
 _SURNAME_RE = re.compile(
-    r'^[赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黄和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍万柯卢莫房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊于惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符刘景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍卻桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广禄阙东欧阳]$')
+    r'^[赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黄和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍万柯卢莫房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊于惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符刘景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍卻桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广库禄阙东欧阳]')
 
 def _looks_like_real_name(s):
     if not s:
@@ -214,9 +214,15 @@ def _looks_like_real_name(s):
         if s.lower().strip('.') in _EN_NON_NAME:
             return False
         return True
-    # 中文名：2–5 个汉字，且去除非人名 token 后仍有残留
+    # 中文名：2–5 个汉字，首字须为常见姓氏，且去除非人名 token 后仍有残留
     if re.fullmatch(r'[\u4e00-\u9fa5]{2,5}', s):
         if s in _NON_NAME_TOKENS:
+            return False
+        # 首字必须是百家姓之一，否则如「是我国」「本课程」「本标准」等 2–5 字中文
+        # 非人名会被误放（曾导致 CTLD 398 把「主讲人是我国…」的「是我国」当主讲人）。
+        # 复姓首字（欧/司/上/诸/东/独…）亦在百家姓集合内，不受影响；少数民族音译名
+        # 首字偶不在集合时宁可少抓（仍可走 Pattern4/F4 或人工核验），避免误收非人名。
+        if not _SURNAME_RE.match(s):
             return False
         stripped = re.sub('|'.join(_NON_NAME_TOKENS), '', s)
         if not stripped:
@@ -1215,6 +1221,24 @@ def is_non_lecture_title(title):
     # 且仅在含明确行政动词（申报/征集/评选/招募/招新/遴选/选拔）时判为非讲座，避免误杀正文
     # 提及这些词的真实讲座预告（真实讲座标题不会以「关于…通知」框架收尾）。
     if re.search(r'关于.{0,120}?(申报|征集|评选|招募|招新|遴选|选拔).{0,60}?(通知|公告)', title):
+        return True
+    return False
+
+
+def _is_empty_notice(rec, title):
+    """RT0-EMPTY：纯文本页但无任何讲座实质内容（无摘要/无主讲/无地点/无海报），
+    且标题明确是「活动预告」类总体通知 → 判为非讲座剔除。
+
+    覆盖 CTLD「活动预告」类总体沙龙通知（如 311：讲座明细在附件 PDF，正文无具体
+    主讲/时间/地点/摘要，parser 只抓到一个模糊日期就被误当讲座入库）。
+    保守策略：仅当标题含「活动预告」才剔除，避免误杀解析暂时失败、但有图片
+    （海报/VLM 富化）或至少含一项实质字段的真实讲座页。
+    """
+    if rec.get('hasPosterImage') or rec.get('vlmExtracted'):
+        return False
+    if rec.get('abstract') or rec.get('speaker') or rec.get('location'):
+        return False
+    if title and '活动预告' in title:
         return True
     return False
 
@@ -3381,24 +3405,47 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             if not re.match(r'^第[一二三四五六七八九十\d]+[场期讲]', m.group(1)):
                 result['speaker'] = m.group(1).strip()
 
-    # F4 补充：speaker 仍为空但 bio 以"姓名,职称..."或"姓名 职称..."开头时，
-    # 从 bio 开头提取主讲人姓名。覆盖 io 源等 speaker 未从正文标签提取到的场景。
-    if (not result.get('speaker')) and result.get('speakerBio'):
+    # F4 补充：speaker 为空，或现有 speaker 明显非人名（被错误提取，如摘要词「是我国」）时，
+    # 从 speakerBio 开头提取主讲人姓名 + 单位。覆盖 CTLD「主讲介绍：」整段 bio 格式：
+    # 「李丹青,现任…」「冯培(首都经济贸易大学),冯培,…」「孙熙国(北京大学),孙熙国:…」
+    # 「王竹立: 中山大学…」「孟克老师 • 百度…」等（这些页面的「主讲介绍」标签未被 speaker_pat
+    # 识别为 speaker 标签，整段落进了 bio，需在此从 bio 开头回填 speaker）。
+    _sp0 = (result.get('speaker') or '').strip()
+    _sp0_valid = bool(_sp0) and _looks_like_real_name(_sp0)
+    if result.get('speakerBio') and (not _sp0_valid):
         bio = result['speakerBio'].strip()
-        # 模式1："姓名, ..."（逗号分隔的简介）
-        m_name = re.match(r'^([\u4e00-\u9fa5]{2,4})(?:[,，]|(?:\s+[，,]))', bio)
-        if m_name and _looks_like_real_name(m_name.group(1)):
-            candidate = re.sub(r'[男女]$', '', m_name.group(1))
-            # 排除机构名（学院/中心/学会等）
-            if candidate and _looks_like_real_name(candidate) and not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', candidate):
-                result['speaker'] = candidate
-        elif not result.get('speaker'):
-            # 模式2："姓名 职称/头衔..."（允许连写如"李志远教授"）
-            m_name2 = re.match(r'^([\u4e00-\u9fa5]{2,4})\s*((?:教授|研究员|博士|院长|主任|讲师|院士|博导|处长|司长|局长|书记|会长|秘书长|理事))', bio)
-            if m_name2 and _looks_like_real_name(m_name2.group(1)):
-                candidate2 = re.sub(r'[男女]$', '', m_name2.group(1))
-                if candidate2 and _looks_like_real_name(candidate2):
-                    result['speaker'] = candidate2
+        _new_sp = None
+        _new_aff_raw = None
+        # 模式A：姓名(单位) / 姓名（单位），括号内为单位
+        m = re.match(r'^([\u4e00-\u9fa5·]{2,4})\s*[（(]\s*([^）)]{2,30}?)\s*[）)]', bio)
+        if m and _looks_like_real_name(m.group(1)):
+            _new_sp = m.group(1)
+            _new_aff_raw = m.group(2)
+        # 模式B：姓名：单位 / 姓名: 单位
+        if not _new_sp:
+            m = re.match(r'^([\u4e00-\u9fa5·]{2,4})\s*[:：]\s*([\u4e00-\u9fa5A-Za-z（）()·]{2,40}?)(?:[，,。\s、]|$)', bio)
+            if m and _looks_like_real_name(m.group(1)):
+                _new_sp = m.group(1)
+                _new_aff_raw = m.group(2)
+        # 模式C：姓名, 单位（逗号分隔）
+        if not _new_sp:
+            m = re.match(r'^([\u4e00-\u9fa5·]{2,4})[,，]', bio)
+            if m and _looks_like_real_name(m.group(1)):
+                _new_sp = m.group(1)
+                _new_aff_raw = bio[m.end():]
+        # 模式D：姓名 职称/称谓（空格 + 职称，含「老师」）
+        if not _new_sp:
+            m = re.match(r'^([\u4e00-\u9fa5·]{2,4})\s*((?:教授|研究员|博士|院长|主任|讲师|院士|博导|处长|司长|局长|书记|会长|秘书长|理事|老师))', bio)
+            if m and _looks_like_real_name(m.group(1)):
+                _new_sp = m.group(1)
+        if _new_sp:
+            result['speaker'] = _new_sp
+            # 覆盖场景（原 speaker 非有效人名，affiliation 多半也被污染）→ 重置；
+            # 普通场景（原 speaker 有效）仅在 affiliation 为空时补。
+            if _new_aff_raw and (not result.get('speakerAffiliation') or not _sp0_valid):
+                _aff = _extract_affiliation(_new_aff_raw)
+                if _aff:
+                    result['speakerAffiliation'] = _aff
 
     # 新闻/回顾处理（R5 政策确认，2026-07-19；回退 2026-07-18 的"保留标记"）：
     # 事后才报道的讲座（新闻/回顾稿）不属于预告类聚合，整条剔除、不入库。
@@ -3436,8 +3483,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     if not skip_news_filter and is_news_record(result):
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
-    if is_non_lecture_title(title) or is_admin_notice(title, body_text) or (not skip_news_filter and is_news_article(title, body_text, result.get('lectureStart'))):
-        return None  # [SKIP-NEWS] / [SKIP-ADMIN]
+    if (is_non_lecture_title(title) or is_admin_notice(title, body_text)
+            or _is_empty_notice(result, title)
+            or (not skip_news_filter and is_news_article(title, body_text, result.get('lectureStart')))):
+        return None  # [SKIP-NEWS] / [SKIP-ADMIN] / [SKIP-EMPTY]
     if skip_news_filter:
         # 来源被显式标记为「跳过新闻过滤」（如整栏为讲座海报预告、发布晚于讲座时间），
         # 记录标记以便后续清理脚本（clean_public.py）也不会误删。
