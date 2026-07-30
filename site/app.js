@@ -364,7 +364,9 @@ const app = createApp({
       // 后端 lectureStats 为权威（与统计页同源）；无后端时回退本机 this.likes
       const s = this.lectureStats[url];
       if (s && typeof s.likes === 'number') return s.likes;
-      return this.likes[url] || 0;
+      // 不再回退本机 localStorage 残留值：本机只代表「本机是否点过赞」(hasLiked)，
+      // 计数以「后端全局权威值」为准，避免旧版逻辑残留的脏值被刷新后显示出来。
+      return 0;
     },
     hasLiked(url) {
       return this.likedUrls.has(url);
@@ -433,7 +435,9 @@ const app = createApp({
     wantCount(url) {
       const s = this.lectureStats[url];
       if (s && typeof s.wants === 'number') return s.wants;
-      return this.wants[url] || 0;
+      // 与 likeCount 一致：计数以「后端全局权威值」为准，不回退本机 localStorage 残留值，
+      // 否则旧版想听逻辑遗留的脏值会在刷新后被显示出来（表现为「刷新数值增加」）。
+      return 0;
     },
     hasWanted(url) {
       return this.wantedUrls.has(url);
