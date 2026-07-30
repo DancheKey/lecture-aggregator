@@ -438,6 +438,24 @@ def extract_ad_title(title):
     return None
 
 
+def strip_admin_shell(raw):
+    """行政通知标题壳去壳（ctld 专用，2026-07-30 用户方案）。
+
+    仅去掉「关于举办/开展/组织/举行」前缀与尾部「的?通知」，**保留引号、期号、括号**，
+    使同一系列多期各有唯一 title。例：
+        关于举办"XXX"培训第5期（教学创新工作坊总第94期）的通知
+        -> "XXX"培训第5期（教学创新工作坊总第94期）
+    若不匹配壳结构（无关于…通知）则原样返回，调用方据此判断是否采用。
+    """
+    t = (raw or '').strip()
+    if not t:
+        return t
+    t = re.sub(r'^关于(?:举办|开展|组织|举行)\s*', '', t)
+    t = re.sub(r'\s*的?通知\s*$', '', t)
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t
+
+
 def _clean_location(loc, title=None):
     if not loc:
         return ''
@@ -3208,13 +3226,21 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
 
     # --- 通用后处理（narrative fallback 之后统一执行）---
 
-    # AD-TITLE: 行政通知标题壳清洗。列表页 title 常是「关于举办“XXX”专题工作坊（第N期）的通知」
-    # 这类行政壳；提取引号内的真实讲座名称作为 title，避免前端卡片显示冗长通知标题。
-    # 对单讲座页，引号内即具体题目；对多讲座系列页，引号内即系列名（各场次 topic 已独立提取）。
+    # AD-TITLE / CTld 标题去壳（2026-07-30 用户方案）：
+    # - 教师发展中心：listTitle 是「关于举办"XXX"培训第N期（总第M期）的通知」行政壳。
+    #   若只抽引号内讲座名，同一系列多期会共用同一 title（如「智能升级 何以为师…」出现 5 次），
+    #   故改为「去壳保留期号」，使每期 title 唯一。例：
+    #     "XXX"培训第5期（教学创新工作坊总第94期）
+    # - 其它源：保留原 extract_ad_title（抽引号内讲座名）行为不变，不影响 skc 等。
     _title = result.get('title') or ''
-    _ad_extracted = extract_ad_title(_title)
-    if _ad_extracted:
-        result['title'] = _ad_extracted
+    if college == '教师发展中心':
+        _shell = strip_admin_shell(result.get('listTitle') or _title)
+        if _shell:
+            result['title'] = _shell
+    else:
+        _ad_extracted = extract_ad_title(_title)
+        if _ad_extracted:
+            result['title'] = _ad_extracted
 
     # D-FINAL: 职级碎片最终守卫。narrative fallback 可能在 D 规则清空后重新设置 speaker
     # （如 io 1916 的「办二级」），故在所有赋值路径结束后再拦截一次。
