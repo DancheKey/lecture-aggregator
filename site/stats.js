@@ -5,6 +5,16 @@
  * 并在客户端计算统计摘要——确保统计页与首页使用同一份数据、计数口径完全一致。
  * stats.json 仍作为 fallback（网络异常或旧版部署时兜底）。
  * 访问/点赞数仍通过 /api/lecture/stats 与本机 localStorage 动态合并后计算。
+ *
+ * 2026-07-30 改版：统计页重新以 lectures/stats.json 为唯一权威数据源。
+ * 原因：
+ *   1) stats.json 仅 ~300KB（含预计算 matrix/yearTotals/campusMap 与最小讲座索引），
+ *      而 lectures.json 全量 ~5.7MB；统计页渲染表格/排序/筛选完全不需要明细字段。
+ *   2) 数据一致性由 scripts/generate_frontend_data.py 保证：每次更新 data/lectures.json
+ *      都会同步重写 stats.json，与 daily.yml / deploy.yml 配套。
+ *   3) 使用 cache:'default' 允许浏览器/GitHub Pages CDN 缓存，避免每次冷加载都回源。
+ *      统计数据日更（每天凌晨 3 点），600s 缓存窗口带来的 10 分钟延迟可接受。
+ * 失败时直接提示错误，不再 fallback 到 5.7MB 全量 lectures.json。
  */
 const { createApp } = Vue;
 
@@ -16,62 +26,6 @@ const STAT_KEY = 'lecture_stats_v1';   // 与 app.js 一致的本机统计键
 const UNKNOWN_YEAR = '其他';             // 讲座时间缺失时归入此类
 // 校区筛选顺序（与 sources.yaml / 首页一致）；空串代表"全部"
 const CAMPUSES = ['', '石牌', '大学城', '佛山', '汕尾', '校级'];
-
-// 讲座年份提取（与 generate_frontend_data.py:62-73 year_of 逻辑一致）
-function yearOf(item) {
-  if (item.lectureStart) {
-    const y = String(item.lectureStart).slice(0, 4);
-    if (/^\d{4}$/.test(y)) return y;
-  }
-  const pub = (item.publishTime || '').trim();
-  if (/^\d{4}/.test(pub)) return pub.slice(0, 4);
-  const title = item.title || '';
-  const m = title.match(/(\d{4})/);
-  if (m) return m[1];
-  return UNKNOWN_YEAR;
-}
-
-// 从 lectures.json 全量数据构建统计摘要（替代预计算 stats.json，保证前后端数据同源）
-function buildStats(data, updatedAt) {
-  const yearsSet = new Set();
-  let sourceNoticeCount = 0;
-  const matrix = {};
-  const yearTotals = {};
-  const lectures = [];
-  const campusMap = {};
-
-  data.forEach(item => {
-    const y = yearOf(item);
-    if (y) yearsSet.add(y);
-    const sources = item.sources || [item];
-    const sc = item.sourceCount;
-    const sCount = (sc != null) ? sc : (sources.length || 1);
-    sourceNoticeCount += sCount;
-    const college = item.college || '未分类';
-    const cellYear = y || UNKNOWN_YEAR;
-    if (!matrix[college]) matrix[college] = {};
-    matrix[college][cellYear] = (matrix[college][cellYear] || 0) + 1;
-    yearTotals[cellYear] = (yearTotals[cellYear] || 0) + 1;
-    if (!campusMap[college]) campusMap[college] = item.campus || '';
-    lectures.push({ u: item.sourceUrl || '', y: y || UNKNOWN_YEAR, c: college, s: sCount });
-  });
-
-  const years = Array.from(yearsSet)
-    .filter(y => /^\d{4}$/.test(y))
-    .sort((a, b) => parseInt(b) - parseInt(a));
-  if (yearsSet.has(UNKNOWN_YEAR)) years.push(UNKNOWN_YEAR);
-
-  return {
-    updatedAt: updatedAt || '',
-    lectureCount: data.length,
-    sourceNoticeCount,
-    years,
-    matrix,
-    yearTotals,
-    lectures,
-    campusMap,
-  };
-}
 
 // 学院 / 年份 / 总计 统计页
 // 支持点击表头按任意列排序（学院名/各年份讲座数/总计/访问数/点赞数），多次点击切换升/降序；
@@ -384,32 +338,22 @@ createApp({
       this._toL = this.filteredLectureCount;
       this._toS = this.filteredSourceCount;
     },
-    // 从 lectures.json 实时计算统计（与首页同源），预计算 stats.json 作为 fallback。
+    // 以预计算的 lectures/stats.json 为唯一权威数据源。
+    // 统计页只渲染 matrix/yearTotals/campusMap 与访问/点赞数，不需要 lectures.json 全量明细。
     load() {
       this.loading = true;
-      fetch('lectures.json', { cache: 'no-store' })
-        .then(r => { if (!r.ok) throw new Error('lectures'); return r.json(); })
+      fetch('lectures/stats.json', { cache: 'default' })
+        .then(r => { if (!r.ok) throw new Error('stats'); return r.json(); })
         .then(resp => {
-          const data = resp.data || resp;
-          this.summary = buildStats(data, resp.updatedAt || '');
+          this.summary = resp || null;
           this.loading = false;
           this.finalizeCountAnimation();
         })
-        .catch(() => {
-          console.warn('无法加载 lectures.json，回退到 lectures/stats.json');
-          fetch('lectures/stats.json', { cache: 'no-store' })
-            .then(r => { if (!r.ok) throw new Error('stats'); return r.json(); })
-            .then(resp => {
-              this.summary = resp || null;
-              this.loading = false;
-              this.finalizeCountAnimation();
-            })
-            .catch(e => {
-              console.error('加载统计数据失败', e);
-              this.loadError = '统计数据加载失败，请稍后刷新重试。';
-              this.loading = false;
-              this.finalizeCountAnimation();
-            });
+        .catch(e => {
+          console.error('加载统计数据失败', e);
+          this.loadError = '统计数据加载失败，请稍后刷新重试。';
+          this.loading = false;
+          this.finalizeCountAnimation();
         });
     },
     // 加载站点总访问量：优先级 本地后端 > 不蒜子
