@@ -149,6 +149,22 @@ def check_skc_title_integrity(recs, errors):
             errors.append(f"[skc title==topic] {url} title={actual!r}")
 
 
+def check_ctld_topic_not_equal_title(recs, errors):
+    """ctld 铁律补充护栏（2026-07-30）：教师发展中心(ctld)的 listTitle 是
+    「关于举办"XXX"通知」行政壳，title 应抽为讲座名、topic 应清空（不冗余）。
+    若 topic 非空且 == title，即 title 被 topic 覆盖/冗余，判为违规。
+    仅针对 ctld 源——life/行知/地理/美术 等大量源的 title==topic 是良性历史形态
+    （title 已承载讲座名，topic 重复为历史简化、前端已适配），不在本次回归修复范围，
+    故不检查，避免误伤。"""
+    for r in recs:
+        if r.get("college") != "教师发展中心":
+            continue
+        t = (r.get("title") or "").strip()
+        tp = (r.get("topic") or "").strip()
+        if tp and t == tp:
+            errors.append(f"[ctld title==topic] {r.get('sourceUrl')} title={t!r}")
+
+
 def test_incremental_merge_unit(errors):
     """scraper.incremental_merge 不应退化基底：只追加、不重复、不覆盖。"""
     try:
@@ -180,6 +196,7 @@ def main():
     errors = []
     check_composite_key_unique(recs, errors)
     check_skc_title_integrity(recs, errors)
+    check_ctld_topic_not_equal_title(recs, errors)
     test_incremental_merge_unit(errors)
 
     if errors:
