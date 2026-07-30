@@ -409,10 +409,16 @@ const app = createApp({
       try {
         this.wants = JSON.parse(localStorage.getItem(WANT_KEY) || '{}');
         this.wantedUrls = new Set(JSON.parse(localStorage.getItem(WANTED_KEY) || '[]'));
-        // 注意：不做 merge-and-save。lectureStats 的权威值由 loadLectureStats() 从后端获取；
-        // 后端不可用时 wantCount() 的 fallback 已直接读 this.wants[url]，无需提前合并。
-        // 合并会把本地值写回 STAT_KEY，若后端 fetch 失败则 inflate 的值被持久化，
-        // 下次刷新又被读回，造成「每次刷新 +1」的循环。
+        // 与 loadLikes() 对称：把已有 wants 合并进 lectureStats，确保统计能正确汇总
+        this.loadLocalStats();
+        for (const [url, count] of Object.entries(this.wants)) {
+          const s = this.lectureStats[url] || { visits: 0, likes: 0, wants: 0 };
+          if (count > (s.wants || 0)) {
+            s.wants = count;
+            this.lectureStats[url] = s;
+          }
+        }
+        this.saveLocalStats();
       } catch (e) {
         this.wants = {};
         this.wantedUrls = new Set();
