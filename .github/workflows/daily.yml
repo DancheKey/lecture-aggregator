@@ -55,6 +55,11 @@ jobs:
       - name: 同步静态数据源并生成前端切片
         run: python scripts/generate_frontend_data.py
 
+      # 铁律护栏：抓取生成的数据必须通过不变量测试，否则阻断提交/部署
+      # （防止 CI 整体重跑退化、title 被 topic 覆盖、复合键重复等回归）。
+      - name: 校验数据不变量（铁律护栏）
+        run: python scripts/test_invariants.py
+
       - name: 提交并推送（仅在有变化时）
         run: |
           git config user.name "github-actions[bot]"

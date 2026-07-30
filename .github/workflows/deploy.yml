@@ -30,6 +30,16 @@ jobs:
       - name: 配置 Pages
         uses: actions/configure-pages@v5
 
+      # 铁律护栏（最后防线）：部署前再校验一次数据不变量，
+      # 防止任何漏网的坏数据（如手动 push 未本地验证）上线公网。
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 校验数据不变量（铁律护栏）
+        run: python scripts/test_invariants.py
+
       # 把 site/ 目录作为静态站点产物上传
       - name: 上传站点产物
         uses: actions/upload-pages-artifact@v3
