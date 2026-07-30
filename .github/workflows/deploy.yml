@@ -37,6 +37,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      # test_invariants.py 会 import scraper 模块，其顶层依赖 requests/yaml/bs4 等。
+      # 若未安装，"校验数据不变量"步骤会因 ImportError 直接失败（此前 13:38/14:25 邮件根因）。
+      - name: 安装 Python 依赖
+        run: pip install -r scraper/requirements.txt
+
       - name: 校验数据不变量（铁律护栏）
         run: python scripts/test_invariants.py
 
