@@ -515,6 +515,20 @@ def _clean_location(loc, title=None):
     m6 = _loc_content_leak.search(loc)
     if m6 and m6.start() > 3:
         loc = loc[:m6.start()].strip()
+    # 章节序号标题泄漏（「一、工作坊安排 / 二、参与方式 / 1. 报名」等）：
+    # BS4 把换行变空格后「地点：X室 二、参与方式」被粘进地点值。真实地点不含「序号+顿号/点」
+    # （「一楼/三楼」是「楼」不是顿号，不受影响）。匹配即截到序号起点。
+    _loc_section = re.compile(r'(?:[一二三四五六七八九十百零0-9]+|[0-9]+)\s*[、.．]')
+    msec = _loc_section.search(loc)
+    if msec and msec.start() > 3:
+        loc = loc[:msec.start()].strip()
+    # 去掉开头的学校全称（location 约定具体到校区/楼栋，不重复「华南师范大学」；
+    # 与存量数据「广州校区石牌校园…」前缀风格保持一致，避免过提取原文全称。仅当位于
+    # 最前、且其后紧跟校区/校园/楼栋词时才去，避免误伤含校名的其它合法地点片段）。
+    if loc.startswith('华南师范大学') and re.match(
+            r'^(?:广州校区|大学城校区|南海校区|汕尾校区|石牌校园|佛山校区|校区|校园)',
+            loc[len('华南师范大学'):]):
+        loc = loc[len('华南师范大学'):].strip()
     # location 尾部吸入完整讲座标题（lswh 等源：BS4 把换行后标题行粘进地点值）
     # 特征：loc 尾部长子串(>=6字) 与 title 完全匹配（允许全/半角标点差异）
     if title and len(title) >= 6:
@@ -3801,7 +3815,13 @@ def _extract_affiliation(rest):
     _UNIT_RE = re.compile(
         r'([\u4e00-\u9fa5A-Za-z·]{0,12}?(?:大学|学院|研究院|研究所|研究中心|实验室|学系|分校|学校)'
         r'(?:[\u4e00-\u9fa5]{0,8}?(?:大学|学院|研究院|研究所|学系))?)')
-    m = _UNIT_RE.search(rest)
+    # 优先取「现为/现任/现供职于/目前任职于/就职于」标记之后的当前单位：
+    # 简介常把学位单位（湖南师范大学学士…）写在最前、当前任职（现为北京大学教育学院教授…）
+    # 写在标记之后；直接取首个单位片段会错取学位单位，故优先在标记之后提取当前单位。
+    _status = re.search(
+        r'(?:现为|现任|现供职于|目前任职于|就职于|现任教于|现职)\s*', rest)
+    _scope = rest[_status.end():] if _status else rest
+    m = _UNIT_RE.search(_scope)
     if m:
         aff = m.group(1)
     else:
@@ -4616,7 +4636,10 @@ def split_record_by_sessions(base, sessions, full_text=''):
             loc = re.sub(r'\s+', '', loc)
             loc = re.sub(r'报告(摘要|人|时间)?$', '', loc)  # 兜底去掉结尾泄漏的「报告…」标签
             if loc:
-                rec['location'] = loc
+                # 统一经系统级地点清理（截断「二、参与方式」等章节序号噪声、
+                # 去掉「华南师范大学」学校全称前缀，与存量数据前缀约定一致），
+                # 否则全页 fallback 抓来的脏 location 会绕过 _clean_location 直接落库。
+                rec['location'] = _clean_location(loc, rec.get('title') or rec.get('topic'))
         # 最终兜底：若本块未识别到主讲人，保留基底（避免误清空系列级主讲人）
         if not rec.get('speaker'):
             rec['speaker'] = prev_speaker or ''
