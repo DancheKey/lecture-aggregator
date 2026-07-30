@@ -1969,7 +1969,7 @@ def _replace_schedule_tables_with_text(soup):
             hh = _n1_normalize(h)
             if re.search(r'时间|日期', hh):
                 field_map[idx] = '时间'
-            elif re.search(r'主题|题目|报告题目|讲座题目|讲题|报告内容', hh):
+            elif re.search(r'主题|题目|报告题目|讲座题目|讲题|报告内容|课程内容|专题内容|内容', hh):
                 field_map[idx] = '主题'
             elif re.search(r'主讲|报告人|演讲人', hh):
                 field_map[idx] = '主讲人'
@@ -4283,14 +4283,16 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
                      s['start'].hour, s['start'].minute) for s in sessions}
         if len(distinct) < 2:
             return []
-    # 期号顺序：sessions 都有可解析时间 → 按实际场次时间升序赋 lectureIndex（时间早的期数靠前）；
-    # 缺时间（如纯编号型共用时间）→ 保持文档顺序。先排序再 enumerate，no_range 范围也对齐。
+    # 场次序号：sessions 都有可解析时间 → 先按 start 升序排序，再按文档顺序赋
+    # 1-based 的 lectureIndex（时间早的场次序号靠前）。固定用场次序号，不借用标题
+    # 「第A-B期」范围作期号——「总第75-77期」等容器级大编号若被当成场次序号，会使
+    # ctld/4290 拆成 75/76/77，既违反「按 start 升序赋 lectureIndex」约定，又让增量去重
+    # 键 (sourceUrl, lectureIndex) 与存量 1/2/3 不一致而产生重复记录。期号语义如需展示
+    # 应由前端从 title 推导。
     if all(s.get('start') for s in sessions):
         sessions.sort(key=lambda s: s['start'])
-    # 期号后缀：优先用标题「第A-B期」范围，否则顺序编号
-    no_range = _parse_title_no_range(title)
     for i, s in enumerate(sessions):
-        s['no'] = str(no_range[0] + i) if no_range else str(i + 1)
+        s['no'] = str(i + 1)
     return sessions
 
 
