@@ -188,7 +188,10 @@ _NAME_FORBIDDEN = (
 # 主讲人候选词首字须为常见姓氏，避免把 星期二/本科/智能 等非人名空格孤立词误抓。
 # 少数民族名/外文音译名首字可能不在集合内，作为 mid 兜底宁可少抓（仍可走 Pattern4/人工核验）。
 _SURNAME_RE = re.compile(
-    r'^[赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黄和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍万柯卢莫房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊于惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符刘景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍卻桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广库禄阙东欧阳]')
+    r'^[赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黄和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍万柯卢莫房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊于惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符刘景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍卻桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广库禄阙东欧阳肖闫]')
+# 补充常见姓氏：肖（与「萧」同音常见姓，如肖菁）、闫（「阎」的简化常用姓，如闫恩亮）。
+# 原集合含「萧/阎」却漏「肖/闫」，导致 _looks_like_real_name 误拒真实姓名、
+# split_record_by_sessions 回退继承前序主讲人而产生错配（ai/163 等）。
 
 def _looks_like_real_name(s):
     if not s:
@@ -3480,7 +3483,14 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 此处仅显式短路并打 [SKIP-RETRO] 日志，提升可观测性；多场拆分后每条仍由下方
     # is_news_record 独立把关。铁律：publishTime > lectureStart（含同日发布晚于讲座开始）
     # 一律判事后，绝不进聚合。
-    if not skip_news_filter and is_news_record(result):
+    # 例外（2026-07-30 修复 ibc/2779）：多讲座公告将在下方拆分，整页 RETRO 短路会误杀
+    # 仍处预告期的场次（如 ibc/2779 第一场发布时已过期、第二场仍预告）。故仅当
+    # detect_multi_session 判定为「单讲座页」(sessions 为空) 时才做整页 RETRO 短路；
+    # 多讲座页交由拆分后的逐条 is_news_record 把关，过期场次单独剔除、保留预告场次。
+    _sessions_pre = detect_multi_session(
+        body_text, title=title, default_year=default_year, publish_time=publish_time,
+        title_year=title_year, url_year=url_year, soup=soup, url=url)
+    if not _sessions_pre and not skip_news_filter and is_news_record(result):
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
     if (is_non_lecture_title(title) or is_admin_notice(title, body_text)
@@ -3534,9 +3544,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # ---- 多讲座公告拆分（MS1–MS5）----
     # 用 body_text（已合并OCR的正文文本）而非完整 text，避免把页眉/导航/页脚里的
     # 「第N讲/第N期/第N场」重复标记误当成分段锚点（汕尾教学工作坊、abdn357等）。
-    sessions = detect_multi_session(
-        body_text, title=title, default_year=default_year, publish_time=publish_time,
-        title_year=title_year, url_year=url_year, soup=soup, url=url)
+    sessions = _sessions_pre
     if sessions:
         split_recs = split_record_by_sessions(result, sessions, full_text=body_text)
         kept = []
@@ -3645,10 +3653,10 @@ _TOPIC_DELIM_RE = re.compile(
 # 主题值终止符：遇到下一个字段标签、中文日期/时段、块结尾即止。
 # 「报告」后的时间/数字/人/地点/摘要 可能与其间被 get_text(' ') 插入的空格隔开，
 # 故用 (?=\s*(?:\d|时间|地点|人|摘要)) 容忍空白（修 ggy/cs 类「报告1题目…报告 时间」错把「报告」吞入主题）。
-_TOPIC_VAL_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点|摘要|简介|主办|承办|'
+_TOPIC_VAL_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点|摘要|简介\s*[：:]|主办|承办|'
                    r'邀请人|报告(?=\s*(?:\d|时间|地点|人|摘要))|$|【|第[一二三四五六七八九十百零0-9]+期))')
 # 块内子字段（主持人/参与者/主讲人）的终止符：遇到下一个字段标签、中文日期/时段、块结尾即止
-_BLOCK_FIELD_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点|题目|主题|摘要|简介|'
+_BLOCK_FIELD_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点|题目|主题|摘要|简介\s*[：:]|'
                       r'主办|承办|邀请人|参与者|$|【|第[一二三四五六七八九十百零0-9]+期|'
                       r'\d{4}年|\d{1,2}月\d{1,2}日|上午|下午|晚上))')
 
@@ -3845,6 +3853,50 @@ def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
             continue
         cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
                      'block': block, '_numbered': True, 'splitMode': 'numbered-prefix'})
+    return cand
+
+
+def _detect_plain_numbered_sessions(text, default_year=None, publish_time=None,
+                                    title_year=None, url_year=None):
+    """候选7（兜底）：纯阿拉伯数字编号列表（「1. 题目 时间：… 地点：…」型，ibc/2779 等）。
+
+    与候选4（题目N：前缀）分工：此处编号是裸「数字+点/顿号」、题目紧跟编号、块内各自带
+    独立时间/地点；候选4 要求显式「题目N：」前缀且各场常共用页眉时间。
+    触发条件（强约束，避免误拆单讲座的编号议程/要点）：
+      · ≥2 个「数字[.．、]」编号标记；
+      · ≥2 段能从块内解析出「含时钟或结束时间」的独立时间（纯 00:00 日期段跳过）。
+    topic 取编号之后、首个字段标签（时间/地点/主讲人/简介…）之前的文本，保留题中已有
+    的冒号（如「学术写作（一）：学术期刊投稿指南」整段为题）。
+    """
+    _NUM_RE = re.compile(r'(\d{1,3})\s*[.．、]\s*')
+    markers = list(_NUM_RE.finditer(text))
+    if len(markers) < 2:
+        return []
+    cand = []
+    for i, mk in enumerate(markers):
+        seg = text[mk.end(): markers[i + 1].start() if i + 1 < len(markers) else len(text)]
+        tm = re.match(
+            r'\s*([^\n]{2,60}?)\s*'
+            r'(?=\s*(?:时间|地点|主讲人|报告人|演讲人|讲者|简介|摘要|$|【))', seg)
+        if not tm:
+            continue
+        topic = tm.group(1).strip()
+        topic = re.sub(r'\s*(?:主讲人|报告人|预告)\s*[:：]?.*$', '', topic).strip()
+        topic = _clean_session_topic(topic)
+        if not topic or len(topic) < 2:
+            continue
+        dt = parse_cn_time(seg, default_year=default_year, publish_time=publish_time,
+                           title_year=title_year, url_year=url_year)
+        if not dt or not dt.get('start'):
+            continue
+        st = dt['start']
+        # 仅认含时钟或结束时间的段（与候选1 守卫一致），避免把编号要点误当多场
+        if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
+            continue
+        cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                     'block': seg, 'splitMode': 'numbered-list'})
+    if len(cand) < 2:
+        return []
     return cand
 
 
@@ -4064,6 +4116,7 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
     """
     labels = list(_TOPIC_DELIM_RE.finditer(text))
     sessions = []
+    sessions_raw = []
     if len(labels) < 2:
         # 候选1 分块标记不足（如纯「题目N：」编号型、单场页）：不在此早退，
         # 交由后续候选2/3/4 兜底，避免阻断多报告页拆分（见 cs 4268）。
@@ -4087,13 +4140,23 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
                             title_year=title_year, url_year=url_year)
         if not dt or not dt.get('start'):
             continue
-        # 块内完整性（MS1）：必须有明确时钟时间或结束时间；仅日期（00:00）不足以区分场次，
-        # 避免把通知日/发布日误当某场时间。
+        # 块内完整性（MS1）：须能区分不同场次。原守卫仅认「带时钟或含结束时间」，
+        # 会误杀论坛日程表等「每行仅给日期、无时刻」的多场（如 ai/163 六行仅有日期）。
+        # 修订：仅当「全部候选都无时钟 且 日期全部相同」时才视为共享页日期/通知日、
+        # 不拆分；若日期互异（≥2 个不同日期）即使无时钟也保留为独立场次。
         st = dt['start']
-        if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
-            continue
-        sessions.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
-                         'block': block, 'splitMode': 'repeated-label'})
+        _has_clock = not (st.hour == 0 and st.minute == 0 and dt.get('end') is None)
+        sessions_raw.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                             'block': block, 'splitMode': 'repeated-label',
+                             '_has_clock': _has_clock})
+    # 候选1 收尾：按修订后的 MS1 守卫决定保留哪些场次
+    if sessions_raw:
+        _distinct_dates = {r['start'].date() for r in sessions_raw}
+        if any(r['_has_clock'] for r in sessions_raw) or len(_distinct_dates) >= 2:
+            for _r in sessions_raw:
+                _r.pop('_has_clock', None)
+            sessions = sessions_raw
+        # 否则（全部无时钟且日期相同）→ 视为共享页日期，不拆分（维持原守卫语义）
     # 候选2（新增，CS 源常见格式）：离散「报告N/专题N」分场标记——
     # 正文形如「报告一\n时间：9:00\n题目：X\n摘要：…\n报告二\n时间：10:00\n题目：Y…」，
     # 「报告N」与「题目」被时间/换行隔开，候选1的「报告N题目」连续标签匹配不到。
@@ -4281,6 +4344,15 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
                               'splitMode': 'bare-topic'})
             if len(cand6) >= 2:
                 sessions = cand6
+    # 候选7（兜底）：纯阿拉伯数字编号列表（「1. 题目 时间：…」型，ibc/2779 等）。
+    # 每项自带独立时间/地点，与候选4（题目N：前缀）分工：此处编号是裸「数字+点/顿号」、
+    # 题目紧跟编号。触发：≥2 个「数字[.．、]」编号标记，且 ≥2 段含独立时间。
+    if len(sessions) < 2:
+        cand7 = _detect_plain_numbered_sessions(
+            text, default_year=default_year, publish_time=publish_time,
+            title_year=title_year, url_year=url_year)
+        if len(cand7) >= 2:
+            sessions = cand7
     # 去重：同 (topic, start) 视为同一场（顶部「题目」常与首期「主题/报告N题目」重复出现）。
     # topic 比较前去掉所有空白，避免正文数学符号/排版导致的「ℤ_{2^k}」与「ℤ _{2^k}」式微差误判为不同场。
     # 同 key 的多块中保留「信息更完整」者（含主讲人/报告人/摘要/参与者等子字段的块优先），
@@ -4323,9 +4395,13 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
         _days = {(s['start'].year, s['start'].month, s['start'].day) for s in sessions}
         if len(_days) == 1:
             return []
-    # MS3-3：列表页列举（内容区内含 ≥ 场次数的「讲座类」详情链接 → 视为列表页，不拆）
+    # MS3-3：列表页列举（内容区内含大量「讲座类」详情链接 → 视为列表页，不拆）
     # 注意：详情页自身也含大量导航/页脚链接，故只统计「链接文本含讲座类关键词」的详情链接，
     # 避免把详情页误判为列表页（如 ggy 5666 含许多导航链接但主题是纯文本，不应触发）。
+    # 阈值收紧（2026-07-30 修复 ibc/2779）：详情页底部「相关/推荐」侧栏常含若干讲座类链接，
+    # 数量可能与场次持平（如 ibc/2779 正文 2 场 + 侧栏 2 条相关讲座链接），若用
+    # 「≥ 场次数」会把真实多讲座详情页误吞。故要求讲座类链接明显占多数（≥ max(场次, 5)）
+    # 才判为列表页——真实的列表/栏目页通常含 ≥5 条讲座链接，详情页的侧栏相关链接极少达此数。
     if soup is not None:
         content = (soup.find('div', class_=lambda c: c and 'wp_articlecontent' in c)
                    or soup.find('div', class_='article-content')
@@ -4342,7 +4418,7 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
             txt = a.get_text(strip=True)
             if len(txt) >= 6 and re.search(r'讲座|报告|讲坛|论坛|沙龙|研讨会|座谈', txt):
                 lect_anchor += 1
-        if lect_anchor >= len(sessions):
+        if lect_anchor >= max(len(sessions), 5):
             return []
     # 时间互不相同才拆（避免把同一讲座的多个子环节误拆）。
     # 例外：显式阿拉伯编号型多报告（候选4，_numbered=True）常共用开场时间，跳过该检查

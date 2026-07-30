@@ -5,7 +5,10 @@ const { createApp } = Vue;
 
 const LIKE_KEY = 'lecture_likes_v1';
 const LIKED_KEY = 'lecture_liked_urls_v1';
-const STAT_KEY = 'lecture_stats_v1';      // 本机讲座访问/点赞统计（公网无后端时降级使用）
+const WANT_KEY = 'lecture_wants_v1';
+const WANTED_KEY = 'lecture_wanted_urls_v1';
+const STAT_KEY = 'lecture_stats_v1';      // 本机讲座访问/点赞/想听统计（公网无后端时降级使用）
+const COUNT_CAP = 300;                    // 点赞/想听超过此值显示 "300+"，防止虚高数字
 
 // 配置项：若已部署「工作流触发代理」（持有 PAT 的 Cloudflare Worker / Vercel Function 等，
 // 见 SECURITY.md R6），把其地址填到此处，公网「抓取新数据」按钮即可立即触发 GitHub Actions；
@@ -38,6 +41,8 @@ const app = createApp({
       showMenu: false,    // 顶部栏更多操作下拉菜单
       likes: {},          // url -> count（本地点赞数）
       likedUrls: new Set(), // 当前浏览器已点赞的 url 集合
+      wants: {},          // url -> count（本地想听数）
+      wantedUrls: new Set(), // 当前浏览器已标记想听的 url 集合
       loading: true,       // 首屏数据加载中（避免闪现空列表）
       dataStage: 'loading', // 'loading' | 'partial' | 'full'：渐进加载阶段
       siteVisits: cachedVisits, // 站点总访问量（null 表示尚未从任何来源拿到）
@@ -399,7 +404,70 @@ const app = createApp({
         .catch(() => { /* 离线：保留本机值 */ });
     },
 
-    /* ---------- 讲座级访问/点赞统计 ---------- */
+    /* ---------- 本地「想听」（同一浏览器去重，逻辑与点赞对称） ---------- */
+    loadWants() {
+      try {
+        this.wants = JSON.parse(localStorage.getItem(WANT_KEY) || '{}');
+        this.wantedUrls = new Set(JSON.parse(localStorage.getItem(WANTED_KEY) || '[]'));
+        // 注意：不做 merge-and-save。lectureStats 的权威值由 loadLectureStats() 从后端获取；
+        // 后端不可用时 wantCount() 的 fallback 已直接读 this.wants[url]，无需提前合并。
+        // 合并会把本地值写回 STAT_KEY，若后端 fetch 失败则 inflate 的值被持久化，
+        // 下次刷新又被读回，造成「每次刷新 +1」的循环。
+      } catch (e) {
+        this.wants = {};
+        this.wantedUrls = new Set();
+      }
+    },
+    saveWants() {
+      try {
+        localStorage.setItem(WANT_KEY, JSON.stringify(this.wants));
+        localStorage.setItem(WANTED_KEY, JSON.stringify(Array.from(this.wantedUrls)));
+      } catch (e) { /* ignore quota/storage errors */ }
+    },
+    wantCount(url) {
+      const s = this.lectureStats[url];
+      if (s && typeof s.wants === 'number') return s.wants;
+      return this.wants[url] || 0;
+    },
+    hasWanted(url) {
+      return this.wantedUrls.has(url);
+    },
+    toggleWant(url) {
+      if (!url) return;
+      const willWant = !this.hasWanted(url);
+      if (willWant) { this.wantedUrls.add(url); } else { this.wantedUrls.delete(url); }
+      this.saveWants();
+      const delta = willWant ? 1 : -1;
+      const cur = (this.lectureStats[url] && this.lectureStats[url].wants) || this.wants[url] || 0;
+      const next = Math.max(0, cur + delta);
+      this.wants[url] = next;
+      if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
+      this.lectureStats[url].wants = next;
+      this.saveLocalStats();
+      this.showToast(willWant ? '已标记想听' : '已取消想听');
+      const endpoint = willWant ? 'want' : 'unwant';
+      fetch('/api/lecture/' + endpoint, {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+        .then(r => r.json())
+        .then(j => {
+          if (j && j.ok && typeof j.wants === 'number') {
+            if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
+            this.lectureStats[url].wants = j.wants;
+            this.wants[url] = j.wants;
+            this.saveLocalStats();
+          }
+        })
+        .catch(() => { /* 离线：保留本机值 */ });
+    },
+    // 显示计数：超过 300 显示 "300+"，避免被攻击造成虚高数字
+    capDisplay(n) {
+      return n > COUNT_CAP ? COUNT_CAP + '+' : String(n);
+    },
+
+    /* ---------- 讲座级访问/点赞/想听统计 ---------- */
     loadLocalStats() {
       try { this.lectureStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
       catch (e) { this.lectureStats = {}; }
@@ -702,6 +770,7 @@ const app = createApp({
   mounted() {
     this.startCountAnimation();
     this.loadLikes();
+    this.loadWants();
     this.loadSiteVisits();
     this.loadLectureStats();
     // 公网静态托管不要先等 /api/lectures 超时；先秒开 latest.json，后台再补全量。
