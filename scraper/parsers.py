@@ -416,6 +416,28 @@ _LOCATION_TERM = re.compile(
     r'内容|详细内容|主要内容|会议注册|讲座教授|特邀专家|面向对象|主持|'
     r'职称|Tencent ?Meeting)'
 )
+
+
+def extract_ad_title(title):
+    """AD-TITLE：行政通知标题壳清洗。
+
+    对「关于举办"XXX"专题工作坊（第N期）的通知」这类行政壳，提取引号内的真实
+    讲座名称作为 title，避免前端卡片显示冗长通知标题。对单讲座页，引号内即具体
+    题目；对多讲座系列页，引号内即系列名（各场次 topic 已独立提取）。
+
+    注意：右边界只认引号（" / "），不排《》，否则讲座题目含《物理化学》等书名号时
+    会被提前截断（ctld4272 案例：原正则把「以《物理化学》课程为例」截到「》」处）。
+    """
+    if not title or not (title.startswith('关于') and '通知' in title):
+        return None
+    _m = re.search(
+        r'^关于(?:举办|开展|组织|举行)\s*[“"「《]([^”"]{3,})[”"]\s*.*的?\s*通知\s*$',
+        title)
+    if _m:
+        return _m.group(1).strip()
+    return None
+
+
 def _clean_location(loc, title=None):
     if not loc:
         return ''
@@ -3187,15 +3209,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # --- 通用后处理（narrative fallback 之后统一执行）---
 
     # AD-TITLE: 行政通知标题壳清洗。列表页 title 常是「关于举办“XXX”专题工作坊（第N期）的通知」
-    # 这类行政壳；提取引号/书名号内的真实讲座名称作为 title，避免前端卡片显示冗长通知标题。
+    # 这类行政壳；提取引号内的真实讲座名称作为 title，避免前端卡片显示冗长通知标题。
     # 对单讲座页，引号内即具体题目；对多讲座系列页，引号内即系列名（各场次 topic 已独立提取）。
     _title = result.get('title') or ''
-    if _title.startswith('关于') and '通知' in _title:
-        _ad_title_m = re.search(
-            r'^关于(?:举办|开展|组织|举行)\s*[“"「《]([^”"」》]{3,})[”"」》]\s*.*的?\s*通知\s*$',
-            _title)
-        if _ad_title_m:
-            result['title'] = _ad_title_m.group(1).strip()
+    _ad_extracted = extract_ad_title(_title)
+    if _ad_extracted:
+        result['title'] = _ad_extracted
 
     # D-FINAL: 职级碎片最终守卫。narrative fallback 可能在 D 规则清空后重新设置 speaker
     # （如 io 1916 的「办二级」），故在所有赋值路径结束后再拦截一次。
