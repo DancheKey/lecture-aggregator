@@ -36,7 +36,7 @@
       "lectureStart": "2026-07-28 14:30:00",
       "lectureEnd": null,
       "location": "生命科学学院138会议室",
-      "abstract": null,
+      "abstract": "",
       "college": "生命科学学院",
       "campus": "石牌",
       "organizer": "生命科学学院",
@@ -824,7 +824,8 @@
       "vlmExtracted": true,
       "listTitle": "梁启超家国情怀及其当代意义",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260615/8725.html",
@@ -975,7 +976,8 @@
       "vlmExtracted": true,
       "listTitle": "知痛知结，护汝芳华",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260612/8742.html",
@@ -1073,7 +1075,8 @@
       "vlmExtracted": true,
       "listTitle": "港澳中小学拔尖创新人才培养",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20260608/546.html",
@@ -1720,7 +1723,8 @@
       "vlmExtracted": true,
       "listTitle": "适应未来的个人学业管理",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20260522/341.html",
@@ -1742,7 +1746,8 @@
       "vlmExtracted": true,
       "listTitle": "商业计划书写作",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260526/8728.html",
@@ -2005,7 +2010,8 @@
       "vlmExtracted": true,
       "listTitle": "AI赋能未来教师：师范生AI教学应用能力提升",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20260520/2957.html",
@@ -2632,7 +2638,8 @@
       "vlmExtracted": true,
       "listTitle": "人工智能与生物分子设计",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20260506/13290.html",
@@ -2669,12 +2676,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2026-05-07 11:31:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“新大众文艺视域下的现代出版与中国文学话语的现代转型”学术工作坊在华南师范大学举行"
     },
     {
@@ -2719,7 +2726,8 @@
       "vlmExtracted": true,
       "listTitle": "废旧动力电池资源化利用",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260429/8709.html",
@@ -3412,7 +3420,8 @@
       "listTitle": "关于区域与国别研究的理论与方法",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20260417/6707.html",
@@ -3503,7 +3512,8 @@
       "vlmExtracted": true,
       "listTitle": "《红楼梦》第五回判词英译研究",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20260410/13266.html",
@@ -3569,7 +3579,8 @@
       "vlmExtracted": true,
       "listTitle": "迅速崛起的新一代中国服装设计师",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260410/8689.html",
@@ -3757,7 +3768,8 @@
       "vlmExtracted": true,
       "listTitle": "乡音一一方言童谣与当代音乐的融合创作",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260407/8682.html",
@@ -4443,7 +4455,8 @@
       "vlmExtracted": true,
       "listTitle": "以赛促教 匠心育桃李——班主任、比赛与一线教学日常分享",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20260311/13217.html",
@@ -5302,7 +5315,8 @@
       "vlmExtracted": true,
       "listTitle": "优化中那些有趣的仿生算法",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20260117/316.html",
@@ -5324,7 +5338,8 @@
       "vlmExtracted": true,
       "listTitle": "航空数据分析简介",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20260116/312.html",
@@ -5346,7 +5361,8 @@
       "vlmExtracted": true,
       "listTitle": "告别毕业迷茫!汕尾校区多学院专属:毕业去向多元选择+留学全阶段路径",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260119/8597.html",
@@ -6358,7 +6374,8 @@
       "listTitle": "辽泽与汉唐东北政局",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251223/8580.html",
@@ -6574,7 +6591,8 @@
       "listTitle": "美墨边境华人史研究的选题、方法与实践",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20251218/6651.html",
@@ -7195,7 +7213,8 @@
       "splitMode": "vlm-poster",
       "isMultiLecture": true,
       "lectureIndex": 4,
-      "lectureCount": 4
+      "lectureCount": 4,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20251203/1385.html",
@@ -7224,7 +7243,8 @@
       "splitMode": "vlm-poster",
       "isMultiLecture": true,
       "lectureIndex": 3,
-      "lectureCount": 4
+      "lectureCount": 4,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251202/13157.html",
@@ -7297,7 +7317,8 @@
       "splitMode": "vlm-poster",
       "isMultiLecture": true,
       "lectureIndex": 2,
-      "lectureCount": 4
+      "lectureCount": 4,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251205/8554.html",
@@ -7420,7 +7441,8 @@
       "vlmExtracted": true,
       "listTitle": "CCF走进高校，从社会仿真到群体博弈：以E-CARGO为视角探索",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20251201/307.html",
@@ -7442,7 +7464,8 @@
       "vlmExtracted": true,
       "listTitle": "CCF走进高校，SCHOLAT数据知识基座赋能高校数智化研究与实践",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20251201/308.html",
@@ -7464,7 +7487,8 @@
       "vlmExtracted": true,
       "listTitle": "锌电池关键材料设计及其界面科学",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20251203/1385.html",
@@ -7493,7 +7517,8 @@
       "splitMode": "vlm-poster",
       "isMultiLecture": true,
       "lectureIndex": 1,
-      "lectureCount": 4
+      "lectureCount": 4,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251203/8561.html",
@@ -7816,7 +7841,8 @@
       "listTitle": "AI应用于历史学学术研究与教学实操",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20251124/1028.html",
@@ -7984,7 +8010,8 @@
       "vlmExtracted": true,
       "listTitle": "人工智能时代下的科学精神与人文精神统一",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20251125/1381.html",
@@ -8028,7 +8055,8 @@
       "vlmExtracted": true,
       "listTitle": "音乐与律动团体游戏的设计方法与实践",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2025/1126/3851.html",
@@ -8043,12 +8071,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2025-11-26 14:50:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "中国古典学第十次讲座：四川大学饶龙隼教授来我院讲学《<庄子>空间视域中的南方书写》"
     },
     {
@@ -8464,7 +8492,8 @@
       "vlmExtracted": true,
       "listTitle": "教师语言艺术",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20251117/304.html",
@@ -8486,7 +8515,8 @@
       "vlmExtracted": true,
       "listTitle": "琴键上的革命：浪漫、革新与现代之声",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20251117/2898.html",
@@ -8769,7 +8799,8 @@
       "vlmExtracted": true,
       "listTitle": "集成光子学和超快光学技术和应用",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2025/1117/3828.html",
@@ -8784,12 +8815,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2025-11-17 08:54:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院举办第十八届“勷勤论坛”文学院分论坛学术前沿系列讲座之“网络微短剧中的虚拟情感与新媒介美学”讲座"
     },
     {
@@ -8837,7 +8868,8 @@
       "vlmExtracted": true,
       "listTitle": "大学“自洽指南”尽兴发光，尽责成长，尽情做自己",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20251114/69.html",
@@ -9108,7 +9140,8 @@
       "listTitle": "“是华人，又不是华人”——土生华人的双重边缘化",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251111/13132.html",
@@ -9614,7 +9647,8 @@
       "vlmExtracted": true,
       "listTitle": "未来已来：人工智能赋能国家治理现代化",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20251103/298.html",
@@ -9636,7 +9670,8 @@
       "vlmExtracted": true,
       "listTitle": "找到你的本科节奏：在多元实践与生活温度中探索自我",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251103/13120.html",
@@ -9832,7 +9867,8 @@
       "ocrExtracted": true,
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "第九届全国师范大学美术教育论坛"
+      "listTitle": "第九届全国师范大学美术教育论坛",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251029/13116.html",
@@ -10051,7 +10087,8 @@
       "timeNote": ";cv-url-date-mismatch",
       "listTitle": "渔火相传— 汕尾渔歌的历史与现代演绎",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20251024/4474.html",
@@ -10191,7 +10228,8 @@
       "vlmExtracted": true,
       "listTitle": "体测科学备战：专项突破与高效准备",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2025/1028/3798.html",
@@ -10206,12 +10244,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2025-10-28 10:45:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学举办古代文学学科建设论坛"
     },
     {
@@ -10381,7 +10419,8 @@
       "vlmExtracted": true,
       "listTitle": "中国戏曲的舞台艺术—表演程式与四功五法",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251021/8498.html",
@@ -10721,7 +10760,8 @@
       "listTitle": "史学理论和史学史前沿理论专题",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20250925/6577.html",
@@ -11217,7 +11257,8 @@
       "lectureCount": 4,
       "listTitle": "“挑战杯”学生创业计划竞赛（小挑）赛事解读与备赛指导",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250912/13073.html",
@@ -11261,7 +11302,8 @@
       "vlmExtracted": true,
       "listTitle": "导师制学生创新成果分享",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250913/8475.html",
@@ -11312,7 +11354,8 @@
       "lectureCount": 4,
       "listTitle": "“挑战杯”学生创业计划竞赛（小挑）赛事解读与备赛指导",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20250909/289.html",
@@ -11338,7 +11381,8 @@
       "lectureCount": 4,
       "listTitle": "“挑战杯”学生创业计划竞赛（小挑）赛事解读与备赛指导",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20250908/6560.html",
@@ -11434,7 +11478,8 @@
       "lectureCount": 4,
       "listTitle": "“挑战杯”学生创业计划竞赛（小挑）赛事解读与备赛指导",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20250909/288.html",
@@ -11459,7 +11504,8 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
-      "newsFilterBypass": true
+      "newsFilterBypass": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250908/13069.html",
@@ -13184,7 +13230,8 @@
       "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "学术讲座：抗生素的代际传递效应及对后代毒性的作用机制"
+      "listTitle": "学术讲座：抗生素的代际传递效应及对后代毒性的作用机制",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250609/13024.html",
@@ -13254,7 +13301,8 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二期",
       "vlmExtracted": true,
-      "newsFilterBypass": true
+      "newsFilterBypass": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250605/13020.html",
@@ -13697,7 +13745,8 @@
       "ocrExtracted": true,
       "listTitle": "《人工智能赋能材料科学与工程》",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250530/13013.html",
@@ -14082,7 +14131,8 @@
       "listTitle": "《从海洋考古看明中叶海外贸易转型与区域经济互动》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250519/8353.html",
@@ -14423,7 +14473,8 @@
       "timeConfidence": "high",
       "timeNote": "general-body-full",
       "listTitle": "华南师范大学砺儒讲坛第132讲：家庭矛盾与王国维、罗振玉关系之终结题目（彭玉平教授）",
-      "host": "马茂军"
+      "host": "马茂军",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20250513/970.html",
@@ -14714,7 +14765,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第34期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第34期"
+      "sessionNumber": "第34期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250506/8345.html",
@@ -15113,7 +15165,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第33期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第33期"
+      "sessionNumber": "第33期",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250421/12981.html",
@@ -15524,7 +15577,8 @@
       "listTitle": "《历史教学研究的重心与路径》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20250411/2824.html",
@@ -15568,7 +15622,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第32期教学工作坊",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250414/12972.html",
@@ -15897,7 +15952,8 @@
       "ocrExtracted": true,
       "listTitle": "《化学与材料研究中的不确定性量化》",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20250411/56.html",
@@ -15921,7 +15977,8 @@
       "listTitle": "《从三位企业家看工业革命的兴起》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250411/8308.html",
@@ -16071,7 +16128,8 @@
       "ocrExtracted": true,
       "listTitle": "《有机太阳能储能电池》",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20250331/4406.html",
@@ -16442,7 +16500,8 @@
       "listTitle": "《广东改革开放口述史项目：当代史口述史讲座》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250327/12954.html",
@@ -16534,7 +16593,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第30期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第30期"
+      "sessionNumber": "第30期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250327/8295.html",
@@ -16803,7 +16863,8 @@
       "listTitle": "《美学，还是情感？文化史研究的新路径》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20250317/4410.html",
@@ -16890,7 +16951,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第29期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第29期"
+      "sessionNumber": "第29期",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250317/12944.html",
@@ -17446,7 +17508,8 @@
       "timeNote": ";cv-url-date-mismatch",
       "listTitle": "算法与程序设计类竞赛简介",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20250303/4408.html",
@@ -17577,7 +17640,8 @@
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "2025年03月03日 周一午餐会报告（第199次-温永立）"
+      "listTitle": "2025年03月03日 周一午餐会报告（第199次-温永立）",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250302/8279.html",
@@ -17790,7 +17854,8 @@
       "ocrExtracted": true,
       "listTitle": "《碳基钙钛矿太阳电池》",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250117/8267.html",
@@ -18084,7 +18149,8 @@
       "vlmExtracted": true,
       "listTitle": "榫卯艺术的魅力与传承",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20250110/260.html",
@@ -18106,7 +18172,8 @@
       "vlmExtracted": true,
       "listTitle": "如何在真实世界中学会做研究",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20250110/259.html",
@@ -18130,7 +18197,8 @@
       "timeNote": "authoritative-label",
       "listTitle": "最优化理论在机器学习中的应用",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20250110/258.html",
@@ -18152,7 +18220,8 @@
       "vlmExtracted": true,
       "listTitle": "工业数据与智能应用创新平台简介",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250110/8251.html",
@@ -18199,7 +18268,8 @@
       "vlmExtracted": true,
       "listTitle": "朋辈分享系列讲座",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ibc.scnu.edu.cn/a/20250107/2779.html",
@@ -18232,7 +18302,8 @@
       "notes": [],
       "splitMode": "numbered-list",
       "speakerSource": "inherited",
-      "listTitle": "学术期刊投稿指南及实证研究论文发表的个案分享"
+      "listTitle": "学术期刊投稿指南及实证研究论文发表的个案分享",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250107/8255.html",
@@ -18494,12 +18565,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2024-12-31 14:56:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院举办“学术之光，思辨之路” 学术座谈会"
     },
     {
@@ -18694,7 +18765,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第28期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第28期"
+      "sessionNumber": "第28期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241224/8239.html",
@@ -19170,7 +19242,8 @@
       "vlmExtracted": true,
       "listTitle": "《多分形富化迁移率边的探索》&《黑暗之心》译作导读",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241213/6365.html",
@@ -19442,7 +19515,8 @@
       "listTitle": "学术讲座：Environmental DNA: understanding aquatic  ecosystems through collecting water",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241211/8232.html",
@@ -19658,7 +19732,8 @@
       "vlmExtracted": true,
       "listTitle": "社会科学研究中的研究问题与选题",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241206/8214.html",
@@ -19850,7 +19925,8 @@
       "vlmExtracted": true,
       "listTitle": "求职面试技巧",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/1201/83.html",
@@ -19873,7 +19949,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第27期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第27期"
+      "sessionNumber": "第27期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241204/8208.html",
@@ -20239,7 +20316,8 @@
       "vlmExtracted": true,
       "listTitle": "第三代太阳能电池：谁是最后的赢家",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20241201/246.html",
@@ -20261,7 +20339,8 @@
       "vlmExtracted": true,
       "listTitle": "我们为什么要学习书法",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://cs.scnu.edu.cn/a/20241129/5785.html",
@@ -20750,7 +20829,8 @@
       "vlmExtracted": true,
       "listTitle": "从经验到审美— 非遗视角下岭南舞蹈的当代转化",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/1124/84.html",
@@ -20773,7 +20853,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第26期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第26期"
+      "sessionNumber": "第26期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20241021/4381.html",
@@ -20897,7 +20978,8 @@
       "vlmExtracted": true,
       "listTitle": "戏剧游戏在中小学课堂中的应用",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241125/6339.html",
@@ -21060,7 +21142,8 @@
       "timeConfidence": "high",
       "timeNote": "general-body-full",
       "notes": null,
-      "listTitle": "学术讲座：“一只虾一条鱼”"
+      "listTitle": "学术讲座：“一只虾一条鱼”",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241120/12863.html",
@@ -21229,7 +21312,8 @@
       "vlmExtracted": true,
       "listTitle": "学业职业事业与人生的选择",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20241021/4381.html",
@@ -21477,7 +21561,8 @@
       "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "学术讲座：相分离作为植物应对环境变化的一种机制"
+      "listTitle": "学术讲座：相分离作为植物应对环境变化的一种机制",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241117/6331.html",
@@ -21549,7 +21634,8 @@
       "vlmExtracted": true,
       "listTitle": "氢燃料电池重点应用及发展趋势",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241115/8193.html",
@@ -22019,7 +22105,8 @@
       "vlmExtracted": true,
       "listTitle": "秉持育人至上教师第一 ，赋能教育高质量发展",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20241113/237.html",
@@ -22041,7 +22128,8 @@
       "vlmExtracted": true,
       "listTitle": "导航定位技术历史与前沿",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241113/8192.html",
@@ -22605,7 +22693,8 @@
       "hasPosterImage": true,
       "listTitle": "“课程思政评价工具的开发与构建”教学创新工作坊（总第84期）",
       "__idx": 924,
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20241107/236.html",
@@ -22627,7 +22716,8 @@
       "vlmExtracted": true,
       "listTitle": "学术有道，诚信为本",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241106/12851.html",
@@ -23051,7 +23141,8 @@
       "vlmExtracted": true,
       "listTitle": "《红楼梦》作者、版本及英译研究",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241029/12841.html",
@@ -23088,12 +23179,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "广州大学人文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2024-10-30 23:21:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院汉语言文字学专业“说文论语”系列讲座之四",
       "vlmExtracted": true
     },
@@ -23110,12 +23201,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "中山大学中国语言文学系",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2024-10-30 23:28:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院汉语言文字学专业“说文论语”系列讲座之三",
       "vlmExtracted": true
     },
@@ -23132,12 +23223,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "暨南大学文学院中文系",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2024-10-30 23:33:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院汉语言文字学专业“说文论语”系列讲座之二",
       "vlmExtracted": true
     },
@@ -23154,12 +23245,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "中山大學中文系",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2024-10-30 23:34:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院汉语言文字学专业“说文论语”系列讲座之一",
       "vlmExtracted": true
     },
@@ -23183,7 +23274,8 @@
       "vlmExtracted": true,
       "listTitle": "面向应用的航天器控制与估计方法",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241025/6306.html",
@@ -23204,7 +23296,8 @@
       "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "学术讲座：细胞自噬调控植物逆境胁迫耐受性的分子机制"
+      "listTitle": "学术讲座：细胞自噬调控植物逆境胁迫耐受性的分子机制",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241024/12835.html",
@@ -23462,7 +23555,8 @@
       "vlmExtracted": true,
       "listTitle": "跑步的正确姿势与损伤防控",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20241021/4381.html",
@@ -23863,7 +23957,8 @@
       "vlmExtracted": true,
       "listTitle": "西秦戏的历史渊源与艺术特色",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20240925/398.html",
@@ -24103,7 +24198,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第25期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第25期"
+      "sessionNumber": "第25期",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240910/12753.html",
@@ -24450,12 +24546,13 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2024-09-11 21:14:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "listTitle": "“新书业与左翼文学的发生”——泰东图书局创立110周年 暨《中国出版家·赵南公》出版学术研讨会在沪举行"
+      "listTitle": "“新书业与左翼文学的发生”——泰东图书局创立110周年 暨《中国出版家·赵南公》出版学术研讨会在沪举行",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240909/12747.html",
@@ -24887,7 +24984,8 @@
       "organizer": "生命科学学院",
       "publishTime": "2024-07-23 17:19:00",
       "publishTimeSource": "label",
-      "listTitle": "学术讲座：Role of ether phospholipids in mitochondrial membrane dynamics and aging"
+      "listTitle": "学术讲座：Role of ether phospholipids in mitochondrial membrane dynamics and aging",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240703/12723.html",
@@ -25561,7 +25659,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第23期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第23期"
+      "sessionNumber": "第23期",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240703/12713.html",
@@ -26046,7 +26145,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第22期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第22期"
+      "sessionNumber": "第22期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240620/8056.html",
@@ -26277,7 +26377,8 @@
       "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "学术讲座：Microclimate control to increase productivity and nutritional quality of leafy vegetables  in a cost-effective manner"
+      "listTitle": "学术讲座：Microclimate control to increase productivity and nutritional quality of leafy vegetables  in a cost-effective manner",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240612/12686.html",
@@ -26736,12 +26837,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2024-06-04 12:14:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院举行“当代美学与批评”学术工作坊（第四期） 暨当代激进美学理论发展与研究学术研讨会"
     },
     {
@@ -27212,7 +27313,8 @@
       "vlmExtracted": true,
       "listTitle": "人类网络空间命运共同体解决方案MIN及其运用",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240524/7943.html",
@@ -27259,7 +27361,8 @@
       "vlmExtracted": true,
       "listTitle": "人工智能解码课堂教学",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240523/8019.html",
@@ -27334,7 +27437,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "sessionNumber": "第二百零八讲",
-      "abstract": null,
+      "abstract": "",
       "vlmExtracted": true,
       "listTitle": "2024-05-21艺术乡建：参与性艺术的乡村在地实践"
     },
@@ -27752,7 +27855,8 @@
       "lectureCount": 3,
       "listTitle": "行知书院沙龙",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20240511/207.html",
@@ -27778,7 +27882,8 @@
       "lectureCount": 3,
       "listTitle": "行知书院沙龙",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20240511/207.html",
@@ -27804,7 +27909,8 @@
       "lectureCount": 3,
       "listTitle": "行知书院沙龙",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0514/64.html",
@@ -27827,7 +27933,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第19期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第19期"
+      "sessionNumber": "第19期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20240513/4321.html",
@@ -27960,7 +28067,7 @@
       "sessionNumber": "第二百零五讲",
       "vlmExtracted": true,
       "speakerSource": "label",
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2024-05-12Holocene dust deposition in northeastern China: influence of the monsoon, the Westerlies and anthropogenic activties"
     },
     {
@@ -28012,7 +28119,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二百零四讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2024-05-12土壤镉来源解析与土壤-水稻体系迁移转运机制"
     },
     {
@@ -28065,7 +28172,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二百零三讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2024-05-12利用孢粉学重建古环境和生物地理历史"
     },
     {
@@ -28279,7 +28386,8 @@
       "vlmExtracted": true,
       "listTitle": "素养导向下的小学数学变革",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240511/7988.html",
@@ -28478,7 +28586,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二百零二讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2024-05-07构建水体铊监测的新方法-基于DGT原理的被动采样技术"
     },
     {
@@ -28596,7 +28704,8 @@
       "vlmExtracted": true,
       "listTitle": "构建科创空间  赋能科学教育",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20240430/378.html",
@@ -28757,7 +28866,8 @@
       "vlmExtracted": true,
       "listTitle": "物理学前沿与大学生活——大学阶段的数理基础及学习",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240427/7862.html",
@@ -29017,7 +29127,8 @@
       "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "华南师范大学砺儒讲坛第122讲：思想政治教育40年的历程和经验"
+      "listTitle": "华南师范大学砺儒讲坛第122讲：思想政治教育40年的历程和经验",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240419/12633.html",
@@ -29083,7 +29194,8 @@
       "vlmExtracted": true,
       "listTitle": "阿里云大模型领域的发展和商业应用",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20240417/374.html",
@@ -29153,7 +29265,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第17期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第17期"
+      "sessionNumber": "第17期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240417/7875.html",
@@ -29325,7 +29438,8 @@
       "vlmExtracted": true,
       "listTitle": "从哲学省思当前教育",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20240325/4290.html",
@@ -30028,7 +30142,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "职业教育作为类型教育的辩证认识",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://abdn.scnu.edu.cn/a/20240323/357.html",
@@ -30146,7 +30261,8 @@
       "vlmExtracted": true,
       "listTitle": "让孩子在游戏中快乐成长",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240322/12607.html",
@@ -30439,7 +30555,8 @@
       "ocrExtracted": true,
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "问题意识与选题判断 ——“南粤讲坛”第87期"
+      "listTitle": "问题意识与选题判断 ——“南粤讲坛”第87期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20240319/367.html",
@@ -30630,7 +30747,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第15期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第15期"
+      "sessionNumber": "第15期",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240311/12597.html",
@@ -31139,7 +31257,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20240116/127.html",
@@ -31175,7 +31294,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20240116/127.html",
@@ -31211,7 +31331,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240115/12576.html",
@@ -31342,7 +31463,8 @@
       ],
       "merged": true,
       "sourceCount": 2,
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/56.html",
@@ -31378,7 +31500,8 @@
       ],
       "merged": true,
       "sourceCount": 2,
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/56.html",
@@ -31414,7 +31537,8 @@
       ],
       "merged": true,
       "sourceCount": 2,
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240114/7761.html",
@@ -32079,7 +32203,8 @@
       "lectureIndex": 1,
       "lectureCount": 2,
       "listTitle": "华南师范大学汕尾校区第14期教学工作坊暨第一批课程教学团队建设启动仪式",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2023/1225/54.html",
@@ -32105,7 +32230,8 @@
       "lectureIndex": 2,
       "lectureCount": 2,
       "listTitle": "华南师范大学汕尾校区第14期教学工作坊暨第一批课程教学团队建设启动仪式",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231227/12552.html",
@@ -32246,7 +32372,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2023-12-24红树林蓝碳及案例分析"
     },
     {
@@ -32273,7 +32399,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十九期",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2023-12-24大气中的新污染物及其环境健康风险"
     },
     {
@@ -32322,7 +32448,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十八期",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2023-12-24基于炭基材料技术体系的构建及其应用"
     },
     {
@@ -32349,7 +32475,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十七期",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2023-12-24二氧化碳升高背景下蓝藻水华的安全防控"
     },
     {
@@ -32588,7 +32714,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十四期",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2023-12-20基于自然的解决方案：历史演进城市热缓解与居民健康"
     },
     {
@@ -32655,7 +32781,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第13期教学工作坊",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20231219/118.html",
@@ -32680,7 +32807,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2023-12-192023年越南区域国别发展研究中国-越南区域经济合作新态势"
     },
     {
@@ -32706,7 +32833,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十三期",
-      "abstract": null,
+      "abstract": "",
       "vlmExtracted": true,
       "listTitle": "2023-12-20村庄去哪儿了?——基于时序遥感识别与分析的实证研究"
     },
@@ -32856,7 +32983,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十一期",
-      "abstract": null,
+      "abstract": "",
       "vlmExtracted": true,
       "listTitle": "2023-12-18“装置”:一种批判边界研究的视角——围绕新疆霍尔果斯口岸研究的扩展"
     },
@@ -33409,7 +33536,8 @@
       "vlmExtracted": true,
       "listTitle": "弘扬传统文化 传承艺术经典",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20231214/7729.html",
@@ -33465,7 +33593,8 @@
       "notes": [],
       "host": "",
       "speakerSource": "label",
-      "listTitle": "2023-12-13高中自然地理研学要义"
+      "listTitle": "2023-12-13高中自然地理研学要义",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2023/1211/52.html",
@@ -33488,7 +33617,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第12期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第12期"
+      "sessionNumber": "第12期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20231208/4273.html",
@@ -33517,7 +33647,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20231214/123.html",
@@ -33562,7 +33693,8 @@
       "timeConfidence": "high",
       "timeNote": "general-body-full",
       "listTitle": "华南师范大学90周年校庆系列学术活动——砺儒讲坛（第30场）：大模型、技术奇点与技术政治学研究",
-      "host": "万晓宏"
+      "host": "万晓宏",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20231213/6140.html",
@@ -33705,7 +33837,8 @@
       "vlmExtracted": true,
       "listTitle": "从传统创新到时尚话语权",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231211/12527.html",
@@ -33919,7 +34052,8 @@
       "vlmExtracted": true,
       "listTitle": "《艺术鉴赏与人文艺术素养提升》 未来时尚设计的创新思考",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20231204/803.html",
@@ -34084,12 +34218,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-12-05 22:39:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "中国文学批评研究会 2023 年年会暨 “两个结合与文学批评的使命”学术研讨会 在华南师范大学召开"
     },
     {
@@ -34196,7 +34330,8 @@
       "timeConfidence": "high",
       "timeNote": "general-body-full",
       "host": "高彩吉",
-      "listTitle": "2023年12月1日学术讲座： 细胞生物学助力作物农艺性状分子设计---Seeing is believing !"
+      "listTitle": "2023年12月1日学术讲座： 细胞生物学助力作物农艺性状分子设计---Seeing is believing !",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231129/12511.html",
@@ -34330,7 +34465,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第10期教学工作坊",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20231129/799.html",
@@ -34548,7 +34684,8 @@
       "vlmExtracted": true,
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "2023年11月24日学术讲座：临床现场快速检测的发展与展望"
+      "listTitle": "2023年11月24日学术讲座：临床现场快速检测的发展与展望",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20231122/6001.html",
@@ -34673,7 +34810,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第9期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第9期"
+      "sessionNumber": "第9期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20231117/4271.html",
@@ -34991,12 +35129,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-11-18 15:18:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学第十六届“勷勤论坛”文学院分论坛之王德胜教授专场讲座：从“以美育代宗教”理解中国美学精神的发生"
     },
     {
@@ -35012,12 +35150,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-11-18 15:44:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院举 第十六届“勷勷论坛”主论坛 “文明铸魂”中华优秀传统文化系列讲座之李静教授专场"
     },
     {
@@ -35255,12 +35393,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-11-16 20:38:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院“庆祝建校九十周年”名家系列讲座 作为“教师”的朱自清"
     },
     {
@@ -35276,12 +35414,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-11-16 20:49:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院“庆祝建校九十周年”名家系列讲座  文学何处得以安放？ ——现代文学的又一次焦虑"
     },
     {
@@ -35398,7 +35536,8 @@
       "vlmExtracted": true,
       "listTitle": "大学生创新创业训练计划线上答疑会",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231109/12486.html",
@@ -35492,7 +35631,8 @@
       "vlmExtracted": true,
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "2023年11月11日学术讲座：Dissecting the molecular mechanism of phytochrome A signaling"
+      "listTitle": "2023年11月11日学术讲座：Dissecting the molecular mechanism of phytochrome A signaling",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231110/12488.html",
@@ -35586,7 +35726,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第7期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第7期"
+      "sessionNumber": "第7期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20231107/338.html",
@@ -35645,12 +35786,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-11-08 21:51:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“庆祝建校九十周年”名家系列讲座之张业松教授专场讲座"
     },
     {
@@ -36694,7 +36835,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第5期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第5期"
+      "sessionNumber": "第5期",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20231026/106.html",
@@ -36798,7 +36940,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231019/12462.html",
@@ -36846,7 +36989,8 @@
       "lectureCount": 3,
       "listTitle": "谈谈学生干部的素质修养",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20231023/105.html",
@@ -36872,7 +37016,8 @@
       "lectureCount": 3,
       "listTitle": "谈谈学生干部的素质修养",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20231023/105.html",
@@ -36898,7 +37043,8 @@
       "lectureCount": 3,
       "listTitle": "谈谈学生干部的素质修养",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231019/12461.html",
@@ -37476,7 +37622,8 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第3期教学工作坊",
       "hasPosterImage": true,
-      "sessionNumber": "第3期"
+      "sessionNumber": "第3期",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231008/12449.html",
@@ -38545,12 +38692,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-06-28 12:37:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院“庆祝建校九十周年”名家系列讲座之 三重空间：多元文化中的华裔写作——以加拿大和澳大利亚为例"
     },
     {
@@ -39042,7 +39189,8 @@
       "publishTime": null,
       "publishTimeSource": "url_proxy",
       "hasPosterImage": true,
-      "listTitle": "会议通知丨华南地理空间信息论坛第三期：位置服务与智慧社会"
+      "listTitle": "会议通知丨华南地理空间信息论坛第三期：位置服务与智慧社会",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230609/12328.html",
@@ -39404,7 +39552,8 @@
       "timeConfidence": "high",
       "timeNote": "same-year",
       "speakerSource": "label",
-      "listTitle": "第56期学术报告​--Bridging Topological Data Analysis and Machine Learning"
+      "listTitle": "第56期学术报告​--Bridging Topological Data Analysis and Machine Learning",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230608/12326.html",
@@ -39765,7 +39914,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "汕尾市红色文化符号的传承与创新",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230529/12313.html",
@@ -39831,7 +39981,8 @@
       "vlmExtracted": true,
       "listTitle": "行知书院科学教育发展与创新训练营",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230526/12310.html",
@@ -39972,7 +40123,8 @@
       "vlmExtracted": true,
       "listTitle": "弘扬中华民族优秀传统文化——略谈硬笔书法",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230525/7575.html",
@@ -40044,7 +40196,8 @@
       "vlmExtracted": true,
       "listTitle": "人无西东聚粤土 路通南北成通衢——漫谈岭南移民",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20230519/4266.html",
@@ -40332,7 +40485,8 @@
       "vlmExtracted": true,
       "listTitle": "高雅艺术进校园",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230519/7559.html",
@@ -40724,12 +40878,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-05-15 16:49:47",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“华南师范大学校庆九十周年名家系列讲座”之“西部与中华文化之源”"
     },
     {
@@ -40900,7 +41054,8 @@
       "lectureCount": 3,
       "listTitle": "学者讲坛第7-9讲丨阿伯丁大学教师主讲，精彩不容错过！",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://abdn.scnu.edu.cn/a/20230504/362.html",
@@ -40926,7 +41081,8 @@
       "lectureCount": 3,
       "listTitle": "学者讲坛第7-9讲丨阿伯丁大学教师主讲，精彩不容错过！",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://abdn.scnu.edu.cn/a/20230504/362.html",
@@ -40952,7 +41108,8 @@
       "lectureCount": 3,
       "listTitle": "学者讲坛第7-9讲丨阿伯丁大学教师主讲，精彩不容错过！",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230511/7552.html",
@@ -41068,7 +41225,8 @@
       "vlmExtracted": true,
       "listTitle": "设计未来与科学理性",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230509/7547.html",
@@ -41216,7 +41374,8 @@
       "timeConfidence": "high",
       "timeNote": "general-body-full",
       "listTitle": "华南师范大学90周年校庆系列学术活动——砺儒讲坛（第七场）：设计、科技理性与东方美学",
-      "host": "罗广"
+      "host": "罗广",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230504/12281.html",
@@ -41326,7 +41485,8 @@
       "vlmExtracted": true,
       "listTitle": "基于Rasch模型的科学素养测评题库建设中的链接效度研究",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20230505/96.html",
@@ -41371,7 +41531,8 @@
       "vlmExtracted": true,
       "listTitle": "大学学习与保研经验分享",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20230505/94.html",
@@ -41941,12 +42102,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-04-20 00:04:40",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院“庆祝建校九十周年”名家系列讲座之“五四精神与闻一多抗战后期思想变化”"
     },
     {
@@ -42038,7 +42199,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "教师科学发声与嗓音保健工作坊",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230414/12264.html",
@@ -42134,7 +42296,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230413/7535.html",
@@ -42284,7 +42447,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230411/7529.html",
@@ -42734,12 +42898,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-03-31 12:58:49",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“华南师范大学校庆九十周年名家系列讲座”之——新文学语体的发现"
     },
     {
@@ -42809,7 +42973,8 @@
       "vlmExtracted": true,
       "listTitle": "“互联网+”创新创业竞赛简介及商业计划书写作指导",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20230327/2430.html",
@@ -43317,12 +43482,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2023-03-22 16:24:52",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "北京师范大学郑国民教授来我院做学术报告"
     },
     {
@@ -43370,7 +43535,8 @@
       "vlmExtracted": true,
       "listTitle": "跨境电商如何助力传统外贸产业转型升级",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230316/12214.html",
@@ -43459,7 +43625,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "华南师范大学行知书院讲座沙龙",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://cs.scnu.edu.cn/a/20230315/5400.html",
@@ -43609,12 +43776,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "河南大学",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "夏晓虹,原北京大学中文系教授,现为河南大学讲座教授。先后赴日本、美国、德国、捷克、韩国、英国、马来西亚、以色列、新加坡、法国以及中国台湾、香港地区从事研究与参加学术会议,并曾在德国海德堡大学(1998)、日本东京大学(1999－2001)、香港岭南大学(",
       "organizer": "文学院",
       "publishTime": "2023-03-16 09:21:49",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院“庆祝建校九十周年”名家系列讲座之新见林纾手稿研究",
       "vlmExtracted": true
     },
@@ -44071,7 +44238,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230307/7482.html",
@@ -44669,7 +44837,8 @@
       "vlmExtracted": true,
       "listTitle": "3D场景感知",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20221230/262.html",
@@ -45092,7 +45261,8 @@
       "hasPosterImage": true,
       "listTitle": "“课程思政建设的现状与趋势”第61期教学创新工作坊",
       "__idx": 1813,
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20221208/7466.html",
@@ -45275,12 +45445,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2022-12-02 10:07:51",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "长江学者特聘教授、中国人民大学文学院博士生导师孙郁教授应邀为我院师生做学术报告"
     },
     {
@@ -45303,7 +45473,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "后疫情时代的教育改革",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20221128/4106.html",
@@ -45332,7 +45503,8 @@
       "hasPosterImage": true,
       "listTitle": "“以赛促建，卓越教学——教学大赛优秀选手经验分享” 第60期教学创新工作坊",
       "__idx": 1822,
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20221130/7450.html",
@@ -45429,7 +45601,8 @@
       "vlmExtracted": true,
       "listTitle": "从母亲的艺术到时尚的艺术",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20221128/7452.html",
@@ -45476,7 +45649,8 @@
       "vlmExtracted": true,
       "listTitle": "国际时尚体系",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20221125/7455.html",
@@ -45621,7 +45795,8 @@
       "vlmExtracted": true,
       "listTitle": "“中国设计”还是“设计在中国”——关于中国设计主体性的思考",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221124/75.html",
@@ -45643,7 +45818,8 @@
       "vlmExtracted": true,
       "listTitle": "为了物理学核心素养的教与评",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20221124/12151.html",
@@ -45687,7 +45863,8 @@
       "vlmExtracted": true,
       "listTitle": "儿童哲学的理论与实践",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20221123/7451.html",
@@ -45765,7 +45942,8 @@
       "vlmExtracted": true,
       "listTitle": "游戏化教学在幼儿园一日活动中的组织与实施",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221117/70.html",
@@ -45787,7 +45965,8 @@
       "vlmExtracted": true,
       "listTitle": "数字生存与文化选择：和大学生一起好好学习",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20221116/12143.html",
@@ -45831,7 +46010,8 @@
       "vlmExtracted": true,
       "listTitle": "书斋与田野：率性教育思与行",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20221103/12138.html",
@@ -45977,7 +46157,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2022/1110/3239.html",
@@ -45992,12 +46173,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2022-11-10 11:31:06",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院“粤港澳跨媒介文化研究人文交流工作坊”圆满举办"
     },
     {
@@ -46044,12 +46225,13 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2022-11-10 11:44:35",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "listTitle": "“《美育》杂志的美育传播——跨文化研究的可能” 何杏枫教授学术讲座"
+      "listTitle": "“《美育》杂志的美育传播——跨文化研究的可能” 何杏枫教授学术讲座",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20221118/7446.html",
@@ -46259,7 +46441,7 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2022-11-04 22:43:04",
       "publishTimeSource": "label",
@@ -46335,7 +46517,8 @@
       "timeNote": "same-year",
       "imageParseMethod": "vlm",
       "listTitle": "“后疫情时代职业教育的挑战与创新”",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20221028/4095.html",
@@ -46364,7 +46547,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221102/68.html",
@@ -46386,7 +46570,8 @@
       "vlmExtracted": true,
       "listTitle": "人工智能：目标识别和文本语义理解",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221031/67.html",
@@ -46408,7 +46593,8 @@
       "vlmExtracted": true,
       "listTitle": "教育人工智能学术沙龙",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20221028/12134.html",
@@ -46458,7 +46644,7 @@
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2022/1029/3234.html",
       "college": "文学院",
       "campus": "大学城",
-      "title": "华南师范大学第十五届“勷勤论坛”文学院分论坛之“学术规范与学术创新意识培养”专题系列讲座（第二讲",
+      "title": "华南师范大学第十五届“勷勤论坛”文学院分论坛之“学术规范与学术创新意识培养”专题系列讲座（第二讲）",
       "topic": "汉字研究的文化生态学方法",
       "lectureStart": "2022-11-02 09:30:00",
       "lectureEnd": "2022-11-02 11:30:00",
@@ -46467,12 +46653,12 @@
       "speakerTitle": "二级教授",
       "speakerAffiliation": "华南师范大学",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "张玉金,毕业于北京大学中文系。系中国古典文献学 \"开山大师兄\"(中国首位获得中国古典文献学博士学位人员)。 华南师范大学二级教授、博士生导师、汉语言文字学博硕士生导师组召集人、华南师范大学教学名师、华南师范大学关工委主任、《语文月刊》主编。广东省中国语言学会会长、中国语言学会常务理事、中国殷商文化学会理事、中国文字学会理事。 主要从事出土文献语言研究、古文字学和汉字学研究。出版学术著作 14部,主编5部,主编丛书3套。在《中国语文》《语言研究》《古汉语研究》《文史》等刊物发表学术论文230多篇。 论著获得教育部高等学校科学研究优秀成果奖(人文社会科学)三等奖 2项,省社科优秀成果一等奖3项、二等奖2项、三等奖2项,省教育厅优秀社科成果二等奖2项,市社科优秀成果一等奖1项。 主持国家社科基金重大招标项目 1项、国家社科基金重点项目1项、国家社科基金一般项目5项,省部级课题7项,省教育厅课题4项。 华南师范大学文学院 202 2 年 10 月 2 9 日",
       "organizer": "文学院",
       "publishTime": "2022-10-29 15:52:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学第十五届“勷勤论坛”文学院分论坛之“学术规范与学术创新意识培养”专题系列讲座（第二讲",
       "vlmExtracted": true
     },
@@ -46543,7 +46729,8 @@
       "vlmExtracted": true,
       "listTitle": "以有效的主题班会开展有效的德育",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ai.scnu.edu.cn/a/20220928/163.html",
@@ -46629,7 +46816,8 @@
       "lectureCount": 5,
       "listTitle": "低俗自动驾驶产业化和未来——以城市之光为例",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221026/65.html",
@@ -46655,7 +46843,8 @@
       "lectureCount": 5,
       "listTitle": "低俗自动驾驶产业化和未来——以城市之光为例",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221026/65.html",
@@ -46681,7 +46870,8 @@
       "lectureCount": 5,
       "listTitle": "低俗自动驾驶产业化和未来——以城市之光为例",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221026/65.html",
@@ -46707,7 +46897,8 @@
       "lectureCount": 5,
       "listTitle": "低俗自动驾驶产业化和未来——以城市之光为例",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221026/65.html",
@@ -46733,7 +46924,8 @@
       "lectureCount": 5,
       "listTitle": "低俗自动驾驶产业化和未来——以城市之光为例",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20221020/12130.html",
@@ -46761,7 +46953,7 @@
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2022/1024/3231.html",
       "college": "文学院",
       "campus": "大学城",
-      "title": "华南师范大学第十五届“勷勤论坛”文学院分论坛之“学术规范与学术创新意识培养”专题系列讲座（第一讲",
+      "title": "华南师范大学第十五届“勷勤论坛”文学院分论坛之“学术规范与学术创新意识培养”专题系列讲座（第一讲）",
       "topic": "关于文学研究方法的若干问题",
       "lectureStart": "2022-10-26 09:00:00",
       "lectureEnd": "2022-10-26 11:00:00",
@@ -46770,12 +46962,12 @@
       "speakerTitle": "特聘教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "李春青,北京市人,文学博士。现任华南师范大学文学院特聘教授。主要从事中国古代儒家文化、古代文论和文学基本理论的教学与研究。曾任教育部重点研究基地北师大文艺学研究中心主任,兼任中国中外文学理论学会副会长、中国文学理论学会副会长、中国文艺评论家协会理事、中国古代文论学会理事等。独立著述有十三种,另有合著、合译、主编著作十余种;发表学术论文二百余篇。著作《诗与意识形态》等曾获得教育部人文社会科学优秀成果奖二等奖、三等奖各一项,北京市哲学社会科学优秀成果一等奖两项。 华南师范大学文学院 202 2 年 10 月 2 4 日",
       "organizer": "文学院",
       "publishTime": "2022-10-24 15:35:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学第十五届“勷勤论坛”文学院分论坛之“学术规范与学术创新意识培养”专题系列讲座（第一讲",
       "vlmExtracted": true
     },
@@ -46968,7 +47160,8 @@
       "vlmExtracted": true,
       "listTitle": "起承转合式的有效德育",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20221018/12127.html",
@@ -47058,12 +47251,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2022-10-20 13:26:48",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "第二届中国古文选本学学术研讨会暨《稀见古文选本丛刊》五十五册发布会在广州召开"
     },
     {
@@ -47389,12 +47582,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2022-10-09 22:47:21",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "新时代湾区青年优秀传统文化交流讲座 之“治学的考镜、辨章-----以《世说新语》某条为例”开讲"
     },
     {
@@ -47410,12 +47603,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2022-10-09 23:04:19",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "新时代湾区青年优秀传统文化交流讲座  之“耐人寻味的‘戏’‘影’融合”"
     },
     {
@@ -47431,12 +47624,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2022-10-09 23:10:20",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "新时代湾区青年优秀传统文化学术研讨会顺利举行"
     },
     {
@@ -47559,7 +47752,8 @@
       "vlmExtracted": true,
       "listTitle": "新时代中国国家安全形式",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220926/12105.html",
@@ -47846,7 +48040,8 @@
       "vlmExtracted": true,
       "listTitle": "算法和程序设计竞赛",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20220924/62.html",
@@ -47868,7 +48063,8 @@
       "vlmExtracted": true,
       "listTitle": "从小白到骨干——小学科学教师的成长之路",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20220919/2342.html",
@@ -47947,7 +48143,8 @@
       ],
       "merged": true,
       "sourceCount": 2,
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20220916/4041.html",
@@ -47992,7 +48189,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220916/12087.html",
@@ -48124,7 +48322,8 @@
       "organizer": "汕尾校区",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "listTitle": "“广东省基础与应用基础研究基金——项目资助体系”专题讲座"
+      "listTitle": "“广东省基础与应用基础研究基金——项目资助体系”专题讲座",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220914/12086.html",
@@ -48191,7 +48390,8 @@
       "vlmExtracted": true,
       "listTitle": "科学教师的责任与任务",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20220917/50.html",
@@ -48632,7 +48832,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "listTitle": "《大学（青年）教师课堂教学“基本功”的历练：认知与行动》",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220628/11991.html",
@@ -49333,7 +49534,8 @@
       "hasPosterImage": true,
       "listTitle": "用技术变革科学研究—— 第55期教学创新工作坊",
       "__idx": 1974,
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220520/11947.html",
@@ -49639,7 +49841,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ibrr.scnu.edu.cn/a/20220510/481.html",
@@ -50055,7 +50258,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "熊彩：从嵌入性视角看乡村振兴中的资本参与丨华南师范大学-华中师范大学2021年田野政治学学术共同体对话会发言"
+      "listTitle": "熊彩：从嵌入性视角看乡村振兴中的资本参与丨华南师范大学-华中师范大学2021年田野政治学学术共同体对话会发言",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20220112/5718.html",
@@ -50076,7 +50280,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "黄振华：家户抑或宗族：国家治理的基本单元及其辨识 | 华南师范大学-华中师范大学2021年田野政治学学术共同体对话会发言"
+      "listTitle": "黄振华：家户抑或宗族：国家治理的基本单元及其辨识 | 华南师范大学-华中师范大学2021年田野政治学学术共同体对话会发言",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220106/11830.html",
@@ -50392,7 +50597,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "国家自然科学基金申请与经验交流会",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2021/1203/2994.html",
@@ -50512,7 +50718,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211206/11805.html",
@@ -50557,7 +50764,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "回归模型参数的变点检测",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20211207/5685.html",
@@ -50730,28 +50938,6 @@
       "ocrExtracted": false
     },
     {
-      "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2021/1128/2979.html",
-      "college": "文学院",
-      "campus": "大学城",
-      "title": "中国语言学高端论坛系列讲座预告",
-      "topic": "第一讲:《广韵》词汇的历史层次第二讲:漫谈近现代日本汉语言文字学史研究",
-      "lectureStart": "2021-11-30 14:00:00",
-      "lectureEnd": "2021-11-30 18:00:00",
-      "location": "华南师范大学大学城校区文一栋学术厅332讲座形式:线上线下混合式",
-      "speaker": "蒋宗福",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "第一讲嘉宾:蒋宗福,男,文学博士,四川大学教授、博士生导师、教育部人文社科重点研究基地四川大学中国俗文化研究所研究员,国家社科基金重大项目首席专家,四川省学术和技术带头人。主持国家社科基金重大、重点及年度项目 5 项;主持教育部人文社科重点研究基地重大项目 2 项。出版《四川方言词语考释》《语言文献论集》《四川方言词语续考》《四川方言词源》《近代汉语论文集》《春秋公羊传注疏》(点校)、《礼记正义》(点校,合作)、《敦煌禅宗文献研究》《〈蜀语〉笺证》《〈广韵〉词汇研究》《语料学概论》等;在《中国语文》《新华文摘》《文献》《方言》《四川大学学报》《宗教学研究》等刊物发表论文 80 余篇。教学获教育部国家级优教成果二等奖、重庆市政府优教成果一等奖,科研获重庆市政府、四川省政府社科优秀成果二、三等奖。 第二讲嘉宾:李无未,厦门大学特聘教授,博士生导师,厦门大学中国语言文学学科博士后流动站负责人。厦门大学古籍研究所所长、汉语言文字学应用与推广中心主任、国家级一流本科专业汉语言负责人。曾赴日本、法国、越南、中国台湾地区等国际知名大学任客座教授与交换教授、访问教授。兼任国家社科基金规划办聘任语言学科评审组会评专家,中国语言学会理事、福建省语言学会会长、世界汉语教育史学会副会长、中国语文现代化学会音韵学会副会长。致力于中外汉语音韵学史等领域研究。在《中国语文》等国内外学术期刊上发表论文 180 余篇。出版《宋元吉安方音研究》(合作)、《日本汉语音韵学史》《台湾汉语音韵学史》《日本近现代汉语语法学史》《东亚视阈汉语史论》《周代朝聘制度研究》《任尔西东:胡以鲁国语学草创原理》等著作。主编《日本汉语教科书汇刊(江户明治编)》( 60 册)、《音韵学论著指要与总目》《汉语音韵学通论》等书。主持并完成国家社科基金重大项目 1 项、国家社科基金重点项目 1 项,国家社科基金一般项目 2 项。现主持国家社科基金重点项目 1 项。获第 15 届\"王力语言学奖\"、国家社科基金优秀成果文库奖、第八届教育部人文社科奖、首届唐作藩音韵学奖、福建省政府哲学社会科学优秀著作一等奖。 华南师范大学文学院 2021年11月27日",
-      "organizer": "文学院",
-      "publishTime": "2021-11-28 13:16:33",
-      "publishTimeSource": "label",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "",
-      "listTitle": "中国语言学高端论坛系列讲座预告"
-    },
-    {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20211130/2214.html",
       "college": "心理学院",
       "campus": "石牌",
@@ -50823,7 +51009,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://gxb.scnu.edu.cn/a/20211122/125.html",
@@ -50852,7 +51039,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20211123/1436.html",
@@ -51088,12 +51276,13 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2021-11-22 08:57:57",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "listTitle": "我心向党，青春如炬——华南师范大学文学院6篇论文入选“2021岭南学术论坛”并获评优秀论文"
+      "listTitle": "我心向党，青春如炬——华南师范大学文学院6篇论文入选“2021岭南学术论坛”并获评优秀论文",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211117/11774.html",
@@ -51147,7 +51336,8 @@
       "host": "杨和焰副教授",
       "speakerSource": null,
       "participants": "徐湘林教授, 华南师范大学政治与公共管理学院师生",
-      "listTitle": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流"
+      "listTitle": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20211116/5666.html",
@@ -51177,7 +51367,8 @@
       "meetingId": "767372062",
       "meetingPlatform": "腾讯会议",
       "speakerSource": "block",
-      "listTitle": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流"
+      "listTitle": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20211115/1433.html",
@@ -51237,7 +51428,8 @@
       "meetingId": "548887897",
       "meetingPlatform": "腾讯会议",
       "speakerSource": "block",
-      "listTitle": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流"
+      "listTitle": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211117/11773.html",
@@ -51289,7 +51481,8 @@
       "meetingId": "562395609",
       "meetingPlatform": "腾讯会议",
       "speakerSource": "block",
-      "listTitle": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流"
+      "listTitle": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211112/11762.html",
@@ -51945,7 +52138,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20210930/576.html",
@@ -52016,7 +52210,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20210924/574.html",
@@ -52083,7 +52278,8 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "listTitle": "20211012  华南师范大学第十四届勷勤论坛之理科类论文写作指导"
+      "listTitle": "20211012  华南师范大学第十四届勷勤论坛之理科类论文写作指导",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2021/1011/2867.html",
@@ -52096,14 +52292,14 @@
       "location": "华南师范大学大学城校区文一栋三楼学术报告厅",
       "speaker": "杜卫",
       "speakerTitle": "教授",
-      "speakerAffiliation": "杭州师范大学",
+      "speakerAffiliation": "杭州师范大学艺术教育研究院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "杜卫,文学博士,杭州师范大学艺术教育研究院教授,中央美术学院美育研究院特聘教授,北京大学美学与美育研究中心兼职研究员,英国苏塞克斯大学和日本广岛大学客座教授。是第十三届全国政协常委,首届教育部高校美育教指委副主任委员,中国高教学会美育专委会理事长。学术研究主要领域是中国现代美学思想、美育理论、艺术理论和高校通识教育研究。主持完成国家社科基金四项,正主持国家社科基金重大课题《当代中国美育话语体系建构研究》。出版《走出审美城》《美育论》《审美功利主义》《心性美学》等学术著作十余部,在《中国社会科学》《文学评论》《文艺研究》《教育研究》等期刊发表学术论文百余篇,曾获得国家和省部级奖励多项。 华南师范大学文学院 202 1 年 10 月 11 日",
       "organizer": "文学院",
       "publishTime": "2021-10-11 16:17:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "第十四届“勷勤论坛”文学院分论坛之今天我们为何需要艺术",
       "vlmExtracted": true
     },
@@ -52120,12 +52316,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "陈志扬,华南师范大学文学院教授,博士生导师。研究领域为史学理论、先秦诸子、古代诗文与诗文批评等,在《文学评论》《学术研究》《中国文化研究》《社会科学战线》《江海学刊》《社会科学辑刊》《中山大学学报》等发表学术论文 30余篇。 华南师范大学文学院 202 1 年 10 月 10 日",
       "organizer": "文学院",
       "publishTime": "2021-10-10 16:07:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "第十四届“勷勤论坛”文学院分论坛之曾点言志的真义与孔子与点的真相",
       "vlmExtracted": true
     },
@@ -52368,7 +52564,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20210909/1402.html",
@@ -52397,7 +52594,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210906/11690.html",
@@ -52501,12 +52699,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "刘慧姝 ,华南师范大学文学院教授,博士生导师。主要论著有《克尔凯郭尔文艺审美思想研究》《试论〈坛经〉世出世法的不二》《多信仰对话与全球责任 ——保罗·尼特的宗教多元论思想及其当代意义》《试论维特根斯坦的\"不可说\"与禅宗的 \"不立文字\" 》《玛辛·格琳审美教育思想研究》《罗洛·梅的存在主义思想研究》等。 华南师范大学文学院 202 1 年 9 月 8 日",
       "organizer": "文学院",
       "publishTime": "2021-09-08 15:07:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院七零后学者论坛系列讲座（第七讲）：后人类时代的理论思考与前景展望",
       "vlmExtracted": true
     },
@@ -52523,12 +52721,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "孙雪霞,文学博士,比较文化博士后,教授。现为古代文学硕士导师组召集人,主要从事古代文学、中国文化的教学研究。为本科生和研究生讲授《先秦文学史》《汉魏六朝文学史》《中国文化概论》《诗经导读》《先秦诸子导读》《庄子导读》《楚辞导读》《人文学概论》《古典诗词鉴赏方法》等课程。出版《文学庄子探微》(入选 \"岭南博士文库\")《神话视野下的庄子神话研究》等专著,主编《中国文化概论》等教材,主持国家社科基金1项,省部级项目1项,厅级项目多项,在《文学评论》《现代哲学》《华南师范大学学报》《华中师范大学学报》等核心刊物上发表论文数十篇。 华南师范大学文学院 202 1 年 8 月 31 日",
       "organizer": "文学院",
       "publishTime": "2021-08-31 15:05:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院七零后学者论坛系列讲座（第六讲）：《庄子·齐物论》寓言释读",
       "vlmExtracted": true
     },
@@ -52545,12 +52743,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "秦晓华,河南安阳人,华南师范大学文学院教授,中山大学文学博士,主要从事文字学研究及汉字、书法等教学工作。主持国家社科基金项目 2项、省部级项目5项。获第六届教育部高校人文社科成果三等奖,2017年广东省哲学社会科学优秀成果奖一等奖,第三届全球华人国学成果奖等。著作主要有《商周金文摹释总集》(副主编)、《商周金文辞类纂》(副主编)、《汉字与书法》等。教学方面,获得2011年华南师范大学\"为了明天\"教学奖中青年教师课堂教学优秀奖一等奖,多次获得课堂教学质量奖优秀奖。 华南师范大学文学院 202 1 年 8 月 26 日",
       "organizer": "文学院",
       "publishTime": "2021-08-26 15:03:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院七零后学者论坛系列讲座（第五讲）：漫谈汉字学的应用价值",
       "vlmExtracted": true
     },
@@ -52567,12 +52765,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "段吉方, 主要从事文艺学、美学、中西马克思主义美学与文论、当代审美文化理论与批评研究,文学博士,博士后。 文学博士,博士后。主持国家社科基金项目重大招标项目 1项,国家社科基金重点项目1项,主持完成国家社科基金年度项目2项,中国博士后科学基金特别资助项目、面上项目、其他省部级项目多项。获广东省哲学社会科学优秀成果奖二等奖3次,三等奖1次。另主持广东省省级精品资源共享课《文学概论》与广东省优秀教学团队\"文学理论系列课程教学团队\"。出版专著4部,主编教材1部,在《文学评论》《文艺理论研究》等刊物发表学术论文百余篇,多篇论文被《新华文摘》《中国社会科学文摘》《中国人民大学报刊复印资料》转载。 华南师范大学文学院 202 1 年 8 月 21 日",
       "organizer": "文学院",
       "publishTime": "2021-08-21 14:55:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院七零后学者论坛系列讲座（第四讲）：英国文化研究理论的经验性及其启发——以“伯明翰学派”前后为中心",
       "vlmExtracted": true
     },
@@ -52589,12 +52787,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "咸立强, 华南师范大学文学院教授, 硕士生导师 ,中国郭沫若学会理事。 编著《 寻找归宿的流浪者 ——创造社研究 》、《 创造社与文学研究会论争缘起研究的回顾与重探 》、《 \"自我\"文学书写的常态与先锋性 》等。曾获华南师范大学 2006年\"为了明天\"中青年教师教学比赛优秀奖二等奖 、 2006-2007年华南师范大学课堂教学质量优秀奖 。 华南师范大学文学院 202 1 年 8 月 18 日",
       "organizer": "文学院",
       "publishTime": "2021-08-18 14:47:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院七零后学者论坛系列讲座（第三讲）：《少年维特之烦恼》的汉译版本及翻译批评问题",
       "vlmExtracted": true
     },
@@ -52611,12 +52809,12 @@
       "speakerTitle": "副教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "张舸,博士、硕士生导师、华南师范大学国家语言文字推广基地副主任、文学院副教授、国家级普通话水平测试员、国家汉办国际汉语教师培训师、广东省教育厅语言文字工作指导服务组专家、 \"国培\"\"省培\"项目授课专家、英国谢菲尔德大学访问学者、广东演讲学会副会长。主要从事二语教学与习得、现代汉语、语言艺术教育研究。编著、主编或参编《普通话水平测试教程》《教师口语基础训练教程》等教材36册,发表论文共22篇,曾荣获中国语保工程广东项目优秀课题、广东省普通话培训优秀课例评选一等奖、华南师大\"为了明天\"中青年教师课堂教学比赛一等奖、全国普通话比赛三等奖,以及\"杰出汉语教师\"、\"我最喜爱的导师\"、\"教学优秀教师\"等荣誉称号。 华南师范大学文学院 202 1 年 8 月 12 日",
       "organizer": "文学院",
       "publishTime": "2021-08-12 14:40:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院七零后学者论坛系列讲座（第二讲）：教师语言艺术",
       "vlmExtracted": true
     },
@@ -52854,12 +53052,12 @@
       "speakerTitle": "教授",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "凌逾,华南师范大学文学院教授,博士生导师。粤港澳大湾区跨界文化研究中心主任,主持学术公众号 \"跨界经纬\"(原名为\"跨界太极\")。出版论著《融媒介:赛博时代的文学跨媒介传播》《跨界网》《跨媒介香港》《跨媒介叙事》《跨界创意访谈录》《跨媒介:港台叙事作品选读》等,发表学术论文百余篇。 华南师范大学文学院 202 1 年 7 月 10 日",
       "organizer": "文学院",
       "publishTime": "2021-07-10 17:36:00",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "文学院七零后学者论坛系列讲座（第一讲）：文学空间考现学",
       "vlmExtracted": true
     },
@@ -52940,7 +53138,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20210705/2137.html",
@@ -53013,7 +53212,8 @@
       "organizer": "汕尾校区",
       "publishTime": "2021-07-07 16:09:00",
       "publishTimeSource": "position",
-      "listTitle": "POA在大学英语教学中的应用"
+      "listTitle": "POA在大学英语教学中的应用",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0705/34.html",
@@ -53056,12 +53256,13 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2021-07-05 10:05:40",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "listTitle": "“唐代文学文本与语言研究”研讨会暨唐代文学读书会第三次会议圆满举办"
+      "listTitle": "“唐代文学文本与语言研究”研讨会暨唐代文学读书会第三次会议圆满举办",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0628/33.html",
@@ -53081,7 +53282,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0628/33.html",
@@ -53101,7 +53304,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0628/33.html",
@@ -53121,7 +53326,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20210624/1394.html",
@@ -53165,7 +53372,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0628/33.html",
@@ -53185,7 +53394,9 @@
       "lectureCount": 5,
       "sourceCount": 1,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0621/32.html",
@@ -53205,7 +53416,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0621/32.html",
@@ -53225,7 +53438,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://ibrr.scnu.edu.cn/a/20210624/412.html",
@@ -53249,7 +53464,8 @@
       "ocrExtracted": true,
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "王鑫迪博士应邀为我院师生做线上学术报告"
+      "listTitle": "王鑫迪博士应邀为我院师生做线上学术报告",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0621/32.html",
@@ -53269,7 +53485,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0621/32.html",
@@ -53289,7 +53507,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0621/32.html",
@@ -53309,7 +53529,9 @@
       "lectureCount": 5,
       "sourceCount": 1,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0615/31.html",
@@ -53367,7 +53589,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210617/11644.html",
@@ -53534,7 +53757,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0608/30.html",
@@ -53554,7 +53779,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210608/11639.html",
@@ -53620,7 +53847,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0608/30.html",
@@ -53640,7 +53869,9 @@
       "lectureCount": 5,
       "sourceCount": 0,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0608/30.html",
@@ -53660,7 +53891,9 @@
       "lectureCount": 5,
       "sourceCount": 1,
       "publishTime": "",
-      "publishTimeSource": ""
+      "publishTimeSource": "",
+      "abstract": "",
+      "speakerBio": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210601/11631.html",
@@ -53711,7 +53944,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210603/11634.html",
@@ -53862,7 +54096,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210521/11624.html",
@@ -54235,7 +54470,8 @@
       "publishTime": "2021-04-22 10:57",
       "publishTimeSource": "companion",
       "timeConfidence": "high",
-      "timeNote": "authoritative-label"
+      "timeNote": "authoritative-label",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20210422/1342.html",
@@ -54522,7 +54758,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210416/11577.html",
@@ -54733,7 +54970,8 @@
       "hasPosterImage": true,
       "listTitle": "“一流课程建设应用及申报”第41期教学创新工作坊",
       "__idx": 2179,
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20210325/1309.html",
@@ -54808,7 +55046,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20210316/148.html",
@@ -55192,7 +55431,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20201228/11456.html",
@@ -55357,7 +55597,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20201210/5375.html",
@@ -55408,7 +55649,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20201127/1268.html",
@@ -55437,7 +55679,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2020/1206/46.html",
@@ -55604,7 +55847,8 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "listTitle": "南粤讲坛第11期学术讲座预告"
+      "listTitle": "南粤讲坛第11期学术讲座预告",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20201130/859.html",
@@ -55766,7 +56010,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20201120/5329.html",
@@ -55930,7 +56175,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20201118/5323.html",
@@ -55951,7 +56197,8 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "listTitle": "“南粤政治学论坛”第一期 学术讲座预告"
+      "listTitle": "“南粤政治学论坛”第一期 学术讲座预告",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20201118/2046.html",
@@ -56137,12 +56384,13 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2020-11-11 16:08:12",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "listTitle": "古文选本与古文选本学研讨会暨《古文要籍选刊》 出版发布会在穗举行"
+      "listTitle": "古文选本与古文选本学研讨会暨《古文要籍选刊》 出版发布会在穗举行",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20201106/2026.html",
@@ -56494,7 +56742,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20201016/1234.html",
@@ -56523,7 +56772,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20201028/123.html",
@@ -56582,7 +56832,8 @@
       "hasPosterImage": true,
       "listTitle": "快来看直播！华师“青椒”国赛展风采",
       "__idx": 2253,
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20201022/1237.html",
@@ -56737,7 +56988,8 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "listTitle": "国家社科自科申报工作坊第2期 预告"
+      "listTitle": "国家社科自科申报工作坊第2期 预告",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20201010/846.html",
@@ -57019,7 +57271,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://io.scnu.edu.cn/a/20201015/1555.html",
@@ -57040,7 +57293,8 @@
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
       "timeNote": "same-day-normal",
-      "listTitle": "【讲座通知】“周边涉海外交知识进高校”系列讲座第一场——我国周边海洋问题概况及主要挑战讲座"
+      "listTitle": "【讲座通知】“周边涉海外交知识进高校”系列讲座第一场——我国周边海洋问题概况及主要挑战讲座",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20201012/5288.html",
@@ -57567,19 +57821,19 @@
       "campus": "大学城",
       "title": "“鸿儒聚云端”系列人文学术讲座第七讲之解读苏东坡预告",
       "topic": "解读苏东坡",
-      "lectureStart": "2020-06-01 08:00:00",
+      "lectureStart": "2020-05-24 10:00:00",
       "lectureEnd": "2020-05-24 12:00:00",
       "location": "",
       "speaker": "马茂军",
       "speakerTitle": "",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "马茂军,华南师范大学文学院教授,博士生导师,中国古代散文学会副会长,中国周必大研究会副会长,广东省高等学校 \"珠江学者\"特聘教授。主要研究中国古代散文史、思想史、文学史。出版专著有《宋代散文史论》、《唐宋散文研究》、《中国古代散文思想史》、《北宋儒学与文学》、《宋代文人心态史》、《唐宋八大家散文》、《中国古代散文概念发生研究》等。2016年11月,马茂军教授做客央视《百家讲坛》,主讲《大宋名相赵普》。 华南师范大学文学院 2020年 5 月 21 日",
       "organizer": "文学院",
       "publishTime": "2020-06-01 11:17:36",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“鸿儒聚云端”系列人文学术讲座第七讲之解读苏东坡预告"
     },
     {
@@ -57588,19 +57842,19 @@
       "campus": "大学城",
       "title": "“鸿儒聚云端”系列人文学术讲座第八讲之浅谈研究生学术研究与论文写作的基本要求预告",
       "topic": "问题与方法:浅谈研究生学术研究与论文写作的基本要求",
-      "lectureStart": "2020-06-01 08:00:00",
+      "lectureStart": "2020-05-31 10:00:00",
       "lectureEnd": "2020-05-31 12:00:00",
       "location": "",
       "speaker": "段吉方",
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "段吉方教授,现任华南师范大学文学院教授、博士生导师、院长,华南师范大学审美文化与批判理论研究中心常务主任,国家社科基金重大招标项目首席专家。兼任中国中外文艺理论学会常务理事、中国文艺理论学会理事、全国外国文论与比较诗学学会理事等。主要从事文艺学研究,出版专著 4部,在《文学评论》《文艺理论研究》《中国文学批评》等刊物发表文章百余篇。 华南师范大学文学院 2020年 5 月 27 日",
       "organizer": "文学院",
       "publishTime": "2020-06-01 11:19:59",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“鸿儒聚云端”系列人文学术讲座第八讲之浅谈研究生学术研究与论文写作的基本要求预告"
     },
     {
@@ -57632,19 +57886,19 @@
       "campus": "大学城",
       "title": "“鸿儒聚云端”系列人文学术讲座第六讲之研究生论文的“合乎规矩”与“不拘一格”预告",
       "topic": "研究生论文的 \"合乎规矩\"与\"不拘一格\"",
-      "lectureStart": "2020-05-21 08:00:00",
+      "lectureStart": "2020-05-17 10:00:00",
       "lectureEnd": "2020-05-17 12:00:00",
       "location": "",
       "speaker": "吴敏",
       "speakerTitle": "",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "吴敏,华南师范大学文学院教授,硕士、博士生导师,中国现代文学研究会理事。早年研究女性文学,后转向文学与政治文化之间关系的理论研究,同时关注 20世纪文学与电影、戏曲、音乐等艺术门类之间的关联。近年来的主要研究领域在\"延安文化\"和\"周扬现象\"这两大方面。主持《周扬与中国现代文艺关系研究》等多项国家社会科学基金项目。主要著作有《延安文人研究》《宝塔山下交响乐——20世纪40年代前后延安的文化组织与文学社团》《中国现代文学研究通史·分流与整合》等。在《中国现代文学研究丛刊》等学术刊物上发表多篇论文。 华南师范大学文学院 2020年 5 月 15 日",
       "organizer": "文学院",
       "publishTime": "2020-05-21 09:55:05",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“鸿儒聚云端”系列人文学术讲座第六讲之研究生论文的“合乎规矩”与“不拘一格”预告"
     },
     {
@@ -57660,12 +57914,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2020-05-21 10:00:14",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“鸿儒聚云端”系列人文学术讲座​之古代文学学术交流座谈会顺利进行"
     },
     {
@@ -57681,12 +57935,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2020-05-21 10:04:01",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“鸿儒聚云端”系列人文学术讲座​之“必须学会写作——学兼文理求天籁，思会中西归大海”讲座顺利进行"
     },
     {
@@ -57952,12 +58206,12 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "",
       "organizer": "文学院",
       "publishTime": "2020-04-23 15:00:17",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "华南师范大学文学院“鸿儒聚云端”系列人文学术讲座",
       "vlmExtracted": true
     },
@@ -57967,19 +58221,19 @@
       "campus": "大学城",
       "title": "“鸿儒聚云端”系列人文学术讲座第一讲之“书香引四方，治学聚一堂”预告",
       "topic": "书香引四方,治学聚一堂",
-      "lectureStart": "2020-04-23 08:00:00",
+      "lectureStart": "2020-04-05 10:00:00",
       "lectureEnd": "2020-04-05 12:00:00",
       "location": "",
       "speaker": "张玉金",
       "speakerTitle": "",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "张玉金,毕业于北京大学中文系,现为华南师范大学文学院教授、博士生导师、汉语言文字学博士研究生导师组组长、《语文月刊》主编,又任华南师范大学学术委员会科研评价与社会服务专门委员会委员、华南师范大学出土文献语言研究中心主任。兼任广东省中国语言学会会长、中国殷商文化学会理事、中国文字学会理事。 2012年获\"华南师范大学教学名师\"称号。荣获2001年度辽宁师范大学科研工作先进个人、华南师范大学2008和2017年年度科研工作优秀奖。 华南师范大学文学院 20 20 年 4 月 1 日",
       "organizer": "文学院",
       "publishTime": "2020-04-23 15:05:09",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“鸿儒聚云端”系列人文学术讲座第一讲之“书香引四方，治学聚一堂”预告"
     },
     {
@@ -57988,19 +58242,19 @@
       "campus": "大学城",
       "title": "“鸿儒聚云端”系列人文学术讲座第二讲之“语言类论文写作漫谈”预告",
       "topic": "语言类论文写作漫谈",
-      "lectureStart": "2020-04-23 08:00:00",
+      "lectureStart": "2020-04-12 10:00:00",
       "lectureEnd": "2020-04-12 12:00:00",
       "location": "",
       "speaker": "邵慧君",
       "speakerTitle": "",
       "speakerAffiliation": "华南师范大学文学院",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "邵慧君,华南师范大学文学院教授,博士生导师,民盟广东省文化委员会委员,华南师范大学岭南文化研究中心副主任,广东省中国语言学学会常务理事。邵慧君教授毕业于复旦大学(本科、硕士)和暨南大学(博士),于 1994年起入职华南师范大学文学院。至今已出版学术专著5部(包括合作),在各类学术期刊上发表论文60余篇,主持国家社科基金项目2项,省厅级项目4项。 华南师范大学文学院 20 20 年 4 月 8 日",
       "organizer": "文学院",
       "publishTime": "2020-04-23 15:08:36",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“鸿儒聚云端”系列人文学术讲座第二讲之“语言类论文写作漫谈”预告"
     },
     {
@@ -58009,19 +58263,19 @@
       "campus": "大学城",
       "title": "“鸿儒聚云端”系列人文学术讲座第三讲之“研究生与研究性学习漫谈”预告",
       "topic": "传承发展,守正创新 ——研究生与研究性学习漫谈",
-      "lectureStart": "2020-04-23 08:00:00",
+      "lectureStart": "2020-04-19 10:00:00",
       "lectureEnd": "2020-04-19 12:00:00",
       "location": "",
       "speaker": "左鹏军",
       "speakerTitle": "",
       "speakerAffiliation": "广东省高等学校",
       "inviter": "",
-      "speakerBio": "学科方向学术活动科研项目科研获奖",
+      "speakerBio": "左鹏军,文学博士,博士后出站。广东省高等学校珠江学者特聘教授 , 华南师范大学教授、博士生导师,华南师范大学岭南文化研究中心主任,广东省宣传思想文化领军人才。全国汉语国际教育专业学位研究生教育指导委员会委员,中国近代文学学会副会长、中国近代文学学会小说分会会长。主要学术领域为中国近代文学、戏曲文献与戏曲史、岭南文学与文化。出版专著15种,其中《晚清民国传奇杂剧文献与史实研究》入选首批《国家哲学社会科学成果文库》;在国(境)内外报刊发表论文多篇。荣获广东省哲学社会科学优秀成果奖、高等学校科学研究优秀成果奖(人文社会科学)等奖励。 华南师范大学文学院 20 20 年 4 月 17 日",
       "organizer": "文学院",
       "publishTime": "2020-04-23 15:10:39",
       "publishTimeSource": "label",
       "hasPosterImage": true,
-      "abstract": "学术研究学科简介学科方向学术活动科研项目科研获奖。",
+      "abstract": "",
       "listTitle": "“鸿儒聚云端”系列人文学术讲座第三讲之“研究生与研究性学习漫谈”预告"
     },
     {
@@ -58187,7 +58441,8 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "general-body-full;cv-url-date-mismatch",
-      "listTitle": "会议通知 | 华南师范大学首届中国政治学本科生研究生学术研讨会"
+      "listTitle": "会议通知 | 华南师范大学首届中国政治学本科生研究生学术研讨会",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20200310/1128.html",
@@ -58376,7 +58631,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2020-01-06青藏高原东北瞬时地貌"
+      "listTitle": "2020-01-06青藏高原东北瞬时地貌",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20191217/1898.html",
@@ -58477,7 +58733,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20191105/1840.html",
@@ -58907,7 +59164,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第九十一讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-12-14北海道石狩川流域泥沙传输过程模拟及来源解析"
     },
     {
@@ -58934,7 +59191,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第九十讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-12-14变化环境下流域和城市水文模拟的研究"
     },
     {
@@ -58962,7 +59219,8 @@
       "imageParseMethod": "ocr",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "listTitle": "2019-12-14流域水环境灾害模拟与治理技术"
+      "listTitle": "2019-12-14流域水环境灾害模拟与治理技术",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20191213/100.html",
@@ -59120,7 +59378,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "sessionNumber": "第八十七讲",
-      "abstract": null,
+      "abstract": "",
       "vlmExtracted": true,
       "listTitle": "2019-12-14地理科学导论——“时间”“空间”“尺度”的案例教学"
     },
@@ -59146,7 +59404,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2019-12-08城市社区生活圈研究与规划"
+      "listTitle": "2019-12-08城市社区生活圈研究与规划",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://lib.scnu.edu.cn/news/zuixingonggao/2019/1209/676.html",
@@ -59669,7 +59928,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20191126/813.html",
@@ -59721,7 +59981,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20191120/511.html",
@@ -60066,7 +60327,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20191114/103.html",
@@ -60542,7 +60804,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "sessionNumber": "第八十讲",
-      "abstract": null,
+      "abstract": "",
       "vlmExtracted": true,
       "listTitle": "2019-10-29景观规划与设计中的生态学应用和研究"
     },
@@ -60570,7 +60832,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十九讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-10-29小城镇与特色小镇—广东小城镇发展路径与趋势"
     },
     {
@@ -60600,7 +60862,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20191022/1042.html",
@@ -60629,7 +60892,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20191031/1063.html",
@@ -60770,7 +61034,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十八讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-10-23面向2035的广州空间发展战略"
     },
     {
@@ -60825,7 +61089,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20191019/1041.html",
@@ -60875,7 +61140,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十七讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-10-18新编世界地图—历史与科学的交融"
     },
     {
@@ -60974,7 +61239,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20191012/1036.html",
@@ -61078,7 +61344,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20190920/1031.html",
@@ -61152,7 +61419,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十六讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-09-26热带亚热带陆表生物与非生物固碳过程及其对环境变化的响应"
     },
     {
@@ -61207,7 +61474,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20190920/113.html",
@@ -61670,7 +61938,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十二讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-07-03论本科生和研究生如何培养学术性思维"
     },
     {
@@ -61821,7 +62089,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20190617/997.html",
@@ -61877,7 +62146,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第七十讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-06-11地缘经济学视角下的中美贸易摩擦解读"
     },
     {
@@ -62226,7 +62495,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20190528/263.html",
@@ -62248,7 +62518,8 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
-      "listTitle": "讲座：观己设计——与自己共舞的日子"
+      "listTitle": "讲座：观己设计——与自己共舞的日子",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20190522/24.html",
@@ -62371,7 +62642,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第六十八讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-05-20北师大的地理机构改革与学科建设"
     },
     {
@@ -62578,7 +62849,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "sessionNumber": "第六十七讲",
-      "abstract": null,
+      "abstract": "",
       "vlmExtracted": true,
       "listTitle": "2019-05-20中国城市社会空间研究与规划实践"
     },
@@ -62676,7 +62947,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2019-05-15研学旅行的方法与实践"
+      "listTitle": "2019-05-15研学旅行的方法与实践",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20190510/1740.html",
@@ -62750,7 +63022,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2019-05-15宏观经济地理学创新与发展"
+      "listTitle": "2019-05-15宏观经济地理学创新与发展",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20190508/975.html",
@@ -62903,7 +63176,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第六十四讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-05-12国外城市考察与我国新型城镇化的几个问题"
     },
     {
@@ -63186,7 +63459,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-04-17基于城镇化趋势的“十四五”基础设施战略布局思考"
     },
     {
@@ -63216,7 +63489,8 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20190410/956.html",
@@ -63432,7 +63706,8 @@
       "publishTime": "2019-04-04 19:54",
       "publishTimeSource": "companion",
       "timeConfidence": "high",
-      "timeNote": "authoritative-label"
+      "timeNote": "authoritative-label",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://io.scnu.edu.cn/a/20190409/1434.html",
@@ -63573,7 +63848,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第五十九讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2019-03-29青藏高原、跨大陆交流与丝路文明发展"
     },
     {
@@ -63680,7 +63955,8 @@
       "publishTimeSource": "position",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "listTitle": "讲座通知"
+      "listTitle": "讲座通知",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20190322/941.html",
@@ -64093,7 +64369,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2018-12-20新时代的地理学"
+      "listTitle": "2018-12-20新时代的地理学",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181214/1661.html",
@@ -64194,7 +64471,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第五十六讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-12-14基于位置数据挖掘的唐宋文人分析"
     },
     {
@@ -64244,7 +64521,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2018-12-10陨石和陨石坑及其科学意义"
+      "listTitle": "2018-12-10陨石和陨石坑及其科学意义",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181206/1651.html",
@@ -64639,7 +64917,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第五十四讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-11-20全球植被对气候变化的响应和反馈"
     },
     {
@@ -64786,7 +65064,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2018-11-19大型湖泊遥感理论与实践"
+      "listTitle": "2018-11-19大型湖泊遥感理论与实践",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181108/1628.html",
@@ -64907,7 +65186,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "sessionNumber": "第五十二讲",
-      "abstract": null,
+      "abstract": "",
       "vlmExtracted": true,
       "speakerSource": "label",
       "listTitle": "2018-11-11Global Corporate Networks: From Global Cities to Tax Havens"
@@ -65031,7 +65310,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "sessionNumber": "第五十讲",
-      "abstract": null,
+      "abstract": "",
       "vlmExtracted": true,
       "listTitle": "2018-10-30从不同时空尺度探析湿地碳循环过程对气候变化和人类活动的响应机制"
     },
@@ -65178,7 +65457,7 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-10-24旅游发展中的资本主义及其批判"
     },
     {
@@ -65302,7 +65581,7 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-10-17数据同化理论与应用"
     },
     {
@@ -65352,7 +65631,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2018-10-08洪水级数的因子贡献率"
+      "listTitle": "2018-10-08洪水级数的因子贡献率",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20180921/47.html",
@@ -65376,7 +65656,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2018-09-21气候变化对草地的影响"
+      "listTitle": "2018-09-21气候变化对草地的影响",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20180924/48.html",
@@ -65402,7 +65683,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第四十六讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-09-24黄土-古土壤序列与古人类活动遗迹"
     },
     {
@@ -65502,7 +65783,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2018-06-26中国东南沿海的同乡同业"
+      "listTitle": "2018-06-26中国东南沿海的同乡同业",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20180620/841.html",
@@ -65954,7 +66236,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-05-08努力——成就无可替代的自己"
     },
     {
@@ -66313,7 +66595,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第四十一讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-04-10青藏高原晚第四纪冰川活动及其年代学"
     },
     {
@@ -66530,7 +66812,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2018-03-23印度洋与印度季风"
+      "listTitle": "2018-03-23印度洋与印度季风",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20180326/1485.html",
@@ -66757,7 +67040,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第三十九讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-01-16可靠度约束下的时空间行为建模与优化"
     },
     {
@@ -66809,7 +67092,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第三十八讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2018-01-12气候引起的干旱对生物地球化学循环影响"
     },
     {
@@ -66908,7 +67191,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第三十七讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-12-22城市化何以能推动旅游业的发展"
     },
     {
@@ -67342,7 +67625,7 @@
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-11-24中国城镇群发展与城镇化的资源环境耦合效应"
     },
     {
@@ -67367,7 +67650,8 @@
       "publishTimeSource": "url_proxy",
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
-      "listTitle": "2017-11-24陕北龙山时期景观考古学研究"
+      "listTitle": "2017-11-24陕北龙山时期景观考古学研究",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20171122/1387.html",
@@ -67467,7 +67751,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第三十三讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-11-18“流空间”视角下的城市与区域结构"
     },
     {
@@ -67541,7 +67825,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第三十二讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-11-15天山地区第四纪冰川演化序列研究"
     },
     {
@@ -67665,7 +67949,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第三十一讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-11-04对地观测大数据访问的时空优化"
     },
     {
@@ -67692,7 +67976,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第三十讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-10-25上海高新区发展中的空间二元结构现象研究"
     },
     {
@@ -67918,7 +68202,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二十九讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-09-26多尺度下人类活动对大气影响的研究和相关启示"
     },
     {
@@ -67942,7 +68226,8 @@
       "timeConfidence": "high",
       "timeNote": "same-year",
       "listTitle": "“互联网+”混合式课堂教学系列工作坊",
-      "__idx": 2704
+      "__idx": 2704,
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20170925/1356.html",
@@ -68099,7 +68384,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二十八讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-09-15空间不平等与空间冲突：以广州大桥扩桥为例"
     },
     {
@@ -68586,7 +68871,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二十五讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-05-24基于遥感的PM2.5栅格面估算及与相关疾病的关联"
     },
     {
@@ -68858,7 +69143,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二十二讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-04-19伊利诺伊河的防洪决策支持系统的开发及应用"
     },
     {
@@ -69055,7 +69340,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二十一讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-03-30北极涛动对非洲东部地区降水的影响"
     },
     {
@@ -69373,7 +69658,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第二十讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-02-221.从古地磁看台湾蓬莱造山运动的崛起、前陆盆地的起始与演变；2.如何以磁性矿物阐解地质作用与环境变化？"
     },
     {
@@ -69400,7 +69685,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第十九讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-01-09中国城市群的发展背景与新的理念"
     },
     {
@@ -69427,7 +69712,7 @@
       "imageParseMethod": "vlm",
       "sessionNumber": "第十八讲",
       "vlmExtracted": true,
-      "abstract": null,
+      "abstract": "",
       "listTitle": "2017-01-08科研团队能力建设与创新发展"
     },
     {
@@ -70766,7 +71051,8 @@
       "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "same-year",
-      "listTitle": "砺儒讲坛第48讲：经济学基础理论与研究方法的创新"
+      "listTitle": "砺儒讲坛第48讲：经济学基础理论与研究方法的创新",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20160822/1088.html",
@@ -71377,7 +71663,8 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "same-year",
-      "listTitle": "大学生学习与生涯规划——物电学院本科生考研深造讲座"
+      "listTitle": "大学生学习与生涯规划——物电学院本科生考研深造讲座",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20160419/1006.html",
@@ -72726,7 +73013,8 @@
       "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "砺儒讲坛第23讲：中国社会治理：现状、问题与趋势"
+      "listTitle": "砺儒讲坛第23讲：中国社会治理：现状、问题与趋势",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20150608/347.html",
@@ -73035,7 +73323,8 @@
       "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "general-body-full",
-      "listTitle": "砺儒讲坛第18讲：图书馆发展趋势"
+      "listTitle": "砺儒讲坛第18讲：图书馆发展趋势",
+      "abstract": ""
     },
     {
       "sourceUrl": "http://cs.scnu.edu.cn/a/20150429/1833.html",
@@ -75336,7 +75625,8 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "same-year",
-      "listTitle": "清洁能源团队讲座通知"
+      "listTitle": "清洁能源团队讲座通知",
+      "abstract": ""
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20101229/790.html",
@@ -75463,7 +75753,66 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "same-year",
-      "listTitle": "“在德国学习与研究”讲座通知"
+      "listTitle": "“在德国学习与研究”讲座通知",
+      "abstract": ""
+    },
+    {
+      "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2021/1128/2979.html",
+      "images": [],
+      "college": "文学院",
+      "campus": "大学城",
+      "title": "中国语言学高端论坛系列讲座预告",
+      "topic": "《广韵》词汇的历史层次",
+      "lectureStart": "2021-11-30 14:00:00",
+      "lectureEnd": "2021-11-30 18:00:00",
+      "location": "大学城校区文一栋学术厅332",
+      "speaker": "蒋宗福",
+      "speakerTitle": "博士",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "男,文学博士,四川大学教授、博士生导师、教育部人文社科重点研究基地四川大学中国俗文化研究所研究员,国家社科基金重大项目首席专家,四川省学术和技术带头人。主持国家社科基金重大、重点及年度项目 5 项;主持教育部人文社科重点研究基地重大项目 2 项。出版《四川方言词语考释》《语言文献论集》《四川方言词语续考》《四川方言词源》《近代汉语论文集》《春秋公羊传注疏》(点校)、《礼记正义》(点校,合作)、《敦煌禅宗文献研究》《〈蜀语〉笺证》《〈广韵〉词汇研究》《语料学概论》等;在《中国语文》《新华文摘》《文献》《方言》《四川大学学报》《宗教学研究》等刊物发表论文 80 余篇。教学获教育部国家级优教成果二等奖、重庆市政府优教成果一等奖,科研获重庆市政府、四川省政府社科优秀成果二、三等奖。",
+      "organizer": "文学院",
+      "publishTime": "2021-11-28 13:16:33",
+      "publishTimeSource": "label",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "isMultiLecture": true,
+      "lectureIndex": 1,
+      "lectureCount": 2,
+      "sourceCount": 1,
+      "notes": [],
+      "guest": "蒋宗福",
+      "splitMode": "inline-topic-session",
+      "speakerSource": "block"
+    },
+    {
+      "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2021/1128/2979.html",
+      "images": [],
+      "college": "文学院",
+      "campus": "大学城",
+      "title": "中国语言学高端论坛系列讲座预告",
+      "topic": "漫谈近现代日本汉语言文字学史研究",
+      "lectureStart": "2021-11-30 14:00:00",
+      "lectureEnd": "2021-11-30 18:00:00",
+      "location": "大学城校区文一栋学术厅332",
+      "speaker": "李无未",
+      "speakerTitle": "特聘教授",
+      "speakerAffiliation": "厦门大学",
+      "inviter": "",
+      "speakerBio": "厦门大学特聘教授,博士生导师,厦门大学中国语言文学学科博士后流动站负责人。厦门大学古籍研究所所长、汉语言文字学应用与推广中心主任、国家级一流本科专业汉语言负责人。曾赴日本、法国、越南、中国台湾地区等国际知名大学任客座教授与交换教授、访问教授。兼任国家社科基金规划办聘任语言学科评审组会评专家,中国语言学会理事、福建省语言学会会长、世界汉语教育史学会副会长、中国语文现代化学会音韵学会副会长。致力于中外汉语音韵学史等领域研究。在《中国语文》等国内外学术期刊上发表论文 180 余篇。出版《宋元吉安方音研究》(合作)、《日本汉语音韵学史》《台湾汉语音韵学史》《日本近现代汉语语法学史》《东亚视阈汉语史论》《周代朝聘制度研究》《任尔西东:胡以鲁国语学草创原理》等著作。主编《日本汉语教科书汇刊(江户明治编)》( 60 册)、《音韵学论著指要与总目》《汉语音韵学通论》等书。主持并完成国家社科基金重大项目 1 项、国家社科基金重点项目 1 项,国家社科基金一般项目 2 项。现主持国家社科基金重点项目 1 项。获第 15 届\"王力语言学奖\"、国家社科基金优秀成果文库奖、第八届教育部人文社科奖、首届唐作藩音韵学奖、福建省政府哲学社会科学优秀著作一等奖。 华南师范大学文学院 2021年11月27日",
+      "organizer": "文学院",
+      "publishTime": "2021-11-28 13:16:33",
+      "publishTimeSource": "label",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "isMultiLecture": true,
+      "lectureIndex": 2,
+      "lectureCount": 2,
+      "sourceCount": 0,
+      "notes": [],
+      "guest": "李无未",
+      "splitMode": "inline-topic-session",
+      "speakerSource": "block"
     }
   ]
 }

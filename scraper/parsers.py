@@ -524,6 +524,13 @@ def _clean_location(loc, title=None):
     m6 = _loc_content_leak.search(loc)
     if m6 and m6.start() > 3:
         loc = loc[:m6.start()].strip()
+    # 讲座形式/线上/线下泄漏：地点后紧跟「讲座形式：线上线下混合式」或「（线上/线下）」
+    # 等开课/参会形式说明，非地点，匹配即截断（文学院 2979 等页把形式粘在地点后）。
+    # 仅匹配明确的「讲座形式/形式：/线上线下/线上/线下」字样，不误伤物理地点名。
+    _loc_format_leak = re.compile(r'讲座形式|形式\s*[：:]|线上|线下|线上线下')
+    mf = _loc_format_leak.search(loc)
+    if mf and mf.start() > 3:
+        loc = loc[:mf.start()].strip()
     # 章节序号标题泄漏（「一、工作坊安排 / 二、参与方式 / 1. 报名」等）：
     # BS4 把换行变空格后「地点：X室 二、参与方式」被粘进地点值。真实地点不含「序号+顿号/点」
     # （「一楼/三楼」是「楼」不是顿号，不受影响）。匹配即截到序号起点。
@@ -1177,6 +1184,11 @@ def is_news_record(rec, poster_page=False):
         return False
     # 海报页 = 讲座公告，不套「发布时间晚于讲座」的回顾稿规则
     if poster_page:
+        return False
+    # 标题/题目明确为预告 → 不判回顾（文学院鸿儒聚云端等网页提前数周发布、
+    # 但讲座时间写在正文里，导致 publishTime 晚于 lectureStart，易被误杀）
+    _title = (rec.get('title') or '') + (rec.get('topic') or '')
+    if '预告' in _title:
         return False
     ls = rec.get('lectureStart') or ''
     pub = rec.get('publishTime') or ''
@@ -3301,7 +3313,24 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 # OCR 场景下，叙事兜底容易把主讲人简介当成讲座摘要；
                 # 若已有 OCR 文本且未提取到明确摘要标签，宁可让 abstract 留空。
                 if not (ocr_text and len(ocr_text) > 50):
-                    result['abstract'] = _narr_abs
+                    # 标题伪摘要守卫（文学院短预告页根因）：叙事兜底拿到的「摘要」
+                    # 若以页面标题（讲座标题/系列名，去空白、统一全/半角标点后）开头，
+                    # 实为「标题 + 字段标签」粘连块（如「华南师范大学…专题系列讲座
+                    # （第一讲）讲座主题：关于…若干问题讲座」），并非真实讲座摘要，
+                    # 不写入 abstract（页面本就无独立摘要段，abstract 留空更符合事实）。
+                    _norm_punct = lambda s: (s or '').replace('（', '(').replace('）', ')') \
+                        .replace('：', ':').replace('，', ',').replace('“', '"').replace('”', '"')
+                    _nt = _norm_punct(re.sub(r'\s+', '', title or ''))
+                    _na = _norm_punct(re.sub(r'\s+', '', _narr_abs or ''))
+                    # 标题伪摘要两种形态：(a) 摘要块以页面标题开头（标题+字段标签粘连）；
+                    # (b) 摘要块内含「讲座主题/报告主题」等字段标签（叙事兜底把标题区
+                    # 当内容抓了进来，如「…系列讲座（第一讲）讲座主题：X讲座」）。
+                    # 任一命中即非真实摘要，abstract 留空。
+                    _header_marker = re.compile(r'讲座主题|报告主题|讲座题目|报告题目')
+                    _is_title_artifact = (_nt and _na.startswith(_nt)) or bool(
+                        _header_marker.search(_narr_abs or ''))
+                    if not _is_title_artifact:
+                        result['abstract'] = _narr_abs
 
     # --- 通用后处理（narrative fallback 之后统一执行）---
 
@@ -4109,6 +4138,101 @@ def _extract_block_field(block, label_re, max_len=40):
     return val
 
 
+def _detect_inline_topic_sessions(text, default_year=None, publish_time=None,
+                                  title_year=None, url_year=None):
+    """候选0：主题段落内直接并列「第一讲：A 第二讲：B」（文学院 2979 等）。
+
+    此类页面只有一个「讲座主题：」标签，但标签值里包含多场讲座的题目；
+    时间/地点统一写在主题段落之后，主讲人写在「第N讲嘉宾：姓名」中。
+    """
+    # 定位主题段落：以「讲座主题/报告主题/主题」开头，到下一个字段标签或段落结尾结束
+    m = re.search(
+        r'(?:讲座主题|报告主题|讲座题目|报告题目|主题|题目)\s*[：:]\s*'
+        r'(第\s*[一二三四五六七八九十0-9]+\s*[讲场]\s*[：:])', text)
+    if not m:
+        return []
+    start = m.start(1)
+    # 主题段落终止位置：遇到时间/地点/主讲/主办等字段标签
+    end = len(text)
+    for kw in ('讲座时间', '报告时间', '时间', '讲座地点', '报告地点', '地点',
+               '主讲嘉宾', '主讲人', '报告人', '主办单位', '承办单位', '主办'):
+        idx = text.find(kw, m.end())
+        if idx != -1 and idx < end:
+            end = idx
+    topic_seg = text[start:end].strip()
+    if len(topic_seg) < 10:
+        return []
+    # 提取每个「第N讲：题目」
+    items = list(re.finditer(
+        r'第\s*([一二三四五六七八九十0-9]+)\s*[讲场]\s*[：:]\s*([^第\n：:]{2,80})',
+        topic_seg))
+    if len(items) < 2:
+        return []
+    # 统一时间/地点
+    _page_dt = parse_cn_time(text, default_year=default_year,
+                             publish_time=publish_time,
+                             title_year=title_year, url_year=url_year)
+    if not _page_dt or not _page_dt.get('start'):
+        return []
+    # 主讲嘉宾简介：按「第N讲嘉宾：」分段，逐段映射到对应场次（去「第N讲嘉宾：姓名」前缀）。
+    # 文学院 2979 等页面把全部主讲人简介集中在「主讲嘉宾简介：第一讲嘉宾：蒋宗福…第二讲
+    # 嘉宾：李无未…」一段，若不分场锚定，拆分后每场都会继承基底的同一份简介（且带
+    # 「第一讲嘉宾：」前缀）。这里按场号建 {no: bio} 映射，拆分时逐场写入正确简介。
+    bio_by_no = {}
+    bio_sec = re.search(r'主讲嘉宾简介\s*[：:]\s*([\s\S]+)', text)
+    if bio_sec:
+        bseg = bio_sec.group(1)
+        _bparts = re.split(r'第\s*([一二三四五六七八九十0-9]+)\s*[讲场]?嘉宾\s*[：:]', bseg)
+        _cn2 = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
+                '七': 7, '八': 8, '九': 9, '十': 10}
+        for j in range(1, len(_bparts) - 1, 2):
+            pno = _bparts[j]
+            body = _bparts[j + 1]
+            try:
+                no_int2 = int(pno) if pno.isdigit() else _cn2.get(pno, len(bio_by_no) + 1)
+            except (ValueError, TypeError):
+                no_int2 = len(bio_by_no) + 1
+            # 去「姓名，」/「姓名：」前缀（body 起首为「蒋宗福，男，…」→ 去掉「蒋宗福，」）
+            body = re.sub(r'^[\u4e00-\u9fa5·]{2,4}\s*[,，:：]\s*', '', body.strip()).strip()
+            if len(body) >= 10:
+                bio_by_no[no_int2] = body
+
+    sessions = []
+    for i, mm in enumerate(items):
+        no = mm.group(1)
+        topic = mm.group(2).strip()
+        if len(topic) < 2:
+            continue
+        # 尝试按主讲人段落分块：找到「第N讲嘉宾：姓名」到下一个「第M讲嘉宾」或结尾
+        sp_m = re.search(
+            rf'第\s*{no}\s*[讲场]?嘉宾\s*[：:]\s*([\u4e00-\u9fa5]{{2,4}})',
+            text)
+        block = topic_seg
+        if sp_m:
+            nxt = re.search(
+                rf'第\s*(?:[一二三四五六七八九十0-9]+)\s*[讲场]?嘉宾\s*[：:]',
+                text[sp_m.end():])
+            blk_end = sp_m.end() + nxt.start() if nxt else len(text)
+            block = text[sp_m.start():blk_end]
+        # 把中文/阿拉伯数字转成整数序号
+        _cn = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
+               '七': 7, '八': 8, '九': 9, '十': 10}
+        try:
+            no_int = int(_cn.get(no, no))
+        except (ValueError, TypeError):
+            no_int = i + 1
+        sessions.append({
+            'topic': topic,
+            'start': _page_dt['start'],
+            'end': _page_dt.get('end'),
+            'block': block,
+            'no': no_int,
+            'splitMode': 'inline-topic-session',
+            'bio': bio_by_no.get(no_int, '')
+        })
+    return sessions if len(sessions) >= 2 else []
+
+
 def detect_multi_session(text, title='', default_year=None, publish_time=None,
                          title_year=None, url_year=None, soup=None, url=None):
     """检测系列讲座公告（MS1-MS3）。
@@ -4133,6 +4257,13 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
     守卫（对全部候选生效）：块内时间须为明确时钟或含结束时间（仅 00:00 日期不足区分场次）；
     多讲座拆分路径末尾还有「空场次丢弃」闸6（无 speaker 且无 topic 的退化场次丢弃）。
     """
+    # 候选0：主题段落内直接并列「第一讲：A 第二讲：B」（文学院 2979 等）
+    sessions = _detect_inline_topic_sessions(
+        text, default_year=default_year, publish_time=publish_time,
+        title_year=title_year, url_year=url_year)
+    if sessions:
+        return sessions
+
     labels = list(_TOPIC_DELIM_RE.finditer(text))
     sessions = []
     sessions_raw = []
@@ -4262,7 +4393,7 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
     if len(sessions) < 2:
         _JIANG_SESSION_RE = re.compile(
             r'(?:第)\s*[一二三四五六七八九十百零0-9]+\s*(?:讲|场|期)'
-            r'(?![题主报人目介摘])(?![一二三四五六七八九十百零0-9])')
+            r'(?![题主报人目介摘])(?!嘉宾)(?![一二三四五六七八九十百零0-9])')
         j_markers = list(_JIANG_SESSION_RE.finditer(text))
         if len(j_markers) >= 2:
             # MS5-GUARD：页眉/导航/面包屑常把同一「第N期」重复出现（如标题、上一篇、下一篇），
@@ -4609,7 +4740,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
         participants = _extract_block_field(block, r'参与者')
         is_roundtable = bool(participants) or bool(re.search(r'圆桌|座谈', block))
         # 主讲人（逐块优先；缺失继承前序；圆桌且无主讲人→置空）
-        sp_m = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*|讲者简介)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
+        sp_m = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*|讲者简介|(?:第\s*[一二三四五六七八九十0-9]+\s*[讲场]?)?嘉宾)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
         if sp_m:
             cand = sp_m.group(1).strip()
             # 提取职称（用于 speakerTitle）
@@ -4750,6 +4881,12 @@ def split_record_by_sessions(base, sessions, full_text=''):
                                 not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', _nm.group(1)):
                             rec['speaker'] = _nm.group(1)
                             rec['speakerSource'] = 'block-bio'
+        # 内联主题段（候选0 inline-topic-session）逐场简介：主讲嘉宾简介按场号集中给出，
+        # 用 session 自带的 bio（已去「第N讲嘉宾：」前缀）覆盖基底/共享继承的错位简介。
+        if s.get('bio'):
+            _b = (s['bio'] or '').strip()
+            if len(_b) >= 10:
+                rec['speakerBio'] = _b
         # 地点：逐块「报告N地点」优先；其次基底（已清洗的共享地点）；再次全页兜底；
         # 最后清泄漏与房间号空格。注意 CS 多报告页地点为全页共享（在页眉「报告地点：X」），
         # 各报告小节通常不含独立地点，故优先用基底干净值，避免被全页「地点：X时间:…报告一…」
