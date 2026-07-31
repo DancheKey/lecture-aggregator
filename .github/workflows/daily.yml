@@ -1,11 +1,11 @@
 name: 每日自动拉取讲座数据
 
 # 触发条件：
-#   1) 定时：北京时间每天 03:00（GitHub Actions 使用 UTC，03:00 CST = 19:00 UTC 前一天）
+#   1) 定时：北京时间每天 01:00（GitHub Actions 使用 UTC，03:00 CST = 17:00 UTC 前一天）
 #   2) 手动：在 Actions 页面点 "Run workflow"，或网站「抓取新数据」按钮经代理触发
 on:
   schedule:
-    - cron: '0 19 * * *'
+    - cron: '0 17 * * *'
   workflow_dispatch: {}
 
 # 本工作流需要写回仓库（提交更新后的数据），并发布 Pages
