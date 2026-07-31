@@ -340,17 +340,9 @@ const app = createApp({
       try {
         this.likes = JSON.parse(localStorage.getItem(LIKE_KEY) || '{}');
         this.likedUrls = new Set(JSON.parse(localStorage.getItem(LIKED_KEY) || '[]'));
-        // 兼容旧数据：早期版本点赞只存 LIKE_KEY，未同步到 STAT_KEY；
-        // 初始化时把已有 likes 合并进 lectureStats，确保统计页能正确汇总。
-        this.loadLocalStats();
-        for (const [url, count] of Object.entries(this.likes)) {
-          const s = this.lectureStats[url] || { visits: 0, likes: 0 };
-          if (count > (s.likes || 0)) {
-            s.likes = count;
-            this.lectureStats[url] = s;
-          }
-        }
-        this.saveLocalStats();
+        // 计数以 lectureStats（后端权威 / 本机 STAT_KEY 缓存）为准；
+        // 不再把旧版 LIKE_KEY 的本地计数合并进 lectureStats，否则刷新后会
+        // 把已取消的脏值重新显示出来。
       } catch (e) {
         this.likes = {};
         this.likedUrls = new Set();
@@ -381,11 +373,14 @@ const app = createApp({
       this.saveLikes();
       const delta = willLike ? 1 : -1;
       // 乐观更新展示计数；后端返回真实值后会被覆盖（统一数据源，消除首页/统计页不一致）
-      const cur = (this.lectureStats[url] && this.lectureStats[url].likes) || this.likes[url] || 0;
+      // 用 typeof 判断，避免 lectureStats.likes === 0 时被 || 误判为缺失而回退到旧本地值。
+      const s = this.lectureStats[url];
+      const cur = (s && typeof s.likes === 'number') ? s.likes : 0;
       const next = Math.max(0, cur + delta);
       this.likes[url] = next;
       if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
       this.lectureStats[url].likes = next;
+      this.saveLikes();
       this.saveLocalStats();
       this.showToast(willLike ? '点赞成功' : '已取消点赞');
       const endpoint = willLike ? 'like' : 'unlike';
@@ -401,6 +396,7 @@ const app = createApp({
             if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
             this.lectureStats[url].likes = j.likes;
             this.likes[url] = j.likes;
+            this.saveLikes();
             this.saveLocalStats();
           }
           // 后端失败 / 被节流：保留本机乐观值（无后端时即为真实值）
@@ -413,16 +409,9 @@ const app = createApp({
       try {
         this.wants = JSON.parse(localStorage.getItem(WANT_KEY) || '{}');
         this.wantedUrls = new Set(JSON.parse(localStorage.getItem(WANTED_KEY) || '[]'));
-        // 与 loadLikes() 对称：把已有 wants 合并进 lectureStats，确保统计能正确汇总
-        this.loadLocalStats();
-        for (const [url, count] of Object.entries(this.wants)) {
-          const s = this.lectureStats[url] || { visits: 0, likes: 0, wants: 0 };
-          if (count > (s.wants || 0)) {
-            s.wants = count;
-            this.lectureStats[url] = s;
-          }
-        }
-        this.saveLocalStats();
+        // 计数以 lectureStats（后端权威 / 本机 STAT_KEY 缓存）为准；
+        // 不再把旧版 WANT_KEY 的本地计数合并进 lectureStats，避免刷新后显示
+        // 已取消的旧值。
       } catch (e) {
         this.wants = {};
         this.wantedUrls = new Set();
@@ -450,11 +439,14 @@ const app = createApp({
       if (willWant) { this.wantedUrls.add(url); } else { this.wantedUrls.delete(url); }
       this.saveWants();
       const delta = willWant ? 1 : -1;
-      const cur = (this.lectureStats[url] && this.lectureStats[url].wants) || this.wants[url] || 0;
+      // 用 typeof 判断，避免 lectureStats.wants === 0 时被 || 误判为缺失而回退到旧本地值。
+      const s = this.lectureStats[url];
+      const cur = (s && typeof s.wants === 'number') ? s.wants : 0;
       const next = Math.max(0, cur + delta);
       this.wants[url] = next;
       if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
       this.lectureStats[url].wants = next;
+      this.saveWants();
       this.saveLocalStats();
       this.showToast(willWant ? '已标记想听' : '已取消想听');
       const endpoint = willWant ? 'want' : 'unwant';
@@ -469,6 +461,7 @@ const app = createApp({
             if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
             this.lectureStats[url].wants = j.wants;
             this.wants[url] = j.wants;
+            this.saveWants();
             this.saveLocalStats();
           }
         })
