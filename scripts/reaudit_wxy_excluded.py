@@ -31,12 +31,22 @@ APPLY = '--apply' in sys.argv
 
 
 def _body(html):
+    """与 parse_detail 正文容器候选保持一致，确保 is_news_article 拿到真实正文。"""
     soup = BeautifulSoup(html, 'html.parser')
-    cd = (soup.find('div', class_='news-text')
+    cd = (soup.find('div', class_='wp_articlecontent')   # WebPlus CMS
+          or soup.find('div', class_='wp_entry')
+          or soup.find('div', class_='article-content')
+          or soup.find('div', class_='container-left')
+          or soup.find('div', class_='article')
+          or soup.find('div', class_='content')
+          or soup.find('div', class_='news-details-all')
           or soup.find('div', class_='news-details-middle')
+          or soup.find('div', class_='news-text')        # 文学院等 CMS
           or soup.find('article')
           or soup.find('div', class_='entry-content'))
-    return cd.get_text(' ', strip=True) if cd else ''
+    text = soup.get_text(' ', strip=True) if not cd else ''
+    body = cd.get_text(' ', strip=True) if cd else text
+    return re.sub(r'\s+', ' ', body).strip()
 
 
 def _norm_dt(s):
@@ -61,9 +71,11 @@ def main():
                 and any(r.get('sourceUrl') == u and r.get('college') == '文学院' for r in recs)]
     print(f'文学院在排除名单: {len(wxy_excl)} 条\n')
 
-    # 标题公告词（真实讲座预告）优先于页脚/叙事规则；回顾完成词（真·报道）维持排除
+    # 正文优先：is_news_article 能直接识别回顾稿/报道（讲座预告正文不会含总结语、
+    # 署名审签链或叙事过程体），应优先于标题关键词，避免标题含"讲座/论坛/座谈会"
+    # 的新闻稿被错判为 RESTORE。
     LEC_TITLE = re.compile(r'讲座|报告|论坛|讲学|预告|研讨会|工作坊|座谈会|名家系列|专场')
-    RECAP_TITLE = re.compile(r'圆满举办|圆满落幕|顺利举行|顺利完成|在华南师范大学举行|在华南师大举行|发布会召开|出版发布会|年会暨|入选|荣获|喜讯|招聘|征文|顺利结束')
+    RECAP_TITLE = re.compile(r'圆满举办|圆满落幕|顺利举行|顺利完成|在华南师范大学举行|在华南师大举行|发布会召开|出版发布会|发布会|年会暨|入选|荣获|喜讯|招聘|征文|顺利结束')
     restore, keep = [], []
     for url in wxy_excl:
         rec0 = next(r for r in recs if r.get('sourceUrl') == url)
@@ -86,18 +98,18 @@ def main():
         rec = out[0] if isinstance(out, list) else out
         title = rec.get('title') or page_title or rec0.get('title') or ''
         ls = rec.get('lectureStart')
-        # 1) 标题含回顾完成词（真·报道/回顾稿）→ 维持排除
-        if RECAP_TITLE.search(title):
-            keep.append((url, 'RECAP_TITLE', title))
-            continue
-        # 2) 标题含讲座公告词（真实预告）→ 恢复
-        if LEC_TITLE.search(title):
-            restore.append((url, rec, title, body))
-            continue
-        # 3) 兜底：is_news_article 关键词
+        # 1) 正文明确是新闻稿/回顾稿 → 维持排除（优先于标题讲座词）
         fa = is_news_article(title, body, ls)
         if fa:
             keep.append((url, 'NEWS_ARTICLE:' + fa, title))
+            continue
+        # 2) 标题含回顾完成词（真·报道/回顾稿）→ 维持排除
+        if RECAP_TITLE.search(title):
+            keep.append((url, 'RECAP_TITLE', title))
+            continue
+        # 3) 标题含讲座公告词（真实预告）→ 恢复
+        if LEC_TITLE.search(title):
+            restore.append((url, rec, title, body))
             continue
         # 4) 仍有讲座信号（speaker/topic）
         if rec.get('speaker') or rec.get('topic'):
