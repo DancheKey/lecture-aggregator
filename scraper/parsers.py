@@ -1185,11 +1185,6 @@ def is_news_record(rec, poster_page=False):
     # 海报页 = 讲座公告，不套「发布时间晚于讲座」的回顾稿规则
     if poster_page:
         return False
-    # 标题/题目明确为预告 → 不判回顾（文学院鸿儒聚云端等网页提前数周发布、
-    # 但讲座时间写在正文里，导致 publishTime 晚于 lectureStart，易被误杀）
-    _title = (rec.get('title') or '') + (rec.get('topic') or '')
-    if '预告' in _title:
-        return False
     ls = rec.get('lectureStart') or ''
     pub = rec.get('publishTime') or ''
     if not ls or not pub:
