@@ -98,7 +98,7 @@ const app = createApp({
 
     // 是否有任何筛选条件激活（控制"清除"按钮显示）
     hasActiveFilter() {
-      return !!(this.campus || this.college || this.year || this.query || this.showLikedOnly);
+      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly);
     },
 
     // 复合筛选 + 按讲座时间倒序
@@ -582,7 +582,7 @@ const app = createApp({
     setCollege(c) { this.college = c; },
     setYear(y) { this.year = y; },
     toggleLikedFilter() { this.showLikedOnly = !this.showLikedOnly; this.campus = ''; this.college = ''; },
-    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.showLikedOnly = false; },
+    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; },
     /* ---------- 分页 ---------- */
     gotoPage(p) {
       if (p < 1 || p > this.totalPages) return;
