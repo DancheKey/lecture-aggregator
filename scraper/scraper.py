@@ -231,7 +231,8 @@ def _completeness(r):
     """记录字段完整度：非空关键字段越多越「完整」，去重/合并时优先保留。"""
     return sum(1 for v in [
         r.get('lectureStart'), r.get('location'), r.get('speaker'),
-        r.get('speakerAffiliation'), r.get('topic'), r.get('speakerBio')
+        r.get('speakerAffiliation'), r.get('topic'), r.get('speakerBio'),
+        r.get('abstract')
     ] if v)
 
 
@@ -390,12 +391,21 @@ def cross_source_dedup(records):
                 # 不同源才考虑合并（同源重复已由 dedup 处理）
                 if ri.get('sourceUrl', '').rstrip('/') == rj.get('sourceUrl', '').rstrip('/'):
                     continue
-                # 同单位（同学院）系列分期：同一张系列海报分期发布，同主讲同日即视为
-                # 同一报告的系列预告/更新，强制合并（不依赖文本相似度，避免通用系列名
-                # vs 具体题目相似度不足而漏合并留下重复）。跨单位仍走下方相似度判定。
+                # 同单位（同学院）系列分期：同一张系列海报分期发布，同主讲同日、
+                # 且题目足够相似（≥0.25）才视为同一报告的系列预告/更新而合并。
+                # ⚠️ 不再「无脑强制合并」：同单位同主讲同日可能是两场不同讲座
+                # （如 bd/66 地理信息科学展望 vs bd/67 青年教师如何做好科研），
+                # 强制合并会误删不同讲座。故同单位也必须过相似度阈值。
                 if ri.get('college', '') and ri.get('college') == rj.get('college'):
-                    union(i, j)
-                    continue
+                    ti_a = ri.get('topic', '') or ri.get('title', '')
+                    ti_b = rj.get('topic', '') or rj.get('title', '')
+                    sim_u = max(
+                        _topic_similarity(ri.get('title', ''), rj.get('title', '')),
+                        _topic_similarity(ti_a, ti_b),
+                    )
+                    if sim_u >= 0.25:
+                        union(i, j)
+                        continue
                 # topic 或 title 相似度（含跨字段交叉比较：
                 # 有的源把实质内容放 topic、有的放 title，需四向全比）
                 ti_a = ri.get('topic', '') or ri.get('title', '')
@@ -428,6 +438,9 @@ def cross_source_dedup(records):
                 title = r.get('title', '')
                 if topic and topic in title:
                     score += 3
+                # abstract 越长越优：合并（含已合并记录的二次合并）时优先保留
+                # 摘要更完整的记录，避免长摘要被短摘要覆盖（如 physics/803 长摘要被 iqm/92 短摘要替代）
+                score += min(len(r.get('abstract') or '') // 120, 6)
                 # 同单位系列分期：优先选 listTitle 期号与自身场次匹配的记录
                 # （该页正是讲这期），使每讲归属其当期页、标题不被张冠李戴。
                 sn = _session_num(r.get('listTitle', '')) or _session_num(r.get('sessionNumber', ''))
@@ -438,7 +451,11 @@ def cross_source_dedup(records):
                     score += 5
                 return score
 
-            primary_idx = max(members, key=lambda idx: _primary_score(group[idx]))
+            primary_idx = max(members, key=lambda idx: (
+                _primary_score(group[idx]),
+                len(group[idx].get('abstract') or ''),
+                len(group[idx].get('speakerBio') or ''),
+            ))
             primary = group[primary_idx]
 
             primary_college = primary.get('college', '')
@@ -466,7 +483,7 @@ def cross_source_dedup(records):
 
             # 补全策略：用从记录的非空字段填补主记录的空字段（同/跨院都做）
             for field in ['speakerTitle', 'speakerAffiliation', 'location',
-                          'speakerBio', 'organizer']:
+                          'speakerBio', 'organizer', 'abstract']:
                 if not primary.get(field):
                     for src_rec in [group[idx] for idx in members if idx != primary_idx]:
                         val = src_rec.get(field)
@@ -563,13 +580,53 @@ def _norm_url(u):
     return str(u or '').rstrip('/')
 
 
-def incremental_merge(existing, new_records):
-    """增量模式合并：existing 基底原样锁定（不再重新去重/跨源合并），
-    new_records 仅做同源去重后追加。跳过对全量的 cross_source_dedup，
-    避免每日增量把人工/VLM 精修的已有记录退化或重组。
+def _cross_source_dup_with_existing(rec, existing_index):
+    """判断 rec 是否与基底 existing 中某条跨源重复。
 
-    跨源去重（不同学院发布同一讲座合并）改为仅 --full 手动重构或人工介入时执行，
-    不在每日增量中自动重跑。
+    用于增量模式：命中则新增记录不追加（避免重复），existing 基底保持原样
+    （包括其 merged 状态不变）。判定与 cross_source_dedup 一致：
+      - 同单位（同学院）同主讲同日不同 URL → 强制视为重复；
+      - 跨单位同主讲同日 + topic/title 相似度 ≥ 0.25 → 视为重复。
+    """
+    spk = _normalize_speaker(rec.get('speaker') or '')
+    if not _is_valid_speaker_name(spk):
+        return False
+    date = (rec.get('lectureStart') or '')[:10]
+    if not date or date.startswith('0000'):
+        return False
+    rivals = existing_index.get((spk, date), [])
+    u1 = _norm_url(rec.get('sourceUrl'))
+    ti_a = rec.get('topic', '') or rec.get('title', '')
+    for r2 in rivals:
+        if _norm_url(r2.get('sourceUrl')) == u1:
+            continue  # 同 URL 由 seen 处理，不在此判
+        if rec.get('college', '') and rec.get('college') == r2.get('college'):
+            return True  # 同单位同主讲同日（系列分期重复发布）
+        ti_b = r2.get('topic', '') or r2.get('title', '')
+        sim = max(
+            _topic_similarity(rec.get('topic', ''), r2.get('topic', '')),
+            _topic_similarity(rec.get('title', ''), r2.get('title', '')),
+            _topic_similarity(ti_a, ti_b),
+            _topic_similarity(rec.get('topic', ''), r2.get('title', '')),
+            _topic_similarity(rec.get('title', ''), r2.get('topic', '')),
+        )
+        if sim >= 0.25:
+            return True
+    return False
+
+
+def incremental_merge(existing, new_records):
+    """增量模式合并：existing 基底原样锁定（不删除/不重组已精修记录），
+    仅对新增记录做去重后追加。
+
+    修复（2026-07-31）：此前为保护精修而完全跳过跨源去重，导致每日增量
+    会反复追加「与基底已有讲座跨源重复」的新 URL 记录（即不同学院发布同一
+    讲座），日积月累产生重复（钱捷系列、刘学兰等即因此冗余）。现改为：
+      1) new_records 内部先做同源去重 + 跨源去重，避免本次批量抓取多 URL
+         同讲座互相重复；
+      2) new_records 与 existing 基底做跨源比对，命中则跳过该新增记录
+         （不重复追加），existing 保持原样、其 merged 状态不变。
+    这样未来增量不再产生重复，且存量数据由人工/--full 清理统一处理。
     """
     base_map = {}
     for r in existing:
@@ -580,18 +637,35 @@ def incremental_merge(existing, new_records):
         key = u + ('#' + str(li) if li else '')
         base_map[key] = r
     seen = set(base_map.keys())
-    new_deduped = []
-    for r in new_records:
-        u = _norm_url(r.get('sourceUrl'))
-        if not u:
+
+    # 新增记录：先同源去重，再跨源去重（new 内部合并，避免互相重复）
+    new_deduped = cross_source_dedup(dedup(new_records))
+
+    # 基底跨源索引：用于判断 new 是否与已有讲座跨源重复
+    existing_index = {}
+    for r in existing:
+        spk = _normalize_speaker(r.get('speaker') or '')
+        if not _is_valid_speaker_name(spk):
             continue
-        li = r.get('lectureIndex')
-        key = u + ('#' + str(li) if li else '')
+        date = (r.get('lectureStart') or '')[:10]
+        if not date or date.startswith('0000'):
+            continue
+        existing_index.setdefault((spk, date), []).append(r)
+
+    final_new = []
+    skip = 0
+    for r in new_deduped:
+        key = _norm_url(r.get('sourceUrl')) + ('#' + str(r.get('lectureIndex')) if r.get('lectureIndex') else '')
         if key in seen:
             continue
+        if _cross_source_dup_with_existing(r, existing_index):
+            skip += 1
+            continue
         seen.add(key)
-        new_deduped.append(r)
-    return list(base_map.values()) + new_deduped
+        final_new.append(r)
+    if skip:
+        print(f'[INCREMENTAL] 跳过 {skip} 条与基底跨源重复的新增记录（不重复追加；基底保持原样）')
+    return list(base_map.values()) + final_new
 
 
 def _process_source(src, year, existing_urls, is_incremental, global_exclude=None):

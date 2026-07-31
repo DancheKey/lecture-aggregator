@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-31T09:23:27.017046+08:00",
+  "updatedAt": "2026-07-31T09:57:15+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260729/8800.html",
@@ -439,29 +439,6 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1
-    },
-    {
-      "sourceUrl": "http://maths.scnu.edu.cn/a/20260630/8761.html",
-      "images": [],
-      "college": "数学科学学院",
-      "campus": "石牌",
-      "title": "勷勤数学•领军学者报告-郭岩",
-      "topic": "The viscous inflow boundary condition for channel flows",
-      "lectureStart": "2026-06-30 09:30:00",
-      "lectureEnd": "2026-06-30 10:30:00",
-      "location": "数科院西楼111",
-      "speaker": "郭岩",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "丁时进) 美国布朗大学",
-      "speakerBio": "郭岩,美国布朗大学L. Herbert Ballou University Professor of Applied Mathematics,1987年本科毕业于北京大学,1993年博士毕业于美国布朗大学。郭岩教授是国际偏微分方程研究领域的著名学者,在Kinetic 理论、流体动力学的稳定性与不稳定性、边界层理论等方面均做出了重要贡献。发表学术论文120余篇,其中在国际数学顶尖期刊Ann. Math.,J. Amer. Math. Soc.,Invent. Math. 发表论文5篇。2013年在第六届华人数学家大会上作一小时特邀报告,2017年当选为美国数学会会士,曾担任国际数学家大会(ICM)PDE领域的Panelist。",
-      "organizer": "数学科学学院",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
-      "timeConfidence": "high",
-      "timeNote": "same-day-normal",
-      "abstract": "The lateral periodic condition has been imposed canonically and investigated extensively in the study of a channel flow, which unfortunately is not compatible with either the celebrated Reynolds' experiment or the self-similar Blasius boundary layer profile. In this talk, we will review recent progress in the study of steady boundary layer theory for both incompressible and compressible fluids, in the presence of new viscous inflow boundary conditions. 欢迎老师、同学们参加、交流！",
-      "listTitle": "勷勤数学•领军学者报告-郭岩"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260629/8748.html",
@@ -1545,30 +1522,17 @@
       "timeNote": "same-year",
       "abstract": "提要: 1 、人工智能时代青少年身心健康面临着现困境 2 、中华优秀传统文化守护青少年身心健康的核心价值 3 、揭示心理健康的内涵、外延及标准 4 、传统文化赋能青少年身心健康的实践路径",
       "listTitle": "华南师范大学砺儒讲坛第146讲：以格局铸根基，以传统文化育人才（林崇德教授）",
-      "host": "陈晓方"
-    },
-    {
-      "sourceUrl": "http://psy.scnu.edu.cn/a/20260527/2962.html",
-      "images": [],
-      "college": "心理学院",
-      "campus": "石牌",
-      "title": "林崇德教授砺儒讲坛",
-      "topic": "以格局铸根基,以传统文化育人才",
-      "lectureStart": "2026-05-31 16:00:00",
-      "lectureEnd": "2026-05-31 17:30:00",
-      "location": "华南师范大学(石牌校区)国际会议厅",
-      "speaker": "林崇德",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "林崇德,北京师范大学资深教授,教育部高校心理健康教育专家指导委员会主任,教育部全国师德师风建设专家",
-      "organizer": "心理学院",
-      "publishTime": "2026-05-27 16:16:00",
-      "publishTimeSource": "position",
-      "timeConfidence": "high",
-      "timeNote": "same-year",
-      "abstract": "1、人工智能时代青少年身心健康面临着的现实困境 2、中华优秀传统文化守护青少年身心健康的核心价值 3、揭示心理健康的内涵、外延及标准 4、传统文化赋能青少年身心健康的实践路径",
-      "listTitle": "5月31日 林崇德教授砺儒讲坛"
+      "host": "陈晓方",
+      "sources": [
+        {
+          "sourceUrl": "http://psy.scnu.edu.cn/a/20260527/2962.html",
+          "college": "心理学院",
+          "campus": "石牌",
+          "title": "林崇德教授砺儒讲坛"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260530/8739.html",
@@ -8410,8 +8374,8 @@
       "lectureEnd": "2025-11-21 11:30:00",
       "location": "文科楼423",
       "speaker": "刘国忠",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "清华大学出土文献研究与保护中心",
       "inviter": "",
       "speakerBio": "刘国忠,男,历史学博士,清华大学出土文献研究与保护中心教授、中心副主任,兼任中国先秦史学会副会长,中国史学会、北京历史学会理事。主要从事简帛学、清华简与先秦史的教学与研究工作,主持国家社科基金重大项目、北京市社科基金项目等多项课题,已经出版《简帛有声:出土简帛的文献学研究》《走近清华简》《唐宋时期命理文献初探》等5部专著,发表学术论文100多篇。",
       "organizer": "社会科学处",
@@ -8421,37 +8385,13 @@
       "timeNote": "general-body-full",
       "abstract": "主要从事简帛学、清华简与先秦史的教学与研究工作,主持国家社科基金重大项目、北京市社科基金项目等多项课题,已经出版《简帛有声:出土简帛的文献学研究》《走近清华简》《唐宋时期命理文献初探》等5部专著,发表学术论文100多篇。",
       "listTitle": "华南师范大学砺儒讲坛第139讲：从清华简看先秦秦汉典籍的若干问题（刘国忠教授）",
-      "host": "张淑一"
-    },
-    {
-      "sourceUrl": "http://lswh.scnu.edu.cn/a/20251118/73.html",
-      "college": "历史文化学院",
-      "campus": "石牌",
-      "title": "从清华简看先秦秦汉典籍的若干问题",
-      "topic": "从清华简看先秦秦汉典籍的若干问题",
-      "lectureStart": "2025-11-21 08:00:00",
-      "lectureEnd": null,
-      "location": "文科楼423会议室",
-      "speaker": "刘国忠",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "清华大学出土文献研究与保护中心",
-      "inviter": "",
-      "speakerBio": "刘国忠，历史学博士，清华大学出土文献研究与保护中心教授、中心副主任，兼任中国先秦史学会副会长，中国史学会、北京历史学会理事。主要从事简帛学、清华简与先秦史的教学与研究工作，主持国家社科基金重大项目、北京市社科基金项目等多项课题，已经出版《简帛有声：出土简帛的文献学研究》《走近清华简》《唐宋时期命理文献初探》等5部专著，发表学术论文100多篇。",
-      "organizer": "历史文化学院",
-      "publishTime": "2025-11-18 16:27",
-      "publishTimeSource": "companion",
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "vlmExtracted": true,
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "listTitle": "从清华简看先秦秦汉典籍的若干问题",
+      "host": "张淑一",
       "sources": [
         {
-          "sourceUrl": "http://skc.scnu.edu.cn/a/20251118/1027.html",
-          "college": "社会科学处",
-          "campus": "校级",
-          "title": "华南师范大学砺儒讲坛第139讲：从清华简看先秦秦汉典籍的若干问题（刘国忠教授）"
+          "sourceUrl": "http://lswh.scnu.edu.cn/a/20251118/73.html",
+          "college": "历史文化学院",
+          "campus": "石牌",
+          "title": "从清华简看先秦秦汉典籍的若干问题"
         }
       ],
       "merged": true,
@@ -19387,96 +19327,6 @@
       "merged": false
     },
     {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241128/245.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740623654182556.jpeg"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第5讲丨人生的意义——人文精神维度之三",
-      "topic": "",
-      "lectureStart": "2024-12-12 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）、中山大学",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-11-28",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第5讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 5,
-      "lectureCount": 5,
-      "listTitle": "2024-11-28  《人文精神概论》系列讲座四 造型艺术的真理"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241031/235.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0109/1736411045937530.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第5讲丨人生的意义——人文精神维度之三",
-      "topic": "",
-      "lectureStart": "2024-12-12 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-10-31",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第5讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 5,
-      "lectureCount": 5,
-      "listTitle": "2024-10-31  《人文精神概论》系列讲座二 人类意识发生论"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241017/230.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0109/1736410644745178.jpg"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第5讲丨人生的意义",
-      "topic": "人文精神维度之三",
-      "lectureStart": "2024-12-12 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）、中山大学",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-10-17",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第5讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 5,
-      "lectureCount": 5,
-      "listTitle": "2024-10-17  《人文精神概论》系列讲座一 导论"
-    },
-    {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241212/8234.html",
       "college": "数学科学学院",
       "campus": "石牌",
@@ -20772,96 +20622,6 @@
       "merged": false
     },
     {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241212/252.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740624041927947.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第4讲丨造型艺术的真理——人文精神维度之二",
-      "topic": "",
-      "lectureStart": "2024-11-28 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员会学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-12-12",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第4讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 4,
-      "lectureCount": 5,
-      "listTitle": "2024-12-12  《人文精神概论》系列讲座五 人生的意义"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241031/235.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0109/1736411045937530.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第4讲丨造型艺术的真理——人文精神维度之二",
-      "topic": "",
-      "lectureStart": "2024-11-28 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-10-31",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第4讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 4,
-      "lectureCount": 5,
-      "listTitle": "2024-10-31  《人文精神概论》系列讲座二 人类意识发生论"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241017/230.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0109/1736410644745178.jpg"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第4讲丨造型艺术的真理",
-      "topic": "人文精神维度之二",
-      "lectureStart": "2024-11-28 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）、中山大学",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-10-17",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第4讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 4,
-      "lectureCount": 5,
-      "listTitle": "2024-10-17  《人文精神概论》系列讲座一 导论"
-    },
-    {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241128/8199.html",
       "college": "数学科学学院",
       "campus": "石牌",
@@ -20885,38 +20645,6 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1
-    },
-    {
-      "sourceUrl": "http://psy.scnu.edu.cn/a/20241122/2777.html",
-      "college": "心理学院",
-      "campus": "石牌",
-      "title": "申继亮教授学术报告",
-      "topic": "改造我们的研究 ---教育发展与改革的期待",
-      "lectureStart": "2024-11-28 15:30:00",
-      "lectureEnd": "2024-11-28 17:00:00",
-      "location": "心理学院520报告厅",
-      "speaker": "申继亮",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "北京师范大学中国教育与社会发展研究院",
-      "inviter": "",
-      "speakerBio": "申继亮,北京师范大学中国教育与社会发展研究院教授, 1986年本科毕业于北京师范大学心理系,1988和1992年在北京师范大学发展心理研究所获得硕士和博士学位,曾任北京师范大学发展心理研究所所长、北京师范大学心理学院分党委书记,教育部基础教育二司副司长、教材局副局长、一级巡视员。 申继亮教授曾主持教育部哲学社会科学研究重大课题攻关项目、国家自然科学基金、全国教育科学规划项目等国家级课题数十项,发表 SSCI/SCI/CSSCI论文数百篇,长期致力于基础教育、教师专业发展、青少年心理健康教育等方向研究。申继亮教授还领导了普通高中课程方案和课程标准、义务教育课程方案和课程标准研制、义务教育统编教材编审工作,主持制定劳动教育、立德树人文件,习近平新时代中国特色社会主义思想进课程教材指南、中华优秀传统文化、革命传统、国家安全等一系列指南和纲要。",
-      "organizer": "心理学院",
-      "publishTime": "2024-11-22 15:52:00",
-      "publishTimeSource": "position",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "加强科学研究,是实现高水平科技自立自强、建设高质量教育体系和世界科技强国的必由之路。然而,目前学界的诸多研究在回应国家大政方针关注的关键问题、落地指导教育实践等方面存在不足。当前,我国经济社会快速发展,教育发展与改革持续推进,科学研究范式深刻变革,心理学与教育学的研究该何去何从？本次讲座将从全国教育科学规划、国家自然科学基金等国家级项目的立项情况切入,审视我国心理学与教育学研究现状与困境,并详细介绍如何通过把握方向、分析形势和创新范式等方式构思和设计符合国家战略需求和教育实践要求的研究课题,从而助力研究者的课题申报和学术发展。 报告人简介: 申继亮,北京师范大学中国教育与社会发展研究院教授, 1986年本科毕业于北京师范大学心理系,1988和1992年在北京师范大学发展心理研究所获得硕士和博士学位,曾任北京师范大学发展心理研究所所长、北京师范大学心理学院分党委书记,教育部基础教育二司副司长、教材局副局长、一级巡视员。 申继亮教授曾主持教育部哲学社会科学研究重大课题攻关项目、国家自然科学基金、全国教育科学规划项目等国家级课题数十项,发表 SSCI/SCI/CSSCI论文数百篇,长期致力于基础教育、教师专业发展、青少年心理健康教育等方向研究。申继亮教授还领导了普通高中课程方案和课程标准、义务教育课程方案和课程标准研制、义务教育统编教材编审工作,主持制定劳动教育、立德树人文件,习近平新时代中国特色社会主义思想进课程教材指南、中华优秀传统文化、革命传统、国家安全等一系列指南和纲要。",
-      "listTitle": "申继亮教授学术报告",
-      "sources": [
-        {
-          "sourceUrl": "http://skc.scnu.edu.cn/a/20241126/925.html",
-          "college": "社会科学处",
-          "campus": "校级",
-          "title": "华南师范大学砺儒讲坛第128讲：改造我们的研究---教育发展与改革的期待"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20241126/925.html",
@@ -22221,126 +21949,6 @@
       "merged": false
     },
     {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241212/252.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740624041927947.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第3讲丨谈谈科学精神——人文精神维度之一",
-      "topic": "",
-      "lectureStart": "2024-11-14 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员会学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-12-12",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第3讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 3,
-      "lectureCount": 5,
-      "listTitle": "2024-12-12  《人文精神概论》系列讲座五 人生的意义"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241128/245.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740623654182556.jpeg"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第3讲丨谈谈科学精神——人文精神维度之一",
-      "topic": "",
-      "lectureStart": "2024-11-14 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）、中山大学",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-11-28",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第3讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 3,
-      "lectureCount": 5,
-      "listTitle": "2024-11-28  《人文精神概论》系列讲座四 造型艺术的真理"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241031/235.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0109/1736411045937530.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第3讲丨谈谈科学精神——人文精神维度之一",
-      "topic": "",
-      "lectureStart": "2024-11-14 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-10-31",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第3讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 3,
-      "lectureCount": 5,
-      "listTitle": "2024-10-31  《人文精神概论》系列讲座二 人类意识发生论"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241017/230.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0109/1736410644745178.jpg"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第3讲丨谈谈科学精神",
-      "topic": "人文精神维度之一",
-      "lectureStart": "2024-11-14 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）、中山大学",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-10-17",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第3讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 3,
-      "lectureCount": 5,
-      "listTitle": "2024-10-17  《人文精神概论》系列讲座一 导论"
-    },
-    {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241108/12857.html",
       "college": "物理学院",
       "campus": "大学城",
@@ -23395,96 +23003,6 @@
       "listTitle": "工作坊一：广东传统工艺的精彩、无奈和希望——岭南非遗文化艺术概述"
     },
     {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241212/252.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740624041927947.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第2讲丨人类意识发生论",
-      "topic": "",
-      "lectureStart": "2024-10-31 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员会学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-12-12",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第2讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 2,
-      "lectureCount": 5,
-      "listTitle": "2024-12-12  《人文精神概论》系列讲座五 人生的意义"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241128/245.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740623654182556.jpeg"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第2讲丨人类意识发生论",
-      "topic": "",
-      "lectureStart": "2024-10-31 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）、中山大学",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-11-28",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第2讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 2,
-      "lectureCount": 5,
-      "listTitle": "2024-11-28  《人文精神概论》系列讲座四 造型艺术的真理"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241017/230.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0109/1736410644745178.jpg"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第2讲丨人类意识发生论",
-      "topic": "",
-      "lectureStart": "2024-10-31 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）、中山大学",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-10-17",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第2讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 2,
-      "lectureCount": 5,
-      "listTitle": "2024-10-17  《人文精神概论》系列讲座一 导论"
-    },
-    {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241030/12843.html",
       "college": "物理学院",
       "campus": "大学城",
@@ -24324,66 +23842,6 @@
       "lectureIndex": 1,
       "lectureCount": 5,
       "listTitle": "2024-12-12  《人文精神概论》系列讲座五 人生的意义"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241128/245.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740623654182556.jpeg"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第1讲丨导论",
-      "topic": "",
-      "lectureStart": "2024-10-17 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）、中山大学",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-11-28",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第1讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 1,
-      "lectureCount": 5,
-      "listTitle": "2024-11-28  《人文精神概论》系列讲座四 造型艺术的真理"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241031/235.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0109/1736411045937530.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第1讲丨导论",
-      "topic": "",
-      "lectureStart": "2024-10-17 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-10-31",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第1讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 1,
-      "lectureCount": 5,
-      "listTitle": "2024-10-31  《人文精神概论》系列讲座二 人类意识发生论"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241015/12819.html",
@@ -31767,37 +31225,17 @@
       "lectureCount": 3,
       "listTitle": "创新创业与创新劳动周——创新创业论坛",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
-    },
-    {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/55.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/shanwei/2024/0305/1709627944855468.jpg"
-      ],
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "《设计思维与创新能力》",
-      "topic": "",
-      "lectureStart": "2024-01-16 16:00:00",
-      "lectureEnd": "2024-01-16 16:45:00",
-      "location": "汕尾校区南教学楼302",
-      "speaker": "黄明睿",
-      "speakerTitle": "副教授、教育部“创业指导教师培训特聘专家”",
-      "speakerAffiliation": "广东技术师范大学",
-      "inviter": "",
-      "speakerBio": "广东技术师范大学副教授 教育部“创业指导教师培训特聘专家”",
-      "organizer": "汕尾校区",
-      "publishTime": "2024-01-01 16:36:00",
-      "publishTimeSource": null,
       "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 3,
-      "lectureCount": 3,
-      "listTitle": "创新创业与创新劳动周——创新创业论坛"
+      "sources": [
+        {
+          "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/55.html",
+          "college": "汕尾校区",
+          "campus": "汕尾",
+          "title": "《设计思维与创新能力》"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20240116/127.html",
@@ -31823,37 +31261,17 @@
       "lectureCount": 3,
       "listTitle": "创新创业与创新劳动周——创新创业论坛",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
-    },
-    {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/55.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/shanwei/2024/0305/1709627944855468.jpg"
-      ],
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "《创新创业竞赛项目的选择》",
-      "topic": "",
-      "lectureStart": "2024-01-16 15:15:00",
-      "lectureEnd": "2024-01-16 16:00:00",
-      "location": "汕尾校区南教学楼302",
-      "speaker": "邱梅",
-      "speakerTitle": "总经理、创业导师",
-      "speakerAffiliation": "广州尊源企业管理咨询有限公司",
-      "inviter": "",
-      "speakerBio": "广州尊源企业管理咨询有限公司总经理 华南师范大学创业导师",
-      "organizer": "汕尾校区",
-      "publishTime": "2024-01-01 16:36:00",
-      "publishTimeSource": null,
       "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 2,
-      "lectureCount": 3,
-      "listTitle": "创新创业与创新劳动周——创新创业论坛"
+      "sources": [
+        {
+          "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/55.html",
+          "college": "汕尾校区",
+          "campus": "汕尾",
+          "title": "《创新创业竞赛项目的选择》"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20240116/127.html",
@@ -31879,37 +31297,17 @@
       "lectureCount": 3,
       "listTitle": "创新创业与创新劳动周——创新创业论坛",
       "imageParseMethod": "vlm",
-      "hasPosterImage": true
-    },
-    {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/55.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/shanwei/2024/0305/1709627944855468.jpg"
-      ],
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "《创新创业竞赛与学生成长》",
-      "topic": "",
-      "lectureStart": "2024-01-16 14:30:00",
-      "lectureEnd": "2024-01-16 15:15:00",
-      "location": "汕尾校区南教学楼302",
-      "speaker": "侯永雄",
-      "speakerTitle": "副院长",
-      "speakerAffiliation": "华南师范大学创业学院",
-      "inviter": "",
-      "speakerBio": "华南师范大学创业学院副院长",
-      "organizer": "汕尾校区",
-      "publishTime": "2024-01-01 16:36:00",
-      "publishTimeSource": null,
       "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 1,
-      "lectureCount": 3,
-      "listTitle": "创新创业与创新劳动周——创新创业论坛"
+      "sources": [
+        {
+          "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/55.html",
+          "college": "汕尾校区",
+          "campus": "汕尾",
+          "title": "《创新创业竞赛与学生成长》"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20240115/12576.html",
@@ -32043,36 +31441,6 @@
       "hasPosterImage": true
     },
     {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20240114/125.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2024/0304/1709544975170959.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "基于智慧高速“云-网-节-端”平台的视觉数据分析技术及其应用",
-      "topic": "",
-      "lectureStart": "2024-01-14 15:50:00",
-      "lectureEnd": "2024-01-14 16:30:00",
-      "location": "汕尾校区南教学楼102",
-      "speaker": "张怀东",
-      "speakerTitle": "副教授",
-      "speakerAffiliation": "华南理工大学未来技术学院",
-      "inviter": "",
-      "speakerBio": "华南理工大学未来技术学院副教授",
-      "organizer": "行知书院",
-      "publishTime": "2024-01-14",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 3,
-      "lectureCount": 3,
-      "listTitle": "2024-01-14 创新创业与创新劳动周——人工智能产业论坛"
-    },
-    {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/56.html",
       "college": "汕尾校区",
       "campus": "汕尾",
@@ -32109,36 +31477,6 @@
       "hasPosterImage": true
     },
     {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20240114/125.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2024/0304/1709544975170959.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "可信安全的自动驾驶系统",
-      "topic": "",
-      "lectureStart": "2024-01-14 15:10:00",
-      "lectureEnd": "2024-01-14 15:50:00",
-      "location": "汕尾校区南教学楼102",
-      "speaker": "李大川",
-      "speakerTitle": "副研究员",
-      "speakerAffiliation": "南方科技大学可信自主系统研究院",
-      "inviter": "",
-      "speakerBio": "南方科技大学可信自主系统研究院副研究员",
-      "organizer": "行知书院",
-      "publishTime": "2024-01-14",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 2,
-      "lectureCount": 3,
-      "listTitle": "2024-01-14 创新创业与创新劳动周——人工智能产业论坛"
-    },
-    {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2024/0101/56.html",
       "college": "汕尾校区",
       "campus": "汕尾",
@@ -32173,36 +31511,6 @@
       "merged": true,
       "sourceCount": 2,
       "hasPosterImage": true
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20240114/125.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2024/0304/1709544975170959.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "具身智能技术方法与应用和挑战",
-      "topic": "",
-      "lectureStart": "2024-01-14 14:30:00",
-      "lectureEnd": "2024-01-14 15:10:00",
-      "location": "汕尾校区南教学楼102",
-      "speaker": "王金龙",
-      "speakerTitle": "副主任",
-      "speakerAffiliation": "深圳清华大学研究院无人驾驶研究中心",
-      "inviter": "",
-      "speakerBio": "深圳清华大学研究院无人驾驶研究中心副主任 中国人工智能学会智能驾驶专委会委员",
-      "organizer": "行知书院",
-      "publishTime": "2024-01-14",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 1,
-      "lectureCount": 3,
-      "listTitle": "2024-01-14 创新创业与创新劳动周——人工智能产业论坛"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240114/7761.html",
@@ -34663,35 +33971,6 @@
       "vlmExtracted": true
     },
     {
-      "sourceUrl": "http://life.scnu.edu.cn/a/20231206/6069.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/life/2023/1206/1701827379466613.jpg"
-      ],
-      "college": "生命科学学院",
-      "campus": "石牌",
-      "title": "学术讲座：花粉管发育的细胞骨架协同调控机制",
-      "topic": "花粉管发育的细胞骨架协同调控机制",
-      "lectureStart": "2023-12-08 14:30:00",
-      "lectureEnd": null,
-      "location": "生命科学学院102会议室",
-      "speaker": "任海云",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "北京师范大学",
-      "inviter": "",
-      "speakerBio": "任海云，北京师范大学教授，国家杰出青年科学基金获得者。现任北京师范大学生物学学术与学位委员会主任，北京师范大学珠海校区生物科技研究中心主任；兼任国务院学科评审组成员，中国细胞生物学学会副理事长、中国植物生理与分子生物学学会女科学家分会副会长。主讲的《细胞生物学》本科课程于2020年获首批国家级一流课程；作为副主编参编了“十二五”国家级规划教材《植物学》，2021年获全国优秀教材奖。主要从事植物细胞骨架与细胞增殖调控分子机制的研究，先后获得国家基金委重点项目、重大研究计划重点项目以及科技部973计划项目等支持，作为通讯作者发表学术论文60余篇，荣获2013年度高等学校科学研究优秀成果奖-自然科学奖一等奖。",
-      "organizer": "生命科学学院",
-      "publishTime": "2023-12-06 09:48:00",
-      "publishTimeSource": "label",
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第十三讲",
-      "vlmExtracted": true,
-      "timeConfidence": "high",
-      "timeNote": "general-body-full",
-      "host": "高彩吉",
-      "listTitle": "2023年12月8日学术讲座：花粉管发育的细胞骨架协同调控机制"
-    },
-    {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20231207/7720.html",
       "college": "数学科学学院",
       "campus": "石牌",
@@ -34974,66 +34253,13 @@
       "timeNote": "same-year",
       "abstract": "现为江苏师范大学校学术委员会主任委员,国家2011计划语言能力部省共建协同创新中心主任,语言科学与艺术国家级实验教学示范中心主任,国家语委语言能力高等研究院院长,《语言科学》主编等。主要学术兼职为国家哲学社会科学基金和国家自然科学基金会评专家,科技部科技创新2030—\"脑科学与类脑研究\"重大项目评审专家,教育部重点实验室(交叉领域类)验收考核组组长、中国语言学会常务理事、中国语文现代化学会副会长等。研究兴趣为神经语言学、理论语言学等,主持国家社科基金重大委托项目、重大项目3项,国家973计划课题、国家社科基金重点项目、国家自然科学基金项目等多项。",
       "listTitle": "华南师范大学90周年校庆系列学术活动——砺儒讲坛（第25场）：从“一带一路”到“人类命运共同体”：新时代语言能力建设服务国家重大需求大有可",
-      "host": "王穗苹"
-    },
-    {
-      "sourceUrl": "http://life.scnu.edu.cn/a/20231129/5998.html",
-      "college": "生命科学学院",
-      "campus": "石牌",
-      "title": "细胞生物学助力作物农艺性状分子设计---Seeing is believing!",
-      "topic": "细胞生物学助力作物农艺性状分子设计---Seeing is believing !",
-      "lectureStart": "2023-12-01 14:30:00",
-      "lectureEnd": null,
-      "location": "生命科学学院102会议室",
-      "speaker": "孔照胜",
-      "speakerTitle": "研究员",
-      "speakerAffiliation": "山西农业大学",
-      "inviter": "",
-      "speakerBio": "孔照胜，研究员，国家杰出青年科学基金获得者，国家重点研发项目首席科学家，山西省后稷实验室（杂粮生物育种山西省实验室）主任，农业农村部杂粮种质创新与分子育种重点实验室主任。2006年在中国科学院遗传与发育生物学研究所获博士学位；2007年-2012年，在美国加州大学戴维斯分校从事博士后研究；2011年入职中国科学院微生物研究所，任创新课题组组长、所学术委员会副主任。2012年入选中科院“百人计划”，2017年终期评估获优秀。2021年任山西农业大学（省农科院）党委常委、副校（院）长。孔照胜研究员长期致力于细胞生物学视角下作物农艺性状的分子设计研究，取得了多项原创性研究成果，引领了相关领域的活体细胞、实时动态研究，并为作物分子改良提供了重要理论依据。相关研究成果发表在Nature Plants、EMBO Journal、Current Biology、eLife、Plant Cell、Molecular Plant、New Phytologist等国际主流学术刊物；部分原创成果编入生命科学领域国际经典教科书《Molecular Biology of the Cell》(第7版)中。入选Faculty member of F1000Prime；兼任《mLife》、《Modem Agriculture》和《植物学报》编委。培养研究生多次荣获国家奖学金等重要奖项以及“北京市优秀毕业生”等荣誉称号。",
-      "organizer": "生命科学学院",
-      "publishTime": "2023-11-29 09:39:00",
-      "publishTimeSource": "label",
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第十二讲",
-      "vlmExtracted": true,
-      "timeConfidence": "high",
-      "timeNote": "general-body-full",
-      "listTitle": "学术讲座： 细胞生物学助力作物农艺性状分子设计---Seeing is believing !",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/life/2023/1129/1701227688596557.jpg"
-      ]
-    },
-    {
-      "sourceUrl": "http://psy.scnu.edu.cn/a/20231120/2604.html",
-      "college": "心理学院",
-      "campus": "石牌",
-      "title": "华南师范大学90周年校庆系列学术活动 砺儒讲坛（第二十三场",
-      "topic": "华南师范大学90周年校庆系列学术活动 砺儒讲坛（第二十三场",
-      "lectureStart": "2023-12-01 14:30:00",
-      "lectureEnd": "2023-12-01 16:30:00",
-      "location": "心理学院520学术报告厅",
-      "speaker": "杨亦鸣",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "杨亦鸣,教育部\"长江学者\"特聘教授,国家\"万人计划\"教学名师,全国高校黄大年式教师团队带头人,享受国务院政府特殊津贴专家,江苏省社科名家,江苏省 \"首席中青年科学家\"(江苏省\"333工程\"第一层次),江苏省\"十佳研究生导师团队\"带头人,博士生导师、博士后联系导师。现为江苏师范大学校学术委员会主任委员,国家2011计划语言能力部省共建协同创新中心主任,语言科学与艺术国家级实验教学示范中心主任,国家语委语言能力高等研究院院长,《语言科学》主编等。曾任江苏师范大学副校长。主要学术兼职为国家哲学社会科学基金和国家自然科学基金会评专家,科技部科技创新2030—\"脑科学与类脑研究\"重大项目评审专家,教育部重点实验室(交叉领域类)验收考核组组长、中国语言学会常务理事、中国语文现代化学会副会长等。研究兴趣为神经语言学、理论语言学等,主持国家社科基金重大委托项目、重大项目3项,国家973计划课题、国家社科基金重点项目、国家自然科学基金项目等多项。先后在PNAS(《美国科学院院报》)、Brain(《脑》)、Cognition(《认知》)、《中国社会科学》、《中国科学》、《中国语文》等刊物发表论文两百余篇,出版著作10余部。曾获国家级教学成果奖一等奖、教育部高等学校人文社会科学优秀成果奖一等奖等。",
-      "organizer": "心理学院",
-      "publishTime": "2023-11-20 16:01:00",
-      "publishTimeSource": "position",
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "vlmExtracted": true,
-      "timeConfidence": "high",
-      "timeNote": "same-year",
-      "abstract": "现为江苏师范大学校学术委员会主任委员,国家2011计划语言能力部省共建协同创新中心主任,语言科学与艺术国家级实验教学示范中心主任,国家语委语言能力高等研究院院长,《语言科学》主编等。主要学术兼职为国家哲学社会科学基金和国家自然科学基金会评专家,科技部科技创新2030—\"脑科学与类脑研究\"重大项目评审专家,教育部重点实验室(交叉领域类)验收考核组组长、中国语言学会常务理事、中国语文现代化学会副会长等。研究兴趣为神经语言学、理论语言学等,主持国家社科基金重大委托项目、重大项目3项,国家973计划课题、国家社科基金重点项目、国家自然科学基金项目等多项。",
-      "listTitle": "华南师范大学90周年校庆系列学术活动 砺儒讲坛（第二十三场）",
+      "host": "王穗苹",
       "sources": [
         {
-          "sourceUrl": "http://skc.scnu.edu.cn/a/20231129/801.html",
-          "college": "社会科学处",
-          "campus": "校级",
-          "title": "华南师范大学90周年校庆系列学术活动——砺儒讲坛（第25场）：从“一带一路”到“人类命运共同体”：新时代语言能力建设服务国家重大需求大有可"
+          "sourceUrl": "http://psy.scnu.edu.cn/a/20231120/2604.html",
+          "college": "心理学院",
+          "campus": "石牌",
+          "title": "华南师范大学90周年校庆系列学术活动 砺儒讲坛（第二十三场"
         }
       ],
       "merged": true,
@@ -35168,7 +34394,17 @@
       "timeNote": "general-body-full",
       "abstract": "兼任国家督学,国家教师教育咨询专家委员会副主任委员,中国教育学会副会长、国际教育分会理事长,中国高教学会学术咨询委员会委员、外语教学研究分会理事长,中国职教学会外语教育工作委员会主任。历任河南大学教师,中国驻纽约总领事馆教育领事,教育部基础教育一司司长,教育部教师工作司司长。完成国家社科基金重大课题2项,出版专著 7部,编著15部,翻译3部,发表学术论文160多篇,总主编教育治理与领导力丛书(15卷),\"一带一路\"国家文化教育大系(72卷)。",
       "listTitle": "华南师范大学90周年校庆系列学术活动——砺儒讲坛（第24场）：教育强国建设背景下人才培养的理念与方略",
-      "host": "王穗苹"
+      "host": "王穗苹",
+      "sources": [
+        {
+          "sourceUrl": "http://psy.scnu.edu.cn/a/20231120/2603.html",
+          "college": "心理学院",
+          "campus": "石牌",
+          "title": "华南师范大学90周年校庆系列学术活动 砺儒讲坛（第二十二场"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2023/1128/49.html",
@@ -35191,41 +34427,6 @@
       "vlmExtracted": true,
       "listTitle": "华南师范大学汕尾校区第10期教学工作坊",
       "hasPosterImage": true
-    },
-    {
-      "sourceUrl": "http://psy.scnu.edu.cn/a/20231120/2603.html",
-      "college": "心理学院",
-      "campus": "石牌",
-      "title": "华南师范大学90周年校庆系列学术活动 砺儒讲坛（第二十二场",
-      "topic": "华南师范大学90周年校庆系列学术活动 砺儒讲坛（第二十二场",
-      "lectureStart": "2023-11-30 14:30:00",
-      "lectureEnd": "2023-11-30 16:30:00",
-      "location": "心理学院520学术报告厅",
-      "speaker": "王定华",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "王定华,现任北京外国语大学党委书记,北外国际教育学院学术委员会主任、二级教授、博士生导师,全国政协委员、教科卫体委员会委员,国务院特贴专家。兼任国家督学,国家教师教育咨询专家委员会副主任委员,中国教育学会副会长、国际教育分会理事长,中国高教学会学术咨询委员会委员、外语教学研究分会理事长,中国职教学会外语教育工作委员会主任。历任河南大学教师,中国驻纽约总领事馆教育领事,教育部基础教育一司司长,教育部教师工作司司长。完成国家社科基金重大课题2项,出版专著 7部,编著15部,翻译3部,发表学术论文160多篇,总主编教育治理与领导力丛书(15卷),\"一带一路\"国家文化教育大系(72卷)。",
-      "organizer": "心理学院",
-      "publishTime": "2023-11-20 15:59:00",
-      "publishTimeSource": "position",
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "vlmExtracted": true,
-      "timeConfidence": "high",
-      "timeNote": "same-year",
-      "abstract": "兼任国家督学,国家教师教育咨询专家委员会副主任委员,中国教育学会副会长、国际教育分会理事长,中国高教学会学术咨询委员会委员、外语教学研究分会理事长,中国职教学会外语教育工作委员会主任。历任河南大学教师,中国驻纽约总领事馆教育领事,教育部基础教育一司司长,教育部教师工作司司长。完成国家社科基金重大课题2项,出版专著 7部,编著15部,翻译3部,发表学术论文160多篇,总主编教育治理与领导力丛书(15卷),\"一带一路\"国家文化教育大系(72卷)。",
-      "listTitle": "华南师范大学90周年校庆系列学术活动 砺儒讲坛（第二十二场）",
-      "sources": [
-        {
-          "sourceUrl": "http://skc.scnu.edu.cn/a/20231129/800.html",
-          "college": "社会科学处",
-          "campus": "校级",
-          "title": "华南师范大学90周年校庆系列学术活动——砺儒讲坛（第24场）：教育强国建设背景下人才培养的理念与方略"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20231129/799.html",
@@ -35571,29 +34772,6 @@
       "sessionNumber": "第9期"
     },
     {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20231117/12494.html",
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "中山大学赵福利教授学术报告",
-      "topic": "基于实体实验同步的慕课西行探索",
-      "lectureStart": "2023-11-23 10:00:00",
-      "lectureEnd": null,
-      "location": "理六栋302",
-      "speaker": "赵福利教授",
-      "speakerAffiliation": "中山大学",
-      "speakerBio": "赵福利，中山大学物理学院党委书记，教授，教育部大学物理教学指导委员会委员。",
-      "organizer": "物理学院",
-      "publishTime": "2023-11-17 09:28:00",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "在高等教育数字化大背景下，从课程微观层面开展了结合数字化技术实现定量演示实验数字化实践。依托 “慕课西行”计划，联合华南师范大学、汕头大学、喀什大学、西藏大学，组建粤-疆-藏虚拟教研室，定制开发兼容多镜头实景互动的奕课堂（OMO）系统，建设数字化实验项目，在中山大学-喀什大学同步课堂上使用，开展内嵌实体实验的同步课堂教学。实现了实验的数字化教学和同步课堂课定量分析的功能。结合互联网和大数据技术，为专业课数字化教学提供新的可参考案例，为进一步推进教育资源共享做出了有益的尝试。 专家简介： 赵福利，中山大学物理学院党委书记，教授，教育部大学物理教学指导委员会委员。",
-      "listTitle": "中山大学赵福利教授学术报告",
-      "speakerSource": null,
-      "sources": [],
-      "merged": false,
-      "sourceCount": 1
-    },
-    {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20231117/4271.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/ctld/2024/0312/1710211666689483.png"
@@ -35621,7 +34799,17 @@
       "abstract": "在高等教育数字化大背景下,从课程微观层面开展了结合数字化技术实现定量演示实验数字化实践。依托\"慕课西行\"计划,联合华南师范大学、汕头大学、喀什大学、西藏大学,组建粵-疆-藏虚拟教研室,定制开发兼容多镜头实景互动的奕课堂(OMO)系统,建设数字化实验项目,在中山大学喀什大学同步课堂上使用,开展内嵌实体实验的同步课堂教学。实现了实验的数字化教学和同步课堂课定量分析的功能。结合互联网和大数据技术,为专业课数字化教学提供新的可参考案例,为进一步推进教育资源共享做出了有益的尝试。 二、主讲人赵福利,中山大学物理学院党委书记,教授,教育部大学物理教学指导委员会委员。 三、时间地点和参与方式",
       "listTitle": "“基于实体实验同步的慕课西行探索”专题工作坊 （总第71期）",
       "__idx": 1399,
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "sources": [
+        {
+          "sourceUrl": "https://physics.scnu.edu.cn/a/20231117/12494.html",
+          "college": "物理学院",
+          "campus": "大学城",
+          "title": "中山大学赵福利教授学术报告"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20231122/7711.html",
@@ -45538,29 +44726,6 @@
       "sourceCount": 1
     },
     {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20230106/12174.html",
-      "images": [],
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "南京大学陈伟教授学术报告",
-      "topic": "非厄米趋肤效应相关相变及其在凝聚态体系中的实现",
-      "lectureStart": "2023-01-10 10:00:00",
-      "lectureEnd": null,
-      "location": "线上",
-      "speaker": "陈伟",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "陈伟,南京大学物理学院教授,博士生导师,国家优秀青年基金获得者。2009年东南大学物理系本科,2014年南京大学物理学院博士。2014-2019年在南京航空航天大学理学院工作,先后担任讲师,副教授(2016),教授(2018)。2017-2019年在苏黎世联邦理工大学(ETH)理论物理研究所(ITP)做访问学者和博士后。2020年起在南京大学物理学院担任教授。已发表学术论文40余篇(第一/通讯30余篇),其中以第一/通讯作者身份发表PRL论文6篇,PRX1篇。陈伟主要从事凝聚态理论研究,近期研究兴趣包括:拓扑物质的量子输运与相变理论;凝聚态体系中的非厄米物理效应;介观电子体系中的量子干涉与量子关联效应;低功耗量子器件、自旋电子学器件物理。",
-      "organizer": "物理学院",
-      "publishTime": "2023-01-06 09:26:00",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "近年来,非厄米趋肤效应(non-Hermitian skin effect)的研究引起了广泛关注,其特点是系统本征态局域在开放边界,对应的动力学过程为波包的单向传输。与单向传输这类非定域效应相悖,磁场会使得波包通过回旋运动而局域。因此,考虑这两种相反效应之间的竞争及其导致的物理效应是个有趣的开放问题。在本报告中,我们将基于正常粒子和狄拉克粒子模型介绍若干有趣的物理结果:(1)在周期边界条件下,非互易格点的复数能谱会被磁场部分地抑制,在长波极限下体现为实数能谱。进一步研究发现,在长波极限下,粒子的准经典轨道在四维复数空间形成封闭轨道,其对应的Onsager-Lifshitz量子化条件保证了相应的实数能谱。(2)在开放边界条件下,磁场可以有效抑制非厄米趋肤效应,对其提供了一种有效的调控方式。(3)发现该体系具有内秉镜面-",
-      "listTitle": "20221220  南京大学陈伟教授学术报告"
-    },
-    {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20230105/263.html",
       "college": "量子物质研究院",
       "campus": "大学城",
@@ -48781,136 +47946,6 @@
       "hasPosterImage": true
     },
     {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2022/0922/25.html",
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "大气颗粒物采样技术",
-      "topic": "",
-      "lectureStart": "2022-09-24 09:00:00",
-      "lectureEnd": null,
-      "location": "汕尾校区南教学楼101",
-      "speaker": "彭力",
-      "speakerTitle": "讲师",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "汕尾校区",
-      "publishTime": "2022-09-22 09:53:03",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "abstract": "大气颗粒物是目前环境空气中的主要污染物，通过有效地采样可以获取大气颗粒物的大小、质量浓度、成分等信息，从而为大气环境治理提供基础。大气颗粒物的采样技术直接影响分析准确性和代表性，为后续分析提供了重要前提。",
-      "vlmExtracted": true,
-      "isMultiLecture": true,
-      "lectureIndex": 3,
-      "lectureCount": 3,
-      "listTitle": "行知书院科技学术节",
-      "sources": [
-        {
-          "sourceUrl": "http://xz.scnu.edu.cn/a/20220924/56.html",
-          "college": "行知书院",
-          "campus": "汕尾",
-          "title": "大气颗粒物采样技术"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
-    },
-    {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2022/0922/25.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/shanwei/2022/0922/1663811791538513.jpg"
-      ],
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "智能超表面及其应用",
-      "topic": "",
-      "lectureStart": "2022-09-24 09:00:00",
-      "lectureEnd": null,
-      "location": "汕尾校区南教学楼101",
-      "speaker": "韩鹏",
-      "speakerTitle": "教授、博士生导师",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "汕尾校区",
-      "publishTime": "2022-09-22 09:53:03",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "abstract": "智能超表面是一种二维超材料，由波长尺度的微结构阵列组成。当电磁波入射到智能超表面时，表面内的金属或电介质微结构与电磁波相互作用，从表面反射或者透射的电磁波即具有了特定的传播性质。通过改变结构或者器件的电学性质，智能超表面可以对电磁波在空域和时域进行调控，从而衍生出定向传输、波束整形等众多的应用。",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 1,
-      "lectureCount": 3,
-      "listTitle": "行知书院科技学术节"
-    },
-    {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2022/0922/25.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/shanwei/2022/0922/1663811791538513.jpg"
-      ],
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "结构光三维重建概述",
-      "topic": "",
-      "lectureStart": "2022-09-24 09:00:00",
-      "lectureEnd": null,
-      "location": "汕尾校区南教学楼101",
-      "speaker": "邱健",
-      "speakerTitle": "副教授、硕士生导师",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "汕尾校区",
-      "publishTime": "2022-09-22 09:53:03",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "abstract": "结构光三维重建技术通过向物体投射特定的结构图案，利用图案在物体不同深度表面的变形，可以重建出物体的三维信息。该技术可以高精度地获取物体三维信息，广泛应用于人脸支付、零部件测量、逆向工程等领域。",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 2,
-      "lectureCount": 3,
-      "listTitle": "行知书院科技学术节"
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20220924/56.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2023/1215/1702604267653381.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "大气颗粒物采样技术",
-      "topic": "",
-      "lectureStart": "2022-09-24 09:00:00",
-      "lectureEnd": null,
-      "location": "汕尾校区南教学楼101",
-      "speaker": "彭力",
-      "speakerTitle": "讲师",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "行知书院",
-      "publishTime": "2022-09-24",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "",
-      "abstract": "大气颗粒物是目前环境空气中的主要污染物，通过有效地采样可以获取大气颗粒物的大小、质量浓度、成分等信息，从而为大气环境治理提供基础。大气颗粒物的采样技术直接影响分析准确性和代表性，为后续分析提供了重要前提。",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 3,
-      "lectureCount": 3,
-      "listTitle": "2022-09-24 韩鹏、邱健、彭力学术沙龙"
-    },
-    {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20220919/2342.html",
       "college": "心理学院",
       "campus": "石牌",
@@ -48990,31 +48025,6 @@
       "hasPosterImage": true
     },
     {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20220922/55.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2023/1215/1702603839956207.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "周易浅说",
-      "topic": "",
-      "lectureStart": "2022-09-22 19:00:00",
-      "lectureEnd": null,
-      "location": "汕尾校区南教学楼101",
-      "speaker": "陈一平",
-      "speakerTitle": "退休教师",
-      "speakerAffiliation": "华南师范大学文学院",
-      "inviter": "",
-      "speakerBio": "华南师范大学文学院退休教师，曾讲授《中国古代文学》、《中国文化概论》等课程，著有《淮南子校注译》、《先秦古诗辨》，主编《中国文化概论》等教材。",
-      "organizer": "行知书院",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "vlmExtracted": true,
-      "listTitle": "2022-09-22 周易浅说"
-    },
-    {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20220916/4041.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/ctld/2022/0916/1663318165620574.png"
@@ -49043,68 +48053,21 @@
           "college": "物理学院",
           "campus": "大学城",
           "title": "心理学院刘学兰教授学术报告"
+        },
+        {
+          "sourceUrl": "http://gxb.scnu.edu.cn/a/20220916/604.html",
+          "college": "工学部",
+          "campus": "佛山",
+          "title": "“教学成果凝炼与成果奖申报”第57期教学创新工作坊"
         }
       ],
       "merged": true,
-      "sourceCount": 2,
+      "sourceCount": 3,
       "__idx": 1919,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "hasPosterImage": true,
       "ocrExtracted": false
-    },
-    {
-      "sourceUrl": "http://gxb.scnu.edu.cn/a/20220916/604.html",
-      "college": "工学部",
-      "campus": "佛山",
-      "title": "“教学成果凝炼与成果奖申报”第57期教学创新工作坊",
-      "topic": "教学成果凝炼与成果奖申报",
-      "lectureStart": "2022-09-22 15:00:00",
-      "lectureEnd": null,
-      "location": "大学城校区物理与电信工程学院理6-320会议室",
-      "speaker": "刘学兰",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "刘学兰,心理学博士,华南师范大学心理学院教授,副院长,广东省教学名师,广东省本科高校心理学类专业教学指导委员会秘书长,广东省中小学健康教育指导委员会委员。中国心理学会婚姻家庭心理与咨询专业委员会副主任委员、理论心理学与心理学史专业委员会委员。广州市人文社科重点基地\"幸福广州心理辅导与研究基地\"副主任。 研究方向为学习心理、心理健康教育、家庭心理与亲密关系,已撰写或主编《中小学生学习辅导》《中学生心理健康教育》《自闭症儿童的教育与干预》等15部著作和教材,参编教材和著作10余部,发表论文60余篇。作为主持人或主要参与人获3项国家级和9项省级教学成果奖。省级一流课程《心理学》负责人。曾获广东省教育系统优秀共产党员,广东省\"南粤优秀教师\",华南师范大学第三届、第四届、第六届、第七届\"我最喜爱的教师\"等称号。 地点: 大学城校区物理与电信工程学院理6-320会议室面向对象: 物理与电信工程学院教师、化学学院教师、信息光电子科技学院教师及对该主题感兴趣的教师二、报名方式点击页面下方报名二维码,并根据提示填写提交相关报名信息。 三、报名截止时间2022年9月21日(周三)17:00前,请老师们尽早报名,以便做好安排。 四、学时认定与获取参与教学创新工作坊的教师可获得华南师范大学教师继续教育学时证明,取得相应学分。请报名参加工作坊的老师统一安装、下载\"华师教发中心\"学习管理平台(超星学习通APP),教师发展中心的所有培训活动将统一使用\"华师教发中心\"学习管理平台进行考勤管理及继续教育学时的记录与统计。 五、联系方式联系电话:020-85210771 联系人:董老师物理与电信工程学院化学学院信息光电子科技学院教师发展中心 2022年9月16日",
-      "organizer": "工学部",
-      "publishTime": "2022-09-16 08:30:00",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "listTitle": "“教学成果凝炼与成果奖申报”第57期教学创新工作坊",
-      "sources": [
-        {
-          "sourceUrl": "https://physics.scnu.edu.cn/a/20220920/12097.html",
-          "college": "物理学院",
-          "campus": "大学城",
-          "title": "心理学院刘学兰教授学术报告"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
-    },
-    {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20220920/12097.html",
-      "images": [],
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "心理学院刘学兰教授学术报告",
-      "topic": "教学成果凝炼与成果奖申报",
-      "lectureStart": "2022-09-22 15:00:00",
-      "lectureEnd": null,
-      "location": "物理与电信工程学院理6-320会议室",
-      "speaker": "刘学兰",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "吴先球个人",
-      "speakerBio": "刘学兰,心理学博士,华南师范大学心理学院教授,副院长,广东省教学名师,广东省本科高校心理学类专业教学指导委员会秘书长,广东省中小学健康教育指导委员会委员。中国心理学会婚姻家庭心理与",
-      "organizer": "物理学院",
-      "publishTime": "2022-09-20 09:21:02",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "listTitle": "20220922  心理学院刘学兰教授学术报告"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220916/12087.html",
@@ -49601,29 +48564,6 @@
       "sourceCount": 2
     },
     {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20220707/12004.html",
-      "images": [],
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "华中师范大学计晨副教授学术报告",
-      "topic": "晕核中的有效场理论",
-      "lectureStart": "2022-07-11 10:00:00",
-      "lectureEnd": null,
-      "location": "理8栋118学术报告厅",
-      "speaker": "计晨",
-      "speakerTitle": "",
-      "speakerAffiliation": "华中师范大学",
-      "inviter": "",
-      "speakerBio": "计晨,2006年本科毕业于南京大学。2012年在美国俄亥俄大学取得博士学位。2012-2017年分别在TRIUMF、ECT*、INFN-TIFPA研究所从事博士后研究。2017年起受聘于华中师范大学粒子物理所副教授。主要从事核结构理论的研究,运用有效场理论与少体方法,探究冷原子Efimov效应、原子核中的晕结构与结团结构、缪原子中核极化效应、轻核光核反应等物理问题。",
-      "organizer": "物理学院",
-      "publishTime": "2022-07-07 10:17:58",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "稀有同位素束流装置为探究滴线附近原子核的结构与反应提供了无限机遇。实验中发现一些丰中子或丰质子轻核具有由核芯与晕核子组成的分子态结构,被称为晕核。它们的稳定性对天体环境中核素的生成起到重要作用。通过有效场理论与核团簇模型的结合,我们可以很好地描述晕核的结构与反应。本报告将简要介绍晕核有效场理论的基础,及其在描述晕核结构、光致裂解反应、核子俘获反应、康普顿散射等核反应过程中的应用。",
-      "listTitle": "20220711  华中师范大学计晨副教授学术报告"
-    },
-    {
       "sourceUrl": "http://abdn.scnu.edu.cn/a/20220629/361.html",
       "college": "阿伯丁数据科学与人工智能学院",
       "campus": "佛山",
@@ -49647,35 +48587,6 @@
       "hasPosterImage": true
     },
     {
-      "sourceUrl": "http://iqm.scnu.edu.cn/a/20220705/241.html",
-      "college": "量子物质研究院",
-      "campus": "大学城",
-      "title": "[2022年7月7日]赵行波 ——Light-front approach to proton structure",
-      "topic": "Light-front approach to proton structure",
-      "lectureStart": "2022-07-07 10:00:00",
-      "lectureEnd": null,
-      "location": "理8栋118学术报告厅",
-      "speaker": "赵行波",
-      "speakerAffiliation": "中科院近代物理研究所",
-      "speakerBio": "赵行波，中科院近代物理研究所研究员，2015年入选“青年千人计划”。2009年获得由Quark Matter 2009会议颁发的Quark Matter 2009会议奖学金，同年还获得了由美国物理学会德克萨斯分会颁发的Robert S. Hyer研究奖，2013年获得由国际光锥物理顾问委员会颁发的Gary McCartor奖。2001-2005年，本科就读于中国科学技术大学近代物理系。2005－2010年，在Texas A&M University攻读物理博士学位，致力于热介质中的粲夸克偶素的研究。2010-2015年，在美国爱荷华州立大学从事博士后研究，致立于光前量子场论与核子结构的研究。2015年入职中科院近代物理研究所。在Phys. Rev. Lett, Phys. Lett. B, Eur. Phys. J. C, Phys. Rev. C, Phys. Rev. D, Few Body syst. 等国际重要学术期刊上发表论文40多篇，其中四篇高引论文合计达600余次。",
-      "organizer": "量子物质研究院",
-      "publishTime": "2022-07-05 14:40:56",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "",
-      "listTitle": "[2022年7月7日]赵行波 ——Light-front approach to proton structure",
-      "sources": [
-        {
-          "sourceUrl": "https://physics.scnu.edu.cn/a/20220706/12003.html",
-          "college": "物理学院",
-          "campus": "大学城",
-          "title": "20220707  中科院近代物理研究所赵行波研究员学术报告"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
-    },
-    {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220706/12003.html",
       "images": [],
       "college": "物理学院",
@@ -49696,7 +48607,17 @@
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "abstract": "Although the proton has been discovered more than 100 years ago, people have just begun to understand its internal structure. In this talk I will introduce a recently constructed nonperturbative approach to the structure of relativistic bound states, named Basis Light-front Quantization (BLFQ). I will demonstrate BLFQ through its application to the proton system. I will show the obtained physical quantities characterizing the three-dimensional structure of the proton, such as the parton distribution functions and the form factors, and make comparison with existing experimental data.",
-      "listTitle": "20220707  中科院近代物理研究所赵行波研究员学术报告"
+      "listTitle": "20220707  中科院近代物理研究所赵行波研究员学术报告",
+      "sources": [
+        {
+          "sourceUrl": "http://iqm.scnu.edu.cn/a/20220705/241.html",
+          "college": "量子物质研究院",
+          "campus": "大学城",
+          "title": "[2022年7月7日]赵行波 ——Light-front approach to proton structure"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "http://abdn.scnu.edu.cn/a/20220628/359.html",
@@ -50847,29 +49768,6 @@
       "sourceCount": 2
     },
     {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20220507/11925.html",
-      "images": [],
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "中山大学袁岑溪副教授学术报告",
-      "topic": "基于统一有效核力的壳模型研究初探",
-      "lectureStart": "2022-05-07 10:00:00",
-      "lectureEnd": null,
-      "location": "理8栋118学术报告厅",
-      "speaker": "袁岑溪",
-      "speakerTitle": "",
-      "speakerAffiliation": "中山大学",
-      "inviter": "",
-      "speakerBio": "袁岑溪,中山大学中法核工程与技术学院副教授、博士生导师、副院长。分别于2006年和2012年获北京大学理学学士和博士,博士期间受国家公派赴东京大学联合培养,博士毕业后入职中山大学中法核工程与技术学院,历任讲师、副教授、博士生导师。主要研究方向是核物理与反应堆物理,在PRL、PLB、PRC等物理学主流刊物发表SCI收录论文71篇。2019年获中国核物理学会唯一奖项胡济民教育科学奖、2017年入选广东省科技创新青年拔尖人才、2015年入选广州市珠江科技新星。",
-      "organizer": "物理学院",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "随着新一代核物理加速器能力的提高,越来越多的远离稳定线的极端丰中子和丰质子原子核被发现和研究。但相比于可能存在的束缚原子核,目前实验条件下能观测和测量的仍是少数,大量原子核的性质仍需借助理论工具描述。原子核壳模型是理论研究这些原子核性质的重要工具,本报告将回顾从从轻核到重核的壳模型研究。有效相互作用壳模型目前在不同区域使用不同的有效相互作用,本报告初步探讨基于统一有效核力的壳模型研究。",
-      "listTitle": "20220507  中山大学袁岑溪副教授学术报告"
-    },
-    {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20220422/4005.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/ctld/2022/0422/1650612460337036.png"
@@ -51679,34 +50577,13 @@
       "timeConfidence": "high",
       "timeNote": "general-body-full",
       "listTitle": "砺儒讲坛第82讲：政府与政治中的质性方法——基于几个研究作品的说明",
-      "host": "杨爱平"
-    },
-    {
-      "sourceUrl": "http://ggy.scnu.edu.cn/a/20211207/5683.html",
-      "college": "政治与公共管理学院",
-      "campus": "大学城",
-      "title": "讲座预告 | 砺儒讲坛第82讲：政府与政治研究中的质性方法——基于几个研究作品的说明",
-      "topic": "讲座预告 | 砺儒讲坛第82讲：政府与政治研究中的质性方法——基于几个研究作品的说明",
-      "lectureStart": "2021-12-09 14:30:00",
-      "lectureEnd": "2021-12-09 16:30:00",
-      "location": "华南师范大学大学城校区文3栋政管学院一楼第二演讲厅",
-      "speaker": "陈那波",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "陈那波,中山大学政治与公共事务管理学院教授、博导;南粤优秀教师( 2015 )、国家教学成果二等奖获得者(第二完成人)( 2018 )、首批国家一流课程 \" 社会科学研究方法 \" 负责人( 2020 )、国家社科重大课题 \" 新时代县域社会治理能力建设研究 \" 首席专家;主要研究领域为国家治理与地方政府行为、基层治理等。",
-      "organizer": "政治与公共管理学院",
-      "publishTime": "2021-12-07 19:50:50",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "listTitle": "讲座预告 | 砺儒讲坛第82讲：政府与政治研究中的质性方法——基于几个研究作品的说明",
+      "host": "杨爱平",
       "sources": [
         {
-          "sourceUrl": "http://skc.scnu.edu.cn/a/20211201/593.html",
-          "college": "社会科学处",
-          "campus": "校级",
-          "title": "砺儒讲坛第82讲：政府与政治中的质性方法——基于几个研究作品的说明"
+          "sourceUrl": "http://ggy.scnu.edu.cn/a/20211207/5683.html",
+          "college": "政治与公共管理学院",
+          "campus": "大学城",
+          "title": "讲座预告 | 砺儒讲坛第82讲：政府与政治研究中的质性方法——基于几个研究作品的说明"
         }
       ],
       "merged": true,
@@ -52024,30 +50901,6 @@
       "sourceCount": 2
     },
     {
-      "sourceUrl": "http://ctld.scnu.edu.cn/a/20211123/1438.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/ctld/2021/1123/1637638830876922.jpg"
-      ],
-      "college": "教师发展中心",
-      "campus": "校级",
-      "title": "“理工类课程教学融入课程思政的探索与实践 ——以《近代物理实验》为例” 教学创新工作坊（第51期）",
-      "topic": "理工类课程教学融入课程思政的探索与实践 ——以《近代物理实验》为例",
-      "lectureStart": "2021-11-25 15:00:00",
-      "lectureEnd": "2021-11-25 17:30:00",
-      "location": "大学城校区理一栋212",
-      "speaker": "吴先球",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "吴先球,博士,教授广东省教学名师物理与电信工程学院教学副院长国家级物理实验教学示范中心主任华师课程思政研究中心专家组成员主讲《近代物理实验》获国家级一流本科课程主编普通高等教育\"十一五\"国家级规划教材《近代物理实验教程(第二版)》。 获国家级教学成果奖二等奖1项。 主持物理学课程思政教学团队被认定为广东省课程思政示范团队。 课程地点: 华南师范大学大学城校区理一栋212",
-      "organizer": "教师发展中心",
-      "publishTime": "2021-11-23 11:37",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "listTitle": "关于举办“理工类课程教学融入课程思政的探索与实践  ——以《近代物理实验》为例”  教学创新工作坊（第51期）的通知"
-    },
-    {
       "sourceUrl": "http://gxb.scnu.edu.cn/a/20211122/125.html",
       "college": "工学部",
       "campus": "佛山",
@@ -52075,31 +50928,6 @@
       ],
       "merged": true,
       "sourceCount": 2
-    },
-    {
-      "sourceUrl": "http://ctld.scnu.edu.cn/a/20211123/1437.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/ctld/2021/1123/1637638607474243.jpg"
-      ],
-      "college": "教师发展中心",
-      "campus": "校级",
-      "title": "“教学型教师的专业发展途径” 教学创新工作坊 （第50期）",
-      "topic": "教学型教师的专业发展途径",
-      "lectureStart": "2021-11-25 14:30:00",
-      "lectureEnd": null,
-      "location": "国际商学院119会议室",
-      "speaker": "徐曼菲",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "徐曼菲,外国语言学及应用语言学博士,华南师范大学外国语言文化学院教授、硕士生导师、副院长,全国第五届教育硕士优秀教师,华南师范大学教学名师,兼中国英汉语比较研究会语料库语言学专业委员会理事,广东外国语言学会理事,教育部\"国培计划\"及省级英语学科骨干教师培训项目负责人与培训专家,省级教学团队\"英语教育与评价\"核心成员。主要研究方向为语料库语言学、英语教育、教师教育。近五年发表CSSCI及EI收录等学术论文十来篇,获省级教学成果奖一等奖3项、二等奖1项,主持国家级一流本科课程1门,省级一流本科课程1门,主持完成省级社科、质量工程与教改项目等3项。",
-      "organizer": "教师发展中心",
-      "publishTime": "2021-11-23 11:34",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "host": "庄慧娟",
-      "listTitle": "关于举办“教学型教师的专业发展途径” 教学创新工作坊 （第50期）的通知"
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20211123/1436.html",
@@ -52201,35 +51029,6 @@
       ]
     },
     {
-      "sourceUrl": "http://iqm.scnu.edu.cn/a/20211122/190.html",
-      "college": "量子物质研究院",
-      "campus": "大学城",
-      "title": "[2021年11月24日]丁亨通——Hot and dense Lattice QCD: Supercomputing nuclear matter in ex",
-      "topic": "Hot and dense Lattice QCD: Supercomputing nuclear matter in extreme conditions",
-      "lectureStart": "2021-11-24 14:00:00",
-      "lectureEnd": null,
-      "location": "理8栋一楼学术报告厅报告",
-      "speaker": "丁亨通",
-      "speakerAffiliation": "华中师范大学",
-      "speakerBio": "丁亨通，教授，华中师范大学 “夸克与轻子物理”教育部重点实验室副主任。2010年于德国比勒费尔德大学获得博士学位，随后在美国布鲁克海汶国家实验室和哥伦比亚大学从事博士后研究工作。2013年回国加入华中师大聘为教授。主要方向为利用格点量子色动力学的大型高性能数值计算方法研究强相互作用核物质在极端温度、密度和外场条件下的性质。目前共发表学术论文80余篇，总被引次数七千一百余次，篇均被引八十余次,其中6篇Phys.Rev.Lett.，1篇有限温度密度格点QCD长篇综述文章(ESI高被引)。多次受邀在领域内重要大型国 际会议上宣讲大会报告 ,自2016年来为历届国际格点场论年会IAC委员，为第37届、在国内第二次举办的国际格点场论年会的会议主席，创建了国内第一个有限温度密度格点QCD专用超算平台。",
-      "organizer": "量子物质研究院",
-      "publishTime": "2021-11-22 14:52:28",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "",
-      "listTitle": "[2021年11月24日]丁亨通——Hot and dense Lattice QCD: Supercomputing nuclear matter in ex",
-      "sources": [
-        {
-          "sourceUrl": "https://physics.scnu.edu.cn/a/20211124/11779.html",
-          "college": "物理学院",
-          "campus": "大学城",
-          "title": "20211124  华中师范大学丁亨通教授学术报告"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
-    },
-    {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211124/11779.html",
       "images": [],
       "college": "物理学院",
@@ -52250,7 +51049,17 @@
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "abstract": "Under conditions of extremely high temperature or large densities the constituents of hadrons, quarks and gluons, can get liberated and form a new, largely unexplored state of matter——quark gluon plasma, which is supposed to be the state of the early universe a few microseconds after the big bang. First-principle numerical calculations based on lattice regularized Quantum Chromodynamics (Lattice QCD) allow us to study the transition from the hadronic phase to the quark gluon plasma phase. They provide invaluable inputs to the interpretation of large experimental heavy-ion programs at the Relativistic Heavy Ion Collider (RHIC) at Brookhaven National Laboratory, New York and the Large Hadron Collider (LHC) at CERN, Switzerland. In the talk I will start by a general introduction to heavy ion collision physics and Lattice QCD, and then review recent success at understanding the properties of hot and dense matter from lattice QCD as well as the role of supercomputers in our research.",
-      "listTitle": "20211124  华中师范大学丁亨通教授学术报告"
+      "listTitle": "20211124  华中师范大学丁亨通教授学术报告",
+      "sources": [
+        {
+          "sourceUrl": "http://iqm.scnu.edu.cn/a/20211122/190.html",
+          "college": "量子物质研究院",
+          "campus": "大学城",
+          "title": "[2021年11月24日]丁亨通——Hot and dense Lattice QCD: Supercomputing nuclear matter in ex"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20211122/189.html",
@@ -52770,29 +51579,6 @@
       "sourceCount": 2
     },
     {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20211101/11754.html",
-      "images": [],
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "中国科学院高能物理研究所童欣研究员学术报告",
-      "topic": "极化中子技术",
-      "lectureStart": "2021-11-03 10:00:00",
-      "lectureEnd": null,
-      "location": "理8栋一楼学术报告厅报告",
-      "speaker": "童欣",
-      "speakerTitle": "",
-      "speakerAffiliation": "中国科学院高能物理研究所",
-      "inviter": "",
-      "speakerBio": "童欣,博士,研究员。2002年本科毕业于中国科学技术大学近代物理系,2008年博士毕业于美国印第安纳大学天文与物理系,同年进入美国橡树岭国家实验室(ORNL)工作并成为正式研究人员(staff scientist)。其后十年期间,领导橡树岭国家实验室(ORNL)美国散裂中子源(SNS)和美国高通量反应堆(HFIR)中极化中子技术团队及研发工作。期间,童欣博士领导的团队研制出世界领先的中子极化系统,并成功应用于多个散裂源和反应堆的中子谱仪;其团队设计并搭建了首台基于在线极化氦3系统的整套极化中子成像装置,填补了国际空白。童欣博士及团队多次获得ORNL重大成果奖(significant event award)。2018年9月进入中科院高能所,担任中国散裂中子源样品环境组及极化中子组负责人。",
-      "organizer": "物理学院",
-      "publishTime": "2021-11-01 15:48:10",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "中子为不带电粒子,和传统的粒子探针X射线和电子相比具有穿透力强、能鉴别核同位素、对轻元素灵敏等优势。另外,中子带有磁矩,是1/2自旋粒子,因此可以被极化。在过去半个多世纪中,中子和极化中子散射在诸多科学领域中对物质的结构学和动力学做出了巨大贡献。中国科学院高能物理研究所于2011年起承担国家\"十一五\"期间重点建设的大科学装置—中国散裂中子源项目(CSNS),总投资为23亿多人民币。目前,CSNS已投入正式运行并对国内外各领域的用户开放。我将在报告中简要介绍中子散射技术,并汇报CSNS的现状以及未来发展的方向。在第二部分报告中我将讲述极化中子的产生原理、技术应用及其发展前景。本报告将简要讲述利用极化中子进行的多个实验,涵盖中子物理、原子分子物理、凝聚态物理及粒子物理等多个物理学科方向。",
-      "listTitle": "20211103  中国科学院高能物理研究所童欣研究员学术报告"
-    },
-    {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211029/11749.html",
       "college": "物理学院",
       "campus": "大学城",
@@ -53237,62 +52023,6 @@
       "sourceCount": 2
     },
     {
-      "sourceUrl": "http://ctld.scnu.edu.cn/a/20211011/1420.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/ctld/2021/1011/1633941354983245.png"
-      ],
-      "college": "教师发展中心",
-      "campus": "校级",
-      "title": "“保持热爱，站好讲台——我的教学成长之路” 第47期教学创新工作坊",
-      "topic": "保持热爱,站好讲台——我的教学成长之路",
-      "lectureStart": "2021-10-14 14:45:00",
-      "lectureEnd": "2021-10-14 16:45:00",
-      "location": "石牌校区教师发展中心206室(网络教育学院楼)",
-      "speaker": "夏宝君",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "夏宝君,华南师范大学副教授、硕士生导师,南粤优秀教师,华南师范大学第七届\"我最喜爱的老师\"。毕业于厦门大学,深耕新闻传播专业教学、科研工作十年,主要从事文化传播、人际传播、公共关系等领域的研究。主持、参与多项国家级、省部级科研项目和教学改革项目,主持国家级一流本科课程、省级一流本科课程《公共关系》。获首届全国高校教师教学创新大赛一等奖、广东省第五届高校(本科)青年教师教学大赛一等奖、广东省高校教师教学创新大赛特等奖。 地点:石牌校区教师发展中心206室(网络教育学院楼)",
-      "organizer": "教师发展中心",
-      "publishTime": "2021-10-11 16:29",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "listTitle": "“保持热爱，站好讲台——我的教学成长之路” 第47期教学创新工作坊通知"
-    },
-    {
-      "sourceUrl": "http://ggy.scnu.edu.cn/a/20210925/5597.html",
-      "college": "政治与公共管理学院",
-      "campus": "大学城",
-      "title": "讲座预告：10月14日下午砺儒讲座",
-      "topic": "以评价改革推动高等教育治理现代化",
-      "lectureStart": "2021-10-14 14:00:00",
-      "lectureEnd": "2021-10-14 16:30:00",
-      "location": "华南师范大学大学城校区文三楼2楼221室",
-      "speaker": "周光礼",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "周光礼,中国人民大学评价研究中心主任,教授,博士生导师,教育部长江学者特聘教授。兼任全国高校信息资料研究会副会长,全国院校战略规划专业委员会理事长。主要从事高等教育政策与管理,大学发展与评价研究。发表学术论文150余篇,出版学术专著20部,承担国家社会科学基金重点项目,国家自然科学基金面上项目等省部级以上课题20余项,获教育部人文社科成果奖等省部级以上奖励20余项。",
-      "organizer": "政治与公共管理学院",
-      "publishTime": "2021-09-25 18:21:15",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "主讲人简介: 周光礼,中国人民大学评价研究中心主任,教授,博士生导师,教育部长江学者特聘教授。兼任全国高校信息资料研究会副会长,全国院校战略规划专业委员会理事长。主要从事高等教育政策与管理,大学发展与评价研究。",
-      "listTitle": "讲座预告：10月14日下午砺儒讲座",
-      "sources": [
-        {
-          "sourceUrl": "http://skc.scnu.edu.cn/a/20210930/576.html",
-          "college": "社会科学处",
-          "campus": "校级",
-          "title": "10月14日砺儒讲坛第80讲：以评价改革推动高等教育治理现代化（周光礼）"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
-    },
-    {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20210930/576.html",
       "college": "社会科学处",
       "campus": "校级",
@@ -53302,7 +52032,7 @@
       "lectureEnd": "2021-10-14 16:30:00",
       "location": "华南师范大学大学城校区文三楼2楼221室",
       "speaker": "周光礼",
-      "speakerTitle": "",
+      "speakerTitle": "教授",
       "speakerAffiliation": "",
       "inviter": "",
       "speakerBio": "周光礼,中国人民大学评价研究中心主任,教授,博士生导师,教育部长江学者特聘教授。兼任全国高校信息资料研究会副会长,全国院校战略规划专业委员会理事长。主要从事高等教育政策与管理,大学发展与评价研究。发表学术论文150余篇,出版学术专著20部,承担国家社会科学基金重点项目,国家自然科学基金面上项目等省部级以上课题20余项,获教育部人文社科成果奖等省部级以上奖励20余项。",
@@ -53314,14 +52044,23 @@
       "speakerSource": "label",
       "abstract": "兼任全国高校信息资料研究会副会长,全国院校战略规划专业委员会理事长。主要从事高等教育政策与管理,大学发展与评价研究。发表学术论文150余篇,出版学术专著20部,承担国家社会科学基金重点项目,国家自然科学基金面上项目等省部级以上课题20余项,获教育部人文社科成果奖等省部级以上奖励20余项。",
       "isMultiLecture": false,
-      "sourceCount": 0,
+      "sourceCount": 2,
       "notes": [],
       "listTitle": "砺儒讲坛第80讲：以评价改革推动高等教育治理现代化（周光礼）",
       "host": "胡中锋",
       "images": [],
       "imageParseMethod": null,
       "vlmExtracted": null,
-      "hasPosterImage": null
+      "hasPosterImage": null,
+      "sources": [
+        {
+          "sourceUrl": "http://ggy.scnu.edu.cn/a/20210925/5597.html",
+          "college": "政治与公共管理学院",
+          "campus": "大学城",
+          "title": "讲座预告：10月14日下午砺儒讲座"
+        }
+      ],
+      "merged": true
     },
     {
       "sourceUrl": "http://gxb.scnu.edu.cn/a/20211008/22.html",
@@ -53375,30 +52114,6 @@
       "timeNote": "same-year",
       "abstract": "著有《中国古代文体学研究》《中国古代文体形态研究》《中国早期文体观念的发生》《近古文章与文体学研究》等。曾获教育部人文社会科学优秀成果奖一等奖、\"全球华人国学成果奖\"等。",
       "listTitle": "砺儒讲坛第79讲：世俗与崇高——中国古代对于文人的贬责与期待（吴承学）"
-    },
-    {
-      "sourceUrl": "http://ctld.scnu.edu.cn/a/20210930/1417.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/ctld/2021/0930/1632988382986450.png"
-      ],
-      "college": "教师发展中心",
-      "campus": "校级",
-      "title": "“公文写作培训”木铎教师沙龙（第26期）",
-      "topic": "公文写作培训",
-      "lectureStart": "2021-10-12 15:00:00",
-      "lectureEnd": "2021-10-12 17:00:00",
-      "location": "石牌校区教师发展中心308室(网络教育学院楼)",
-      "speaker": "王丰",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "文学硕士,教育管理在读博士。历任党办校办秘书科科员、科长,现任党办校办副主任。2004年入职华南师大以来,一直在学校办公室从事行政管理和文秘工作,具有较强的政治理论素养、综合协调能力、组织管理能力和文字写作功底,尤其是对公文写作有着深厚的理论基础和丰富的实践经验,深度参与了学校章程、历次学校党代会报告、学校校庆、发展规划等学校党政重大活动和重要规章制度的文稿撰写工作。 培训预期目标: 公文是政府机关、企事业单位保证政令畅通、工作高效运行的重要媒介,可谓公务活动的\"指挥棒\"。公文写作是行政管理人员做好本职工作的必修课程和基本能力。如何进一步规范公文写作,有效提高公文写作能力和水平？如何做到熟能生巧、严谨规范？这是新时代做好公文写作的一个重要课题。主讲人将结合自身丰富的公文写作经验,运用大量鲜活具体的实例,从\"为什么写？\"\"写什么？\"\"怎么写？\"等三个方面,全面系统讲解公文文种特点、行文规范要求以及如何提升公文写作的方法等。",
-      "organizer": "教师发展中心",
-      "publishTime": "2021-09-30 15:41",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "listTitle": "关于举办“公文写作培训”木铎教师沙龙（第26期）的通知"
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20211009/1418.html",
@@ -54238,34 +52953,6 @@
       "sourceCount": 1
     },
     {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0705/34.html",
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "【扬帆教学论坛】教师专业发展培训·第五周",
-      "listTitle": "【扬帆教学论坛】教师专业发展培训·第五周",
-      "topic": "服装设计表达——从效果图到成衣",
-      "speaker": "贺萌萌",
-      "speakerTitle": "教授、博士生导师、设计学博士",
-      "speakerAffiliation": "",
-      "speakerBio": "",
-      "abstract": "",
-      "lectureStart": "2021-07-09 09:30:00",
-      "lectureEnd": "2021-07-09 11:30:00",
-      "location": "周一至周四 一楼大会议室，周五 二楼会议室",
-      "organizer": "汕尾校区",
-      "publishTime": "2021-07-05 09:51:00",
-      "publishTimeSource": "None",
-      "timeConfidence": "high",
-      "timeNote": null,
-      "images": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "isMultiLecture": true,
-      "lectureIndex": 4,
-      "lectureCount": 4,
-      "sourceCount": 0
-    },
-    {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20210706/1397.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/ctld/2021/0527/1622103036489185.jpg"
@@ -54387,34 +53074,6 @@
       "listTitle": "POA在大学英语教学中的应用"
     },
     {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0705/34.html",
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "【扬帆教学论坛】教师专业发展培训·第五周",
-      "listTitle": "【扬帆教学论坛】教师专业发展培训·第五周",
-      "topic": "电化学分析导论",
-      "speaker": "祝保林",
-      "speakerTitle": "硕士、教授",
-      "speakerAffiliation": "",
-      "speakerBio": "",
-      "abstract": "",
-      "lectureStart": "2021-07-06 09:30:00",
-      "lectureEnd": "2021-07-06 11:30:00",
-      "location": "周一至周四 一楼大会议室，周五 二楼会议室",
-      "organizer": "汕尾校区",
-      "publishTime": "2021-07-05 09:51:00",
-      "publishTimeSource": "None",
-      "timeConfidence": "high",
-      "timeNote": null,
-      "images": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "isMultiLecture": true,
-      "lectureIndex": 2,
-      "lectureCount": 4,
-      "sourceCount": 0
-    },
-    {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0706/2.html",
       "college": "汕尾校区",
       "campus": "汕尾",
@@ -54462,25 +53121,6 @@
       "lectureIndex": 1,
       "lectureCount": 4,
       "listTitle": "【扬帆教学论坛】教师专业发展培训·第五周"
-    },
-    {
-      "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0705/1.html",
-      "college": "汕尾校区",
-      "campus": "汕尾",
-      "title": "科学研究中的数学基础（二）",
-      "topic": "科学研究中的数学基础（二",
-      "lectureStart": "2021-07-05 08:00:00",
-      "lectureEnd": null,
-      "location": "汕尾校区(金町村委会)一楼会议室",
-      "speaker": "刘则毅",
-      "speakerTitle": "教授、博士研究生",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "汕尾校区",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
-      "listTitle": "科学研究中的数学基础（二）"
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0628/33.html",
@@ -56281,29 +54921,6 @@
       "sourceCount": 2
     },
     {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20210322/11553.html",
-      "images": [],
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "中国科学院近代物理研究所何源研究员学术报告",
-      "topic": "加速器驱动先进核裂变能",
-      "lectureStart": "2021-03-24 10:00:00",
-      "lectureEnd": null,
-      "location": "理六栋525",
-      "speaker": "何源",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "何源,中国科学院近代物理研究所,研究员,博士生导师,直线加速器中心主任,中国科学院特聘研究员。国家杰出青年基金获得者,国家级人才计划入选者。1995年毕业于兰州大学物理系电子科学与材料工程专业,获得理学学士学位;2003年毕业于中国科学院研究生院核技术及应用专业,获得工学博士学位。曾获得中国科学院杰出成就奖,甘肃青年五四奖章,物理学会胡刚复物理奖,国务院政府特殊津贴。目前主要从事高功率强流超导直线加速器和先进核裂变能研究工作,任国家\"十二五重大科技基础设施——加速器驱动嬗变研究装置\"项目总工程师。",
-      "organizer": "物理学院",
-      "publishTime": "2021-03-22 09:51:28",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "中科院近代物理所团队在前期ADS研究项目中坚持走自主创新之路,创新性地提出了加速器驱动先进核能系统ADANES的概念,并在其核心技术:超导质子直线加速器、高功率散裂中子靶、乏燃料干法再生处理和核燃料材料等方面取得了一批具有国际领先和先进水平的创新性研究成果。该报告简要介绍加速器驱动乏燃料循环利用原理方法以及相关技术的的进展。 专家简介: 何源,中国科学院近代物理研究所,研究员,博士生导师,直线加速器中心主任,中国科学院特聘研究员。国家杰出青年基金获得者,国家级人才计划入选者。1995年毕业于兰州大学物理系电子科学与材料工程专业,获得理学学士学位;2003年毕业于中国科学院研究生院核技术及应用专业,获得工学博士学位。曾获得中国科学院杰出成就奖,甘肃青年五四奖章,物理学会胡刚复物理奖,国务院政府特殊津贴。目前主要从事高功率强流超导直线加速器和先进核裂变能研究工作,任国家\"十二五重大科技基础设施——加速器驱动嬗变研究装置\"项目总工程师。",
-      "listTitle": "20210324  中国科学院近代物理研究所何源研究员学术报告"
-    },
-    {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210318/11552.html",
       "college": "物理学院",
       "campus": "大学城",
@@ -56880,38 +55497,6 @@
       "vlmExtracted": true,
       "hasPosterImage": true,
       "ocrExtracted": false
-    },
-    {
-      "sourceUrl": "http://soe.scnu.edu.cn/a/20201208/7.html",
-      "college": "环境学院",
-      "campus": "大学城",
-      "title": "建立土壤环境基准与标准体系,创新土壤净化技术与应用模式",
-      "topic": "",
-      "lectureStart": "2020-12-10 09:30:00",
-      "lectureEnd": null,
-      "location": "华南师范大学大学城校区理3栋环境研究院六楼会议室",
-      "speaker": "骆永明",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "骆永明 博士 中国科学院南京土壤研究所研究员、中国科学院土壤环境与污染修复重点实验室主任，主要从事土壤污染过程与修复等研究工作。现为生态环境部国家生态环境保护专家委员会委员、国家环境基准委员会副主任委员、国家土壤生态环境保护专家委员会委员；科技部国家中长期土壤污染防治领域科技发展规划战略研究组组长；农业农村部耕地重金属污染防治联合攻关技术指导委员会主任委员和专家组首席科学家；国家自然科学基金委重大项目首席科学家；未来地球-海岸带国际计划科学指导委员会委员、国际植物技术学会副主席、中国土壤学会土壤修复专业委员会顾问等。曾为中国科学院烟台海岸带研究所所长，国家“973”计划项目、“863”计划重大项目、中科院创新团队项目等首席科学家。",
-      "organizer": "环境学院",
-      "publishTime": "2020-12-08 14:57:32",
-      "publishTimeSource": "position",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "现为生态环境部国家生态环境保护专家委员会委员、国家环境基准委员会副主任委员、国家土壤生态环境保护专家委员会委员;科技部国家中长期土壤污染防治领域科技发展规划战略研究组组长;农业农村部耕地重金属污染防治联合攻关技术指导委员会主任委员和专家组首席科学家;国家自然科学基金委重大项目首席科学家;未来地球-海岸带国际计划科学指导委员会委员、国际植物技术学会副主席、中国土壤学会土壤修复专业委员会顾问等。曾为中国科学院烟台海岸带研究所所长,国家\"973\"计划项目、\"863\"计划重大项目、中科院创新团队项目等首席科学家。",
-      "listTitle": "建立土壤环境基准与标准体系,创新土壤净化技术与应用模式",
-      "sources": [
-        {
-          "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2020/1206/46.html",
-          "college": "环境研究院",
-          "campus": "大学城",
-          "title": "建立土壤环境基准与标准体系,创新土壤净化技术与应用模式"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
     },
     {
       "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2020/1206/46.html",
@@ -57994,7 +56579,7 @@
       "publishTime": "2020-10-28 14:36:30",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "abstract": "",
+      "abstract": "近年来哈勃常数测量的不一致性已经逐渐演变成了宇宙学的重大危机。哈勃常数是一个重要的宇宙学参数,宇宙学中的所有绝对距离和",
       "listTitle": "[2020年10月29日]张鑫——哈勃常数危机",
       "sources": [
         {
@@ -58006,29 +56591,6 @@
       ],
       "merged": true,
       "sourceCount": 2
-    },
-    {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20201028/849.html",
-      "images": [],
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "东北大学张鑫教授学术报告",
-      "topic": "哈勃常数危机",
-      "lectureStart": "2020-10-29 10:00:00",
-      "lectureEnd": null,
-      "location": "理八栋210",
-      "speaker": "张鑫",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "张鑫,东北大学教授、博士生导师,研究领域为宇宙学。在暗能量宇宙学、暴胀宇宙学、中微子物理、引力波天文学、21厘米宇宙学等多个方向长期开展研究工作,在Nature Communications、Physical Review D、European Physical Journal C等国际学术期刊发表论文140余篇,被引用 5700 多次,H 因子41。曾获得国务院政府特殊津贴,入选国家\"万人计划\"青年拔尖人才、辽宁省\"兴辽英才计划\"领军人才、教育部新世纪优秀人才,并获得国家自然科学基金优秀青年科学基金项目资助。曾获辽宁省自然科学二等奖。任中国引力与相对论天体物理学会理事、《中国科学:物理学力学天文学》和 SCIENCE CHINA Physics, Mechanics & Astronomy编委。",
-      "organizer": "物理学院",
-      "publishTime": "2020-10-28 00:00:00",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "近年来哈勃常数测量的不一致性已经逐渐演变成了宇宙学的重大危机。哈勃常数是一个重要的宇宙学参数,宇宙学中的所有绝对距离和",
-      "listTitle": "20201029 东北大学张鑫教授学术报告"
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20201027/1239.html",
@@ -58714,29 +57276,6 @@
       "merged": true,
       "sourceCount": 2,
       "speakerSource": null
-    },
-    {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20200918/841.html",
-      "images": [],
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "宁波大学崔田教授学术报告",
-      "topic": "新型超氢化物的理论设计、实验合成与性能研究",
-      "lectureStart": "2020-09-19 10:00:00",
-      "lectureEnd": null,
-      "location": "理六栋302会议室",
-      "speaker": "崔田",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "邢宏喜报告",
-      "speakerBio": "崔田教授,国家级人才,新世纪百千万人才工程国家级人选,973首席科学家; 现任宁波大学物理科学与技术学院特聘院长,长期从事高压极端条件下凝聚态物质的理论与实验研究工作,在纯氢和富氢体系以及其它简单分子凝聚体系的高压结构与奇异特性、超硬多功能材料的理论设计与实验合成等方面,取得了多项成果;发表 SCI论文 400余篇,获授权发明专利12项、软件著作权 1项。获得国家自然科学二等奖 2项、省部级一等奖 5项。",
-      "organizer": "物理学院",
-      "publishTime": "2020-09-18 00:00:00",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "富氢化合物在高压下具有丰富的晶体结构和电子结构,是物理学、材料科学及超导界共同关注的一类材料。最近,科研人员利用高压技术制备出新型的硫氢化物H3S及镧氢化物LaH10,发现其超导转变温度分别可达203K和260K,刷新了超导新纪录,向着实现室温超导的梦想更进一步。我们课题组在硫氢化物的高压理论和实验的研究基础上,选取典型的镧系稀土金属与多种氢源,在不同合成条件下制备出了新型的超氢化物。利用金刚石对顶砧超高压产生技术及原位同步辐射X射线衍射技术结合第一性原理计算方法获得了新型超氢化物的晶体结构与化学计量比,通过对比镧系超氢化物的晶体结构、电子结构、磁性与超导电性之间的关系,进一步揭示调制超导电性的关键因素,深化了对富氢体系中超导电性的认识和理解,有望为富氢超导体的研究提供更清晰的物理图像。 个人简介:崔田教授,国家级人才,新世纪百千万人才工程国家级人选,973首席科学家; 现任宁波大学物理科学与技术学院特聘院长,长期从事高压极端条件下凝聚态物质的理论与实验研究工作,在纯氢和富氢体系以及其它简单分子凝聚体系的高压结构与奇异特性、超硬多功能材料的理论设计与实验合成等方面,取得了多项成果;发表 SCI论文 400余篇,获授权发明专利12项、软件著作权 1项。获得国家自然科学二等奖 2项、省部级一等奖 5项。",
-      "listTitle": "20200919 宁波大学崔田教授学术报告"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20200911/1993.html",
@@ -60824,28 +59363,6 @@
       "merged": true
     },
     {
-      "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2019/1129/40.html",
-      "college": "环境研究院",
-      "campus": "大学城",
-      "title": "Release of Constitutive Chemicals from Macroplastics",
-      "topic": "Release of Constitutive Chemicals from Macroplastics: Microplastic's big brother",
-      "lectureStart": "2019-12-03 15:00:00",
-      "lectureEnd": null,
-      "location": "华南师范大学(大学城校区)环境学院理三栋6楼会议室",
-      "speaker": "Daniel Schlenk",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "环境研究院",
-      "publishTime": "2019-11-29 13:27:50",
-      "publishTimeSource": "position",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "Ø 加州大学河滨分校终身教授,水体环境研究领域国际顶尖专家,在淡水和海洋环境、生态毒理领域具有很高的国际影响力。Ø 香港中文大学和厦门大学特聘教授,美国科学促进会会员,美国环保局 FIFRA 科学咨询委员会常任理事( 2012-2014 年担任主席),北美环境毒理学与化学学会( SETAC )委员,美国环保局生态过程和效应委员会 \" 水生生物标准指南 \" 科学咨询委员会特设成员,多次参加 NSF , USEPA , NOAA 和国家环境卫生科学研究所的提案审查小组。Ø 目前已发表 380 余篇 SCI 论文,其中 PNAS , ES&T 等顶尖期刊论文近30篇,总引用 8000 多次, H 指数为 47。",
-      "listTitle": "Release of Constitutive Chemicals from Macroplastics"
-    },
-    {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20191129/817.html",
       "college": "物理学院",
       "campus": "大学城",
@@ -61754,39 +60271,6 @@
       "sourceCount": 1
     },
     {
-      "sourceUrl": "http://iqm.scnu.edu.cn/a/20191111/92.html",
-      "images": [],
-      "college": "量子物质研究院",
-      "campus": "",
-      "title": "统计物理在大数据及网络科学中的应用",
-      "topic": "统计物理在大数据及网络科学中的应用",
-      "lectureStart": "2019-11-14 15:30:00",
-      "lectureEnd": null,
-      "location": "理6-301报告",
-      "speaker": "张子柯",
-      "speakerTitle": "",
-      "speakerAffiliation": "杭州师范大学",
-      "inviter": "",
-      "speakerBio": "张子柯，男， 2011 年获瑞士弗里堡大学理论物理博士，现为阿里巴巴商学院教授，浙江省杰出青年基金获得者。主要研究方向为大数据与网络科学交叉科学领域。其中以大数据理论与分析、复杂网络、人工智能为主要研究对象。已正式发表SCI论文60篇，其中第一作者及通讯作者论文39篇。论文总影响因子为逾200，H指数24。SCI引用2000余次，单篇最高引用461次。5篇论文入选ESI-Top1%高被引论文，1篇论文入选ESI-Top1‰热点论文。相关研究成果发表在《Physics Reports》（IF=28.295）等国内外顶尖期刊。主持国家自然科学基金2项，浙江省自然科学基金2项，欧盟第七科技框架项目1项，其他省部级项目3项。申请发明专利16项。荣获中国计算机协会自然科学二等奖，杭州市优秀学术成果一等奖，近年来入选浙江省优秀教师，浙江省中青年学科带头人，浙江省师德先进个人，杭州市优秀教师，浙江省钱江人才计划。兼任复杂性科学研究会秘书长，中国新闻史学会计算传播学研究委员会理事。",
-      "organizer": "量子物质研究院",
-      "publishTime": "2019-11-11 10:39:00",
-      "publishTimeSource": "position",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "网络是现代信息传播的重要载体。现代社会中一系列重大事件的发生,无一不伴随着在线网络上的广泛传播,例如舆论新闻的扩散,社会观点的形成,突发事件的应对等。不仅如此,网络上的信息扩散模式,还能从一定程度上反映其他系统的变化趋势。本次报告将介绍课题组运用统计物理方法在大数据及网络科学方向上的的思考和最新研究进展。",
-      "sourceCount": 2,
-      "listTitle": "IQM SeminarIQM 讲座",
-      "sources": [
-        {
-          "sourceUrl": "https://physics.scnu.edu.cn/a/20191113/803.html",
-          "college": "物理学院",
-          "campus": "大学城",
-          "title": "杭州师范大学张子柯教授学术报告"
-        }
-      ],
-      "merged": true
-    },
-    {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20191113/803.html",
       "college": "物理学院",
       "campus": "大学城",
@@ -61840,41 +60324,6 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1
-    },
-    {
-      "sourceUrl": "http://soe.scnu.edu.cn/a/20191107/2.html",
-      "college": "环境学院",
-      "campus": "大学城",
-      "title": "土壤中持久性自由基及其环境化学行为",
-      "topic": "",
-      "lectureStart": "2019-11-13 14:30:00",
-      "lectureEnd": "2019-11-13 15:30:00",
-      "location": "华南师范大学大学城校区环境学院理三栋六楼会议室",
-      "speaker": "贾汉忠",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "贾汉忠博士,西北农林科技大学教授、博士生导师;2011年1月毕业于北京科技大学环境工程系,获工学博士学位。先后入选(或获得)中国科学院\"西部之光\"人才计划(2011年)、新疆首批\"自治区优秀青年科技人才\"计划(2013年)、2014年度\"新疆高层次人才引进计划\"、2015年度中科院\"青年创新促进会\"会员、中国科学院\"西部青年学者(A类)\"人才项目(2015年)、陕西省第九批\"百人计划\"(2017年)、第六届中国土壤学会\"优秀青年学者\"奖(2018年)、2019年度陕西省杰出青年科学基金等。研究方向包括土壤有机污染物的环境界面行为、土壤环境自由基的形成及环境效应、微纳米环境功能材料的研制及应用、污染场地(农田)土壤的原(异)位修复技术。近年来,主持国家自然科学基金青年基金1项、面上项目2项、国家重点研发计划(课题负责人)1项,省部级基金11项,以及企业委托项目2项,以骨干(或任务负责人)身份参与包括国家自然科学基金重点基金、国家重点研发计划等项目8项。在Environmental Science & Technology、Applied Catalysis B: Environmental等国内外期刊发表科技论文60余篇,其中以第一作者及通讯作者发表SCI索引论文共计35篇(第一作者18篇)。 报告",
-      "organizer": "环境学院",
-      "publishTime": "2019-11-07 14:32:19",
-      "publishTimeSource": "position",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "环境持久性自由基即被认为是一类新型环境风险物质,亦可促使污染物的转化,近年来受到广泛关注。本报告针对土壤环境中持久性自由基的形成过程、稳定机制、以及反应活性进行了系统的探讨。 第三届农业资源与环境论坛农业资源高效利用与绿色发展研讨会",
-      "ocrExtracted": true,
-      "listTitle": "土壤中持久性自由基及其环境化学行为",
-      "sources": [
-        {
-          "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2019/1107/37.html",
-          "college": "环境研究院",
-          "campus": "大学城",
-          "title": "土壤中持久性自由基及其环境化学行为"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2,
-      "imageParseMethod": "ocr",
-      "hasPosterImage": true
     },
     {
       "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2019/1107/37.html",
@@ -68274,28 +66723,6 @@
       "sourceCount": 1
     },
     {
-      "sourceUrl": "http://skc.scnu.edu.cn/a/20180316/454.html",
-      "college": "社会科学处",
-      "campus": "校级",
-      "title": "砺儒讲坛第59讲：抗战后期中国的大国地位与外交作为",
-      "topic": "机遇、谋略与实力:抗战后期中国的大国地位与外交作为",
-      "lectureStart": "2018-03-20 20:00:00",
-      "lectureEnd": null,
-      "location": "华南师范大学石牌校区国际会议厅(图书馆北面)",
-      "speaker": "王建朗",
-      "speakerTitle": "",
-      "speakerAffiliation": "中国社会科学院近代史研究所",
-      "inviter": "",
-      "speakerBio": "王建朗,江苏姜埝人,1956年生。现任中国社会科学院近代史研究所所长,中国社会科学院研究生院近代史系主任、教授、博士生导师。兼任中国史学会秘书长、中国抗日战争史学会会长、《近代史研究》及《抗日战争研究》编委会主任。主要著作有:《抗日战争时期的中国对外关系》(合著)、《中国复兴枢纽》(合著)、《抗战初期的远东国际关系》、《中国废除不平等条约的历程》、《中华民国史•外交志》(合著)、《中国近代通史》第9卷(合著)、《太平洋战争爆发后国民政府外交战略与对外政策》等。",
-      "organizer": "社会科学处",
-      "publishTime": "2018-03-16 14:57:48",
-      "publishTimeSource": "label",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "现任中国社会科学院近代史研究所所长,中国社会科学院研究生院近代史系主任、教授、博士生导师。兼任中国史学会秘书长、中国抗日战争史学会会长、《近代史研究》及《抗日战争研究》编委会主任。主要著作有:《抗日战争时期的中国对外关系》(合著)、《中国复兴枢纽》(合著)、《抗战初期的远东国际关系》、《中国废除不平等条约的历程》、《中华民国史•外交志》(合著)、《中国近代通史》第9卷(合著)、《太平洋战争爆发后国民政府外交战略与对外政策》等。",
-      "listTitle": "砺儒讲坛第59讲：抗战后期中国的大国地位与外交作为(王建朗教授）"
-    },
-    {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20180316/8.html",
       "college": "历史文化学院",
       "campus": "石牌",
@@ -72733,38 +71160,6 @@
       "listTitle": "砺儒讲坛第44讲： Geography versus Policy:Exploring How Location Matters in Placed-Based Policies Using a Natural Experiment in China"
     },
     {
-      "sourceUrl": "http://psy.scnu.edu.cn/a/20160606/1056.html",
-      "college": "心理学院",
-      "campus": "石牌",
-      "title": "洪兰教授学术报告会",
-      "topic": "教养的艺术",
-      "lectureStart": "2016-06-06 15:00:00",
-      "lectureEnd": "2016-06-06 17:00:00",
-      "location": "华南师范大学石牌校区图书馆国际会议厅",
-      "speaker": "洪兰",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "洪兰,教授, 1969 年台湾大学毕业后,即赴美留学,取得加州大学实验心理学博士学位。曾在耶鲁大学哈斯金实验室及加州大学尔湾医学院神经科接受博士后训练,之后进入圣地亚哥沙克生物研究所任研究员,并于加州大学河滨校区担任研究教授。 1992 年回台任教于中正大学心理所,为中央大学认知神经科学研究所创所所长,目前为中央大学讲座教授、台北医学大学讲座教授、阳明大学神经科学研究所教授暨认知神经心理学实验室主持人。 洪兰教授是台湾神经心理学专家和认知脑科学的权威,发表了大量的高端学术论文,同时还翻译了五十多本脑科学相关著作,出版个人专著三十多部。近年来,洪兰教授推广阅读不遗余力,走遍台湾近一千所中小学、社区演讲,更深入山区偏远小学,推广阅读及城乡文化交流。针对台湾教育、社会问题等广泛领域提出建言,卓著的洞见在台湾深具影响力。",
-      "organizer": "心理学院",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "曾在耶鲁大学哈斯金实验室及加州大学尔湾医学院神经科接受博士后训练,之后进入圣地亚哥沙克生物研究所任研究员,并于加州大学河滨校区担任研究教授。1992 年回台任教于中正大学心理所,为中央大学认知神经科学研究所创所所长,目前为中央大学讲座教授、台北医学大学讲座教授、阳明大学神经科学研究所教授暨认知神经心理学实验室主持人。洪兰教授是台湾神经心理学专家和认知脑科学的权威,发表了大量的高端学术论文,同时还翻译了五十多本脑科学相关著作,出版个人专著三十多部。",
-      "listTitle": "洪兰教授学术报告会",
-      "sources": [
-        {
-          "sourceUrl": "http://skc.scnu.edu.cn/a/20160527/302.html",
-          "college": "社会科学处",
-          "campus": "校级",
-          "title": "6月6日砺儒讲坛第43讲：教养的艺术"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
-    },
-    {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20160527/302.html",
       "college": "社会科学处",
       "campus": "校级",
@@ -73045,29 +71440,6 @@
       ],
       "merged": true,
       "sourceCount": 2
-    },
-    {
-      "sourceUrl": "http://skc.scnu.edu.cn/a/20160504/285.html",
-      "images": [],
-      "college": "社会科学处",
-      "campus": "校级",
-      "title": "珠江学者讲坛—王穗苹教授学术讲座",
-      "topic": "自闭症儿童的语音感知特点 ——来自汉语的证据",
-      "lectureStart": "2016-05-05 15:00:00",
-      "lectureEnd": "2016-05-05 17:00:00",
-      "location": "心理学院五楼报告厅",
-      "speaker": "王穗苹",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
-      "inviter": "",
-      "speakerBio": "华南师范大学教授、博士生导师,广东省\"珠江学者\"特聘教授。教育部\"新世纪优秀人才\"、\"全国优秀博士学位论文奖\"获得者。现任中国心理学会语言心理学分会副主任、中国英汉语比较研究会心理语言学分会常务理事、中国心理学会普通与实验心理学专业委员会理事等职。长期致力于人类语言加工的研究,主要采用多模态技术,如眼动追踪、脑电记录、功能磁共振、以及快速光学成像等探讨语言与交流的认知及大脑神经机制、语言学习与教学、语言障碍矫治与康复等问题。先后主持国家自然科学基金5项、美国国家自科基金1项(联合主持),国家哲学社会科学重点项目、省自然科学基金重点项目等近三十项国家和省部级重要课题。近五年来在Cerebral Cortex, Neuroimage, Journal of Memory and Language,Journal of Autism and Developmental Disorders等重要的SCI、SSCI国际学术期刊发表论文40余篇,成果获\"第三届全国教育科学研究优秀成果一等奖\"、 \"广东省哲学社会科学优秀成果\"一等奖等多个奖项,多次应邀在国际学术会议和国外著名大学进行演讲。担任《Neuroimage》、《Journal of Experimental Psychology》等近三十个重要国际学术期刊的审稿人。 更多王穗苹教授的信息请参见: http://psy.scnu.edu.cn/a/20150624/",
-      "organizer": "社会科学处",
-      "publishTime": "2016-05-04 15:54:03",
-      "publishTimeSource": "label",
-      "timeConfidence": "high",
-      "timeNote": "general-body-full",
-      "abstract": "自闭症儿童的语音感知特点 ——来自汉语的证据作为一种发育障碍,自闭症谱系障碍个体既表现出某些认知功能的缺陷,又具备\"岛状\"智力特征。在语音感知领域,来自西语的研究发现,相比于正常人,自闭症个体在音调知觉方面具有普遍而稳定的优势。对自闭个体的语音知觉进行研究有重要的理论和实际意义,不仅有助于自闭症诊断标准的科学制定,而且还有助于理解自闭症个体其他感知特点的机制,及这些个体在口语交流方面出现缺陷的成因 。这场报告将首先介绍汉语语音中\"声调携带语义\"的特点,随后介绍过去几年中我们所做的一系列研究,这些研究以汉语声调的独特性为切入点,系统考察声调语言环境下成长的自闭症儿童如何进行声调信息的感知与范畴化,在此基础上,讨论了自闭症儿童在构建语言特异性语音表征方面可能存在的缺陷,以及研究结果对自闭症诊断的潜在意义。",
-      "listTitle": "珠江学者讲坛—王穗苹教授学术讲座"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20160426/1020.html",
@@ -73909,38 +72281,6 @@
           "college": "心理学院",
           "campus": "石牌",
           "title": "陆林教授学术讲座--心理系建系三十周年暨建院三周年系列学术活动"
-        }
-      ],
-      "merged": true,
-      "sourceCount": 2
-    },
-    {
-      "sourceUrl": "http://psy.scnu.edu.cn/a/20151118/878.html",
-      "college": "心理学院",
-      "campus": "石牌",
-      "title": "陆林教授学术讲座--心理系建系三十周年暨建院三周年系列学术活动",
-      "topic": "病理性记忆消除的策略和神经机制",
-      "lectureStart": "2015-11-20 10:00:00",
-      "lectureEnd": "2015-11-20 11:30:00",
-      "location": "心理学院5楼学术报告厅",
-      "speaker": "陆林",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "北京大学",
-      "inviter": "",
-      "speakerBio": "陆林,医学博士,博士生导师,北京大学第六医院院长/北京大学精神卫生研究所所长、国家精神心理疾病临床医学研究中心主任、药物依赖性研究北京市重点实验室主任、痴呆诊治转化医学研究北京市重点实验室学术委员会主任、北京大学临床心理中心主任。为国家自然科学基金委创新研究群体学术带头人、教育部长江学者特聘教授、科技部973计划项目首席科学家、国家杰出青年基金获得者,北京大学-清华大学联合中心PI,北京大学McGoven脑研究所PI。长期从事精神疾病的基础研究和临床治疗工作,在Science、Nat Neurosci等著名国际期刊上发表SCI论文180余篇,被国际同行引用6000余次,其中10余篇文章的单篇引用率超过100次,在神经科学和精神病学领域产生了重要影响。",
-      "organizer": "心理学院",
-      "publishTime": "2015-11-18 17:04:54",
-      "publishTimeSource": "position",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "abstract": "为国家自然科学基金委创新研究群体学术带头人、教育部长江学者特聘教授、科技部973计划项目首席科学家、国家杰出青年基金获得者,北京大学-清华大学联合中心PI,北京大学McGoven脑研究所PI。长期从事精神疾病的基础研究和临床治疗工作,在Science、Nat Neurosci等著名国际期刊上发表SCI论文180余篇,被国际同行引用6000余次,其中10余篇文章的单篇引用率超过100次,在神经科学和精神病学领域产生了重要影响。",
-      "listTitle": "陆林教授学术讲座--心理系建系三十周年暨建院三周年系列学术活动",
-      "sources": [
-        {
-          "sourceUrl": "http://skc.scnu.edu.cn/a/20151120/218.html",
-          "college": "社会科学处",
-          "campus": "校级",
-          "title": "11月20日砺儒讲坛第29讲：病理性记忆消除的策略和神经机制"
         }
       ],
       "merged": true,
