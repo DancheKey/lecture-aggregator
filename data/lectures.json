@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-31T09:57:15+08:00",
+  "updatedAt": "2026-07-31T10:14:23+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260729/8800.html",
@@ -23812,36 +23812,6 @@
       "listTitle": "《人文精神概论》系列讲座一 导论",
       "imageParseMethod": "vlm",
       "hasPosterImage": true
-    },
-    {
-      "sourceUrl": "http://xz.scnu.edu.cn/a/20241212/252.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740624041927947.png"
-      ],
-      "college": "行知书院",
-      "campus": "汕尾",
-      "title": "第1讲丨导论",
-      "topic": "",
-      "lectureStart": "2024-10-17 19:00:00",
-      "lectureEnd": null,
-      "location": "南教学楼303",
-      "speaker": "钱捷",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学（汕尾）",
-      "inviter": "",
-      "speakerBio": "华南师范大学（汕尾）特聘教授，中山大学教授，博士生导师；中华外国哲学史学会笛卡尔哲学专业委员会副主任、康德哲学专业委员会学术委员，中华现代外国哲学学会法国哲学专业委员会副会长。",
-      "organizer": "行知书院",
-      "publishTime": "2024-12-12",
-      "publishTimeSource": null,
-      "hasPosterImage": true,
-      "imageParseMethod": "vlm",
-      "sessionNumber": "第1讲",
-      "vlmExtracted": true,
-      "splitMode": "vlm-poster",
-      "isMultiLecture": true,
-      "lectureIndex": 1,
-      "lectureCount": 5,
-      "listTitle": "2024-12-12  《人文精神概论》系列讲座五 人生的意义"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241015/12819.html",

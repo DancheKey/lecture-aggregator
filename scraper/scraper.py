@@ -397,6 +397,16 @@ def cross_source_dedup(records):
                 # （如 bd/66 地理信息科学展望 vs bd/67 青年教师如何做好科研），
                 # 强制合并会误删不同讲座。故同单位也必须过相似度阈值。
                 if ri.get('college', '') and ri.get('college') == rj.get('college'):
+                    # 同单位系列分期强信号：同主讲、同日、同 lectureIndex（如钱捷
+                    # 《人文精神概论》各期被多个 URL 重复发布，标题分别为完整系列名
+                    # 与「第N讲丨具体题目」，文本相似度可能低于 0.25，但显然同一期）。
+                    # 用 lectureIndex 相同作为强制合并条件，避免误删同单位同主讲同日
+                    # 的*不同*讲座（bd/66 与 bd/67 lectureIndex 均 None，不会触发）。
+                    li_a = ri.get('lectureIndex')
+                    li_b = rj.get('lectureIndex')
+                    if li_a is not None and li_a == li_b:
+                        union(i, j)
+                        continue
                     ti_a = ri.get('topic', '') or ri.get('title', '')
                     ti_b = rj.get('topic', '') or rj.get('title', '')
                     sim_u = max(
