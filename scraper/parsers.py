@@ -1156,10 +1156,13 @@ def is_news_record(rec):
 
     主规则：发布时间晚于讲座时间（即讲座结束后才发布），视为对已结束讲座的
     报道或回顾，不纳入聚合。
-    - 若讲座时刻已知（非缺省 00:00:00），用「时刻」比较：发布晚于讲座即命中，
+    - 若讲座时刻「真实已知」（非占位），用「时刻」比较：发布晚于讲座即命中，
       可抓住「当天讲座、当晚发回顾」的情况（原逻辑只比日期会漏）。
-    - 若讲座时刻未知（解析为 00:00:00），退化为「日期」比较（原逻辑），
-      避免把「时间未知的真预告」误判为新闻。
+    - 若讲座时刻未知（缺省 00:00:00）或仅为铁律占位 08:00:00（页面只给日期、
+      无具体时刻，按「时间占位约定」统一填充的凌晨占位），退化为「日期」比较：
+      仅当发布日期**严格晚于**讲座日期（隔天/更晚才发）才判新闻；发布日期
+      == 讲座日期（当天发布预告）不判新闻。这样避免把「只给日期、当天发布的
+      真预告」误判为新闻（文学院等大量讲座页只给日期，曾因此反复被误杀）。
     辅助规则：标题含明显新闻/回顾类关键词（已在 EXCLUDE_KW 中，由 is_lecture 拦截）。
     """
     if not rec:
@@ -1190,8 +1193,12 @@ def is_news_record(rec):
         if delta_days <= 1:
             return False
         return pub_dt.date() > ls_dt.date()
-    # 真实发布时间戳：时刻已知用时刻比（抓「当晚发回顾」），未知退化为日期比
-    if ls_dt.time() != datetime.time(0, 0):
+    # 真实发布时间戳：时刻「真实已知」（非占位）用时刻比（抓「当晚发回顾」）；
+    # 占位 08:00（页面只给日期、按铁律统一填的凌晨占位）与 00:00 同等视为时刻
+    # 未知，退化为日期比，且发布日期 == 讲座日期时不判新闻（当天发布预告属正常）。
+    _zero = datetime.time(0, 0)
+    _placeholder = datetime.time(8, 0)
+    if ls_dt.time() != _zero and ls_dt.time() != _placeholder:
         return pub_dt > ls_dt
     return pub_dt.date() > ls_dt.date()
 
@@ -2115,6 +2122,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                    or soup.find('div', class_='content')
                    or soup.find('div', class_='news-details-all')
                    or soup.find('div', class_='news-details-middle')
+                   or soup.find('div', class_='news-text')        # 文学院等 CMS 正文区（须先于通用 <article> 标签，避免误匹配导航骨架）
                    or soup.find('article')
                    or soup.find('div', class_='entry-content'))
     body_text = content_div.get_text(' ') if content_div else text
