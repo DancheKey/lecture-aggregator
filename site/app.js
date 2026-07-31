@@ -539,12 +539,31 @@ const app = createApp({
         else if (++tries > 20) clearInterval(iv);
       }, 500);
     },
-    // 加载每条讲座的访问/点赞：优先后端，失败降级本机 localStorage
+    // 加载每条讲座的访问/点赞/想听：优先后端，失败降级本机 localStorage。
+    // 注意：后端 lecture_stats.json 里旧记录可能没有 `wants` 字段；
+    // 若直接 `this.lectureStats = j.stats` 覆盖，会把本机 STAT_KEY 中已保存
+    // 的 wants 一并清空，导致「图标已高亮（wantedUrls 还记得）但数字为 0」。
+    // 因此按 URL 做字段级合并：后端没有的字段保留本地值，后端有的字段以
+    // 后端权威值覆盖本地。
     loadLectureStats() {
+      let localStats = {};
+      try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
+      catch (e) { localStats = {}; }
       fetch('/api/lecture/stats', { cache: 'no-store' })
         .then(r => r.json())
-        .then(j => { if (j && j.stats) this.lectureStats = j.stats; })
-        .catch(() => { this.loadLocalStats(); });
+        .then(j => {
+          if (j && j.stats) {
+            const merged = { ...localStats };
+            for (const [url, serverSt] of Object.entries(j.stats)) {
+              merged[url] = { ...(merged[url] || {}), ...serverSt };
+            }
+            this.lectureStats = merged;
+            localStorage.setItem(STAT_KEY, JSON.stringify(merged));
+          } else {
+            this.lectureStats = localStats;
+          }
+        })
+        .catch(() => { this.lectureStats = localStats; });
     },
     showToast(msg) {
       this.toast.message = msg;
