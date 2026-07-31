@@ -40,9 +40,9 @@ def extract_body(htm):
     return div.get_text(' ', strip=True) if div else ''
 
 
-def classify_rec(rec, body, fallback_title):
+def classify_rec(rec, body, fallback_title, poster_page=False):
     title = rec.get('title') or fallback_title or ''
-    fr = is_news_record(rec)
+    fr = is_news_record(rec, poster_page=poster_page)
     fa = is_news_article(title, body, rec.get('lectureStart'))
     return fr, fa
 
@@ -89,14 +89,41 @@ def main():
             uncertain.append((r, 'UNPARSEABLE'))
             continue
         body = extract_body(h)
+        # 海报退化判定：以 parse_detail 设置的 hasPosterImage 标志为准（不依赖
+        # images 列表是否填充，因为 parse_detail 的 result['images'] 实际可能
+        # 为空），配合正文长度双保险。
+        imgs_all = []
         if isinstance(out, list):
-            flags = [classify_rec(rec, body, r.get('title')) for rec in out]
+            for rec in out:
+                imgs_all.extend(rec.get('images') or [])
+        else:
+            imgs_all = (out.get('images') or [])
+        # 海报页判定：hasPosterImage 标志（parse_detail 设置），兼容 list/dict
+        if isinstance(out, dict):
+            _hpi = out.get('hasPosterImage')
+        elif out:
+            _hpi = any(rec.get('hasPosterImage') for rec in out)
+        else:
+            _hpi = False
+        poster_page_flag = bool(_hpi) or (len(body) < 150 and bool(imgs_all))
+        if isinstance(out, list):
+            # 对海报退化页用 stored lectureStart（08:00 铁律占位）而非 fresh（OCR
+            # 失败回退到 00:00），以触发 is_news_record 的海报退化严格比较分支。
+            flags = []
+            for rec in out:
+                rec_chk = dict(rec)
+                if poster_page_flag and rec.get('lectureStart','').endswith(('00:00:00',)) and r.get('lectureStart','').endswith(('08:00:00',)):
+                    rec_chk['lectureStart'] = r.get('lectureStart')
+                flags.append(classify_rec(rec_chk, body, r.get('title'), poster_page=poster_page_flag))
             if all(fr or fa for fr, fa in flags):
                 news.append((r, 'all-sessions-retro', len(body)))
             else:
                 keep.append((r, 'has-lecture-session'))
         else:
-            fr, fa = classify_rec(out, body, r.get('title'))
+            rec_chk = dict(out)
+            if poster_page_flag and out.get('lectureStart','').endswith(('00:00:00',)) and r.get('lectureStart','').endswith(('08:00:00',)):
+                rec_chk['lectureStart'] = r.get('lectureStart')
+            fr, fa = classify_rec(rec_chk, body, r.get('title'), poster_page=poster_page_flag)
             if fr or fa:
                 reason = []
                 if fr:

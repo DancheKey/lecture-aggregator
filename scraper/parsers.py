@@ -1151,7 +1151,7 @@ def _date_head(s):
         return None
 
 
-def is_news_record(rec):
+def is_news_record(rec, poster_page=False):
     """判断是否为新闻/回顾而非讲座预告。
 
     主规则：发布时间晚于讲座时间（即讲座结束后才发布），视为对已结束讲座的
@@ -1163,6 +1163,12 @@ def is_news_record(rec):
       仅当发布日期**严格晚于**讲座日期（隔天/更晚才发）才判新闻；发布日期
       == 讲座日期（当天发布预告）不判新闻。这样避免把「只给日期、当天发布的
       真预告」误判为新闻（文学院等大量讲座页只给日期，曾因此反复被误杀）。
+    - **海报页退化例外**（poster_page=True 且讲座时刻为占位 08:00）：海报页
+      VLM/OCR 应已抽到真实时刻，若仍是占位 08:00 视为退化标记，**不豁免**
+      「时刻未知」逻辑，按严格时刻比较，避免「当天海报讲座当晚发回顾」被占位
+      08:00 误保护为「时刻未知」而漏过铁律（2026-07-31 文学院3585等 VLM 缓存
+      污染场景的根治：缓存返回全空字段 → lectureStart 退化为占位 → 占位被原
+      修复误豁免 → 当日回顾稿漏过）。
     辅助规则：标题含明显新闻/回顾类关键词（已在 EXCLUDE_KW 中，由 is_lecture 拦截）。
     """
     if not rec:
@@ -1193,11 +1199,20 @@ def is_news_record(rec):
         if delta_days <= 1:
             return False
         return pub_dt.date() > ls_dt.date()
+    # 海报退化占位：poster_page=True 且讲座时刻是铁律占位 08:00:00 → 08:00 是铁律
+    # 「页面只给日期无时刻」的统一虚拟讲座时间；海报页 VLM/OCR 应已抽到真实时刻
+    # 却仍是 08:00，视为退化标记，**不豁免**「时刻未知」逻辑，按严格时刻比较，
+    # 避免「当天海报讲座当晚发回顾」被占位 08:00 误保护为「时刻未知」而漏过铁律
+    # （见函数 docstring 末段，2026-07-31 根治）。
+    # 不覆盖 00:00：00:00 不是铁律约定的虚拟讲座时间，是 OCR/VLM 真失败的回退，
+    # 对其做严格比较会在「早晨 07:00 发布下午讲座预告」时误杀，仍走日期比。
+    _zero = datetime.time(0, 0)
+    _placeholder = datetime.time(8, 0)
+    if poster_page and ls_dt.time() == _placeholder:
+        return pub_dt > ls_dt
     # 真实发布时间戳：时刻「真实已知」（非占位）用时刻比（抓「当晚发回顾」）；
     # 占位 08:00（页面只给日期、按铁律统一填的凌晨占位）与 00:00 同等视为时刻
     # 未知，退化为日期比，且发布日期 == 讲座日期时不判新闻（当天发布预告属正常）。
-    _zero = datetime.time(0, 0)
-    _placeholder = datetime.time(8, 0)
     if ls_dt.time() != _zero and ls_dt.time() != _placeholder:
         return pub_dt > ls_dt
     return pub_dt.date() > ls_dt.date()
@@ -3498,7 +3513,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     _sessions_pre = detect_multi_session(
         body_text, title=title, default_year=default_year, publish_time=publish_time,
         title_year=title_year, url_year=url_year, soup=soup, url=url)
-    if not _sessions_pre and not skip_news_filter and is_news_record(result):
+    if not _sessions_pre and not skip_news_filter and is_news_record(result, poster_page=poster_only):
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
     if (is_non_lecture_title(title) or is_admin_notice(title, body_text)
@@ -3558,7 +3573,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         kept = []
         for r in split_recs:
             # MS5：拆分后每条独立过回顾判定（某期日期早于发布日→剔除该期，不影响其他期）
-            if is_news_record(r):
+            if is_news_record(r, poster_page=poster_only):
                 print(f'[SKIP-RETRO-SESSION] {url} 第{r.get("lectureIndex")}期', file=sys.stderr)
                 continue
             kept.append(r)
