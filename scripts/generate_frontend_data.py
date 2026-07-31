@@ -192,6 +192,23 @@ def build_stats(data, updated_at):
     }
 
 
+def with_unit(item, url_dates):
+    """为单页多讲座拆分记录标注 unitType，供前端区分「场」与「期」：
+
+    - 同一 sourceUrl 组内所有记录的讲座日期完全相同（同一天多场次）
+      -> 'session'（第x场，同一活动的某一场）
+    - 同一 sourceUrl 组内记录跨了不同日期（系列讲座分期）
+      -> 'issue'（第x期，不同日期的若干期）
+
+    仅对含 lectureIndex 的记录附加该字段；其它记录原样透传，不污染主数据。
+    """
+    it = dict(item)
+    if item.get('lectureIndex') is not None:
+        dates = url_dates.get(item.get('sourceUrl') or '', set())
+        it['unitType'] = 'session' if len(dates) == 1 else 'issue'
+    return it
+
+
 def main():
     os.makedirs(SITE_DIR, exist_ok=True)
     data, updated_at = load_lectures()
@@ -199,13 +216,24 @@ def main():
         print('[warn] 没有讲座数据，跳过生成')
         return
 
+    # 构建 sourceUrl -> 讲座日期集合，用于区分「同一活动的多场」（同天=场）
+    # 与「系列讲座分期」（跨天=期）。
+    url_dates = {}
+    for item in data:
+        u = item.get('sourceUrl') or ''
+        d = (item.get('lectureStart') or '')[:10]
+        url_dates.setdefault(u, set())
+        if d:
+            url_dates[u].add(d)
+
     sorted_data = sort_for_latest(data)
-    latest = [latest_preview(item) for item in sorted_data[:LATEST_SIZE]]
-    lite = [strip_fields(item) for item in data]
+    latest = [latest_preview(with_unit(item, url_dates)) for item in sorted_data[:LATEST_SIZE]]
+    lite = [with_unit(item, url_dates) for item in data]
     stats = build_stats(data, updated_at)
 
     # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
-    atomic_write(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': data})
+    # 全量切片同样附加 unitType（供本地 /api/lectures 与 GitHub Pages 回退），与 lite 一致
+    atomic_write(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': [with_unit(item, url_dates) for item in data]})
     atomic_write(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
     atomic_write(os.path.join(SITE_DIR, 'lite.json'), {'updatedAt': updated_at, 'data': lite})
     atomic_write(os.path.join(SITE_DIR, 'stats.json'), stats)
