@@ -123,6 +123,23 @@ def load_lectures():
     return raw if isinstance(raw, list) else [], ''
 
 
+def load_excluded():
+    """读取全局排除名单 data/excluded_urls.json。
+
+    该名单既被爬虫用于增量抓取时跳过，也必须在展示端过滤——凡是列入的 URL
+    不应出现在聚合页面 / 统计中（否则 excluded 形同虚设，非讲座会反复回潮）。
+    """
+    p = os.path.join(ROOT, 'data', 'excluded_urls.json')
+    if not os.path.exists(p):
+        return set()
+    try:
+        with open(p, 'r', encoding='utf-8') as f:
+            lst = json.load(f)
+        return set(lst) if isinstance(lst, list) else set()
+    except Exception:
+        return set()
+
+
 def sort_for_latest(data):
     """按 lectureStart 降序，缺失时间排最后。"""
     def key(item):
@@ -215,6 +232,14 @@ def main():
     if not data:
         print('[warn] 没有讲座数据，跳过生成')
         return
+
+    # 全局排除名单：凡是列入的 URL 不应出现在聚合页面（与爬虫端跳过抓取保持一致）。
+    # 这是根治「排除过的非讲座又回来」的关键——之前 excluded 只被爬虫用，展示端从不过滤。
+    excluded = load_excluded()
+    if excluded:
+        before = len(data)
+        data = [r for r in data if (r.get('sourceUrl') or '') not in excluded]
+        print(f'[filter] 排除名单过滤: {before} -> {len(data)} (移除 {before - len(data)} 条)')
 
     # 构建 sourceUrl -> 讲座日期集合，用于区分「同一活动的多场」（同天=场）
     # 与「系列讲座分期」（跨天=期）。

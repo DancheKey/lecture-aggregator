@@ -38,8 +38,53 @@ _lecture_stats = {}                     # url -> {"visits": N, "likes": M}
 _recent_site_ip = {}                   # ip -> 最近一次计数的时间戳（站点访问防刷）
 _recent_lecture = {}                   # (ip, url) -> 时间戳（单讲座访问防刷）
 _recent_like_action = {}               # (ip, url) -> (时间戳, 'like'|'unlike')（点赞防刷，区分动作）
+_recent_want_action = {}               # (ip, url) -> (时间戳, 'want'|'unwant')（想听防刷，区分动作）
 VISIT_THROTTLE = 180                   # 同一 IP / 同一讲座 3 分钟内只计 1 次
 LIKE_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同点赞动作只接受一次（允许 like↔unlike 交替）
+WANT_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同想听动作只接受一次（允许 want↔unwant 交替）
+
+
+def _load_excluded():
+    """读取全局排除名单 data/excluded_urls.json。
+
+    该名单既被爬虫用于增量抓取时跳过，也必须在展示端过滤——凡是列入的 URL
+    不应出现在聚合页面 / 统计中（否则 excluded 形同虚设，非讲座会反复回潮）。
+    """
+    p = os.path.join(DATA_DIR, 'excluded_urls.json')
+    try:
+        with open(p, 'r', encoding='utf-8') as f:
+            lst = json.load(f)
+        return set(lst) if isinstance(lst, list) else set()
+    except Exception:
+        return set()
+
+
+def _attach_unit_types(data):
+    """为单页多讲座拆分记录标注 unitType（场/期），逻辑须与 scripts/generate_frontend_data.py
+    的 with_unit() 严格一致，确保本地开发服务器下发的 /api/lectures 与公网静态切片行为相同：
+
+    - 同一 sourceUrl 组内所有讲座日期相同（同一天多场次）-> 'session'（第x场）
+    - 跨了不同日期（系列讲座分期）-> 'issue'（第x期）
+
+    仅对含 lectureIndex 的记录附加该字段，其余原样透传，不污染主数据。
+    """
+    url_dates = {}
+    for item in data:
+        u = item.get('sourceUrl') or ''
+        d = (item.get('lectureStart') or '')[:10]
+        url_dates.setdefault(u, set())
+        if d:
+            url_dates[u].add(d)
+    out = []
+    for item in data:
+        if item.get('lectureIndex') is not None:
+            dates = url_dates.get(item.get('sourceUrl') or '', set())
+            it = dict(item)
+            it['unitType'] = 'session' if len(dates) == 1 else 'issue'
+            out.append(it)
+        else:
+            out.append(item)
+    return out
 
 
 def _load_stat_files():
@@ -384,6 +429,56 @@ class Handler(SimpleHTTPRequestHandler):
             _save_lecture_stats()
             return self._send_json({'ok': True, 'likes': st.get('likes', 0)})
 
+    def _api_lecture_want_post(self):
+        """记录一次「想听」：前端已做本机 toggle（奇数次想听、偶数次取消）。
+
+        防刷：同一 IP 对同一讲座在 WANT_THROTTLE 秒内重复「想听」动作只计一次。
+        """
+        body = self._read_body_json()
+        url = (body.get('url') or '').strip()
+        if not url:
+            return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
+        if url.rstrip('/') not in _known_lecture_urls():
+            return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
+        ip = self._client_ip()
+        now = time.time()
+        with _stat_lock:
+            key = (ip, url)
+            last = _recent_want_action.get(key)
+            if last and last[1] == 'want' and now - last[0] < WANT_THROTTLE:
+                cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
+                return self._send_json({'ok': True, 'wants': cur.get('wants', 0), 'throttled': True})
+            st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
+            st['wants'] = st.get('wants', 0) + 1
+            _recent_want_action[key] = (now, 'want')
+            _save_lecture_stats()
+            return self._send_json({'ok': True, 'wants': st.get('wants', 0)})
+
+    def _api_lecture_unwant_post(self):
+        """取消一次「想听」：前端偶数次点击触发，这里累减（最小 0）。
+
+        防刷：同一 IP 对同一讲座在 WANT_THROTTLE 秒内重复「取消」动作只计一次。
+        """
+        body = self._read_body_json()
+        url = (body.get('url') or '').strip()
+        if not url:
+            return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
+        if url.rstrip('/') not in _known_lecture_urls():
+            return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
+        ip = self._client_ip()
+        now = time.time()
+        with _stat_lock:
+            key = (ip, url)
+            last = _recent_want_action.get(key)
+            if last and last[1] == 'unwant' and now - last[0] < WANT_THROTTLE:
+                cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
+                return self._send_json({'ok': True, 'wants': cur.get('wants', 0), 'throttled': True})
+            st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
+            st['wants'] = max(0, st.get('wants', 0) - 1)
+            _recent_want_action[key] = (now, 'unwant')
+            _save_lecture_stats()
+            return self._send_json({'ok': True, 'wants': st.get('wants', 0)})
+
     def do_GET(self):
         if self.path.split('?')[0] == '/api/visits':
             return self._api_visits_get()
@@ -416,6 +511,13 @@ class Handler(SimpleHTTPRequestHandler):
                     updated_at = raw.get('updatedAt', '') or ''
                 else:
                     data = raw if isinstance(raw, list) else []
+            # 全局排除名单过滤：凡是列入的 URL 不应展示（与公网静态切片一致）。
+            excluded = _load_excluded()
+            if excluded:
+                data = [r for r in data if (r.get('sourceUrl') or '') not in excluded]
+            # 本地下发的 /api/lectures 须与公网静态切片一致地补上 unitType（场/期），
+            # 否则 app.js 拿不到该字段会全部回退显示「期」。
+            data = _attach_unit_types(data)
             self._send_json({'data': data, 'mtime': cur_mtime, 'updatedAt': updated_at, 'unchanged': False})
             return
         if self.path.split('?')[0] == '/api/sources':
@@ -477,6 +579,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._api_lecture_like_post()
         if base == '/api/lecture/unlike':
             return self._api_lecture_unlike_post()
+        if base == '/api/lecture/want':
+            return self._api_lecture_want_post()
+        if base == '/api/lecture/unwant':
+            return self._api_lecture_unwant_post()
         self.send_error(404)
 
     def do_PUT(self):
@@ -518,6 +624,9 @@ def _prune_throttles():
                 for k, v in list(_recent_like_action.items()):
                     if now - v[0] >= LIKE_THROTTLE:
                         _recent_like_action.pop(k, None)
+                for k, v in list(_recent_want_action.items()):
+                    if now - v[0] >= WANT_THROTTLE:
+                        _recent_want_action.pop(k, None)
         except Exception:
             pass
 
