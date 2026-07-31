@@ -243,7 +243,12 @@ const app = createApp({
       const d = new Date(iso.replace(' ', 'T'));
       if (isNaN(d)) return '待定';
       const wk = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
-      return `${d.getMonth() + 1}月${d.getDate()}日 周${wk} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      // 占位时间（08:00 / 00:00 表示页面未抽取到具体时刻）→ 不显示虚假时刻，标注「时间待定」
+      const hh = d.getHours(), mm = d.getMinutes();
+      if ((hh === 8 && mm === 0) || (hh === 0 && mm === 0)) {
+        return `${d.getMonth() + 1}月${d.getDate()}日 周${wk} 时间待定`;
+      }
+      return `${d.getMonth() + 1}月${d.getDate()}日 周${wk} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     },
     dayKey(iso) {
       if (!iso || typeof iso !== 'string') return '时间待定';
