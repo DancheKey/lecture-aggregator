@@ -5,6 +5,7 @@ import sys
 import json
 import time
 import yaml
+import datetime
 import requests
 import charset_normalizer
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -625,6 +626,41 @@ def _cross_source_dup_with_existing(rec, existing_index):
     return False
 
 
+# 增量时间门宽限天数：允许「讲座/发布时间略早于 since」的近期讲座补入增量，
+# 覆盖列表页分页延迟、网络抖动等导致的"晚几天才翻到"的合理场景。
+# 超过该宽限的历史旧讲座一律不计入增量（杜绝旧数据当新事件）。
+INCREMENTAL_GRACE_DAYS = 7
+
+
+def _parse_iso(s):
+    """解析 ISO 时间字符串为 datetime；失败返回 None。"""
+    if not s:
+        return None
+    s = str(s).strip()
+    try:
+        return datetime.datetime.fromisoformat(s.replace('Z', '+00:00'))
+    except ValueError:
+        pass
+    try:
+        return datetime.datetime.strptime(s[:19], '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        return None
+
+
+def _effective_dt(rec):
+    """讲座有效时间：讲座时间优先，发布时间兜底；取不出返回 None。
+
+    用于增量时间门：判断一条新抓到的讲座是否「旧得不该计入增量」。
+    """
+    for key in ('lectureStart', 'publishTime'):
+        v = rec.get(key)
+        if v:
+            dt = _parse_iso(v)
+            if dt:
+                return dt
+    return None
+
+
 def incremental_merge(existing, new_records):
     """增量模式合并：existing 基底原样锁定（不删除/不重组已精修记录），
     仅对新增记录做去重后追加。
@@ -882,6 +918,28 @@ def main():
                   f'疑似现有数据未正确合并，拒绝覆盖 data/lectures.json。', file=sys.stderr)
             return
     if is_incremental and not args.source and not args.out:
+        # 增量时间门（2026-08-01 全局修复）：
+        # 此前 `since` 只用于设置 is_incremental 布尔，从未过滤讲座，导致增量退化成
+        # 「URL 不在 existing 就抓」的全量追加——列表页新翻到的任何历史 URL（含 2014/
+        # 2021 等远古旧讲座）都被当新事件灌入主数据，CI 每跑一次数据就变。
+        # 修复：增量新增的讲座，其有效时间必须 ≥ since - GRACE_DAYS，否则丢弃（不计入
+        # 增量），既保留「近期/未来讲座补入」能力，又杜绝历史旧讲座冒充当新事件。
+        # 全量模式（--full）不走此分支，仍抓全历史建库。
+        cutoff = _parse_iso(since) if since else None
+        if cutoff is not None:
+            floor = cutoff - datetime.timedelta(days=INCREMENTAL_GRACE_DAYS)
+            kept, dropped = [], 0
+            for r in all_fetched:
+                t = _effective_dt(r)
+                if t is not None and t < floor:
+                    dropped += 1
+                    print(f'[SKIP-OLD] 增量跳过历史旧讲座(早于时间门) {r.get("sourceUrl")} | '
+                          f'lectureStart={r.get("lectureStart")} | publishTime={r.get("publishTime")}')
+                    continue
+                kept.append(r)
+            all_fetched = kept
+            if dropped:
+                print(f'[INCREMENTAL] 时间门过滤 {dropped} 条历史旧讲座（不计入增量，避免旧数据当新事件）')
         # 增量模式：基底(existing)原样锁定，仅对新增记录做同源去重后追加，
         # 不再对全量重跑 cross_source_dedup（避免每日增量退化/重组已有精修数据）。
         out = incremental_merge(existing, all_fetched)
