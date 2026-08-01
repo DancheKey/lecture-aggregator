@@ -261,7 +261,8 @@ _EXCLUDE_PREFIX = ['报名', '报名截止', '截止', '直播', '提交', '签�
 # 支持混合中英文标签（N1e）：标签候选已同时含中文与英文（Time/Seminar Time），
 # 海报中 "时间/Time:" 这类组合标签会被正则分别命中其中任一段。
 _LABEL_RE = re.compile(
-    r'(讲座时间|报告时间|学术报告时间|开讲时间|开课时间|会议时间|seminar\s*时间'
+    r'(讲座时间|报告时间|学术报告时间|开讲时间|开课时间|会议时间|研讨会\s*日期|研讨\s*日期'
+    r'|讲座\s*日期|报告\s*日期|举办\s*日期|举办\s*时间|seminar\s*时间'
     r'|Seminar\s*Time\s*:?|Time\s*:?|时间|时闻)\s*[：:]?\s*(.{0,50})',
     re.IGNORECASE)
 _RETRO_WORDS = ['成功', '已举办', '已举行', '圆满', '回顾', '报道', '纪实', '日前']
@@ -294,6 +295,9 @@ def _label_scan(body_text):
                 continue
             tier = 1
         elif kw_norm in ('讲座时间', '报告时间', '学术报告时间', 'seminartime', 'seminartime:'):
+            tier = 1
+        elif kw_norm in ('研讨会日期', '研讨日期', '讲座日期', '报告日期', '举办日期', '举办时间'):
+            # 研讨会/讲座/报告/举办的「日期/时间」是讲座事件日的最高权威标签（高于弱「时间」）
             tier = 1
         elif kw_norm in ('开讲时间', '开课时间', '会议时间'):
             tier = 2
