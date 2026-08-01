@@ -626,10 +626,9 @@ def _cross_source_dup_with_existing(rec, existing_index):
     return False
 
 
-# 增量时间门宽限天数：允许「讲座/发布时间略早于 since」的近期讲座补入增量，
-# 覆盖列表页分页延迟、网络抖动等导致的"晚几天才翻到"的合理场景。
-# 超过该宽限的历史旧讲座一律不计入增量（杜绝旧数据当新事件）。
-INCREMENTAL_GRACE_DAYS = 7
+# 增量时间门：水位线 = since（最近一次增量抓取时间）。
+# 一条新抓到的讲座算「近期/未来」⇔ 发布时间 ≥ 水位线 或 事件时间(lectureStart) ≥ 水位线；
+# 两者都早于水位线才丢弃，杜绝历史旧讲座冒充当新事件。无宽限（避免拍脑袋魔法数字）。
 
 
 def _parse_iso(s):
@@ -645,20 +644,6 @@ def _parse_iso(s):
         return datetime.datetime.strptime(s[:19], '%Y-%m-%d %H:%M:%S')
     except ValueError:
         return None
-
-
-def _effective_dt(rec):
-    """讲座有效时间：讲座时间优先，发布时间兜底；取不出返回 None。
-
-    用于增量时间门：判断一条新抓到的讲座是否「旧得不该计入增量」。
-    """
-    for key in ('lectureStart', 'publishTime'):
-        v = rec.get(key)
-        if v:
-            dt = _parse_iso(v)
-            if dt:
-                return dt
-    return None
 
 
 def incremental_merge(existing, new_records):
@@ -927,11 +912,25 @@ def main():
         # 全量模式（--full）不走此分支，仍抓全历史建库。
         cutoff = _parse_iso(since) if since else None
         if cutoff is not None:
-            floor = cutoff - datetime.timedelta(days=INCREMENTAL_GRACE_DAYS)
+            # 统一时区：last_scrape 可能带时区(如 +08:00)，讲座时间均为 naive 本地时间，
+            # 比较前均去时区，避免 offset-naive/offset-aware 比较抛 TypeError 致 CI 崩溃。
+            cutoff = cutoff.replace(tzinfo=None)
+            # 水位线 = since（最近一次增量抓取时间）。OR 规则：一条新抓到的讲座
+            # 算「近期/未来」⇔ 发布时间 ≥ 水位线 或 事件时间(lectureStart) ≥ 水位线；
+            # 两者都早于水位线才丢弃，杜绝历史旧讲座冒充当新事件。无宽限：
+            #   - 发布早于水位线的远古/过期旧讲座 → 在 publishTime 这一维被排除；
+            #   - 事件在未来(≥水位线)的真实 upcoming 讲座 → 永不被漏掉；
+            #   - 已进主数据的 URL 由 incremental_merge 的 key 锁定，不会重复加入。
             kept, dropped = [], 0
             for r in all_fetched:
-                t = _effective_dt(r)
-                if t is not None and t < floor:
+                pub = _parse_iso(r.get('publishTime'))
+                lec = _parse_iso(r.get('lectureStart'))
+                if pub is not None and pub.tzinfo is not None:
+                    pub = pub.replace(tzinfo=None)
+                if lec is not None and lec.tzinfo is not None:
+                    lec = lec.replace(tzinfo=None)
+                is_recent = (pub is not None and pub >= cutoff) or (lec is not None and lec >= cutoff)
+                if not is_recent:
                     dropped += 1
                     print(f'[SKIP-OLD] 增量跳过历史旧讲座(早于时间门) {r.get("sourceUrl")} | '
                           f'lectureStart={r.get("lectureStart")} | publishTime={r.get("publishTime")}')
