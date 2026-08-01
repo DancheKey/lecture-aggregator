@@ -1239,6 +1239,8 @@ _NON_LECTURE_KW = [
     # 与 EXCLUDE_KW 对齐（仅加明确的新闻类词，不放"招生"等语境词——讲座主题里可能出现）：
     '纪实', '侧记', '花絮', '速递', '快讯',
     '展览', '作品展', '开幕', '拉开帷幕', '启动', '启动仪式',
+    # 比赛类（真实讲座预告标题不会以"大赛/竞赛/比赛"结尾，如"研究生职业规划大赛"是赛事非讲座）
+    '大赛', '竞赛', '比赛',
 ]
 
 
@@ -1342,6 +1344,12 @@ _NEWS_TITLE_RETRO = r'回顾(?!与|及|·|、|—|－|和)'
 # 活动必已结束，不可能是预告。与 title-conduct 互补——title-conduct 要求「举办/开展/举行」
 # + 讲座类关键词，本规则覆盖「圆满落幕」等纯完成态、未必含「举办」字样的回顾稿标题（如 ibc）。
 _NEWS_TITLE_DONE = r'(圆满落幕|圆满结束|圆满完成|成功举办|顺利举办|顺利开展|顺利召开|成功召开|落下帷幕|讲座圆满|报告圆满|活动圆满|取得圆满成功|取得圆满|在沪举行|在穗举行|在京举行|在深举行|在汉举行|在宁举行|在杭举行|在蓉举行|在渝举行|在陕举行|在粤举行)'
+# 回顾叙事：欢迎词回顾体（"热烈欢迎…莅临讲学"活动已发生，区别于"热烈欢迎广大师生参加"预告）
+_NEWS_WELCOME = r'热烈欢迎.{0,40}?(莅临|出席|来到|光临).{0,20}?(讲学|讲座|报告|指导|交流|访问|作学术)'
+# 回顾叙事：访谈/纪要/会务等过程体标记（活动已结束的纪实，非预告）
+_NEWS_NARRATIVE_RETRO = r'(访谈过程|访谈纪要|会议纪要|会议材料|会务工作|会场布置|合影留念|现场气氛热烈|交流热烈|圆满闭幕)'
+# 分论坛/对话会/研讨会 完成态（已顺利/圆满/成功召开），前向预告词排除由调用处处理
+_NEWS_SESSION_DONE = r'(分论坛|对话会|研讨会|报告会|学术沙龙|沙龙).{0,15}?(顺利|圆满|成功|召开|举办|落幕|举行)'
 
 
 # RT2g 叙事过程体标记：正文含多个「叙事标记」（举行/举办/开展/召开/报告会 + 圆满/顺利/
@@ -1450,6 +1458,13 @@ def is_news_article(title, body, lecture_start=None):
     # 7) RT2g 叙事过程体（无结构化标签的流式回顾长文）
     if _narrative_process_is_retro(b):
         return 'narrative-process'
+    # 8) 回顾叙事：热烈欢迎…莅临讲学 / 访谈纪要 / 会场布置（活动已发生，非预告）
+    if re.search(_NEWS_WELCOME, b) or re.search(_NEWS_NARRATIVE_RETRO, b):
+        return 'narrative-process'
+    # 9) 分论坛/对话会/研讨会 完成态（已顺利/圆满/成功召开），排除前向预告词
+    _sd = re.search(_NEWS_SESSION_DONE, b)
+    if _sd and not re.search(r'(将|拟|计划|定于|欢迎|邀请|敬请|届时|拟于)', _sd.group(0)):
+        return 'narrative-session-done'
     return None
 
 
@@ -2094,6 +2109,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         r'^(?:通知公告|新闻动态|学术讲座|新闻详情|通知|公告|新闻|动态|'
         r'首页|主页|关于我们|联系我们|列表|详情)$'
     )
+    # 机构名标题：以「华南师范大学」开头 + 2~6 字 + 学院/研究院/学部/中心/书院/实验室，
+    # 属站点机构名而非文章标题（如 seri 191 的 h1="华南师范大学环境研究院"），须跳过改用 h3/title。
+    _INST_RE = re.compile(r'^华南师范大学.{2,6}(学院|研究院|学部|中心|书院|实验室)$')
     if list_title:
         title = _clean_title(list_title)
     else:
@@ -2101,7 +2119,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         if h1:
             h1_text = h1.get_text(strip=True)
             # h1 是短栏目名（≤6字且命中常见栏目词）→ 跳过，尝试 h3 或 <title>
-            if len(h1_text) <= 6 or _SECTION_NAME_RE.match(h1_text):
+            if len(h1_text) <= 6 or _SECTION_NAME_RE.match(h1_text) or _INST_RE.match(h1_text):
                 h3 = soup.find('h3') or soup.find('h4')
                 if h3:
                     title = h3.get_text(strip=True)
@@ -2731,12 +2749,14 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             result['speakerSource'] = 'label'
             _multi_name_matched = True
         if not _multi_name_matched:
-            _en_name, _en_aff = _split_english_speaker(sp)
+            _en_name, _en_aff, _en_title = _split_english_speaker(sp)
             if _en_name:
                 result['speaker'] = _en_name
                 result['speakerSource'] = 'label'
                 if _en_aff:
                     result['speakerAffiliation'] = _en_aff
+                if _en_title and not result.get('speakerTitle'):
+                    result['speakerTitle'] = _en_title
             else:
                 # CJK：折叠空格、去尾部职称，取头部 2~4 字人名
                 if re.search(r'[\u4e00-\u9fa5]', sp):
@@ -2808,12 +2828,14 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         # 英文/拉丁姓名快路径（2026-07-24 修复：cs 5294「Yan Zhang, University of Oslo」
         # 原中文抽取路径只匹配 CJK、英文全落空，被守卫清空）。命中则直接落库并跳过 CJK 路径。
         if m and sp:
-            _en_name, _en_aff = _split_english_speaker(sp)
+            _en_name, _en_aff, _en_title = _split_english_speaker(sp)
             if _en_name:
                 result['speaker'] = _en_name
                 result['speakerSource'] = 'label'
                 if sp_title:
                     result['speakerTitle'] = sp_title
+                elif _en_title:
+                    result['speakerTitle'] = _en_title
                 if _en_aff:
                     result['speakerAffiliation'] = _en_aff
             else:
@@ -3576,7 +3598,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         for _title_src in (title, list_title or ''):
             if not _title_src:
                 continue
-            _en_name, _en_aff = _split_english_speaker(_title_src)
+            _en_name, _en_aff, _en_title = _split_english_speaker(_title_src)
             if _en_name:
                 result['speaker'] = _en_name
                 result['speakerSource'] = 'title'
@@ -3589,7 +3611,16 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                     _title_src, re.I)
                 if _prefix_m:
                     result['speakerTitle'] = _prefix_m.group(1).strip()
+                elif _en_title:
+                    result['speakerTitle'] = _en_title
                 break
+
+    # ---- 成立大会类总体通知跳过（非单场讲座）----
+    # 标题或摘要含「成立大会」且无明确主讲人、无具体结束时刻（仅日期占位）→ 属研究院/中心
+    # 成立大会总体通知，非公开单场讲座，跳过不入库（如 seri 191「环境科学高端论坛暨…成立大会」）。
+    if ('成立大会' in (title or '') or '成立大会' in (result.get('abstract') or '')) \
+            and not result.get('speaker') and not result.get('lectureEnd'):
+        return None
 
     # ---- 多讲座公告拆分（MS1–MS5）----
     # 用 body_text（已合并OCR的正文文本）而非完整 text，避免把页眉/导航/页脚里的
@@ -4005,11 +4036,22 @@ def _split_english_speaker(sp):
     返回 (name, affiliation)；未命中返回 ('', '')。
     """
     if not sp:
-        return '', ''
+        return '', '', ''
     s = sp.strip()
-    # 先剥离前导英文荣誉头衔，避免把 "Professor Bryan Strange" 整体当姓名。
-    s = re.sub(r'^(Associate\s+Professor|Full\s+Professor|Professor|'
-               r'Ph\.D\.?|PhD|Dr\.?|Doctor)\s+', '', s, flags=re.I)
+    _title = ''
+    # 先剥离前导英文荣誉头衔，避免把 "Professor Bryan Strange" 整体当姓名；
+    # 同时把剥离的头衔归一化存入 _title 返回（"Dr." 表示博士，符合展示约定）。
+    _hm = re.match(r'^(Associate\s+Professor|Full\s+Professor|Professor|'
+                   r'Ph\.D\.?|PhD|Dr\.?|Doctor)\s+', s, flags=re.I)
+    if _hm:
+        _raw = _hm.group(1).strip()
+        if re.fullmatch(r'Dr\.?', _raw, re.I):
+            _title = 'Dr.'
+        elif re.fullmatch(r'Ph\.?D\.?', _raw, re.I):
+            _title = 'Ph.D.'
+        else:
+            _title = _raw
+        s = s[_hm.end():]
     # 兼容 "ES&T副主编、加州大学河滨分校Daniel Schlenck教授" 等中文前缀+英文姓名
     m = re.search(
         r'(?<![A-Za-z])'
@@ -4022,10 +4064,10 @@ def _split_english_speaker(sp):
         r'，|,|。|;|；|\s|$))',
         s)
     if not m:
-        return '', ''
+        return '', '', ''
     name = m.group(1).strip()
     if not _looks_like_real_name(name):
-        return '', ''
+        return '', '', ''
     after = s[m.end():].strip()
     aff = ''
     # 括号形式：Yan Zhang (University of Oslo)
@@ -4058,7 +4100,7 @@ def _split_english_speaker(sp):
                             r'Full\s+Professor|Distinguished[\s\w]*|Chair|院士|教授|副教授|'
                             r'研究员|副研究员|讲师|博士|[。，.,\s]+)', aff, re.I)):
         aff = ''
-    return name, aff
+    return name, aff, _title
 
 
 # 荣誉头衔（出现在姓名之前的「前缀型」人才称号，区别于跟在姓名后的职称「教授/研究员」）。
@@ -4791,12 +4833,14 @@ def split_record_by_sessions(base, sessions, full_text=''):
             else:
                 # 英文/拉丁姓名兜底（2026-07-24）：_SPEAKER_NAME_RE 仅匹配 CJK，
                 # 多报告页英文主讲人（如 "Yan Zhang, University of Oslo"）会落到这里，尝试英文抽取。
-                _en_name, _en_aff = _split_english_speaker(cand)
+                _en_name, _en_aff, _en_title = _split_english_speaker(cand)
                 if _en_name:
                     rec['speaker'] = _en_name
                     rec['speakerSource'] = 'block'
                     if speaker_title:
                         rec['speakerTitle'] = speaker_title
+                    elif _en_title:
+                        rec['speakerTitle'] = _en_title
                     if _en_aff:
                         rec['speakerAffiliation'] = _en_aff
                 else:
