@@ -2191,9 +2191,13 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         s = (src or '').lower()
         s2 = unquote(s)
         bad = ('logo', 'banner', 'icon', 'avatar', 'arrow', 'btn', 'nav', 'share',
-               'close', 'header', 'slide', 'weixin', 'wechat', 'wx', 'qr', 'qrcode',
+               'close', 'header', 'slide', 'weixin', 'wechat', 'qr', 'qrcode',
                'qr-code', 'scan', 'saoma', 'carousel', 'flash', 'pixel', 'spacer',
                '二维码', '关注', '公众号', '扫码', '订阅')
+        # 注意：曾含 'wx' 以抓微信图，但文学院海报路径含 '/pics/wxy/'（wxy 含子串 wx）
+        # 被误判为微信图过滤，导致文学院海报图收不进 images、OCR 无图可跑、日期错误回退
+        # URL 日（wxy3582 误得 2024-10-30 而非真实 2024-11-21）。weixin/wechat/qr 已覆盖微信
+        # 二维码，故移除过宽的 'wx'。
         return any(k in s or k in s2 for k in bad)
 
     def _is_banner_parent(el):
@@ -2482,8 +2486,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         td = _date_from_title(title)
         if td:
             t = td
-    if not t:
+    if not t and not (result.get('hasPosterImage') or poster_only):
         # 最终兜底：URL 路径完整日期（旧站点/极简页）。不可信（常为发布日/通知日）。
+        # 海报页（hasPosterImage/poster_only）不走此兜底：其讲座日应在海报图(OCR/VLM)中，
+        # 用 URL 发布/通知日填充会给出错误日期（如 wxy3582 误得 2024-10-30 而非真实 2024-11-21）。
         url_date = _date_from_url(url)
         if url_date:
             y, mo, d = url_date
