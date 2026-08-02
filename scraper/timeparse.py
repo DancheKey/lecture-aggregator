@@ -169,7 +169,7 @@ def _parse_segment(seg, default_year, publish_time):
     # 3) 抗 OCR 噪声的紧凑数字日期：年份后接 3-6 位紧邻数字。
     m = re.search(r'20(\d{2})([ \t]{0,2})(\d{3,6})', seg)
     if m:
-        cand = _parse_compact_run(m, seg, 2000 + int(m.group(1)), m.group(2))
+        cand = _parse_compact_run(m, seg, 2000 + int(m.group(1)), m.group(3))
         if cand:
             cand['from_full'] = True
             return cand
