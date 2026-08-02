@@ -4331,6 +4331,14 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
         # 交由后续候选2/3/4 兜底，避免阻断多报告页拆分（见 cs 4268）。
         pass
     for i, lab in enumerate(labels):
+        # 前置 speaker 识别（physics807：「嘉宾：X」位于「主题：Y」之前，且归一化后
+        # 与「主题：」粘连；取紧邻本主题标签之前、最近的「嘉宾：X」，其姓名终止于
+        # 「主题/题目/嘉宾简介」等标签之前，避免跨场吞并下一场嘉宾）
+        _pre = text[max(0, lab.start() - 250):lab.start()]
+        _sp_list = list(re.finditer(
+            r'(?:嘉宾|主讲人|报告人|讲者)\s*[：:]\s*([^\n]{2,30}?)\s*'
+            r'(?=主题|题目|报告题目|嘉宾简介|$)', _pre))
+        speaker = _sp_list[-1].group(1).strip() if _sp_list else ''
         blk_start = lab.end()
         blk_end = labels[i + 1].start() if i + 1 < len(labels) else len(text)
         block = text[blk_start:blk_end]
@@ -4357,7 +4365,7 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
         _has_clock = not (st.hour == 0 and st.minute == 0 and dt.get('end') is None)
         sessions_raw.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
                              'block': block, 'splitMode': 'repeated-label',
-                             '_has_clock': _has_clock})
+                             'speaker': speaker, '_has_clock': _has_clock})
     # 候选1 收尾：按修订后的 MS1 守卫决定保留哪些场次
     if sessions_raw:
         _distinct_dates = {r['start'].date() for r in sessions_raw}
@@ -4725,6 +4733,10 @@ def split_record_by_sessions(base, sessions, full_text=''):
     # 补丁7：收集各场次主讲人姓名，用于在共享简介区按姓名锚定各自的简介
     _all_speakers = []
     for s in sessions:
+        if s.get('speaker'):
+            # 前置 speaker（physics807 块内"嘉宾："实为下一场主讲），其简介由块内
+            # "嘉宾简介："位置提取，不纳入姓名锚定（避免用下一场嘉宾名错锚共享简介）
+            continue
         _blk = s.get('block', '') or ''
         _spm = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*)\s*[：:]\s*(.+?){_BLOCK_FIELD_STOP}', _blk)
         if _spm:
@@ -4801,71 +4813,82 @@ def split_record_by_sessions(base, sessions, full_text=''):
         # 主讲人（逐块优先；缺失继承前序；圆桌且无主讲人→置空）
         sp_m = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*|讲者简介|(?:第\s*[一二三四五六七八九十0-9]+\s*[讲场]?)?嘉宾)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
         if sp_m:
-            cand = sp_m.group(1).strip()
-            # 提取职称（用于 speakerTitle）
-            title_m = re.search(
-                r'(特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-                r'研究员|教授|讲师|博士后|博士|院士)', cand)
-            speaker_title = title_m.group(1) if title_m else ''
-            # 先去掉尾部职称/单位后缀，再取姓名（避免「徐湘林教授」被截成「徐湘林教」，
-            # 也避免「穆肃教授」连写被 {2,3} 正则吞掉「教」字成「穆肃教」）
-            cand_core = re.sub(
-                r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-                r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', cand).strip()
-            # 从 3 字到 2 字降序取最长有效姓名；避免「陈玺上海大学…」被贪婪匹配成「陈玺上」。
-            nm = None
-            for _l in range(min(3, len(cand_core)), 1, -1):
-                _nm = re.match(rf'^([\u4e00-\u9fa5]{{{_l}}})', cand_core)
-                if _nm and _looks_like_real_name(_nm.group(1)):
-                    nm = _nm
-                    break
-            if nm:
-                name = nm.group(1)
-                rest2 = cand_core[nm.end():].strip(' （(，,）)')
-                # 城市名守卫：若 name 末字 + rest2 首字构成省/市名，且 rest2[1:] 紧接单位关键词，回退。
-                if len(name) >= 3 and rest2 and len(rest2) >= 2:
-                    _CITIES = {'上海', '北京', '天津', '重庆', '黑龙江', '吉林', '辽宁', '河北', '山西',
-                               '陕西', '甘肃', '青海', '山东', '河南', '江苏', '安徽', '浙江', '福建',
-                               '江西', '湖北', '湖南', '广东', '广西', '海南', '四川', '贵州', '云南',
-                               '西藏', '宁夏', '新疆', '内蒙古', '香港', '澳门', '台湾'}
-                    if (name[-1] + rest2[0]) in _CITIES and \
-                            re.match(r'^(?:大学|学院|研究院|研究所|研究中心|实验室|学系|分校|学校)', rest2[1:]):
-                        shorter = name[:-1]
-                        if _looks_like_real_name(shorter):
-                            name = shorter
-                            rest2 = cand_core[len(name):].strip(' （(，,）)')
-                rec['speaker'] = name
-                rec['speakerSource'] = 'block'
-                if speaker_title:
-                    rec['speakerTitle'] = speaker_title
-                # 用 cand_core（已删尾部职称后缀）计算姓名之后残余，避免把删掉的
-                # 「教授」等又塞回 rest；中间单位（如「姓名,工学博士,西北大学」）得以保留。
-                rest = cand_core[len(name):].strip(' （(，,）)')
-                if rest:
-                    aff = _extract_affiliation(rest)
-                    if aff:
-                        rec['speakerAffiliation'] = aff
+            if s.get('speaker'):
+                # 块内「嘉宾：」实为下一场主讲（physics807 块末"嘉宾：下一场"会被 sp_m
+                # 误匹配），优先采用 detect_multi_session 从主题标签前提取的前置 speaker
+                rec['speaker'] = s['speaker']
+                rec['speakerSource'] = 'block-prefix'
             else:
-                # 英文/拉丁姓名兜底（2026-07-24）：_SPEAKER_NAME_RE 仅匹配 CJK，
-                # 多报告页英文主讲人（如 "Yan Zhang, University of Oslo"）会落到这里，尝试英文抽取。
-                _en_name, _en_aff, _en_title = _split_english_speaker(cand)
-                if _en_name:
-                    rec['speaker'] = _en_name
+                cand = sp_m.group(1).strip()
+                # 提取职称（用于 speakerTitle）
+                title_m = re.search(
+                    r'(特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
+                    r'研究员|教授|讲师|博士后|博士|院士)', cand)
+                speaker_title = title_m.group(1) if title_m else ''
+                # 先去掉尾部职称/单位后缀，再取姓名（避免「徐湘林教授」被截成「徐湘林教」，
+                # 也避免「穆肃教授」连写被 {2,3} 正则吞掉「教」字成「穆肃教」）
+                cand_core = re.sub(
+                    r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
+                    r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', cand).strip()
+                # 从 3 字到 2 字降序取最长有效姓名；避免「陈玺上海大学…」被贪婪匹配成「陈玺上」。
+                nm = None
+                for _l in range(min(3, len(cand_core)), 1, -1):
+                    _nm = re.match(rf'^([\u4e00-\u9fa5]{{{_l}}})', cand_core)
+                    if _nm and _looks_like_real_name(_nm.group(1)):
+                        nm = _nm
+                        break
+                if nm:
+                    name = nm.group(1)
+                    rest2 = cand_core[nm.end():].strip(' （(，,）)')
+                    # 城市名守卫：若 name 末字 + rest2 首字构成省/市名，且 rest2[1:] 紧接单位关键词，回退。
+                    if len(name) >= 3 and rest2 and len(rest2) >= 2:
+                        _CITIES = {'上海', '北京', '天津', '重庆', '黑龙江', '吉林', '辽宁', '河北', '山西',
+                                   '陕西', '甘肃', '青海', '山东', '河南', '江苏', '安徽', '浙江', '福建',
+                                   '江西', '湖北', '湖南', '广东', '广西', '海南', '四川', '贵州', '云南',
+                                   '西藏', '宁夏', '新疆', '内蒙古', '香港', '澳门', '台湾'}
+                        if (name[-1] + rest2[0]) in _CITIES and \
+                                re.match(r'^(?:大学|学院|研究院|研究所|研究中心|实验室|学系|分校|学校)', rest2[1:]):
+                            shorter = name[:-1]
+                            if _looks_like_real_name(shorter):
+                                name = shorter
+                                rest2 = cand_core[len(name):].strip(' （(，,）)')
+                    rec['speaker'] = name
                     rec['speakerSource'] = 'block'
                     if speaker_title:
                         rec['speakerTitle'] = speaker_title
-                    elif _en_title:
-                        rec['speakerTitle'] = _en_title
-                    if _en_aff:
-                        rec['speakerAffiliation'] = _en_aff
+                    # 用 cand_core（已删尾部职称后缀）计算姓名之后残余，避免把删掉的
+                    # 「教授」等又塞回 rest；中间单位（如「姓名,工学博士,西北大学」）得以保留。
+                    rest = cand_core[len(name):].strip(' （(，,）)')
+                    if rest:
+                        aff = _extract_affiliation(rest)
+                        if aff:
+                            rec['speakerAffiliation'] = aff
                 else:
-                    # 值非人名（如「主持嘉宾：」粘连），继承前序
-                    rec['speaker'] = prev_speaker
-                    rec['speakerAffiliation'] = prev_aff
-                    rec['speakerTitle'] = prev_title
-                    rec['speakerSource'] = 'inherited' if prev_speaker else None
+                    # 英文/拉丁姓名兜底（2026-07-24）：_SPEAKER_NAME_RE 仅匹配 CJK，
+                    # 多报告页英文主讲人（如 "Yan Zhang, University of Oslo"）会落到这里，尝试英文抽取。
+                    _en_name, _en_aff, _en_title = _split_english_speaker(cand)
+                    if _en_name:
+                        rec['speaker'] = _en_name
+                        rec['speakerSource'] = 'block'
+                        if speaker_title:
+                            rec['speakerTitle'] = speaker_title
+                        elif _en_title:
+                            rec['speakerTitle'] = _en_title
+                        if _en_aff:
+                            rec['speakerAffiliation'] = _en_aff
+                    else:
+                        # 值非人名（如「主持嘉宾：」粘连），继承前序
+                        rec['speaker'] = prev_speaker
+                        rec['speakerAffiliation'] = prev_aff
+                        rec['speakerTitle'] = prev_title
+                        rec['speakerSource'] = 'inherited' if prev_speaker else None
         else:
-            if is_roundtable:
+            if s.get('speaker'):
+                # 前置 speaker（detect_multi_session 候选1 从「嘉宾：X」前置于主题标签提取，
+                # 该主讲人本就不在 block 内、sp_m 匹配不到，这里优先采用）
+                rec['speaker'] = s['speaker']
+                rec['speakerSource'] = 'block-prefix'
+            elif is_roundtable:
                 rec['speaker'] = None
                 rec['speakerAffiliation'] = ''
                 rec['speakerTitle'] = ''
@@ -4924,10 +4947,10 @@ def split_record_by_sessions(base, sessions, full_text=''):
                         rec['speakerSource'] = 'block-bio'
         else:
             _bio_m = re.search(
-                r'(?:讲者简介|报告人简介|主讲人简介|主讲人介绍|个人简介|专家介绍)[：:]\s*'
+                r'(?:讲者简介|报告人简介|主讲人简介|主讲人介绍|个人简介|专家介绍|嘉宾简介)[：:]\s*'
                 r'(.+?)(?=\s*(?:题目\d*|报告[一二三四五六七八九十百零0-9]|报告时间|报告地点|'
-                r'报告题目|报告摘要|主讲人简介|报告人简介|讲者简介|个人简介|专家介绍|'
-                r'主讲人[：:]|报告人[：:]|'
+                r'报告题目|报告摘要|主讲人简介|报告人简介|讲者简介|个人简介|专家介绍|嘉宾简介|'
+                r'主讲人[：:]|报告人[：:]|嘉宾[：:]|'
                 r'[一二三四五六七八九十百零0-9]+[、.．]|报名方式|联系方式|面向对象|参与方式|$))', block, re.S)
             if _bio_m:
                 _b = _bio_m.group(1).strip()

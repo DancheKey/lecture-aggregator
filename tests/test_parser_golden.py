@@ -106,9 +106,10 @@ CASES = [
     # ggy5666 同人 4 场（徐湘林 x4）——校验不误拆且 bio 不互串
     {'url': 'http://ggy.scnu.edu.cn/a/20211116/5666.html', 'count': 4,
      'speakers': ['徐湘林', '徐湘林', '徐湘林', '徐湘林'], 'topic_sub': []},
-    # physics807 三场（speaker 空，标题承载）——校验不崩溃
+    # physics807 三场：嘉宾在主题之前（嘉宾：X → 主题：Y → 嘉宾简介：…教授），
+    # 块末"嘉宾：下一场"指向下一场；核验前置 speaker 正确落位（刘玉鑫/吴小山/刘玉斌）
     {'url': 'https://physics.scnu.edu.cn/a/20191118/807.html', 'count': 3,
-     'speakers': ['', '', ''], 'topic_sub': []},
+     'speakers': ['刘玉鑫', '吴小山', '刘玉斌'], 'topic_sub': []},
     # 直播已下线(404)占位，抓取失败自动 skip（ctld4409 经本地缓存已回填，仅 CI 无缓存时 skip）
     {'url': 'http://ctld.scnu.edu.cn/a/20250310/4409.html', 'count': 2,
      'speakers': ['卢晓中', '赵淦森'], 'topic_sub': [], 'may_404': True},
