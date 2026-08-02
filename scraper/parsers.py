@@ -987,14 +987,19 @@ def _vlm_extract_fields(img_urls, cfg):
         "Authorization": "Bearer " + cfg['api_key'],
         "Content-Type": "application/json",
     }
-    for attempt in range(6):
+    for attempt in range(3):
         try:
             r = requests.post(cfg['base_url'], headers=headers, json=payload, timeout=60)
             if r.status_code == 429:
-                # 免费层 RPM 限制：指数退避（15s→30s→60s→120s→240s→480s，上限600s）
-                _time.sleep(min(15 * (2 ** attempt), 600)); continue
+                # 免费层限流（"访问量过大"）：快速失败，避免指数退避空耗 60min 超时。
+                # 最多 2 次短退避（5s/10s）后放弃，回落 RapidOCR。
+                if attempt < 2:
+                    _time.sleep(5 * (attempt + 1)); continue
+                return None
             if r.status_code >= 500:
-                _time.sleep(3 * (attempt + 1)); continue
+                if attempt < 2:
+                    _time.sleep(3 * (attempt + 1)); continue
+                return None
             r.raise_for_status()
             resp = r.json()
             txt = resp['choices'][0]['message']['content']
@@ -1003,8 +1008,11 @@ def _vlm_extract_fields(img_urls, cfg):
                 _vlm_cache_set(key, fields)
                 _time.sleep(1.5)  # 主动限速，串行调用避免触发 RPM 限流
                 return fields
+            return None
         except Exception:
-            _time.sleep(3 * (attempt + 1))
+            if attempt < 2:
+                _time.sleep(3 * (attempt + 1)); continue
+            return None
     return None
 
 
