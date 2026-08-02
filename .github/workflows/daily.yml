@@ -49,7 +49,7 @@ jobs:
       - name: 运行爬虫（增量）
         env:
           ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
-          VLM_MODEL: glm-4.6v
+          VLM_MODEL: glm-4.6v-flash
         run: python scraper/scraper.py
 
       - name: 同步静态数据源并生成前端切片
