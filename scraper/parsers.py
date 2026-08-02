@@ -775,18 +775,31 @@ def _load_dotenv():
     return env
 
 
-def _load_vlm_config():
-    """返回 VLM 配置 dict；若无 API Key 返回 None（调用方自动降级到 rapidocr）。"""
+def _load_vlm_configs():
+    """返回 VLM provider 配置列表（按优先级：Gemini 主、智谱备）；无 key 返回空列表（调用方降级 OCR）。"""
     env = _load_dotenv()
-    api_key = _os.environ.get('ZHIPU_API_KEY') or env.get('ZHIPU_API_KEY')
-    if not api_key:
-        return None
-    return {
-        'api_key': api_key,
-        'model': _os.environ.get('VLM_MODEL') or env.get('VLM_MODEL') or 'glm-4.6v-flash',
-        'base_url': (_os.environ.get('VLM_BASE_URL') or env.get('VLM_BASE_URL')
-                     or 'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
-    }
+    cfgs = []
+    # 主通道：Google Gemini（OpenAI 兼容端点，免费 flash 层低延迟、不易排队）
+    gkey = _os.environ.get('GEMINI_API_KEY') or env.get('GEMINI_API_KEY')
+    if gkey:
+        cfgs.append({
+            'name': 'gemini',
+            'api_key': gkey,
+            'model': (_os.environ.get('GEMINI_MODEL') or env.get('GEMINI_MODEL') or 'gemini-2.5-flash'),
+            'base_url': (_os.environ.get('GEMINI_BASE_URL') or env.get('GEMINI_BASE_URL')
+                         or 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'),
+        })
+    # 备用通道：智谱 GLM（免费但常限流 429），主通道不可用时降级
+    zkey = _os.environ.get('ZHIPU_API_KEY') or env.get('ZHIPU_API_KEY')
+    if zkey:
+        cfgs.append({
+            'name': 'zhipu',
+            'api_key': zkey,
+            'model': (_os.environ.get('VLM_MODEL') or env.get('VLM_MODEL') or 'glm-4.6v-flash'),
+            'base_url': (_os.environ.get('VLM_BASE_URL') or env.get('VLM_BASE_URL')
+                         or 'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
+        })
+    return cfgs
 
 
 def _vlm_cache_path():
@@ -960,9 +973,9 @@ def _parse_vlm_datetime(s, default_year, publish_time, title_year, url_year):
     return None
 
 
-def _vlm_extract_fields(img_urls, cfg):
-    """调用多模态 LLM 提取海报结构化字段。返回 dict 或 None（无 key / 失败 / 限流耗尽）。"""
-    if not cfg or not img_urls:
+def _vlm_extract_fields(img_urls, cfgs):
+    """按优先级遍历 provider 调用 VLM 提取海报结构化字段。返回 dict 或 None（无 key / 失败 / 限流耗尽）。"""
+    if not cfgs or not img_urls:
         return None
     key = _hash.md5('|'.join(sorted(img_urls)).encode('utf-8')).hexdigest()
     cached = _vlm_cache_get(key)
@@ -978,6 +991,22 @@ def _vlm_extract_fields(img_urls, cfg):
     message = [{"type": "text", "text": VLM_PROMPT}]
     for b in contents:
         message.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b}})
+    # 本地调试走代理（读 HTTPS_PROXY 环境变量）；CI 未设则空 dict -> 传 None，requests 直连
+    _proxies = {}
+    _hp = _os.environ.get('HTTPS_PROXY') or _os.environ.get('https_proxy')
+    if _hp:
+        _proxies = {'https': _hp, 'http': _hp}
+    for cfg in cfgs:
+        fields = _vlm_try_one_provider(message, cfg, _proxies or None)
+        if fields:
+            _vlm_cache_set(key, fields)
+            _time.sleep(1.5)  # 主动限速，串行调用避免触发 RPM 限流
+            return fields
+    return None
+
+
+def _vlm_try_one_provider(message, cfg, proxies):
+    """单个 provider 的带重试提取；遇 429/5xx/异常最多 2 次短退避后放弃。返回 dict 或 None。"""
     payload = {
         "model": cfg['model'],
         "messages": [{"role": "user", "content": message}],
@@ -989,10 +1018,10 @@ def _vlm_extract_fields(img_urls, cfg):
     }
     for attempt in range(3):
         try:
-            r = requests.post(cfg['base_url'], headers=headers, json=payload, timeout=60)
+            r = requests.post(cfg['base_url'], headers=headers, json=payload, timeout=60, proxies=proxies)
             if r.status_code == 429:
-                # 免费层限流（"访问量过大"）：快速失败，避免指数退避空耗 60min 超时。
-                # 最多 2 次短退避（5s/10s）后放弃，回落 RapidOCR。
+                # 免费层限流（"访问量过大"）：快速失败，避免指数退避空耗超时。
+                # 最多 2 次短退避（5s/10s）后放弃，回落下一个 provider / RapidOCR。
                 if attempt < 2:
                     _time.sleep(5 * (attempt + 1)); continue
                 return None
@@ -1005,8 +1034,6 @@ def _vlm_extract_fields(img_urls, cfg):
             txt = resp['choices'][0]['message']['content']
             fields = _parse_vlm_json(txt)
             if fields and _vlm_fields_useful(fields):
-                _vlm_cache_set(key, fields)
-                _time.sleep(1.5)  # 主动限速，串行调用避免触发 RPM 限流
                 return fields
             return None
         except Exception:
@@ -2378,7 +2405,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         # 两图同发导致 VLM 失败回退 OCR）。逐张取首个返回有效字段的图即可正确命中。
         vlm_fields = None
         for _u in imgs[:3]:
-            _f = _vlm_extract_fields([_u], _load_vlm_config())
+            _f = _vlm_extract_fields([_u], _load_vlm_configs())
             if _f:
                 vlm_fields = _f
                 break
@@ -3696,7 +3723,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                  or _abstract_is_nav_noise(result.get('abstract') or '')
                  or not (result.get('speakerBio') or '').strip())):
         for _u in imgs[:3]:
-            _f = _vlm_extract_fields([_u], _load_vlm_config())
+            _f = _vlm_extract_fields([_u], _load_vlm_configs())
             if not _f:
                 continue
             _ff = _normalize_vlm_keys(_f)
