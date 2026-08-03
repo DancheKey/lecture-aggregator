@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 CACHE = os.path.join(ROOT, 'tmp_diag')
 
 import parsers as P
-P._load_vlm_config = lambda: None  # 打桩 VLM
+P._load_vlm_configs = lambda: []  # 打桩 VLM：CI 无 key，本地也必须与 CI 一致走 OCR 路径
 
 # 垃圾 topic 特征（历史上由表格/页眉误读产生）：如 '0- 17' / '0 -12' / 纯序号
 _FORBIDDEN_TOPIC = ('0-', '0 -', '0—')
@@ -101,7 +101,8 @@ CASES = [
     # 上下文、5 场被错误合并；发布时间提取修复后正确拆 5 场。topic 当前 OCR 未提取到，
     # 故 topic_sub 不强校验。
     {'url': 'http://xz.scnu.edu.cn/a/20221026/65.html', 'count': 5,
-     'speakers': ['张曦', '黄佩瑶', '陈嘉仪', '林逸鑫', '龚雅云、黄嘉正'], 'topic_sub': []},
+     'speakers': ['张曦', '黄佩瑶', '陈嘉仪', '林逸鑫', '龚雅云、黄嘉正'], 'topic_sub': [],
+     'requires_vlm': True},
     # cs 多报告（同页 2 场不同主讲）
     {'url': 'http://cs.scnu.edu.cn/a/20240516/5708.html', 'count': 2,
      'speakers': ['罗富财', '林富春'],
@@ -133,6 +134,8 @@ def _check_no_bio_leak(self, url, recs):
 
 def _make_test(case):
     def test(self):
+        if case.get('requires_vlm') and not P._load_vlm_configs():
+            self.skipTest('该 case 依赖 VLM 解析海报，CI 未配置 VLM key，跳过')
         try:
             recs = parse(case['url'])
         except Exception as e:  # noqa: BLE001
