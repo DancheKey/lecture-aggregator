@@ -163,20 +163,40 @@ def build_stats(data, updated_at):
         sc = item.get('sourceCount')
         s_count = sc if sc is not None else (len(sources) or 1)
         source_notice_count += s_count
-        # 预计算矩阵：按去重后讲座计数（每个 item 只计一次，按主学院/主年份）
+        # 预计算矩阵：按「该讲座归属的全部单位」计数。
+        # 跨源合并的讲座（同一讲座被多个单位发布）应在每个相关单位各计一次，
+        # 与首页筛选逻辑 Set([主学院, ...来源单位]) 完全一致，修复统计页漏算合并讲座的问题。
+        # 注意：这是「讲座-单位归属计数」，联合发布的讲座会在各单位重复计入，故
+        # 各单位计数之和会大于唯一讲座总数 lectureCount（属正常，统计页有说明文字）。
         primary_college = item.get('college') or '未分类'
-        matrix.setdefault(primary_college, {})
+        units = []
+        seen_unit = set()
+        for c in [primary_college] + [s.get('college') for s in sources if s.get('college')]:
+            if c and c not in seen_unit:
+                seen_unit.add(c)
+                units.append(c)
         cell_year = y or UNKNOWN_YEAR
-        matrix[primary_college][cell_year] = matrix[primary_college].get(cell_year, 0) + 1
-        year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
-        # 记录学院 -> 校区映射（取主学院）
-        if primary_college not in campus_map:
-            campus_map[primary_college] = item.get('campus') or ''
-        # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
+        for c in units:
+            matrix.setdefault(c, {})
+            matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
+            year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
+        # 学院 -> 校区映射：主学院优先；来源单位补全（保证合并讲座的来源单位也能按校区筛选）
+        for c in units:
+            if c in campus_map:
+                continue
+            if c == primary_college:
+                campus_map[c] = item.get('campus') or ''
+            else:
+                src = next((s for s in sources if s.get('college') == c), None)
+                campus_map[c] = (src or {}).get('campus') or ''
+        # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞。
+        # cs = 该讲座归属的全部单位（含主学院与来源单位），供访问/点赞按单位展开归属；
+        # c = 主学院（保留，供来源通知数等按主讲座口径统计）。
         lectures.append({
             'u': primary_url,
             'y': y or UNKNOWN_YEAR,
             'c': primary_college,
+            'cs': units,
             's': s_count,
         })
 

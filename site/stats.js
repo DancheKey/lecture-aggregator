@@ -128,18 +128,21 @@ createApp({
           m[college][year] = { count: count || 0, visits: 0, likes: 0 };
         });
       });
-      // 再叠加访问/点赞（按主卡 url 计一次，避免按来源重复累加）
+      // 再叠加访问/点赞：按该讲座归属的每个单位（cs）展开累加，
+      // 与矩阵计数口径一致——联合发布的讲座其访问/点赞也在每个相关单位计入。
       const lectures = (this.summary && this.summary.lectures) || [];
       lectures.forEach(l => {
         const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
         if (!st.visits && !st.likes) return;
-        const c = l.c || '未分类';
         const y = l.y || UNKNOWN_YEAR;
-        const cell = (m[c] && m[c][y]) || { count: 0, visits: 0, likes: 0 };
-        cell.visits += (st.visits || 0);
-        cell.likes += (st.likes || 0);
-        if (!m[c]) m[c] = {};
-        m[c][y] = cell;
+        const cols = (l.cs && l.cs.length) ? l.cs : [l.c || '未分类'];
+        cols.forEach(c => {
+          const cell = (m[c] && m[c][y]) || { count: 0, visits: 0, likes: 0 };
+          cell.visits += (st.visits || 0);
+          cell.likes += (st.likes || 0);
+          if (!m[c]) m[c] = {};
+          m[c][y] = cell;
+        });
       });
       return m;
     },
@@ -335,8 +338,10 @@ createApp({
       this._finalStart = performance.now();
       this._fromL = this.displayLecture;
       this._fromS = this.displaySource;
-      this._toL = this.filteredLectureCount;
-      this._toS = this.filteredSourceCount;
+      // 顶部始终展示「唯一讲座总数」（去重口径），不随跨源合并展开而放大；
+      // 各单位计数之和（合计行）会因联合发布而大于此数，由统计页说明文字解释。
+      this._toL = this.lectureCount;
+      this._toS = this.sourceNoticeCount;
     },
     // 以预计算的 lectures/stats.json 为唯一权威数据源。
     // 统计页只渲染 matrix/yearTotals/campusMap 与访问/点赞数，不需要 lectures.json 全量明细。
@@ -400,18 +405,19 @@ createApp({
     this.loadSiteVisits();
   },
 
-  // 切换校区 / 输入学院名时，若动画已结束则即时更新顶部数字（不再重播动画）
+  // 切换校区 / 输入学院名时，若动画已结束则即时更新顶部数字（不再重播动画）。
+  // 顶部展示唯一讲座总数 / 来源通知总数（去重口径），不随筛选改变单位计数口径。
   watch: {
     campusFilter() {
       if (this._finalized) {
-        this.displayLecture = this.filteredLectureCount;
-        this.displaySource = this.filteredSourceCount;
+        this.displayLecture = this.lectureCount;
+        this.displaySource = this.sourceNoticeCount;
       }
     },
     collegeFilter() {
       if (this._finalized) {
-        this.displayLecture = this.filteredLectureCount;
-        this.displaySource = this.filteredSourceCount;
+        this.displayLecture = this.lectureCount;
+        this.displaySource = this.sourceNoticeCount;
       }
     },
   },

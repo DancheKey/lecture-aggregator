@@ -79,10 +79,14 @@ const app = createApp({
       return Array.from(set).sort((a, b) => b.localeCompare(a));
     },
 
-    // 去重学院列表，按讲座数倒序，便于高频学院靠前
+    // 去重学院列表，按讲座数倒序，便于高频学院靠前。
+    // 计数口径与筛选一致：合并讲座按「主学院 ∪ 来源单位」展开，每个相关单位各计一次。
     colleges() {
       const cnt = {};
-      this.all.forEach(l => { if (l.college) cnt[l.college] = (cnt[l.college] || 0) + 1; });
+      this.all.forEach(l => {
+        const cs = new Set([l.college, ...(l.sources || []).map(s => s.college)].filter(Boolean));
+        cs.forEach(c => { cnt[c] = (cnt[c] || 0) + 1; });
+      });
       return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
     },
 
