@@ -1,10 +1,8 @@
 """为前端生成优化后的数据切片。
 
 从 data/lectures.json 生成：
-  - site/lectures.json：全量原始数据，供本地 /api/lectures 与 GitHub Pages 回退使用。
-  - site/lectures/lite.json：全量数据（含 abstract、speakerBio），与本地 /api/lectures
-    字段完全一致，用于 GitHub Pages 首屏快速渲染 + 完整筛选 + 完整卡片展示。
-  - site/lectures/latest.json：仅保留最新 50 条（首页第一页），字段与 lite.json 一致
+  - site/lectures.json：全量原始数据，供本地 /api/lectures 与 GitHub Pages 后台加载使用。
+  - site/lectures/latest.json：仅保留最新 50 条（首页第一页），与 lectures.json 同字段集
     （含 abstract、speakerBio），用于"先渲染第一页，后台再加载完整数据"的渐进体验。
   - site/lectures/stats.json：统计页专用，包含预计算的学院-年份矩阵、年份合计、
     以及用于动态访问/点赞数的最小讲座索引，避免统计页加载 2MB+ 全量数据。
@@ -26,7 +24,7 @@ SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
 LATEST_SIZE = 50
 UNKNOWN_YEAR = '其他'
 # 首页首屏（latest.json）只需要列表卡片展示字段，长文本按首页 truncate 长度截断，
-# 让首屏秒开；详情字段仍保留在 lite.json 中，确保展开/查看时与本地一致。
+# 让首屏秒开；详情字段在 site/lectures.json 中仍完整保留，确保展开/查看时信息齐全。
 LATEST_PREVIEW_LEN = 220
 
 
@@ -83,16 +81,9 @@ def stamp_script_version(html_name, js_name):
         print(f'[done] {html_name}: {js_name} 缓存版本号 = {ver}')
 
 
-def strip_fields(item):
-    """保留全部字段，确保公网静态版（lite/latest）与本地 /api/lectures 卡片内容一致。
-    历史上曾在这里剥离 abstract、speakerBio 以减小体积，但导致公网卡片比本地少「简介/内容摘要」。
-    """
-    return dict(item)
-
-
 def latest_preview(item):
     """生成首屏 latest.json 的轻量条目：保留列表必要字段，长文本截断。
-    与 lite.json 字段完全一致，只是 abstract/speakerBio 被截断，不损失功能只损失未展开长度。"""
+    与 site/lectures.json 字段完全一致，只是 abstract/speakerBio 被截断，不损失功能只损失未展开长度。"""
     preview = dict(item)
     for key in ('abstract', 'speakerBio'):
         val = preview.get(key)
@@ -253,23 +244,18 @@ def main():
 
     sorted_data = sort_for_latest(data)
     latest = [latest_preview(with_unit(item, url_dates)) for item in sorted_data[:LATEST_SIZE]]
-    lite = [with_unit(item, url_dates) for item in data]
     stats = build_stats(data, updated_at)
 
     # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
-    # 全量切片同样附加 unitType（供本地 /api/lectures 与 GitHub Pages 回退），与 lite 一致
     atomic_write(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': [with_unit(item, url_dates) for item in data]})
     atomic_write(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
-    atomic_write(os.path.join(SITE_DIR, 'lite.json'), {'updatedAt': updated_at, 'data': lite})
     atomic_write(os.path.join(SITE_DIR, 'stats.json'), stats)
 
     latest_bytes = os.path.getsize(os.path.join(SITE_DIR, 'latest.json'))
-    lite_bytes = os.path.getsize(os.path.join(SITE_DIR, 'lite.json'))
     stats_bytes = os.path.getsize(os.path.join(SITE_DIR, 'stats.json'))
     stats_lectures_count = len(stats['lectures'])
     print(f'[done] site/lectures.json: {len(data)} 条')
     print(f'[done] latest.json: {len(latest)} 条 ({latest_bytes / 1024:.1f} KB)')
-    print(f'[done] lite.json: {len(lite)} 条 ({lite_bytes / 1024:.1f} KB)')
     print(f'[done] stats.json: {stats_lectures_count} 条索引 ({stats_bytes / 1024:.1f} KB)')
 
     # 给前端脚本打内容 hash 版本号，避免浏览器长期缓存旧 JS（见 stamp_script_version 注释）。

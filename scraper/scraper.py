@@ -456,7 +456,7 @@ def cross_source_dedup(records):
                 # （该页正是讲这期），使每讲归属其当期页、标题不被张冠李戴。
                 sn = _session_num(r.get('listTitle', '')) or _session_num(r.get('sessionNumber', ''))
                 own = _session_num(r.get('sessionNumber', ''))
-                if own is None and r.get('isMultiLecture') and r.get('lectureIndex'):
+                if own is None and r.get('isMultiLecture') and r.get('lectureIndex') is not None:
                     own = r.get('lectureIndex')
                 if sn and own and sn == own:
                     score += 5
@@ -564,7 +564,7 @@ def dedup(records):
         # 多讲座拆分：同 sourceUrl 多条（lectureIndex 不同）必须视为不同讲座，
         # 否则会被当成「同 URL 真重复」压成 1 条（如 cs 5708 一页两场）。
         li = rec.get('lectureIndex')
-        multi_key = ('#' + str(li)) if (rec.get('isMultiLecture') and li) else ''
+        multi_key = ('#' + str(li)) if (rec.get('isMultiLecture') and li is not None) else ''
         key = (rec.get('college', ''), ntitle, ls, url + multi_key)
         if key not in groups:
             groups[key] = []
@@ -826,7 +826,7 @@ def main():
         u = str(r.get('sourceUrl', '')).rstrip('/')
         if not u:
             continue
-        if r.get('isMultiLecture') and r.get('lectureIndex'):
+        if r.get('isMultiLecture') and r.get('lectureIndex') is not None:
             existing_urls.add((u, r.get('lectureIndex')))
         else:
             existing_urls.add((u, None))

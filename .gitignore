@@ -44,6 +44,8 @@ docs/从零搭建讲座聚合网站.md
 docs/OCR_RULES_CURRENT.md
 docs/lecture_split_rules_review.html
 docs/rules_docx*_review.html
+docs/*需求规格*.html
+docs/*audit*.html
 
 # ===== 运行时 / 增量状态 =====
 # 注意：data/last_scrape.json 必须入库！GitHub Actions 每日定时抓取依赖它在

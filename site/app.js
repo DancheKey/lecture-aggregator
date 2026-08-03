@@ -649,10 +649,10 @@ const app = createApp({
     /* ---------- 数据加载（增量 / 渐进式） ----------
      * 本地后端存在时：走 /api/lectures，返回全量最新数据。
      * GitHub Pages 静态托管时：先拉体积最小的 latest.json（最新 50 条）立刻渲染
-     * 第一页；后台再拉 lite.json 启用完整筛选与翻页。
+     * 第一页；后台再拉 lectures.json 启用完整筛选与翻页。
      * 关键优化：公网环境下不要先等 /api/lectures 超时，而是直接走静态切片；
      * 浏览器缓存使用 default，让 GitHub Pages 的 max-age=600 生效，避免每次刷新
-     * 都重新下载 1MB+ 的 lite.json。
+     * 都重新下载 6MB 的 lectures.json。
      */
     loadLectures(incremental) {
       const url = (incremental && this.mtime)
@@ -700,14 +700,14 @@ const app = createApp({
           this._applyLectureData(resp);
           this.dataStage = 'partial';
           this.loading = false;
-          // 后台继续加载完整精简数据（lite.json 已 gzip，约 1MB，启用完整筛选翻页）
+          // 后台继续加载完整数据（lectures.json，启用完整筛选翻页）
           this._loadStaticFull();
         })
         .catch(() => { this._loadStaticFull(true); });
     },
 
     _loadStaticFull(fallbackToOriginal = false) {
-      const path = fallbackToOriginal ? 'lectures.json' : 'lectures/lite.json';
+      const path = 'lectures.json';
       fetch(path, { cache: 'default' })
         .then(r => r.json())
         .then(resp => {

@@ -2041,6 +2041,32 @@ def _locate_publish_time(soup, content_div, body_text, full_text):
     m = re.search(PUB, full_text, re.IGNORECASE)
     if m:
         return m.group(1).strip(), 1
+    # Level 1：信息区「时间图标」标记（maths 等 CMS 用 <i class="fas fa-time"></i> 紧跟发布时间，
+    # 无「发布时间」文字标签，且位于 .meta 文章信息区而非正文 content_div 内）。
+    # 仅在文章信息区（class 含 meta/info/pub）内、带 fa-time/fa-clock 图标的容器才提取，
+    # 避免误抓正文里用同款图标标注的讲座时间。
+    # 归为 level 1（高置信，等同显式标签）：maths 发布日常与讲座日同天，若归 level 2 会被
+    # R3 本质条款「同日即作废」误杀；图标在信息区是站点明确的发布时间标记，应豁免同日作废。
+    if soup:
+        for ic in soup.find_all(['i', 'span', 'em'], class_=re.compile(r'fa-time|fa-clock', re.I)):
+            container = ic.find_parent(['a', 'li', 'span', 'p', 'div'])
+            if not container:
+                continue
+            anc = ic
+            in_meta = False
+            for _ in range(6):
+                anc = anc.parent
+                if not anc:
+                    break
+                cls = ' '.join(anc.get('class', []) or [])
+                if re.search(r'\bmeta\b|\binfo\b|pub|article-info|post-info', cls, re.I):
+                    in_meta = True
+                    break
+            if not in_meta:
+                continue
+            mm = re.search(r'(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}(?::\d{2})?)?)', container.get_text())
+            if mm:
+                return mm.group(1).strip(), 1
     # Level 2：class 命中 .info/.meta/.article-info/.pub
     if content_div:
         for tag in content_div.find_all(class_=re.compile(r'info|meta|pub|article-info', re.I)):
@@ -2159,24 +2185,29 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     if list_title:
         title = _clean_title(list_title)
     else:
-        h1 = soup.find('h1') or soup.find('h2')
-        if h1:
-            h1_text = h1.get_text(strip=True)
-            # h1 是短栏目名（≤6字且命中常见栏目词）→ 跳过，尝试 h3 或 <title>
-            if len(h1_text) <= 6 or _SECTION_NAME_RE.match(h1_text) or _INST_RE.match(h1_text):
-                h3 = soup.find('h3') or soup.find('h4')
-                if h3:
-                    title = h3.get_text(strip=True)
-                elif soup.title:
-                    title = soup.title.get_text(strip=True)
-                else:
-                    title = h1_text
-            else:
-                title = h1_text
-        elif soup.title:
-            title = soup.title.get_text(strip=True)
-        else:
-            title = ''
+        # 收集所有 h1/h2，优先取第一个非栏目名/非机构名的真实标题；
+        # 部分 CMS（如物理学院 physics）会把站点机构名「华南师范大学物理学院」放在第一个 h1，
+        # 真实文章标题「双创周学术讲座」放在第二个 h1，直接 find('h1') 会取错并降级到 h3「搜索」。
+        headings = soup.find_all(['h1', 'h2'])
+        title = ''
+        for h in headings:
+            h_text = h.get_text(strip=True)
+            if not h_text:
+                continue
+            if len(h_text) <= 6 and _SECTION_NAME_RE.match(h_text):
+                continue
+            if _INST_RE.match(h_text):
+                continue
+            title = h_text
+            break
+        if not title:
+            h3 = soup.find('h3') or soup.find('h4')
+            if h3:
+                title = h3.get_text(strip=True)
+            elif soup.title:
+                title = soup.title.get_text(strip=True)
+            elif headings:
+                title = headings[0].get_text(strip=True)
         title = _clean_title(title)
 
     text = soup.get_text(' ')
@@ -2487,7 +2518,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 partial['splitMode'] = 'vlm-poster'
                 if len(applied) > 1:
                     partial['isMultiLecture'] = True
-                    partial['lectureIndex'] = i
+                    partial['lectureIndex'] = i   # 1-based（enumerate 已 start=1）
                     partial['lectureCount'] = len(applied)
                 _vlm_sessions.append((partial, pt))
         else:
@@ -3609,9 +3640,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 仍处预告期的场次（如 ibc/2779 第一场发布时已过期、第二场仍预告）。故仅当
     # detect_multi_session 判定为「单讲座页」(sessions 为空) 时才做整页 RETRO 短路；
     # 多讲座页交由拆分后的逐条 is_news_record 把关，过期场次单独剔除、保留预告场次。
+    _base_dt = None
+    _ls = result.get('lectureStart')
+    if _ls:
+        try:
+            _base_dt = datetime.datetime.fromisoformat(_ls)
+        except Exception:
+            _base_dt = None
     _sessions_pre = detect_multi_session(
         body_text, title=title, default_year=default_year, publish_time=publish_time,
-        title_year=title_year, url_year=url_year, soup=soup, url=url)
+        title_year=title_year, url_year=url_year, soup=soup, url=url,
+        base_start=_base_dt)
     if not _sessions_pre and not skip_news_filter and is_news_record(result, poster_page=poster_only):
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
@@ -4328,7 +4367,8 @@ def _detect_inline_topic_sessions(text, default_year=None, publish_time=None,
 
 
 def detect_multi_session(text, title='', default_year=None, publish_time=None,
-                         title_year=None, url_year=None, soup=None, url=None):
+                         title_year=None, url_year=None, soup=None, url=None,
+                         base_start=None):
     """检测系列讲座公告（MS1-MS3）。
 
     返回 [] 表示单讲座；否则返回 session 列表（含块文本供拆分时逐块提取）：
@@ -4358,6 +4398,33 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
     if sessions:
         return sessions
 
+    # 候选0b：书名号并列主讲（汕尾教学论坛等）。正文形如
+    # 「莫逊男《题目A》 胡小勇《题目B》 潘家辉《题目C》」，按《》切分为 N 场；
+    # 每场主讲人=书名号前姓名、题目=书名号内文。该类页常含「一条共享时间/地点」
+    # （整论坛同场），而非每场各带时间（后者由候选1 按「题目:」拆分，不含《》，不会误触发）。
+    # 守卫：≥2 个《》匹配、且书名号前 2–4 字须像真实姓名（剔除「课程/讲授」等前缀误匹配）。
+    # 共享时间取自 base_start（parse_detail 已算出的整页时间），缺省时回退整页时间解析。
+    _BOOK_RE = re.compile(r'([\u4e00-\u9fa5]{2,3})\s*《\s*([^》]{2,40}?)\s*》')
+    _bm = list(_BOOK_RE.finditer(text))
+    if len(_bm) >= 2:
+        _bs = base_start
+        if _bs is None:
+            _pdt = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
+                                 title_year=title_year, url_year=url_year)
+            _bs = _pdt['start'] if _pdt and _pdt.get('start') else None
+        if _bs:
+            _book_sessions = []
+            for _i, _m in enumerate(_bm):
+                _nm = _m.group(1).strip()
+                _tp = _m.group(2).strip()
+                if not _looks_like_real_name(_nm):
+                    continue
+                _book_sessions.append({'no': _i + 1, 'topic': _tp, 'start': _bs,
+                                       'end': None, 'block': _m.group(0),
+                                       'splitMode': 'book-title', 'speaker': _nm})
+            if len(_book_sessions) >= 2:
+                return _book_sessions
+
     labels = list(_TOPIC_DELIM_RE.finditer(text))
     sessions = []
     sessions_raw = []
@@ -4374,6 +4441,10 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
             r'(?:嘉宾|主讲人|报告人|讲者)\s*[：:]\s*([^\n]{2,30}?)\s*'
             r'(?=主题|题目|报告题目|嘉宾简介|$)', _pre))
         speaker = _sp_list[-1].group(1).strip() if _sp_list else ''
+        # 净化：页眉空「主讲人/嘉宾」字段（形如「主讲人: 时间: 地点: 一、 题目:」）
+        # 会被截到下一个「题目」而误得「时间: 地点: 一、」这类垃圾；仅当像真实姓名才采用。
+        if speaker and not _looks_like_real_name(speaker):
+            speaker = ''
         blk_start = lab.end()
         blk_end = labels[i + 1].start() if i + 1 < len(labels) else len(text)
         block = text[blk_start:blk_end]
@@ -4811,7 +4882,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
         # 避免破坏前端分组与统计（规则：title=listTitle/系列名，topic=单场题目）。
         rec['title'] = base_title
         rec['isMultiLecture'] = True
-        rec['lectureIndex'] = int(s['no'])
+        rec['lectureIndex'] = int(s['no'])   # detect_multi_session 末尾已统一赋 1-based no
         rec['lectureCount'] = len(sessions)
         # 来源通知计数：同一公告拆出的 N 条共享 1 个来源页，仅首条计 1，其余计 0，
         # 避免统计页「覆盖 N 条来源通知」把 1 则公告高估为 N 条。
@@ -5015,6 +5086,13 @@ def split_record_by_sessions(base, sessions, full_text=''):
         # 结束前瞻须含「报告摘要/报告人/报告时间/时间/题目」——CS 压缩标签「报告地点：X会议室
         # 报告摘要」会把「报告」漏进地点，且「报告地点：X时间:3月11日」须遇裸「时间」即截断。
         lm = re.search(r'报告\d*地点[：:]\s*([\u4e00-\u9fa5A-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告\d|报告摘要|报告人|报告时间|报告题目|时间|题目|主题|摘要|内容简介|$)', block)
+        if not lm:
+            # 模式B：块内独立「地点：」标签（系列讲座每场自带地点，如 lswh 冷战史系列），
+            # 与「报告N地点」互斥分工；停止前瞻须含下一场序号（二、三、…）与常见尾部词，
+            # 避免吞入下一场地点或「欢迎…」。页眉「地点：一、」在块外，不会命中。
+            lm = re.search(
+                r'(?<!报告)地点[：:]\s*([\u4e00-\u9fa5A-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告|时间|题目|主题|摘要|内容简介|主讲|主持|参与|报名|联系|欢迎|嘉宾|'
+                r'一、|二、|三、|四、|五、|六、|七、|八、|九、|十、|$)', block)
         if lm:
             loc = lm.group(1).strip()
         if not loc and rec.get('location'):

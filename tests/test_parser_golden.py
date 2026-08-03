@@ -95,10 +95,13 @@ CASES = [
     {'url': 'http://ctld.scnu.edu.cn/a/20250317/4410.html', 'count': 2,
      'speakers': ['胡国胜', '王红'],
      'topic_sub': ['价值引领的人工智能教育应用', '人工智能助力教师队伍新发展']},
-    # xz 跨日期同主题系列：单页拆多期不误合（注意：库中旧值 speaker='张曦'，
-    # 当前 parser 直播重解析得 '和会'，此处锁定当前正确解析结果；旧库值属数据陈旧，待 rebackfill）
-    {'url': 'http://xz.scnu.edu.cn/a/20221026/65.html', 'count': 1,
-     'speakers': ['和会'], 'topic_sub': ['低俗自动驾驶']},
+    # xz 跨日期同主题系列：单页拆多期不误合。
+    # 注意：本页为行知书院讲座海报（OCR 提取），实际含 5 场不同主讲的研究报告，
+    # 应拆 5 条。旧基线 count=1 是错误值——当时 publishTime=None 导致 OCR 日期缺年份
+    # 上下文、5 场被错误合并；发布时间提取修复后正确拆 5 场。topic 当前 OCR 未提取到，
+    # 故 topic_sub 不强校验。
+    {'url': 'http://xz.scnu.edu.cn/a/20221026/65.html', 'count': 5,
+     'speakers': ['张曦', '黄佩瑶', '陈嘉仪', '林逸鑫', '龚雅云、黄嘉正'], 'topic_sub': []},
     # cs 多报告（同页 2 场不同主讲）
     {'url': 'http://cs.scnu.edu.cn/a/20240516/5708.html', 'count': 2,
      'speakers': ['罗富财', '林富春'],

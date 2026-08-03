@@ -27,10 +27,10 @@ parsers.parse_detail(html, url, college, campus)
 data/lectures.json  { updatedAt, data:[...] }     ← 爬虫唯一数据源
    │  cp 同步
    ▼
-site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{latest,lite,stats}.json
+site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{latest,stats}.json
    │
    ▼
-前端 site/index.html + app.js（GitHub Pages 直接读 site/lectures/lite.json）
+前端 site/index.html + app.js（GitHub Pages 后台加载 site/lectures.json）
 ```
 
 ---
@@ -189,7 +189,7 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
 ---
 
 ### 1.7 前端切片（`scripts/generate_frontend_data.py`）
-- `site/lectures/lite.json`（首屏）与 `latest.json`（前 50 条）**保留全部字段**（含 `abstract`/`speakerBio`）。
+- `site/lectures.json`（全量回退）与 `latest.json`（前 50 条，首页首屏）**保留全部字段**（含 `abstract`/`speakerBio`）。
 - ⚠️ 历史上曾为减小体积剥离这两字段，导致**公网卡片比本地少「简介/内容摘要」两行**——这是切片裁剪不是数据缺失。任何「优化体积」而裁剪字段的冲动，先确认该字段在首页卡片被渲染。
 
 ---
@@ -241,7 +241,7 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
 
 ### 3.4 本地预览（开发用）
 - `server.py` 默认 `127.0.0.1:8000`；WorkBuddy 沙箱会拦截浏览器连接，必须 `dangerouslyDisableSandbox: true` 后台启动。
-- 前端 `server.py` 走 `/api/lectures` 读完整 `data/lectures.json`；公网无后端走 `site/lectures/lite.json`。两者字段集须一致（见 §1.5），否则公网卡片比本地少字段。
+- 前端 `server.py` 走 `/api/lectures` 读完整 `data/lectures.json`；公网无后端走 `site/lectures.json`。两者字段集须一致（见 §1.5），否则公网卡片比本地少字段。
 - `start_local.bat` 须纯 ASCII（Windows `cmd` 默认 GBK，中文注释会破坏命令）。
 
 ### 3.5 推送约定
@@ -255,7 +255,7 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
 
 ### 3.7 首页 / 统计页数字动画与访问量一致性（纯静态部署）
 
-公网无后端，首页先加载 `lectures/latest.json`（50 条）再后台加载 `lectures/lite.json`（全量）；统计页直接加载 `lectures/stats.json`。两页顶部都有「讲座数 / 来源通知数」滚动动画，底部共享站点总访问量。为保证体验与一致性，约定如下：
+公网无后端，首页先加载 `lectures/latest.json`（50 条）再后台加载 `lectures.json`（全量）；统计页直接加载 `lectures/stats.json`。两页顶部都有「讲座数 / 来源通知数」滚动动画，底部共享站点总访问量。为保证体验与一致性，约定如下：
 
 #### 3.7.1 数字滚动动画：从 1 二次加速、封顶不超真实值、数据到达后平滑过渡
 - 旧的实现用 `CEIL = 950` 作为滚动软上限，导致 950 这个「历史数字」在屏幕上停留数秒，等完整 JSON 到达后才跳到真实值（如 1741），视觉上像「卡死」。
