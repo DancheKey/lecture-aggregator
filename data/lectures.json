@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-05T05:42:20+08:00",
+  "updatedAt": "2026-08-05 13:37:07",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260804/8806.html",
@@ -3546,7 +3546,7 @@
       "lectureEnd": null,
       "location": "文科楼423会议室",
       "speaker": "孙波",
-      "speakerTitle": "",
+      "speakerTitle": "二级研究员、泰山学者",
       "speakerAffiliation": "山东省文化和旅游厅副厅长、省文物局副局长、二级研究馆员、泰山学者",
       "inviter": "",
       "speakerBio": "长期从事中国新石器时代考古研究，主持或参与多项重要遗址发掘及国家社科重大项目，在《中国社会科学》《考古》等发表论文20余篇，获山东省社科优秀成果奖。",
@@ -3559,7 +3559,13 @@
       "listTitle": "龙山文化的聚落与社会",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2026/0417/1776389748830383.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20260416/84.html",
@@ -3572,7 +3578,7 @@
       "location": "文科楼423会议室",
       "speaker": "黄民兴",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "西北大学区域国别研究院",
       "inviter": "",
       "speakerBio": "教育部\"长江学者特聘教授,西北大学区域国别研究院学术委员会主任,国务院特殊津贴专家马克思主义理论研究和建设工程教材首席专家,陕西省世界史三秦学者创新团队\"首席专家。兼任中国世界近代现代史研究会副会长、中国中东学会副会长、中国社会科学院《世界历史》和《西亚非洲》杂志编委。主要从事中东近现代史、中东现代化、民族主义研究,主要独著有《沙特阿拉伯一一一个产油国人力资源的发展》《中东国家通史·伊拉克卷》《中东历史与现状工十讲》《裂土重构中东民族主义与民族国家构建》。 [",
       "organizer": "历史文化学院",
@@ -3584,7 +3590,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2026/0416/1776329357871612.png"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20260417/6707.html",
@@ -6526,9 +6538,9 @@
       "location": "文科楼423会议室",
       "speaker": "杨军",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "吉林大学历史文化学院中国史系",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "杨军，吉林大学历史文化学院中国史系教授、博士生导师，《史学集刊》主编，中国民族史学会副会长、吉林省民族学会副会长、吉林省地方志学会副会长、长春市儒学研究会会长。国家社科基金重大项目首席专家，已出版学术著作50余部、发表学术论文150余篇。",
       "organizer": "历史文化学院",
       "publishTime": "2025-12-17 14:54",
       "publishTimeSource": "companion",
@@ -6538,7 +6550,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "海洋也是历史研究的一种视角，海洋确曾“主动”干预过人类的历史进程。西汉末年的大海侵，渤海侵蚀陆地，极大地改变了海岸线，对东北亚政局产生极为深远的影响。内陆郡县突然成为临海郡县，交通路线沉没海底，海船可以驶向辽东的深处，此巨变对当时的政局究竟产生何种影响？在新的海陆格局下，谁又是最大的受益者？",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1217/1765954483156005.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251223/8580.html",
@@ -6755,7 +6773,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "美国得克萨斯州作为如今全美华人人口第三多的州，得州华人史研究却相对薄弱。当下，美墨边境非法移民危机持续发酵。回溯过去，《排华法案》如何在南部边境实施？在方法上，得州华人史研究与加州、夏威夷等地传统美国华人史研究有何不同？讲者将结合自身在得州田野调查的经历，分享如何整合美国国家、地方、大学档案机构文献及口述史料，开展多层级、多类型的一手史料研究。讲者提出“以社区为基础”的宗旨，通过与当地学者、艺术家、档案馆员、华人华侨合作，推动历史研究“从群众中来，到群众中去”。",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1217/1765954324891265.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20251218/6651.html",
@@ -7264,8 +7288,8 @@
       "lectureEnd": null,
       "location": "文科楼423会议室",
       "speaker": "梅建军",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "所长、研究教授、特邀访问教授",
+      "speakerAffiliation": "英国剑桥李约瑟研究所、剑桥大学麦克唐纳考古研究所、中山大学人文高等研究院",
       "inviter": "",
       "speakerBio": "梅建军,英国剑桥李约瑟研究所所长,剑桥大学麦克唐纳考古研究所研究教授,中山大学人文高等研究院特邀访问教授。Advances in Archaeomaterials主编,《考古学报》《考古》《西域研究》以及Journal of Archaeological Science和Archaeometry等期刊编委。主要从事中国古代冶金技术史、科技考古和中外科技文化交流史的研究。",
       "organizer": "历史文化学院",
@@ -7277,7 +7301,13 @@
       "listTitle": "中国古代的金属技术与文明演进",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1208/1765160029888153.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251205/13159.html",
@@ -7357,9 +7387,9 @@
       "college": "美术学院",
       "campus": "石牌",
       "title": "设计学研究方法工作坊",
-      "topic": "作为一种刺激物“设计”对人带来的诸多关键影响",
-      "lectureStart": "2025-12-06 09:00:00",
-      "lectureEnd": "2025-12-06 11:00:00",
+      "topic": "解释画面中的“美”",
+      "lectureStart": "2025-12-04 14:30:00",
+      "lectureEnd": "2025-12-04 17:00:00",
       "location": "华南师范大学美术学院二楼第一会议室",
       "speaker": "熊磊",
       "speakerTitle": "",
@@ -7375,7 +7405,7 @@
       "vlmExtracted": true,
       "splitMode": "vlm-poster",
       "isMultiLecture": true,
-      "lectureIndex": 4,
+      "lectureIndex": 1,
       "lectureCount": 4,
       "abstract": ""
     },
@@ -7387,9 +7417,9 @@
       "college": "美术学院",
       "campus": "石牌",
       "title": "设计学研究方法工作坊",
-      "topic": "AI浪潮下的美术教育",
-      "lectureStart": "2025-12-05 19:00:00",
-      "lectureEnd": "2025-12-05 21:00:00",
+      "topic": "解释画面中的“美”",
+      "lectureStart": "2025-12-04 14:30:00",
+      "lectureEnd": "2025-12-04 17:00:00",
       "location": "华南师范大学美术学院二楼第一会议室",
       "speaker": "熊磊",
       "speakerTitle": "",
@@ -7405,7 +7435,7 @@
       "vlmExtracted": true,
       "splitMode": "vlm-poster",
       "isMultiLecture": true,
-      "lectureIndex": 3,
+      "lectureIndex": 1,
       "lectureCount": 4,
       "abstract": ""
     },
@@ -7461,9 +7491,9 @@
       "college": "美术学院",
       "campus": "石牌",
       "title": "设计学研究方法工作坊",
-      "topic": "绘画表达间的“差异”",
-      "lectureStart": "2025-12-05 14:30:00",
-      "lectureEnd": "2025-12-05 17:00:00",
+      "topic": "解释画面中的“美”",
+      "lectureStart": "2025-12-04 14:30:00",
+      "lectureEnd": "2025-12-04 17:00:00",
       "location": "华南师范大学美术学院二楼第一会议室",
       "speaker": "熊磊",
       "speakerTitle": "",
@@ -7479,7 +7509,7 @@
       "vlmExtracted": true,
       "splitMode": "vlm-poster",
       "isMultiLecture": true,
-      "lectureIndex": 2,
+      "lectureIndex": 1,
       "lectureCount": 4,
       "abstract": ""
     },
@@ -7570,7 +7600,7 @@
       "location": "文科楼423会议室",
       "speaker": "张小贵",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "暨南大学文学院历史学系",
       "inviter": "",
       "speakerBio": "张小贵,先后就读于北京师范大学、中山大学,历史学博士。现为暨南大学文学院历史学系系主任、教授,博士生导师。曾先后赴英国伦敦大学亚非学院、德国图宾根大学访学进修。主要研究领域为古代外来宗教文化史。发表中英日文学术论文60余篇,出版学术专著四部、译著三部(合译)。主持国家社科基金冷门\"绝学\"研究专项等项目多项。",
       "organizer": "历史文化学院",
@@ -7582,7 +7612,13 @@
       "listTitle": "丝绸之路上的璀璨明珠——敦煌历史与文化",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1203/1764729400854492.png"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20251201/309.html",
@@ -7769,8 +7805,8 @@
       "lectureEnd": null,
       "location": "文科楼423会议室",
       "speaker": "刘平",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授、博士生导师",
+      "speakerAffiliation": "复旦大学历史系",
       "inviter": "",
       "speakerBio": "在人类社会的历史长河中,巫术无远弗届,源远流长,后来逐渐分为两途,一是凝聚为某种宗教,一是继续其巫术面相。时至今日,巫术依然是世界上诸多民族中的一种常见现象。在中国历史上、现实中,通灵术包含萨满、扶乱、降童、关亡、出马仙、卜紫姑、看米、看香等种类。讲者近年关注通灵,开展过多次田野考察,认为对通灵这类民间信仰的研究,可以为人们认识、处理\"封建迷信\"现象、提倡正序良俗提供理论依据,能更好地推动历史学、民俗学、人类学、宗教学、民间文学等学科的深入研究。 主持人郭淇斌时间12月3日14:30--16:30 地点文科楼423会议室",
       "organizer": "历史文化学院",
@@ -7782,7 +7818,13 @@
       "listTitle": "观察与反思：民间通灵漫谈",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1202/1764658687294494.png"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20251126/6617.html",
@@ -7993,7 +8035,7 @@
       "location": "文科楼423会议室",
       "speaker": "夏翠娟",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "上海图书馆、中国人民大学数字人文研究院",
       "inviter": "",
       "speakerBio": "夏翠娟,上海图书馆三级研究员,中国人民大学数字人文研究院研究员。上海市图书馆学会学术委员会数字人文专业委员会主任,上海市图形图像学会文化数智化专业委员会副主任。研究方向:元数据与数字人文。主持国家哲社课题2项,参与国家级科研项目10余项。在DSH、DIM、图书馆学与资讯科学、图书馆论坛、图书馆杂志等国内外学术期刊发表论文90 余篇。",
       "organizer": "历史文化学院",
@@ -8005,7 +8047,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "帮助历史学背景的研究者掌握基本的生成式人工智能（GenAI）本地应用环境部署和工具安装。包括以下学习模块：1.基线RAG：大模型本地化部署，安装ollama，至少下载一个大模型如deep seek r1：7b，AnythingLLM 2.KG-RAG：知识图谱存储与检索，安装Neo4J5.20.x，Python3.9及以上版本 3.AI编程：VsCode+通义灵码/CodeGeeX 以文本和图像的处理为例，引导如何对历史学文本进行智能处理，进而构建知识图谱，实现KG-RAG 4.无代码构建智能体",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1128/1764319460106903.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20251124/1028.html",
@@ -8092,9 +8140,9 @@
       "location": "文科楼423会议室",
       "speaker": "梅谦立",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "中山大学哲学系",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "中山大学逸仙学者、哲学系教授、博士生导师。主要研究领域为西学东渐、中学西传、中西哲学比较，代表性研究成果有《中国哲学家孔夫子》《从邂逅到相识:孔子与亚里士多德相遇在明清》等。",
       "organizer": "历史文化学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -8104,7 +8152,13 @@
       "listTitle": "耶稣会士与儒家经典",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1128/1764292886209991.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20251126/1382.html",
@@ -8116,8 +8170,8 @@
       "lectureEnd": null,
       "location": "美术学院二楼大会议室",
       "speaker": "洪强",
-      "speakerAffiliation": "",
-      "speakerBio": "",
+      "speakerAffiliation": "香港教育大学文化与创意艺术学系",
+      "speakerBio": "香港故宫开馆展艺术家 亚洲文化协会奖助金得主 现任香港教育大学文化与创意艺术学系 教授 国际知名数码媒体艺术家、研究者 学者和设计师 他以数字媒介重构中国哲学，作品展于M+、香港艺术馆等国际平台。本次讲座将分享其艺术理念与文创硕博课程特色。",
       "organizer": "美术学院",
       "publishTime": "2025-11-26 15:22:00",
       "timeConfidence": "high",
@@ -8126,7 +8180,12 @@
       "listTitle": "【讲座预告】数位哲思——洪强的艺术主张与创意教育",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2025/1126/1764141895315887.jpg"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "教授"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20251120/2901.html",
@@ -8187,7 +8246,7 @@
       "location": "美术学院二楼大会议室",
       "speaker": "吴波",
       "speakerAffiliation": "清华大学美术学院",
-      "speakerBio": "",
+      "speakerBio": "清华大学美术学院 长聘教授、博士生导师 染织服装艺术设计系副主任",
       "organizer": "美术学院",
       "publishTime": "2025-11-25 15:10:00",
       "timeConfidence": "high",
@@ -8196,7 +8255,12 @@
       "listTitle": "【讲座预告】传统服饰文化研究与当代设计转译",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2025/1126/1764141207810546.jpg"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "教授"
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20251112/305.html",
@@ -8300,7 +8364,7 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "贾葆蘅，著有小说《人在温哥华》《移民梦》。与黎全恩教授和丁果先生合作出版《加拿大华侨移民史(1858-1966)》《加拿大华侨移民史》(1858-2001)。曾受聘为北京外国语大学加拿大研究中心、广东外语外贸大学加拿大研究中心兼职研究员，现为温州大学华侨学院兼职研究员、加拿大华侨文化保护和发展协会顾问。发表《加华文学起源刍见》《香港移民在加拿大的发展》等学术论文。",
       "organizer": "历史文化学院",
       "publishTime": "2025-11-20 09:32",
       "publishTimeSource": "companion",
@@ -8310,7 +8374,13 @@
       "listTitle": "我的文学历史创作之路",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1120/1763602366406311.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251123/8541.html",
@@ -8347,10 +8417,10 @@
       "lectureEnd": null,
       "location": "文科楼423会议室",
       "speaker": "邢来顺",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授、博士生导师、博雅学者",
+      "speakerAffiliation": "华中师范大学历史文化学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "邢来顺，华中师范大学历史文化学院教授、博士生导师、博雅学者，享受国务院政府特殊津贴专家。主要研究方向为德国史、欧洲近现代史。中国德国史研究会名誉会长、中国世界近代史研究会副会长、湖北省世界史学会会长、《世界历史》编委、国家社科基金学科规划评审组专家。主持国家社科基金重大项目、重点项目等多项。出版著作（译著）十余部，在《历史研究》《世界历史》《史学理论研究》《光明日报》（理论版）等学术报刊发表论文多篇。",
       "organizer": "历史文化学院",
       "publishTime": "2025-11-20 09:28",
       "publishTimeSource": "companion",
@@ -8360,7 +8430,13 @@
       "listTitle": "德意志文明的起源问题",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1120/1763602139143615.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251122/8545.html",
@@ -8497,8 +8573,8 @@
       "lectureEnd": "2025-11-21 17:00:00",
       "location": "华南师范大学美术楼一楼阶梯教室",
       "speaker": "邓小南",
-      "speakerAffiliation": "",
-      "speakerBio": "",
+      "speakerAffiliation": "北京大学博雅荣休教授",
+      "speakerBio": "北京大学博雅荣休教授 国家级高等学校教学名师 曾任北京大学人文社会科学研究院院长",
       "organizer": "美术学院",
       "publishTime": "2025-11-19 09:50:00",
       "timeConfidence": "high",
@@ -8507,7 +8583,12 @@
       "listTitle": "【讲座预告】邓小南教授《宋代文化中的大雅和大俗》",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2025/1119/1763517118833923.jpg"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "教授"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20251118/6611.html",
@@ -8693,7 +8774,7 @@
       "location": "文科楼423会议室",
       "speaker": "李培德",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "华侨大学华侨华人与区域国别研究院",
       "inviter": "",
       "speakerBio": "李培德,先后获香港中文大学历史学学士、 东京大学亚洲(东洋)史学硕士及博士学位。曾任香港大学亚洲研究中心专职研究员、香港科技大学人文学部兼任教授、香港大学现代语言及文化学院名誉教授,现为华侨大学华侨华人与区域国别研究院特聘教授。研究领域包括中国近现代史经济史、海外华商史、 冷战史等。",
       "organizer": "历史文化学院",
@@ -8705,7 +8786,13 @@
       "listTitle": "中国银行的海外分行研究——以1950年代新加坡分行为个案",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1114/1763089106141448.png"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251118/8525.html",
@@ -8955,9 +9042,9 @@
       "location": "文科楼423会议室",
       "speaker": "林发钦",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "澳门理工大学人文及社会科学学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "历史学博士，澳门理工大学人文及社会科学学院院长、教授、博士生导师。全国港澳研究会理事、澳门口述历史协会会长、澳门历史教育学会会长。研究领域及学术专长为中外交通史、澳门史、文化遗产、口述历史等。",
       "organizer": "历史文化学院",
       "publishTime": "2025-11-14 10:44",
       "publishTimeSource": "companion",
@@ -8967,7 +9054,13 @@
       "listTitle": "众生平等：澳门口述历史的在地实践与国际交流",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1114/1763088288233276.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20251111/300.html",
@@ -9003,9 +9096,9 @@
       "location": "文科楼423会议室",
       "speaker": "宋燕鹏",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "中国社会科学院中国社会科学出版社",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "宋燕鹏，中国社会科学院中国社会科学出版社编审，博士生导师。曾任马来西亚大学中文系暨马来西亚华人研究中心客座研究员。长期致力于马来西亚华人史、中国与东南亚关系史研究。",
       "organizer": "历史文化学院",
       "publishTime": "2025-11-14 10:42",
       "publishTimeSource": "companion",
@@ -9015,7 +9108,13 @@
       "listTitle": "区域国别学知识生成路径之我见：以马来西亚研究为例",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1114/1763088184797241.png"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251113/13134.html",
@@ -9250,7 +9349,7 @@
       "location": "文科楼423会议室",
       "speaker": "王纯强",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "南洋理工大学",
       "inviter": "",
       "speakerBio": "(ONG SOON KEONG) 王纯强 ,土生土长的新加坡人。本科毕业于新加坡国立大学中文系,后赴美国学习,先后获伊利诺伊大学厄巴纳一香槟分校硕士、康奈尔大学历史学硕士及博士学位。曾任教于美国密苏里大学哥伦比亚校区,2014 年返回新加坡后执教于南洋理工大学,现为中文系系主任、高级讲师。主要研究领域包括近代中国港口城市史、海外华人史及新加坡史等。代表性专著为Coming Home to a Foreign Country: Xiamen and Returned Overseas Chinese, 1843-1938, 相关研究成果亦发表于China and Asia:A Journal in Historical Studies,Journal of 《华人研究国际学报》 ChinaReview, 《南洋学报》等学术期 Chinese Overseas,( 刊。",
       "organizer": "历史文化学院",
@@ -9262,7 +9361,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "本讲座以新加坡与马来西亚的土生华人（又称海峡华人或峇峇娘惹）为研究对象，探讨其在海外华人历史书写中所处的“双重边缘化”困境。一方面，海外华人在宏观的中国史叙事中常居边缘位置；另一方面，融合了马来血统，并在文化上深度本地化与西化的土生华人，在海外华人研究内部也常被视为“非典型”或“被同化”的群体。讲座将梳理土生华人的历史形成与社会变迁，分析其在语言、宗教、服饰、饮食等方面所呈现的中马文化融合特征，并深入探讨他们族群身份与文化认同的内在张力。通过这一案例，旨在反思“华人性”（Chineseness）与“在地性”（locality）之间的复杂互动。重新审视这些“边缘”群体，对于我们理解东南亚海外华人历史的复杂性与文化解释的局限性，具有至关至关重要的启示。",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1113/1763023021153686.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251111/13132.html",
@@ -9989,7 +10094,10 @@
       "imageParseMethod": "ocr",
       "hasPosterImage": true,
       "listTitle": "第九届全国师范大学美术教育论坛",
-      "abstract": ""
+      "abstract": "",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2025/1030/1761806280239166.jpg"
+      ]
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251029/13116.html",
@@ -10630,9 +10738,9 @@
       "location": "文科楼423会议室",
       "speaker": "俞金尧",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "南开大学历史学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "南开大学历史学院教授，兼任中国社会科学院大学教授、河南大学讲座教授、博士生导师，中国世界近代史研究会专业委员会会长。曾长期在中国社会科学院世界历史研究所工作。研究方向为欧洲经济社会史、世界近现代史，出版《欧洲婚姻、家庭和人口史研究》《五个世纪的维度》等著作。在《中国社会科学》《历史研究》等刊物上发表论文数十篇。",
       "organizer": "历史文化学院",
       "publishTime": "2025-10-14 14:32",
       "publishTimeSource": "companion",
@@ -10642,7 +10750,13 @@
       "listTitle": "资本主义的时空",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1014/1760423570660675.png"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251015/8489.html",
@@ -10849,9 +10963,9 @@
       "location": "文科楼423会议室",
       "speaker": "李红岩",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "华南师范大学",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "李红岩，华南师范大学兼职特聘教授。中国编辑学会副会长，国务院特殊津贴专家，中国史学会理事、史学理论分会副会长，曾任中国社会科学杂志社副总编辑，兼任《历史研究》《中国社会科学文摘》《中国社会科学评价》主编，《中国社会科学报》编辑部主任。主要研究阐释学、史学理论、史学史。在《历史研究》《近代史研究》《文史哲》《人民日报》《光明日报》等刊物发表各类文章200余篇。出版《阐释生成与历史阐释》《中国近代史学史论》《新中国马克思主义史学思想》《钱锺书与近代学人》《史学的光与影》等专著十余部。",
       "organizer": "历史文化学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -10861,7 +10975,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1013/1760319779907531.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20250925/6577.html",
@@ -11269,9 +11389,9 @@
       "location": "一课大楼北904室",
       "speaker": "梁勇",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "厦门大学历史与文化遗产学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "厦门大学历史与文化遗产学院教授，博士生导师，国家社科基金重大招标项目主持人。入选厦门大学南强青年拔尖A类人才、厦门市高层次A类人才、福建省高层次A类人才，“闽江学者”特聘教授。先后获得教育部高等学校第八届（人文社科类）优秀成果青年成果奖，国家级教学成果二等奖等奖项。",
       "organizer": "历史文化学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -11281,7 +11401,13 @@
       "listTitle": "会馆的“生命史”——长时间视野下的清代重庆八省会馆",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0922/1758512794597229.png"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250918/8473.html",
@@ -14003,9 +14129,9 @@
       "location": "文科楼423会议室",
       "speaker": "李晟文",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "加拿大拉瓦尔大学人文学院历史系",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "加拿大拉瓦尔大学人文学院历史系终身教授、博士生导师及《中国历史文化研究》丛刊主编。主要从事明清史、中法关系史、中加关系史、加拿大华人移民与跨文化交遇等课题的研究。在中国、加拿大、法国及比利时发表有多种研究成果，其中书（含主编）主要有：《明史研究备览》（天津，1988）、《清代文化—传统文化的总结和中西大交流的发展》（天津，1991）、《十七世纪法国耶稣会士在新法兰西与中国的传教策略》（加拿大、法国，2001）、《马可·波罗以来中国与欧洲、美洲的相遇和交流》（加拿大，2010）、《文化媒介及中国与西方、美洲的文化交流》（加拿大，2015）、《中西文化的邂逅与交流研究》（加拿大，2022）等。",
       "organizer": "历史文化学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -14015,7 +14141,13 @@
       "listTitle": "《康乾时期圆明园的建造与中法文化交流》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0528/1748392474421142.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20250523/978.html",
@@ -14220,9 +14352,9 @@
       "location": "文科楼423会议室",
       "speaker": "李庆新",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "广东省社会科学院海洋史研究中心",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "历史学博士，广东省外语外贸大学云山工作室首席专家，广东省社会科学院海洋史研究中心二级研究员，《海洋史研究》主编，广东省政府文史研究馆馆员，兼任中国海外交通史研究会副会长、广东历史学会会长。主要研究领域为海洋史、经济史、中外关系史、广东史。出版专著《明代海禁与东南亚贸易》《濒海之地：南海贸易与中外关系史研究》《海上丝绸之路》（中、英、韩语版）等。",
       "organizer": "历史文化学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -14232,7 +14364,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0520/1747705671370513.png"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250519/8353.html",
@@ -14442,9 +14580,9 @@
       "location": "文科楼423会议室",
       "speaker": "徐涛",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "上海社会科学院历史研究所",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "现任上海社会科学院历史研究所研究员、《史林》编辑部主任，兼任上海中山学社副社长等职。荣获2024年东方英才计划领军项目，中国历史研究院“兰台青年学者”，第十六届上海哲学社会科学优秀成果奖“学术新锐奖”“上海社科新人”和“曙光计划”学者等称号。论著先后获得“郭沫若中国历史学奖”优秀学术成果奖提名奖、“孙中山与近代中国研究”优秀成果奖、“孙中山与近代中国青年学术奖”一等奖。长期从事中国近现代史研究，出版各类著作10余本，发表学术论文近百篇，在上海城市史、孙中山研究、西物东渐等领域多有创获。",
       "organizer": "历史文化学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -14454,7 +14592,13 @@
       "listTitle": "《孙中山研究推进的几种可能》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0516/1747357595939575.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250516/8356.html",
@@ -15327,7 +15471,7 @@
       "location": "文科楼423会议室",
       "speaker": "宁镇疆",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "上海大学历史系",
       "inviter": "",
       "speakerBio": "",
       "organizer": "历史文化学院",
@@ -15339,7 +15483,13 @@
       "listTitle": "《由出土文献研究实例谈（历史训诂学）》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0417/1744860660762939.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20250429/270.html",
@@ -15375,9 +15525,9 @@
       "location": "文科楼423会议室",
       "speaker": "张海英",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "复旦大学历史系",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "复旦大学历史系教授，博士生导师。主要从事明清史、中国古代经济史、经济思想史等领域的研究，讲授中国古代史、明清史等课程。已出版《明清江南商品流通与市场体系》《走向大众的计然之术：明清商书研究》《沉暮与新生——明》（香 港版《明：庶民世代与俗世风情》）等著作。",
       "organizer": "历史文化学院",
       "publishTime": "2025-04-17 11:25",
       "publishTimeSource": "companion",
@@ -15387,7 +15537,13 @@
       "listTitle": "《从日用类书看明代（四民）的生活百态》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0417/1744860401891723.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250421/12980.html",
@@ -15666,7 +15822,7 @@
       "location": "文科楼423会议室",
       "speaker": "任世江",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "天津师范大学",
       "inviter": "",
       "speakerBio": "编审,天津师范大学特聘教授,曾任《历史教学》 主编,现任《经济社会史评论》副主编,著有《编历史课程专题解析》(印刷15次)等,致力于普及史学研究新成果。 主持人:王三三华南师范大学历史文化学院副教授与谈人:张庆海华南师范大学历史文化学院教授主办单位华南师范大学历史文化学院协办单位华南师范大学历史文化学院研究生会",
       "organizer": "历史文化学院",
@@ -15678,7 +15834,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0417/1744860111494354.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20250411/2824.html",
@@ -16065,10 +16227,10 @@
       "lectureEnd": "2025-04-12 11:00:00",
       "location": "文科楼423会议室",
       "speaker": "李新宽",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授、博士生导师",
+      "speakerAffiliation": "上海师范大学世界史系",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "上海师范大学世界史系教授、博士生导师。主要研究方向为中世纪晚期及近代早期英国史。中国英国史研究会副秘书长、中国世界中世纪史学会常务理事、中国古代中世纪史研究会理事、国家社会科学基金项目通讯评审鉴定专家，教育部学位与研究生教育发展中心评审专家。主持完成国家社科基金项目2项，主持在研国家社科基金重点项目“近代早期英国金融创新与资本主义的成长”；出版专著《国家与市场—英国重商主义时代的历史解读》《英国市场经济体制的起源》等，译著《南海泡沫与现代金融的诞生》《私人铸币：工业革命时代的货币世界1775-1821》；发表学术论文50多篇。著作《但丁—意大利民族诗人之冠》曾获全国优秀社会科学普及作品奖。",
       "organizer": "历史文化学院",
       "publishTime": "2025-04-11 09:58",
       "publishTimeSource": "companion",
@@ -16078,7 +16240,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0411/1744336763255310.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250411/8308.html",
@@ -16345,9 +16513,9 @@
       "location": "文科楼423",
       "speaker": "黄一农",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "台湾中研院 新竹清华大学历史研究所",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "台湾中研院院士 新竹清华大学历史研究所教授",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-28 09:50",
       "publishTimeSource": "companion",
@@ -16357,7 +16525,13 @@
       "listTitle": "《大数据时代的深度学习》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0328/1743126612510406.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250327/12956.html",
@@ -16564,9 +16738,9 @@
       "location": "文科楼423",
       "speaker": "左玉河",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "中国社会科学院历史理论研究所",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "历史学博士，中国社会科学院历史理论研究所原副所长、研究员、博士生导师，国家“万人计划”哲学社会科学领军人才，兼中国现代文化学会副会长、中国史学会史学理论分会副会长、中国现代文化学会口述历史专业委员会会长。出版专著《从四部之学到七科之学》《中国近代文明通论》《张东荪传》等20余部；并在《历史研究》《近代史研究》等刊物上发表学术论文90余篇，被《新华文摘》《中国社会科学文摘》及人大复印资料《历史学》《中国近代史》等刊物转载40余篇；《中国近代学术体制之创建》荣获中国社会科学院第八届科研成果一等奖（2014年）、《民国社会生活史》荣获郭沫若中国历史学奖三等奖（2023年）。主持并参与十多项国家社科基金重大项目及中国社会科学院重大课题。",
       "organizer": "历史文化学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -16576,7 +16750,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0328/1743126534683837.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250327/12954.html",
@@ -16782,9 +16962,9 @@
       "location": "文科楼423",
       "speaker": "松野诚也",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "日本明治学院大学国际和平研究所",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "现任日本明治学院大学国际和平研究所研究员。编有《陆军登户研究所相关资料》《陆军高等文官名簿 陆军书记官 陆军技师》《日军迫击第五营关系资料》等资料集，涉及华南日军毒气战和伪造法币的档案。",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-20 15:02",
       "publishTimeSource": "companion",
@@ -16794,7 +16974,13 @@
       "listTitle": "《人工智能与文献学结合的新探索》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0321/1742528159850250.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://cs.scnu.edu.cn/a/20250321/5826.html",
@@ -16901,19 +17087,22 @@
       "lectureEnd": "2025-03-20 09:00:00",
       "location": "华南师范大学美术学院院楼三楼学术报告厅",
       "speaker": "柳絮",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "认证工程师、认证教师、外聘讲师",
+      "speakerAffiliation": "天琥教育、源AI",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "天琥教育创始人，源AI执行董事。中国首批Adobe、Autodesk(3D/CAD)认证工程师、认证教师，广美/华师/华农外聘讲师。全国知名设计教育专家，具有20年设计和教育经验，擅长将实际投标经验用系统理论来进行讲解，独创三维五段学习法、VR全真模拟职业训练系统、AI辅助课堂系统。",
       "organizer": "美术学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "abstract": "OZ世代设计突国O AI在艺术中的角色和未来实战展示A在各个设计工种和设计工作中的流程和结合。介绍最新的deepseek技术和智能体的设计应用 c讲解AI技术在设计行业的最新应用情况C国内外A工具的最新成果介绍设计企业目前的人才要求标准和招聘方向为青年设计师提供一些学习的方法和思路。 讲座",
+      "abstract": "讲解AI技术在设计行业的最新应用情况·国内外AI工具的最新成果·实战展示AI在各个设计工种和设计工作中的流程和结合·介绍最新的deepseek技术和智能体的设计应用·介绍设计企业目前的人才要求标准和招聘方向·为青年设计师提供一些学习的方法和思路",
       "ocrExtracted": true,
       "listTitle": "讲座预告：AI在艺术中的角色和未来",
       "imageParseMethod": "ocr",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2025/0320/1742435944135925.jpg"
+      ],
       "hasPosterImage": true
     },
     {
@@ -16927,9 +17116,9 @@
       "location": "文科楼423",
       "speaker": "谷乃曦",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "瑞典隆德大学人文学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "Professor of the History of Religions, Centre for Theology and Religious Studies, Lund University",
       "organizer": "历史文化学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -16939,7 +17128,13 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": ""
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0320/1742453984147583.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20250317/4410.html",
@@ -17092,9 +17287,9 @@
       "location": "文科楼423",
       "speaker": "王震中",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "中国社会科学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "王震中，现为中国社会科学院学部委员，国家一级教授，中国社会科学院大学特聘首席教授，中国社会科学院历史学部副主任，中国殷商文化学会会长。曾任中国社会科学院历史研究所副所长，学位委员会主任，第十三届全国政协委员。在学术上先后提出：中国文明和国家起源路径的聚落三形态演进说、进入国家以后的“邦国-王国（三代王朝）-帝国”说、“夏商周三代王朝为复合制国家结构”说、“因复合制国家结构华夏民族形成于夏代”说、“中华民族共同体形成于以郡县制为机制的大一统国家形态结构”说等，创建了系统而影响广泛的学术体系。",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-13 15:17",
       "publishTimeSource": "companion",
@@ -17104,7 +17299,13 @@
       "listTitle": "《论原始王权与一统王权的区别和联系》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0313/1741850242602508.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250316/8286.html",
@@ -17142,9 +17343,9 @@
       "location": "第一课室大楼北座802教室",
       "speaker": "韩建业",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "中国人民大学历史学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "韩建业，中国人民大学历史学院教授、博士生导师、吴玉章学者讲席教授、教育部“长江学者奖励计划”特聘教授，兼任国务院学位委员会第八届考古学学科评议组成员、中国考古学会理事、中国历史研究院中华文明与世界古文明比较研究中心特邀研究员，享受国务院政府特殊津贴。主要从事中国新石器考古和夏商周考古、中国上古史、环境考古与人地关系、中西文化交流和文明比较等研究。",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-13 15:15",
       "publishTimeSource": "companion",
@@ -17154,7 +17355,13 @@
       "listTitle": "《亚欧大陆原生文明的文明化进程比较》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0313/1741850155318939.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20250313/48.html",
@@ -17167,9 +17374,9 @@
       "location": "文科楼423",
       "speaker": "霍巍",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "四川大学历史文化学院考古系",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "霍巍，四川大学杰出教授，现任四川大学历史文化学院考古系教授、博士生导师，四川大学历史文化学院学术院长、中国藏学研究所所长、四川大学铸牢中华民族共同体意识研究基地主任等职。任国务院学科评议组第七、第八届考古学科召集人之一、国家社科基金评委、教育部本科教学指导委员会委员、中国考古学会理事、四川省历史学会副会长、四川省考古学会会长等学术职务；系教育部重要人才计划、教育部“跨世纪优秀人才”专家、四川省学术带头人、国务院特殊津贴获得者。主要研究领域为汉唐考古、西南考古、西藏考古、文物学与艺术史、中外文化交流等。",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-13 15:13",
       "publishTimeSource": "companion",
@@ -17179,7 +17386,13 @@
       "listTitle": "《三星堆考古与中华文明》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0313/1741850043957946.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250315/8282.html",
@@ -17242,9 +17455,9 @@
       "location": "文科楼423",
       "speaker": "沈长云",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "河北师范大学历史文化学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "沈长云，河北师范大学历史文化学院教授、博士生导师，河北师范大学古籍所原所长，中国先秦史学会顾问、原副会长，享受国务院政府特殊津贴，兼任中国社会科学院古文明研究中心专家委员会委员、中华炎黄文化研究会理事暨史前专业委员会副主任。主要从事中国先秦史、史学理论、中国古代文献等研究。",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-13 15:06",
       "publishTimeSource": "companion",
@@ -17254,7 +17467,13 @@
       "listTitle": "《关于夏史研究的几个症结问题》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0313/1741849619528350.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20250313/46.html",
@@ -17267,9 +17486,9 @@
       "location": "文科楼423",
       "speaker": "李禹阶",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "重庆师范大学历史与社会学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "李禹阶，重庆师范大学历史与社会学院二级教授、博士生导师，重庆师范大学原副校长，三峡文化与社会发展研究院院长，入选重庆市首批学术技术带头人，享受国务院特殊津贴。兼任四川大学历史文化学院博士生导师，澳门科技大学访问教授、博士生导师。曾兼任重庆市社会科学界联合会副主席、中国社会史学会（国家一级学会）副会长、中国历史学会理事、国际儒学联合会理事等。主要从事中国思想史、社会史、人类学。",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-13 15:03",
       "publishTimeSource": "companion",
@@ -17279,7 +17498,13 @@
       "listTitle": "《知识经济与制度建构》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0313/1741849456719116.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250314/8284.html",
@@ -17338,7 +17563,7 @@
       "speakerTitle": "",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "杨红伟，兰州大学教授、兰州大学首批萃英学者、博士生导师，铸牢中华民族共同体意识研究培育基地研究员，甘肃省“四个一批”人才，兼任中国经济史学会现代经济史专委会副主任、中国现代史学会常务理事、教育部历史教学指导委员会委员、甘肃史学会常务副会长、甘肃省党史学会副会长、甘肃省高校文哲教学指导委员会副主任、湖南大学岳麓书院客座教授、青海师范大学讲座教授等。主要从事中国近现代史、西北区域史与民族史研究。",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-11 10:29",
       "publishTimeSource": "companion",
@@ -17348,7 +17573,13 @@
       "listTitle": "《探索边疆与铸造国民》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0311/1741660271215148.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20250310/4409.html",
@@ -17548,9 +17779,9 @@
       "location": "文科楼423会议室",
       "speaker": "安吉塔·鲍葛薇",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "拉脱维亚大学人文学院亚洲研究系中国语言文学方向",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "拉脱维亚大学人文学院亚洲研究系中国语言文学方向副教授，博士生导师。代表性研究成果有《汉语历代发展史》《周易〉中的历史智慧及以当代（拉脱维亚）社会为视角的翻译方法研究》《中国经典的拉脱维亚语翻译》《藏语在拉脱维亚教学方法论》《中国哲学和传统文学中的“消息”概念》《名家语言细节解析》《拉脱维亚大学中国语言文化教学探析》等。",
       "organizer": "历史文化学院",
       "publishTime": "2025-03-07 17:19",
       "publishTimeSource": "companion",
@@ -17560,7 +17791,13 @@
       "listTitle": "《拉脱维亚的汉字研究》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0307/1741339310371215.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20250429/269.html",
@@ -18613,9 +18850,9 @@
       "location": "文科楼423会议室",
       "speaker": "郭明建",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "厦门大学历史与文化遗产学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "厦门大学历史与文化遗产学院教授，博士生导师，主要研究方向为新石器时代考古与科技考古。曾任耶鲁大学访问学者、中国国家博物馆副研究馆员、暨南大学教授，先后参与和负责河南鹤壁大赉店遗址、河北康保兴隆遗址发掘和雄安新区专项调查等田野考古项目十余项，主持中国国家社科基金、美国ACLS/Luce基金等研究项目多项，编写了《山东薛河流域系统考古调查报告》等田野考古报告和学术著作，在《考古学报》、《考古》、《光明日报》、《Archaeological Research in Asia》等期刊发表论文三十余篇。",
       "organizer": "历史文化学院",
       "publishTime": "2025-01-02 10:21",
       "publishTimeSource": "companion",
@@ -18625,7 +18862,13 @@
       "listTitle": "《良渚——考古揭示的中国早期文明》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/0102/1735784491478637.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20241226/424.html",
@@ -18932,17 +19175,22 @@
       "lectureEnd": null,
       "location": "华南师范大学美术学院二楼大会议室(报告厅)",
       "speaker": "陈中科",
-      "speakerAffiliation": "",
-      "speakerBio": "",
+      "speakerAffiliation": "华南师范大学美术学院",
+      "speakerBio": "1989年毕业于广州美术学院\n全国中小学教师继续教育网特聘美育专家\n中国美术家协会会员\n广东第二师范学院副教授\n中国艺术研究院何家英访问学者\n受聘于华南师范大学美术学院\n受聘于广州美术学院绘画学院水彩画系\n茂名开明画院名誉院长\n水彩画《外婆家的老房子》获第十届全国美展优秀奖\n入展《其命惟新——广东美术百年大展》\n入编《全国高中美术教科书》\n黑白木刻版画《海阔天高——南沙港印象》入选第十二届全国美展\n入编《2014中国版画精品展》\n入编《2014中国版画年鉴》\n入选《大潮起珠江——纪念改革开放四十年全国美术作品展览》\n入选2020年纪念广东省经济区成立40周年“双区”展\n2020年《中国共产党百年画典》\n入选国庆75周年美术经典中的共和国史经典美术作品\n水彩画《秋之礼赞》\n入选第十三届全国美展\n水彩画《秋后的原野》\n入展祖国的笑容这样美——首届中国水彩风景画展\n水彩画《万千飞鸟访南沙》\n入选第十二届全国水彩·粉画展\n水彩画《遍野麦香》\n第三届全国小幅水彩展入会资格作品\n水彩画《路边的tony》\n第二届全国美术教育教师作品展览入会资格作品\n水彩作品《自留地》\n入选第十三届全国水彩画笔粉画展\n水彩作品《秋后的原野》\n入选第十四届全国美展",
       "organizer": "美术学院",
       "publishTime": "2024-12-17 15:02:00",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "abstract": "美華南纤轮大学|美术学院 South China NormalUniversitySchool ofFineArts 平凡之美从生活素材到美术作品的形成 2024 12/20 15:00 16:30 华南师范大学美术学院二楼大会议室主讲名家陈中科 1989年毕业于广州美术学院全国中小学教师继续教育网特聘美育专家中国美术家协会会员广东第二师范学院副教授中国艺术研究院何家英访问学者受聘于华南师范大学美术学院受聘于广州美术学院绘画学院水彩画系茂名开明画院名誉院长水彩画《外婆家的老房子》 获第十届全国美展优秀奖入展《其命惟新广东美术百年大展》 入编《全国高中美术教科书》 黑白木刻版画《海阔天高一—南沙港印象》 入选第十二届全国美展入编《2014中国版画精品展》 入编《2014中国版画年鉴》 入选《大潮起珠江一一纪念改革开放四十年全国美术作品展览》 入选2020年纪念广东省经济特区成立40周年\"双区\"展 2020年《中国共产党百年画典》 入选国庆75周年美术经典中的共和国史经典美术作品水彩画《秋之礼赞》 入选第十三届全国美展水彩画《秋后的原野》 入展祖国的笑容这样美首届中国水彩风景画展水彩画《万千飞鸟访南沙》 入选第十二届全国水彩·粉画展水彩画《遍野麦香》 第三届全国小幅水彩展入会资格作品水彩画《路边的tony》 第二届全国美术教育教师作品展览入会资格作品水彩作品《自留地》 入选第十三届全国水彩画笔粉画展水彩作品《秋后的原野》 入选第十四届全国美展",
+      "abstract": "",
       "listTitle": "讲座预告：平凡之美——从生活素材到美术作品的形成",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1217/1734418963581939.jpg"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "副教授"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241220/8237.html",
@@ -19364,10 +19612,10 @@
       "lectureEnd": "2024-12-13 11:00:00",
       "location": "华南师范大学历史文化学院文科楼423会议室",
       "speaker": "陈晓琦",
-      "speakerTitle": "",
+      "speakerTitle": "国家茶艺技师、国家高级评茶师及考评员",
       "speakerAffiliation": "",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "国家茶艺技师、国家高级评茶师及考评员",
       "organizer": "历史文化学院",
       "publishTime": "2024-12-12 14:29",
       "publishTimeSource": "companion",
@@ -19377,7 +19625,13 @@
       "listTitle": "《传统饮茶方式的现代演绎》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2024/1212/1733985132294494.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20241212/41.html",
@@ -19390,9 +19644,9 @@
       "location": "华南师范大学历史文化学院428会议室",
       "speaker": "冀开运",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "西南大学历史文化学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "西南大学历史文化学院教授，中希文明互鉴中心特聘研究员，博士生导师，长期从事中东历史与国际关系研究，兼任中国中东学会副会长，西南大学“一带一路”研究院副院长，西南大学伊朗研究中心主任，民盟西南大学基层委员会副主委。先后七次深入伊朗进行田野调查和访学交流，主编出版蓝皮书系列《伊朗发展报告》，独著《伊朗现代化历程》《伊朗与伊斯兰世界关系研究》《两伊战争及其影响研究》，合作出版译著《伊朗五百年》，主持并完成国家级课题4项、省部级课题6项，发表论文80余篇，长期紧密跟踪中东焦点局势，多次接受国内外主流媒体采访，相关研究成果被伊朗伊斯兰共和国文化部评选为“国际优秀研究”一等奖。",
       "organizer": "历史文化学院",
       "publishTime": "2024-12-12 12:00",
       "publishTimeSource": "companion",
@@ -19402,7 +19656,13 @@
       "listTitle": "《中伊可比性与差异性解读》讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2024/1212/1733984868568389.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20241212/252.html",
@@ -20000,16 +20260,21 @@
       "location": "华南师范大学美术学院二楼报告厅(大会议室)",
       "speaker": "甘明智",
       "speakerAffiliation": "广州美术学院绘画艺术学院",
-      "speakerBio": "",
+      "speakerBio": "毕业于广州美术学院油画系 从事油画创作，负责色彩教学",
       "organizer": "美术学院",
       "publishTime": "2024-12-03 09:16:00",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "abstract": "一- #地址ADD 将色彩的基础原理分解为具体化可直接执行的引导性的指令华南师范大学在写生中建立适合自己的色彩运用逻辑美术学院大会议室 ConferenceRoomoftheSchoolofFineArts, SouthChinaNormalUniversity 主办:华南师范大学美术学院",
+      "abstract": "色彩量化教学——将色彩的基础原理分解为具体化可直接执行的引导性的指令在写生中建立适合自己的色彩运用逻辑",
       "listTitle": "讲座预告：色彩量化教学",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1204/1733275015714660.jpg"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "副教授"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241204/8209.html",
@@ -20119,7 +20384,7 @@
       "location": "华南师范大学美术学院二楼报告厅(大会议室)",
       "speaker": "罗玉鑫",
       "speakerAffiliation": "广州画院专职画家",
-      "speakerBio": "",
+      "speakerBio": "广州画院专职画家 一级美术师 第十三届全国美展进京 第十四届全国美展金奖 中国美术家协会会员 中国工笔画学会青年艺委会委员 广东省美术家协会会员 李可染画院研究员 广东省中国画学会理事 广东省女画家协会理事 华南师范大学硕士研究生校外导师",
       "organizer": "美术学院",
       "publishTime": "2024-11-27 11:52:00",
       "timeConfidence": "high",
@@ -20128,7 +20393,12 @@
       "listTitle": "讲座预告：提纯——从《休戚与共》谈花鸟画形式语...",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1127/1732679589183013.png"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "一级美术师"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241202/6350.html",
@@ -20286,7 +20556,11 @@
       "listTitle": "讲座预告：华师砺儒讲坛第129讲——审美与人生",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1127/1732679975746063.jpg"
+      ],
+      "hasPosterImage": true
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20241128/926.html",
@@ -20459,7 +20733,7 @@
       "location": "华南师范大学美术学院二楼报告厅(大会议室)",
       "speaker": "李安红",
       "speakerAffiliation": "天津美术学院",
-      "speakerBio": "",
+      "speakerBio": "天津美术学院教授 中国雕塑学会会员 中国工艺美术学会雕塑专业委员会委员 全国城市雕塑设计资格证书持有者",
       "organizer": "美术学院",
       "publishTime": "2024-11-26 16:12:00",
       "timeConfidence": "high",
@@ -20468,7 +20742,12 @@
       "listTitle": "讲座预告：经典雕塑作品中的芳华",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1126/1732608796168151.jpg"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "教授"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241129/8207.html",
@@ -21051,19 +21330,23 @@
       "lectureStart": "2024-11-25 19:00:00",
       "lectureEnd": "2024-11-25 21:00:00",
       "location": "华南师范大学美术学院二楼报告厅(大会议室)",
-      "speaker": "Timi",
-      "speakerAffiliation": "",
-      "speakerBio": "",
+      "speaker": "Timi O’Neill",
+      "speakerAffiliation": "兰州大学威尔士学院；英国威尔士三一圣大卫大学（UWTSD）",
+      "speakerBio": "兰州大学威尔士学院副院长 英国威尔士三一圣大卫大学（UWTSD）艺术与设计专业博士 艺术设计专业硕士的课程负责人",
       "organizer": "美术学院",
       "publishTime": "2024-11-24 10:06:00",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "abstract": "孝南行范大学丨美术学院 2024.11.25 SouthChina NormalUniversity,Schoolof FineArts 19:00-21:00 Timi O'Neill 兰州大学威尔士学院副院长 英国威尔士三一圣大卫大学（UWTSD）艺术与设计专业博士 艺术设计专业硕士的课程负责人 AIEd的元颠覆 为建立在人工智能和沉浸式技术 基础上的未来艺术学院辩护 地点丨华南师范大学美术学院大会议室 主办丨华南师范大学美术学院",
+      "abstract": "",
       "listTitle": "讲座预告：AIEd 的元颠覆——为建立在人工智能和...",
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "speakerTitle": "博士"
+      "speakerTitle": "博士",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1125/1732518223740661.jpg"
+      ],
+      "hasPosterImage": true
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20241121/1027.html",
@@ -21075,8 +21358,8 @@
       "lectureEnd": null,
       "location": "华南师范大学美术学院二楼报告厅(大会议室)",
       "speaker": "张爱国",
-      "speakerAffiliation": "署老爱,生于江苏淮安",
-      "speakerBio": "",
+      "speakerAffiliation": "中国美术学院书法学院",
+      "speakerBio": "别署老爱，生于江苏淮安。本、硕、博皆就读于中国美术学院书法篆刻专业，师从王冬龄教授，2007年获文学博士学位。现为中国美术学院书法学院书法与篆刻系主任 硕士研究生导师 西泠印社社员 日本岐阜女子大学客座教授 中国美术学院现代书法研究中心研究员 浙江省书法教育研究会副理事长 浙江逸仙书画院副院长 杭州市书法家协会副主席 兰亭书法社副社长 香港中文大学访问艺术家",
       "organizer": "美术学院",
       "publishTime": "2024-11-21 15:45:00",
       "timeConfidence": "high",
@@ -21085,7 +21368,12 @@
       "listTitle": "讲座预告：品读《大开通》——兼及书法艺术性及学...",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1121/1732176845493774.jpg"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "教授"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241124/12866.html",
@@ -22695,7 +22983,10 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "abstract": "\"历史、技艺与传承:岭南非遗在过去与今天\"工作坊二: [ 清代通草画里的广式生活]。",
-      "listTitle": "工作坊二：清代通草画里的广式生活"
+      "listTitle": "工作坊二：清代通草画里的广式生活",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1105/1730768081954742.jpg"
+      ]
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20241107/8160.html",
@@ -23149,7 +23440,10 @@
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "abstract": "\"历史、技艺与传承:岭南非遗在过去与今天\"工作坊一: [广东传统工艺的精彩、无奈和希望 ——岭南非遗文化艺术概述]。",
-      "listTitle": "工作坊一：广东传统工艺的精彩、无奈和希望——岭南非遗文化艺术概述"
+      "listTitle": "工作坊一：广东传统工艺的精彩、无奈和希望——岭南非遗文化艺术概述",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/1105/1730767957917999.jpg"
+      ]
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20241030/12843.html",
@@ -24119,7 +24413,7 @@
       "location": "美术学院二楼大会议室",
       "speaker": "金静",
       "speakerAffiliation": "2007届校友",
-      "speakerBio": "",
+      "speakerBio": "深圳市红岭中学美术教师 深圳福田区中学美术兼职教研员 华南师范大学美术学院兼职教授 深圳市特色学科组负责人 深圳福田区名师工作室主持人 人美版《义务教育教科书·美术》教材编委",
       "organizer": "美术学院",
       "publishTime": "2024-09-23 16:53:00",
       "timeConfidence": "high",
@@ -24128,7 +24422,12 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": "学院第六期\"校友讲坛\"暨\"美育讲坛\" 主题:如何上好一节美术课主讲人:金静(2007届校友) 时间:2024年9月26日(周四)15:00 地点:美术学院二楼大会议室。"
+      "abstract": "学院第六期\"校友讲坛\"暨\"美育讲坛\" 主题:如何上好一节美术课主讲人:金静(2007届校友) 时间:2024年9月26日(周四)15:00 地点:美术学院二楼大会议室。",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/0925/1727224924200744.png"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "兼职教授"
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20240920/4356.html",
@@ -24525,9 +24824,9 @@
       "location": "",
       "speaker": "克里斯蒂安·盖勒兰 Christian Guellerin",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "法国南特大西洋设计学院",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "法国南特大西洋设计学院校长\n法国设计教育主席 / 积云公司名誉总裁\n上海设计创意创新总裁 / 贝宁非洲设计学院院长\nDIID(设计国际创新发展)科学委员会成员\n杭州新建筑艺术中心(NACAA)副主任、创始人\n\nCHANCELLOR OF L'ECOLE DE DESIGN NANTES ATLANTIQUE.\nPRESIDENT OF FRANCE DESIGN EDUCATION.\nHONORARY PRESIDENT OF CUMULUS.\nPRESIDENT OF DESIGN CREATIVE INNOVATION IN SHANGHAI.\nPRESIDENT OF AFRICA DESIGN SCHOOL IN BENIN.\nMEMBER OF THE SCIENTIFIC COMMITTEE OF DIID (DESIGN INTERNATIONAL INNOVATION DEVELOPMENT).\nDEPUTY DIRECTOR AND FOUNDER OF NACAA (NEW CENTER OF ART AND ARCHITECTURE) IN HANGZHU.",
       "organizer": "美术学院",
       "publishTime": "2024-09-09 12:35:00",
       "publishTimeSource": "position",
@@ -24538,7 +24837,10 @@
       "ocrExtracted": true,
       "listTitle": "讲座预告：《设计与创新策略：设计学院的未来》",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2024/0923/1727084248604553.jpg"
+      ]
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20240911/8118.html",
@@ -61218,16 +61520,16 @@
       "sourceUrl": "http://aol.scnu.edu.cn/a/20190608/265.html",
       "college": "美术学院",
       "campus": "石牌",
-      "title": "讲座：记忆场域——「其名惟心——广东美术百年大...",
-      "topic": "记忆场域——「其名惟心——广东美术百年大...",
+      "title": "讲座：记忆场域——其命惟新——广东美术百年大展 策划始末",
+      "topic": "其命惟新——广东美术百年大展 策划始末",
       "lectureStart": "2019-06-11 19:30:00",
       "lectureEnd": null,
-      "location": "",
-      "speaker": "记忆场",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "location": "华南师范大学（石牌校区）一课室大楼 西102",
+      "speaker": "许钦松",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "广东省文联",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "其命惟新——广东美术百年大展 总策划 广东省文联主席 中国美术家协会顾问 中国艺术研究院研究员、博士生导师",
       "organizer": "美术学院",
       "publishTime": "2019-06-08 15:17:30",
       "publishTimeSource": "position",
@@ -61235,9 +61537,12 @@
       "timeNote": "same-year",
       "abstract": "",
       "ocrExtracted": true,
-      "listTitle": "讲座：记忆场域——「其名惟心——广东美术百年大...",
+      "listTitle": "讲座：记忆场域——其命惟新——广东美术百年大展 策划始末",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2019/0608/1559978304614579.jpg"
+      ]
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20190530/988.html",
@@ -61468,23 +61773,27 @@
       "college": "美术学院",
       "campus": "石牌",
       "title": "讲座：观己设计——与自己共舞的日子",
-      "topic": "与自由共舞的日子",
-      "lectureStart": "2019-05-28 08:00:00",
-      "lectureEnd": null,
-      "location": "",
-      "speaker": "",
+      "topic": "与自己共舞的日子",
+      "lectureStart": "2019-05-29 19:30:00",
+      "lectureEnd": "2019-05-29 21:30:00",
+      "location": "华南师范大学美术学院阶梯教室",
+      "speaker": "王耿锋",
       "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "广州观己景观设计有限公司",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "王耿锋，广州观己景观设计有限公司设计总监，毕业于华师美术学院环境艺术设计系，从事景观设计实践多年，拥有丰富的设计项目经验与感悟心得。",
       "organizer": "美术学院",
-      "publishTime": null,
-      "publishTimeSource": "url_proxy",
+      "publishTime": "2019-05-28 10:59:16",
+      "publishTimeSource": "position",
       "hasPosterImage": true,
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
       "listTitle": "讲座：观己设计——与自己共舞的日子",
-      "abstract": ""
+      "abstract": "",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2019/0528/1559012803273682.png",
+        "http://statics.scnu.edu.cn/pics/aol/2019/0528/1559012803287710.png"
+      ]
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20190522/24.html",
@@ -61851,9 +62160,9 @@
       "lectureStart": "2019-05-20 15:00:00",
       "lectureEnd": "2019-05-20 16:30:00",
       "location": "华南师范大学美术学院大会议室",
-      "speaker": "歇泰瑞",
-      "speakerAffiliation": "·歇ThierryTESSIER英国剑桥大学艺术史专业毕业Vanities画廊创建人艺术展览策展人艺术品经纪人艺术史专家艺术品鉴定师Creapole设计学院",
-      "speakerBio": "",
+      "speaker": "Thierry Tessier",
+      "speakerAffiliation": "英国剑桥大学艺术史专业毕业；Vanities 画廊创建人",
+      "speakerBio": "作为艺术品鉴定师和时尚历史学家，我愿意分享我在艺术品项目管理方面的能力和艺术推广的多方面知识和技巧，通过多年的艺术品市场和和在 时尚界积累的经验。我完全可以胜任从艺术审计，艺术品经纪人，策划举办艺术展览再到艺术课教学等多项工作。在2009年，我和我的合伙人共同创办了Thierry Tessier & Cie工作室，拥有一个团结奋进、朝气蓬勃的有力团队。",
       "organizer": "美术学院",
       "publishTime": "2019-05-13 11:42:48",
       "timeConfidence": "high",
@@ -61863,7 +62172,11 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "speakerTitle": "教授"
+      "speakerTitle": "教授",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2019/0513/1557719096521760.png"
+      ],
+      "hasPosterImage": true
     },
     {
       "sourceUrl": "http://io.scnu.edu.cn/a/20190513/1447.html",
@@ -62055,10 +62368,10 @@
       "lectureEnd": "2019-05-15 21:30:00",
       "location": "华南师范大学美术学院阶梯教室芝加哥考察美国现代主义建筑设计的发展",
       "speaker": "杜肇铭",
-      "speakerTitle": "",
+      "speakerTitle": "教授、硕导",
       "speakerAffiliation": "广东财经大学艺术艺术学院院长",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "广东财经大学艺术学院院长、教授、硕导 华南理工大学建筑学院在读博士 广东省高校美术与设计教育专业委员会副秘书长 广东省陈设设计协会常务理事 广东省高校建筑与环境设计专业委员会学术委员会委员 研究方向：建筑与环境艺术设计、绿色健康室内设计 主持教育部人文社会科学研究规划基金项目《岭南地域环境艺术低能耗节能设计方法研究》、广东省哲学社会科学“十一五”规划一般项目《基于低碳理念的岭南风格室内设计研究》、广东省委宣传部打造“理论粤军”重大调研项目委托研究项目《关于我省城市文化景观建设情况的调研》等。 在《装饰》《文艺争鸣》《美术学刊》等专业核心以上期刊发表30余篇学术论文；主编《室内设计史》和《艺术设计概论》教材。 获中国美家协会主办“为中国而设计”第四、五届全国环境设计论坛优秀奖；广东省教育厅艺术教育科研论文一、三等奖；广东高校美术与设计教育专业委员会年会论文一等奖；设计作品分获中国第五届、七届室内设计双年展银奖、优秀奖；全国家具设计大赛一等奖；全国室内设计大赛三等奖；全国室内设计手绘表现大赛优秀奖；广东家具展设计大赛一等奖；广东装饰行业设计作品展评金奖；广东省首届室内设计大赛二等奖等荣誉。",
       "organizer": "美术学院",
       "publishTime": "2019-05-13 11:45:51",
       "publishTimeSource": "position",
@@ -62068,7 +62381,10 @@
       "ocrExtracted": true,
       "listTitle": "讲座：芝加哥考察—美国现代主义建筑设计的发展",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2019/0513/1557719168640958.jpg"
+      ]
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20190514/254.html",
@@ -62079,9 +62395,9 @@
       "lectureStart": "2019-05-15 19:00:00",
       "lectureEnd": null,
       "location": "",
-      "speaker": "",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speaker": "陈林侠",
+      "speakerTitle": "教授 博士生导师 广东省珠江学者特聘教授",
+      "speakerAffiliation": "中山大学中文系",
       "inviter": "",
       "speakerBio": "",
       "organizer": "美术学院",
@@ -62089,11 +62405,14 @@
       "publishTimeSource": "position",
       "timeConfidence": "high",
       "timeNote": "same-year",
-      "abstract": "",
+      "abstract": "电影被称为叙事艺术，自然离不开故事，那么，什么是故事，什么是好故事。电影作为大众媒介，又当如何讲述故事，这些问题同样是中国电影的产业化，已成为制约进一步发展的瓶颈，本讲座将对此展开讨论。",
       "ocrExtracted": true,
       "listTitle": "讲座信息：讲故事与讲好中国故事",
       "imageParseMethod": "ocr",
-      "hasPosterImage": true
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2019/0514/1557798417114765.jpg"
+      ]
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20190510/108.html",
@@ -62297,8 +62616,8 @@
       "topic": "鼻血洋：商业工作室的非创意逻辑  ——幹嘛...",
       "lectureStart": "2019-04-26 19:00:00",
       "lectureEnd": null,
-      "location": "美术学院二楼学术报告厅(石牌校区)特邀嘉宾",
-      "speaker": "肩血洋 BX-PLANET创始人动画导高 2019",
+      "location": "美术学院二楼学术报告厅(石牌校区)",
+      "speaker": "鼻血洋",
       "speakerAffiliation": "",
       "speakerBio": "鼻血洋 BX-PLanet 创始人,动画导演,动画师。 曾就职于《将将将动画工作室》制作《功夫兔和菜包狗》系列剧集。 于 2015 年成立 BX-Planet 。负责和制作工作室成立以来的所有项目。 先后服务过百度、腾讯、阿里巴巴、美图秀秀、新浪、格力高、知乎、大众、 ofo 、 vichy 、奥利奥、 GQ 、 supercell 等公司。 学术讲座: 曾受邀在中央电视台、 ADOBE LIVE 、北京服装设计学院、北京理工大学和数家广告公司进行过",
       "organizer": "美术学院",
@@ -62309,7 +62628,11 @@
       "listTitle": "讲座:鼻血洋：商业工作室的非创意逻辑  ——幹嘛...",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2019/0426/1556247360777584.jpg"
+      ],
+      "hasPosterImage": true
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20190424/228.html",
@@ -62320,9 +62643,9 @@
       "lectureStart": "2019-04-26 09:00:00",
       "lectureEnd": "2019-04-26 12:00:00",
       "location": "",
-      "speaker": "",
-      "speakerAffiliation": "",
-      "speakerBio": "",
+      "speaker": "陈志华",
+      "speakerAffiliation": "福州大学数学与计算机科学学院",
+      "speakerBio": "福州大学数学与计算机科学学院教授 闽江学者 旗山学者",
       "organizer": "美术学院",
       "publishTime": "2019-04-24 11:02:00",
       "timeConfidence": "high",
@@ -62331,7 +62654,12 @@
       "listTitle": "讲座：深度学习原理与实作—探讨其在美术与设计学...",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/aol/2019/0426/1556247848600035.jpg"
+      ],
+      "hasPosterImage": true,
+      "speakerTitle": "教授 博士生导师"
     },
     {
       "sourceUrl": "http://cs.scnu.edu.cn/a/20190419/4028.html",

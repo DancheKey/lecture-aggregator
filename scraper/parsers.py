@@ -776,26 +776,16 @@ def _load_dotenv():
 
 
 def _load_vlm_configs():
-    """返回 VLM provider 配置列表（按优先级：Gemini 主、智谱备）；无 key 返回空列表（调用方降级 OCR）。"""
+    """返回 VLM provider 配置列表（智谱 GLM 主通道）；无 key 返回空列表（调用方降级 OCR）。"""
     env = _load_dotenv()
     cfgs = []
-    # 主通道：Google Gemini（OpenAI 兼容端点，免费 flash 层低延迟、不易排队）
-    gkey = _os.environ.get('GEMINI_API_KEY') or env.get('GEMINI_API_KEY')
-    if gkey:
-        cfgs.append({
-            'name': 'gemini',
-            'api_key': gkey,
-            'model': (_os.environ.get('GEMINI_MODEL') or env.get('GEMINI_MODEL') or 'gemini-2.5-flash'),
-            'base_url': (_os.environ.get('GEMINI_BASE_URL') or env.get('GEMINI_BASE_URL')
-                         or 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'),
-        })
-    # 备用通道：智谱 GLM（免费但常限流 429），主通道不可用时降级
+    # 主通道：智谱 GLM（国内直连、免费稳定，海报结构化首选；不可用则回落本地 RapidOCR）
     zkey = _os.environ.get('ZHIPU_API_KEY') or env.get('ZHIPU_API_KEY')
     if zkey:
         cfgs.append({
             'name': 'zhipu',
             'api_key': zkey,
-            'model': (_os.environ.get('VLM_MODEL') or env.get('VLM_MODEL') or 'glm-4.6v-flash'),
+            'model': (_os.environ.get('VLM_MODEL') or env.get('VLM_MODEL') or 'glm-4v-flash'),
             'base_url': (_os.environ.get('VLM_BASE_URL') or env.get('VLM_BASE_URL')
                          or 'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
         })

@@ -44,13 +44,12 @@ jobs:
 
       # 增量抓取：若仓库内 data/last_scrape.json 存在，则只补该时间之后的新讲座；
       # 否则（首次或缺失）自动全量，并以已有 data/lectures.json 作去重基底。
-      # VLM 双通道（Gemini 主 + 智谱备）：API Key 走 GitHub Secrets（加密，绝不写明文）；
-      # 模型名非敏感，明文注入即可。主通道不可用时自动降级备用通道，再不可用则回落本地 RapidOCR。
+      # VLM 主通道：智谱 GLM（国内直连、免费稳定），API Key 走 GitHub Secrets（加密，绝不写明文）；
+      # 模型名非敏感，明文注入即可。通道不可用时自动回落本地 RapidOCR。
       - name: 运行爬虫（增量）
         env:
           ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
-          VLM_MODEL: glm-4.6v-flash
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VLM_MODEL: glm-4v-flash
         run: python scraper/scraper.py
 
       - name: 同步静态数据源并生成前端切片
