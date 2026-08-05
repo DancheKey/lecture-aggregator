@@ -33654,13 +33654,13 @@
       "location": "地理科学学院101报告厅",
       "speaker": "邱维理",
       "speakerTitle": "教授",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "北京师范大学地理科学学部",
       "inviter": "",
       "speakerBio": "博士,北京师范大学地理科学学部教授,中国地理学会地貌与第四纪专业委员会委员,全国高校地质学与地貌学教学研究会理事长。多年从事自然地理学、 地质学、地貌学、第四纪沉积与环境等课程的教学和相关野外实习的指导工作,主要研究方向是地貌与第四纪环境。是《地质学基础》《自然地理学研究方法》等教材的编写者。对地质地貌类课程的课堂教学、地质地貌类课程的野外实践实习、中学生野外自然地理研学活动等也有深入的研究和探索",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "isMultiLecture": null,
       "lectureIndex": null,
@@ -33670,7 +33670,8 @@
       "host": "",
       "speakerSource": "label",
       "listTitle": "2023-12-13高中自然地理研学要义",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2023/1211/52.html",
@@ -57784,17 +57785,18 @@
       "lectureEnd": null,
       "location": "地理科学学院101会议室",
       "speaker": "张会平",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "中国地震局地质研究所",
       "inviter": "",
       "speakerBio": "张会平,男,1978年生,博士,中国地震局地质研究所研究员,主要从事构造地貌、河流地貌及其年代学等方面的研究。 2015年入选中组部\"万人计划＂青年拔尖人才计划,防震减灾优秀人才百人计划第二批人选,2019年入选中国地震局\"领军人才\"。2016年获国家自然科学基金委优秀青年基金\"构造地貌学资助。共发表SCI论文52篇,第一作者SCI论文11篇,CSCD论文11 篇。2012年获\"中国地震学会第八届李善邦青年优秀地震科技论文奖三等奖\",2016年获第十届青藏高原青年科技奖,2017年获第十六届青年地质科技奖银锤奖,2018年获国家科学技术奖自然科学奖二等奖。现任中国地质学会青年工作委员会副主任委员,中国地震学会青年科技工作委员会副主任委员,中国地震学会构造地貌专业委员会秘书长,美国地球物理学会(AGU)期刊《Tec- tonics》副主编。 华南研花大学",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2020-01-06青藏高原东北瞬时地貌",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20191217/1898.html",
@@ -58557,17 +58559,18 @@
       "lectureEnd": null,
       "location": "地理科学学院101报告厅",
       "speaker": "柴彦威",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "北京大学城市与环境学院",
       "inviter": "",
       "speakerBio": "日本广岛大学文学博士,北京大学城市与环境学院教授、博士生导师、智慧城市研究与规划中心主任,中国地理学会常务理事及城市地理学专业委员会前主任、中国城市科学研究会城市大数据专业委员会副主任、北京市人民政府特邀人员。中国城市",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2019-12-08城市社区生活圈研究与规划",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20191125/1880.html",
@@ -61142,10 +61145,10 @@
       "lectureEnd": null,
       "location": "地理科学学院3楼会议室",
       "speaker": "戴志军",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "华东师范大学河口海岸学国家重点实验室",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "戴志军，华东师范大学河口海岸学国家重点实验室教授，博士生导师，曾荣获教育部新世纪优秀人才，上海市启明星及提名国际杰出青年水文学家等荣誉。任教育部第三、四轮学科评议专家及中国河口海岸分会等学会理事，国际SCI期刊Geomorphology、Scientific Reports以及Frontiers of Earth Science等编委和副主编。已在海岸平衡与稳定、冲积型河流水沙输运、河口沉积与地貌变化格局等取得一系列创新性成果，荣获省、市自然科学奖（上海市自然科学一等奖1项）、科技进步奖及社科奖等4项，在国内外发表论文140多篇和5部专著，以第一（通讯）作者在Geophysical Research Letters、Journal of Hydrology、Environmental Science & Technology等国际重要期刊发表50余篇论文，曾受到国际地貌学会前主席Goudie，国际IGBP前主席Syvitski以及EGU达西水文奖获得者Giesen等团队正面引用和评价，被Science、Nature系列期刊等总引超过1300次，曾4篇为ESI高被引论文，2篇为ESI热点论文，成果在解决长江口深水航道泥沙回淤、杭州湾北岸海堤安全防护以及国内外21个岸滩冲淤演变与港工泥沙问题具有明显成效。",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -61157,7 +61160,8 @@
         "https://statics.scnu.edu.cn/pics/geography/2019/0702/1562059061587598.jpg"
       ],
       "hasPosterImage": true,
-      "imageParseMethod": "vlm"
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20190624/1785.html",
@@ -62096,17 +62100,18 @@
       "lectureEnd": "2019-05-20 16:30:00",
       "location": "地理科学学院101讲学厅",
       "speaker": "雷鸣",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "陕西师范大学地理科学与旅游学院",
       "inviter": "",
       "speakerBio": "雷鸣,中国教育学会地理专业委员会常务理事、中国地理学会编辑出版委员会委员,被中国地理学会授予\"首届全国优秀地理编辑\"\"全国地理科普活动先进工作者\"称号,现为《中学地理教学参考》主编、陕西师范大学地理科学与旅游学院教育硕士兼职导师。 教育部\"国培计划\"培训班授课专家、全国师范院校和人教社地理赛课评委,多次在全国地理教师培训会做论文写作、地理教研、教师发展及杂志编辑方面的讲座。策划、主编10多部地理教学丛书、电子产品和地理科普图书;发表教研论文、地理文章百余篇,多篇文章被中国人民大学书报资料中心权威杂志全文转载。 華南師花大学",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2019-05-15研学旅行的方法与实践",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20190510/1740.html",
@@ -62171,17 +62176,18 @@
       "lectureEnd": "2019-05-17 17:00:00",
       "location": "地理科学学院3楼会议室",
       "speaker": "刘志高",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "副研究员",
+      "speakerAffiliation": "中国科学院地理科学与资源研究所",
       "inviter": "",
       "speakerBio": "刘志高,男,副研究员,硕士生导师,中国科学院地理科学与资源研究所区域可持续发展模拟研究室副主任。2009年德国法兰克福大学获博士学位。 2010年以来主持国家自然基金项目4项,获国家领导人批示咨询报告4份,参与完成的重大国家规划5项目,参与国家\"一带一路\"相关规划和西部大开发十三五\"规划等重大规划。在JournalofEconomicGeography,Environment and Planning A, Habit International, Journal of Cleaner Production, Scientometrics, EnergyPolicy,ZeitschriftfuirWirtschaftsgeographie,《地理学报》和《经济学动态》等期刊发表论文50多篇,合作出版专著1部。任国际区域研究协会中国分会常务理事、中国地理学会经济地理学专业委员会委员。主要研究方向:演化经济地理学、产业集群、对外贸易与投资。 華南師花大学",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2019-05-15宏观经济地理学创新与发展",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20190508/975.html",
@@ -62607,7 +62613,12 @@
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "abstract": "智慧国土空间规划的思考华南师范大学地理科学学院 / 学术交流 2019-04-17 18:10:43 来源:华南师范大学评论: 0 点击: 收藏本文题目:智慧国土空间规划的思考主讲人:甄峰",
-      "listTitle": "智慧国土空间规划的思考"
+      "listTitle": "智慧国土空间规划的思考",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/2019/0417/20190417061900911.gif"
+      ],
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm"
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20190417/64.html",
@@ -63533,17 +63544,18 @@
       "lectureEnd": null,
       "location": "地理科学学院101讲学厅",
       "speaker": "傅伯杰",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "院士",
+      "speakerAffiliation": "中国科学院",
       "inviter": "",
       "speakerBio": "傅伯杰,中国科学院院士、第三世界科学院院士、英国爱丁堡皇家学会外籍院士。现任中国科学院生态环境研究中心研究员、学术委员会主任,北京师范大学地理科学学部部长。兼任中国科学院地学部主任。任中国地理学会理事长、国际地理联合会副主席、国家生态保护与建设专家委员会副主任主要从事自然地理学与景观生态学研究,在土地利用结构与生态过程、景观生态学和生态系统服务等方面取得了系统性创新成果。发表学术论文4o0余篇,其中在Science、Nature geoscience、Nature climate change 等SCi收录刊物发表论文280余篇,出版著作10部。曾获国家自然科学二等奖,国家科技进步二等奖,中国科学院杰出科技成就奖,何梁何利科学与技术进步奖和国际景观生态学会杰出贡献奖。任chinese GeographicalScience主编、生态学报主编、地球科学进展主编,Landscape Ecology、Landscape and Urban Planning 华南研花大学 Current Opinion in Environmental Sustainability等刊U物编委",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2018-12-20新时代的地理学",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181214/1661.html",
@@ -63685,17 +63697,18 @@
       "lectureEnd": null,
       "location": "地理科学学院101讲学厅",
       "speaker": "谢先德",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "中国科学院广州地球化学研究所",
       "inviter": "",
       "speakerBio": "谢先德,矿物物理学家和高压矿物学家,现任中国科学院广州地球化学研究所研究员、博士生导师。1952年入南京大学地质系学习, 1959年在前苏联第城矿业学院获地质矿物学硕士学位。历任中国科学院地球化学研究所所长、中国科学院广州分院院长兼广东省科学院院长、广东省科协主席、第八、九届全国人大代表。1990年当选国际矿物协会主席,1994年当选俄罗斯科学院外籍院士,1996年成为美国科学促进会会员,2001年当选国际欧亚科学院院土。早年从事系统矿物学研究,是2种硼酸盐和2种硫酸盐新矿物的发现者。随后多年在我国首次地下核试验和首次地面成坑核试验的地质效应研究中做出了重要成绩。80年代初在美国联邦地质调查所从事陨石撞击坑内矿物的冲击变质研究,首次提出了石英的七阶段冲击变质模型。从1990年至今一直从事在太空中经过强烈碰撞的陨石和地表陨石坑矿物的微观变化研究,发现和参与发现了涂氏磷钙石、王氏钛铁矿等9种高压相新矿物。发表论文220余篇,专著13部,译著1部。获国家自然科学奖2 项,省部级成果奖13项,美国论著奖1项。1998年获广东省科学技术突出贡献一等奖,同时被授予\"广东省有突出贡献专家\"称号。他培养的博士生中,有4名成为国家杰出青年基金获得者",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2018-12-10陨石和陨石坑及其科学意义",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181206/1651.html",
@@ -64228,17 +64241,18 @@
       "lectureEnd": null,
       "location": "地理科学学院101讲学厅",
       "speaker": "段洪涛",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "中科院南京地理与湖泊研究所",
       "inviter": "",
       "speakerBio": "段洪涛,中科院南京地理与湖泊研究所研究员,博士生导师,江苏省杰出青年基金获得者。长期从事湖泊水环境遥感研究,已主持国家水专项课题、国家自然科学基金等项目10余项。发表SCI论文70余篇,含1区以上30 篇;第一/通讯作者SCI论文近30篇,主要发表在RSE、 ES&T、WR等相关领域顶级刊物。曾荣获中科院院长特别奖(2007),全国青年地理科技奖(2013)、中科院青年创新促进会优秀会员(2016)等荣誉称号。担任第五届青年地学论坛共同主席,国际对地观测领域著名杂志lnternational Journal of Applied Earth Observa tionandGeoinformation(JAG)编委等社会职务",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2018-11-19大型湖泊遥感理论与实践",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181108/1628.html",
@@ -64745,17 +64759,18 @@
       "lectureEnd": null,
       "location": "地理科学学院101讲学厅",
       "speaker": "孙志斌",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "美国科罗拉多州立大学",
       "inviter": "",
       "speakerBio": "孙志斌,博士,现任美国科罗拉多州立大学研究员,美国SPIE 国际会议的组委会成员,参加和主持多次国际学术会议(如:美国 AGU)。专长于数据同化的理论与应用,非线性系统的数值模拟等学术研究。曾参与世界上首个开始地磁数据同化新领域的研究;目前研究分析紫外线的卫星数据和地面观测数据,人工神经网络算法在水质预测中的应用,利用遥感数据估计森林树种覆盖。已在国际刊物发表多篇学术论文,并为多个SCI刊物审阅稿件。",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
-      "abstract": "",
-      "listTitle": "2018-10-17数据同化理论与应用"
+      "abstract": "自九十年代以来，数据同化作为一个数学工具，不但广泛应用于大气科学和海洋科学，还开始被成功应用于其他的学科。它能帮助一个动态模型不断的把观测数据的信息吸收进来，甚至能改进无法观测的物理量，从而不断的把模型的(预测)输出逼近现实。它的原理还可以作另一方面的推广，数据融合可以借鉴于数据同化的方法，将不同来源的同类型数据(如卫星数据和地面观测数据)优化结合起来，得到质量更高的数据。",
+      "listTitle": "2018-10-17数据同化理论与应用",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181015/1582.html",
@@ -64795,17 +64810,18 @@
       "lectureEnd": null,
       "location": "地理科学学院三楼会议室",
       "speaker": "汪丽娜",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "副教授",
+      "speakerAffiliation": "华南师范大学地理科学学院",
       "inviter": "",
       "speakerBio": "汪丽娜,博士,华南师范大学地理科学学院副教授。 主要从事水资源系统可持续性、水文频率计算、洪水异变及其驱动力方面的相关研究。相关工作已获国家自然科学基金、教育部高等学校博士学科点、广东省自然科学基金、广东省教育厅育苗工程等专项科研基金资助已在《Hydrological Processes》、 《ecological en- gineering》、《 《水利学报》等专业期刊发表论文四十余篇,其中SCI收录4篇,EI收录3篇华南研花大学",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2018-10-08洪水级数的因子贡献率",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20180921/47.html",
@@ -64820,17 +64836,18 @@
       "lectureEnd": null,
       "location": "地理科学学院101讲学厅",
       "speaker": "胡中民",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "华南师范大学地理科学学院",
       "inviter": "",
       "speakerBio": "胡中民,现任华南师范大学地理科学学院研究员, 兼任亚洲通量网执委会成员,中国林学会气象专业委员会常务理事,美国地球物理学会(AGU)会员,中国生态学会会员。主要从事陆地生态系统碳水循环及其对全球变化响应研究。现已发表科研论文40余篇,其中以第或通讯作者在EcologyLetters,Global ChangeBi- ology,Global Ecology and Biogeography等前沿刊物发表论文20篇。 华南師花大学",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2018-09-21气候变化对草地的影响",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20180924/48.html",
@@ -64946,18 +64963,19 @@
       "lectureStart": "2018-06-28 14:30:00",
       "lectureEnd": null,
       "location": "地理科学学院三楼会议室",
-      "speaker": "",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speaker": "吴重庆",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "中山大学哲学系",
       "inviter": "",
       "speakerBio": "吴重庆教授现任中山大学哲学系教授,博士生导师,华南农村研究中心主任,国务院特殊津贴专家,中山大学\"百人计划\"引进人才 。兼任《开放时代》特约主编、RuralChina 编辑委员、Rethinking Socialism and ReforminChina(Brill)丛书主编之一。哈佛大学哈佛一燕京学社、香港大学新闻与传媒研究中心、新加坡国立大学东亚研究所、台湾大学人文社会高等研究院访问学者。 华南御靴大学",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2018-06-26中国东南沿海的同乡同业",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20180620/841.html",
@@ -65017,9 +65035,9 @@
       "lectureStart": "2018-06-14 09:00:00",
       "lectureEnd": null,
       "location": "地理科学学院三楼会议室",
-      "speaker": "李思悦等",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speaker": "李思悦",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "中国科学院重庆绿色智能技术研究院",
       "inviter": "",
       "speakerBio": "",
       "organizer": "地理科学学院",
@@ -65028,12 +65046,84 @@
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "abstract": "",
-      "listTitle": "全球变化下河流碳输送及界面CO2释放",
+      "listTitle": "岭南地理论坛第四十三讲",
       "images": [
         "https://statics.scnu.edu.cn/pics/geography/2018/0609/1528520429137869.jpg"
       ],
       "hasPosterImage": true,
-      "imageParseMethod": "vlm"
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "sessionNumber": "",
+      "splitMode": "vlm-poster",
+      "isMultiLecture": true,
+      "lectureIndex": 1,
+      "lectureCount": 3
+    },
+    {
+      "sourceUrl": "http://geography.scnu.edu.cn/a/20180609/45.html",
+      "college": "地理科学学院",
+      "campus": "石牌",
+      "title": "Ferdinand von Richthofen's Loess Research in China",
+      "topic": "Ferdinand von Richthofen's Loess Research in China",
+      "lectureStart": "2018-06-14 09:00:00",
+      "lectureEnd": null,
+      "location": "地理科学学院三楼会议室",
+      "speaker": "费杰",
+      "speakerTitle": "副教授",
+      "speakerAffiliation": "德国汉堡大学孔子学院、复旦大学历史地理研究所",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "地理科学学院",
+      "publishTime": "2018-06-09 12:56",
+      "publishTimeSource": "companion",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "",
+      "listTitle": "岭南地理论坛第四十三讲",
+      "images": [
+        "https://statics.scnu.edu.cn/pics/geography/2018/0609/1528520429137869.jpg"
+      ],
+      "hasPosterImage": true,
+      "imageParseMethod": "ocr",
+      "vlmExtracted": false,
+      "sessionNumber": "",
+      "splitMode": "ocr-poster",
+      "isMultiLecture": true,
+      "lectureIndex": 2,
+      "lectureCount": 3
+    },
+    {
+      "sourceUrl": "http://geography.scnu.edu.cn/a/20180609/45.html",
+      "college": "地理科学学院",
+      "campus": "石牌",
+      "title": "河流环境演变效应评估：流域文明与人类社会发展",
+      "topic": "河流环境演变效应评估：流域文明与人类社会发展",
+      "lectureStart": "2018-06-14 09:00:00",
+      "lectureEnd": null,
+      "location": "地理科学学院三楼会议室",
+      "speaker": "何洪鸣",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "中国科学院水利部水土保持研究所",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "地理科学学院",
+      "publishTime": "2018-06-09 12:56",
+      "publishTimeSource": "companion",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "",
+      "listTitle": "岭南地理论坛第四十三讲",
+      "images": [
+        "https://statics.scnu.edu.cn/pics/geography/2018/0609/1528520429137869.jpg"
+      ],
+      "hasPosterImage": true,
+      "imageParseMethod": "ocr",
+      "vlmExtracted": false,
+      "sessionNumber": "",
+      "splitMode": "ocr-poster",
+      "isMultiLecture": true,
+      "lectureIndex": 3,
+      "lectureCount": 3
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20180607/1544.html",
@@ -65248,17 +65338,18 @@
       "lectureEnd": "2018-05-23 16:30:00",
       "location": "第一课室大楼西201",
       "speaker": "段玉山",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授、博导",
+      "speakerAffiliation": "华东师范大学地理科学学院",
       "inviter": "",
       "speakerBio": "、博导 DAAG The sowre for all fiags GEOGRAPHY 华东师范大学地理科学学院党委书记。国际地理联合会地理教育委员会IGU-CGE执委中国教育学会地理教学专业委员会副理事长、秘书长。《 地理教学》杂志主编,高中地理课标制定修订组核心成员。",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "abstract": "",
-      "listTitle": "2018-05-21地理课标修订与核心素养"
+      "listTitle": "2018-05-21地理课标修订与核心素养",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20180518/1533.html",
@@ -65954,17 +66045,18 @@
       "lectureEnd": null,
       "location": "地理科学学院三楼会议室",
       "speaker": "张虎才",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "云南师范大学",
       "inviter": "",
       "speakerBio": "张虎才,理学博士、教授、博士生导师,系中国科学院\"百人计划\"入选者,2010年云南省高端引进人才团队负责人。现为云南师范大学高原地理过程与环境变化省重点实验室主任、高原湖泊沉积与环境云南省创新团队负责人、中加高原湖泊研究中心中方负责人,主要从事湖泊沉积与环境气候变化研究。张虎才教授作为负责人已承担国家自然科学基金重点项目、云南省高端人才引进项目碳专项、中德合作项目等多个国家级、省部级重要科研项目。出版中英文著作多部,并在NatureCommunications、QSR、PPP、 PLoSOne、QR、GRL、JOP等著名学术刊物上发表论文160余篇。 华南師花大学",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2018-03-23印度洋与印度季风",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20180326/1485.html",
@@ -66792,17 +66884,18 @@
       "lectureEnd": null,
       "location": "地理科学学院三楼会议室",
       "speaker": "崔建新",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "副研究员",
+      "speakerAffiliation": "陕西师范大学西北历史环境与经济社会发展研究院",
       "inviter": "",
       "speakerBio": "崔建新,副研究员。2005年获得兰州大学自然地理学博士学位。同年进入陕西师范大学西北历史环境与经济社会发展研究院。一直致力于环境考古和景观考古等领域的研究工作,试图探索基于多源数据和多种技术手段的跨学科研究方法。主要兴趣点为新石器以来的文化演进历史及政治、文化、气候背景之间的互动关系。已经发表SCI/SSCI论文多篇,出版专著1部。先后主持教育部和国家自然科学基金项目,参与科技部科技支撑计划、 973项目以及科技部基础资源调查专项等多个项目。 华南御彩大学",
       "organizer": "地理科学学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
-      "imageParseMethod": "ocr",
+      "imageParseMethod": "vlm",
       "hasPosterImage": true,
       "listTitle": "2017-11-24陕北龙山时期景观考古学研究",
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20171122/1387.html",
@@ -68230,9 +68323,9 @@
       "location": "院楼三楼会议室",
       "speaker": "孟刚",
       "speakerTitle": "研究员",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "复旦大学中国历史地理研究所",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "“中国历史地理信息系统（CHGIS）”复旦大学工作组成员，《历史地理》集刊编辑，《中华大典·历史地理典》学术秘书。参加《中华大典·历史地理典·政区分典》的编纂，编著有《晋书地理志汇释》。",
       "organizer": "地理科学学院",
       "publishTime": "2017-04-26 20:53",
       "publishTimeSource": "companion",
@@ -68244,7 +68337,8 @@
         "http://statics.scnu.edu.cn/pics/geography/2017/0426/1493211506567718.jpg"
       ],
       "hasPosterImage": true,
-      "imageParseMethod": "vlm"
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20170418/381.html",
@@ -69063,7 +69157,8 @@
       "images": [
         "http://statics.scnu.edu.cn/pics/geography/2016/1222/1482416418135554.jpg"
       ],
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20161222/12.html",
@@ -69094,7 +69189,8 @@
       "images": [
         "http://statics.scnu.edu.cn/pics/geography/2016/1222/1482416418135554.jpg"
       ],
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20161222/12.html",
@@ -69125,7 +69221,8 @@
       "images": [
         "http://statics.scnu.edu.cn/pics/geography/2016/1222/1482416418135554.jpg"
       ],
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20161222/12.html",
@@ -69156,7 +69253,8 @@
       "images": [
         "http://statics.scnu.edu.cn/pics/geography/2016/1222/1482416418135554.jpg"
       ],
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20161222/12.html",
@@ -69187,7 +69285,8 @@
       "images": [
         "http://statics.scnu.edu.cn/pics/geography/2016/1222/1482416418135554.jpg"
       ],
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20161222/12.html",
@@ -69218,7 +69317,8 @@
       "images": [
         "http://statics.scnu.edu.cn/pics/geography/2016/1222/1482416418135554.jpg"
       ],
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20161222/12.html",
@@ -69249,7 +69349,8 @@
       "images": [
         "http://statics.scnu.edu.cn/pics/geography/2016/1222/1482416418135554.jpg"
       ],
-      "abstract": ""
+      "abstract": "",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20161212/1201.html",
