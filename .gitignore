@@ -87,3 +87,7 @@ data/_*
 data/*.backup.json
 data/*.bak.*
 *.tmp
+# golden 测试的直播 HTML 缓存目录（密封化后测试改用 tests/fixtures/，
+# 此目录若被旧流程生成，不得入库——内含外部站点抓取的网页）
+tmp_diag/
+verify_sandbox/

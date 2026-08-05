@@ -4,7 +4,7 @@ import io
 import sys
 import datetime
 import requests
-from urllib.parse import urljoin, unquote
+from urllib.parse import urljoin, unquote, urlparse
 from bs4 import BeautifulSoup
 from timeparse import parse_cn_time, _year_from_text, resolve_lecture_time, _date_from_title
 
@@ -666,10 +666,23 @@ def _img_to_text(img_url_or_bytes):
             elif url.startswith('/statics.'):
                 # 站点把 statics.scnu.edu.cn 以根路径形式引用，实际缺协议
                 url = 'https:' + url
-            r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=20)
+            if url.startswith(('http://', 'https://')):
+                # 2026-08-05 安全修复：SSRF 校验 + 逐跳重定向校验 + 大小上限
+                raw = _safe_fetch(url)
+            elif _allowed_local_image(url):
+                # 本地图片仅允许爬虫自己的 PDF 转图产物目录（防 file:// 注入）
+                try:
+                    with open(url, 'rb') as f:
+                        raw = f.read(_MAX_FETCH_BYTES + 1)
+                except OSError:
+                    return ''
+            else:
+                return ''
+            if not raw or len(raw) > _MAX_FETCH_BYTES:
+                return ''
             fd, target = tempfile.mkstemp(suffix='.jpg')
             with os.fdopen(fd, 'wb') as f:
-                f.write(r.content)
+                f.write(raw)
         # 超大图保护：海报原图偶有过亿像素（如 139MP），直接送 OCR 会 OOM 且基本无可读文字。
         # 超过阈值直接跳过（返回空），避免进程被杀死；正常海报（通常 < 30MP）不受影响。
         try:
@@ -720,6 +733,97 @@ import json as _json
 import base64 as _b64
 import hashlib as _hash
 import time as _time
+
+# ============================================================================
+# 出站请求安全基线（2026-08-05 体检修复，安全-1/2/3）：
+# 本模块的请求目标全部来自被抓页面（img/iframe/a 标签），完全由第三方控制：
+#   - 仅允许 http/https，DNS 解析后拒绝私网/环回/链路本地/保留段（防 SSRF）；
+#   - 手动跟随重定向且逐跳重新校验（requests 默认最多 30 跳重定向可绕过表层限制）；
+#   - 响应体限量读取，防超大响应耗尽内存（DoS）；
+#   - 本地文件读取仅限爬虫自己的 PDF 转图输出目录，
+#     杜绝页面注入 file:// / 本地路径导致任意本地文件被读取。
+# ============================================================================
+import ipaddress as _ipaddress
+import socket as _socket
+
+_MAX_FETCH_BYTES = 20 * 1024 * 1024   # 单次出站响应上限：20MB
+_MAX_REDIRECTS = 5                     # 最大重定向跳数（逐跳重新校验目标）
+
+# 本地图片白名单目录：仅允许爬虫自己的 PDF 转图输出目录（与 PDF-POSTER-VLM 落盘路径一致）
+_LOCAL_IMG_WHITELIST_DIR = _os.path.normpath(_os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'tmp', 'pdf_posters'))
+
+
+def _allowed_local_image(path):
+    """本地路径是否落在白名单目录内（先归一化，防止 ../ 越界）。"""
+    try:
+        p = _os.path.normpath(_os.path.abspath(path))
+        return p.startswith(_LOCAL_IMG_WHITELIST_DIR + _os.sep)
+    except Exception:
+        return False
+
+
+def _is_safe_http_url(url):
+    """SSRF 校验：仅 http/https，且解析后的 IP 全部为公网地址才放行。"""
+    try:
+        p = urlparse(url)
+    except Exception:
+        return False
+    if p.scheme not in ('http', 'https') or not p.hostname:
+        return False
+    try:
+        port = p.port or (443 if p.scheme == 'https' else 80)
+        infos = _socket.getaddrinfo(p.hostname, port, proto=_socket.IPPROTO_TCP)
+    except Exception:
+        return False
+    for info in infos:
+        try:
+            ip = _ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            return False
+    return True
+
+
+def _safe_fetch(url, max_bytes=_MAX_FETCH_BYTES, timeout=20, verify=True):
+    """安全下载：SSRF 校验 + 逐跳校验的重定向跟随 + 响应体大小上限。
+
+    成功返回 bytes；任何校验失败 / 网络错误 / 超限返回 None。
+    verify=False 仅限已知校内域名的证书链残缺兜底（见 PDF 下载处），勿扩散使用。
+    """
+    cur = url
+    for _hop in range(_MAX_REDIRECTS + 1):
+        if not _is_safe_http_url(cur):
+            return None
+        try:
+            r = requests.get(cur, headers={'User-Agent': 'Mozilla/5.0'},
+                             timeout=timeout, stream=True,
+                             allow_redirects=False, verify=verify)
+        except requests.exceptions.RequestException:
+            return None
+        try:
+            if r.status_code in (301, 302, 303, 307, 308):
+                loc = r.headers.get('Location')
+                if not loc:
+                    return None
+                cur = urljoin(cur, loc)
+                continue
+            if r.status_code != 200:
+                return None
+            chunks, total = [], 0
+            for ch in r.iter_content(chunk_size=65536):
+                if not ch:
+                    continue
+                total += len(ch)
+                if total > max_bytes:
+                    return None
+                chunks.append(ch)
+            return b''.join(chunks)
+        finally:
+            r.close()
+    return None
 
 
 VLM_PROMPT = """你是一个学术讲座海报信息提取助手。下面是一张（或多张）学术讲座海报图片。请从中提取结构化信息，并以 JSON 格式输出，不要输出任何额外解释文字。
@@ -797,27 +901,45 @@ def _vlm_cache_path():
                          'data', '.vlm_cache.json')
 
 
+# 2026-08-05 体检修复（严重-7）：缓存「整文件读入→改→截断写回」在 scraper 的
+# 5 线程并发下存在读改写竞争：丢缓存、读到半截文件被静默当空缓存（重复烧 VLM
+# 额度）、写一半崩溃后文件永久损坏。改为全程持锁 + 写临时文件后 os.replace 原子替换。
+import threading as _threading
+_VLM_CACHE_LOCK = _threading.Lock()
+
+
 def _vlm_cache_get(key):
-    try:
-        p = _vlm_cache_path()
-        if _os.path.exists(p):
-            d = _json.load(open(p, encoding='utf-8'))
-            return d.get(key)
-    except Exception:
-        pass
-    return None
+    with _VLM_CACHE_LOCK:
+        try:
+            p = _vlm_cache_path()
+            if _os.path.exists(p):
+                with open(p, encoding='utf-8') as f:
+                    d = _json.load(f)
+                return d.get(key)
+        except Exception:
+            pass
+        return None
 
 
 def _vlm_cache_set(key, val):
-    try:
-        p = _vlm_cache_path()
-        d = {}
-        if _os.path.exists(p):
-            d = _json.load(open(p, encoding='utf-8'))
-        d[key] = val
-        _json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
-    except Exception:
-        pass
+    with _VLM_CACHE_LOCK:
+        try:
+            p = _vlm_cache_path()
+            d = {}
+            if _os.path.exists(p):
+                try:
+                    with open(p, encoding='utf-8') as f:
+                        d = _json.load(f)
+                except Exception:
+                    d = {}  # 缓存损坏时重建，而不是让整个写入失败
+            d[key] = val
+            _os.makedirs(_os.path.dirname(p), exist_ok=True)
+            tmp = p + '.tmp'
+            with open(tmp, 'w', encoding='utf-8') as f:
+                _json.dump(d, f, ensure_ascii=False)
+            _os.replace(tmp, p)
+        except Exception:
+            pass
 
 
 def _vlm_img_b64(img_url):
@@ -829,20 +951,27 @@ def _vlm_img_b64(img_url):
             u = 'https:' + u
         elif u.startswith('/statics.'):
             u = 'https:' + u
-        # 支持本地文件路径（file:// 或直接路径），用于 PDF 海报转图片后本地识别
+        # 本地文件路径：仅允许爬虫自己的 PDF 转图产物目录。
+        # 2026-08-05 安全修复：页面上若被注入 file:// 或本地裸路径，此前会无条件
+        # open() 任意本地文件；现一律先过白名单校验，白名单外直接拒绝。
         if u.startswith('file://'):
             local_path = u[7:]
-        elif _os.path.exists(u) and not u.startswith('http'):
+        elif not u.startswith(('http://', 'https://')) and _os.path.exists(u):
             local_path = u
         else:
             local_path = None
         if local_path:
+            if not _allowed_local_image(local_path):
+                return None
             with open(local_path, 'rb') as f:
-                raw = f.read()
+                raw = f.read(_MAX_FETCH_BYTES + 1)
+            if len(raw) > _MAX_FETCH_BYTES:
+                return None
         else:
-            r = requests.get(u, headers={'User-Agent': 'Mozilla/5.0'}, timeout=20)
-            r.raise_for_status()
-            raw = r.content
+            # SSRF 校验 + 逐跳重定向校验 + 大小上限
+            raw = _safe_fetch(u)
+            if raw is None:
+                return None
         im = Image.open(io.BytesIO(raw))
         w, h = im.size
         # 装饰小图（1x1 跟踪像素、小图标）或超长条幅：VLM 无价值，忽略以省 token、降误判
@@ -1157,11 +1286,16 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
         dt = _parse_vlm_datetime(ts, default_year, publish_time, title_year, url_year)
         if dt:
             result['lectureStart'] = dt.isoformat(sep=' ')
+            de = None
             if te:
                 de = _parse_vlm_datetime(te, default_year, publish_time, title_year, url_year)
                 if de:
                     result['lectureEnd'] = de.isoformat(sep=' ')
-            t = {'start': dt, 'end': None, 'has_time': True}
+            # 修复（2026-08-05 体检 严重-1）：end 必须随 t 一并返回。此前固定
+            # t = {'start': dt, 'end': None}，导致 parse_detail 末尾归一化
+            # （if t: result['lectureEnd'] = t['end']…）把刚写入的 VLM 结束时间
+            # 无条件覆盖为 None——纯海报页的 lectureEnd 必然丢失。
+            t = {'start': dt, 'end': de, 'has_time': True}
     return t
 
 
@@ -2337,14 +2471,16 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 _abs_pdf = urljoin(url, _pdf_url) if not _pdf_url.startswith('http') else _pdf_url
                 if _abs_pdf.startswith('//'):
                     _abs_pdf = 'http:' + _abs_pdf
-                import urllib.request as _urllib_req, ssl as _ssl
-                _pdf_req = _urllib_req.Request(_abs_pdf, headers={'User-Agent': 'Mozilla/5.0'})
-                _pdf_ctx = _ssl.create_default_context()
-                _pdf_ctx.check_hostname = False
-                _pdf_ctx.verify_mode = _ssl.CERT_NONE
-                _pdf_resp = _urllib_req.urlopen(_pdf_req, timeout=20, context=_pdf_ctx)
-                _pdf_data = _pdf_resp.read()
-                if _pdf_data[:5] == b'%PDF-':
+                # 2026-08-05 安全修复：原先全局禁用 TLS 证书校验（CERT_NONE），
+                # 中间人可替换 PDF 内容。改用 _safe_fetch：SSRF 校验 + 启用证书校验
+                # + 逐跳重定向校验 + 大小上限；仅对校内域名（证书链可能残缺）
+                # 放宽一次重试，避免个别学院 PDF 因证书问题失抓。
+                _pdf_data = _safe_fetch(_abs_pdf)
+                if _pdf_data is None:
+                    _pdf_host = urlparse(_abs_pdf).hostname or ''
+                    if _pdf_host.endswith('scnu.edu.cn'):
+                        _pdf_data = _safe_fetch(_abs_pdf, verify=False)
+                if _pdf_data and _pdf_data[:5] == b'%PDF-':
                     import io
                     try:
                         import fitz as _fitz

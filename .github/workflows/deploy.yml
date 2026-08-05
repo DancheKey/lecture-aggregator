@@ -20,6 +20,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -42,8 +43,17 @@ jobs:
       - name: 安装 Python 依赖
         run: pip install -r scraper/requirements.txt
 
+      # 切片新鲜度守卫（2026-08-05 体检修复 中等-19）：部署前由 data/lectures.json
+      # 重新生成前端切片，杜绝「手工改了 data/ 却忘跑切片脚本」导致公网切片陈旧。
+      - name: 重新生成前端切片
+        run: python scripts/generate_frontend_data.py
+
       - name: 校验数据不变量（铁律护栏）
         run: python scripts/test_invariants.py
+
+      # 一致性守卫：server.py 下发路径与切片生成路径必须逐条一致（防双实现漂移）
+      - name: 一致性守卫测试
+        run: python tests/test_frontend_consistency.py
 
       # 把 site/ 目录作为静态站点产物上传
       - name: 上传站点产物

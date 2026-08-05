@@ -778,7 +778,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
         time.sleep(1)
     except Exception as e:
         print(f'[ERROR] 信息源「{name}」抓取失败：{e}', file=sys.stderr)
-    return local
+        # 2026-08-05 体检修复（严重-3）：把失败上报给调用方。此前异常仅打印后吞掉，
+        # main() 无从知晓哪些源失败，水位照常推进 → 失败时段内发布的讲座永久漏抓。
+        # 已抓到的部分结果仍返回（不浪费），但本源水位不得推进。
+        return local, f'{name}: {e}'
+    return local, None
 
 
 def main():
@@ -869,16 +873,20 @@ def main():
     # 并发抓取各信息源：源与源之间独立，大幅缩短 GitHub Actions 全量/增量耗时
     max_workers = 1 if args.source else 5
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
+    failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded): src for src in sources}
         for future in as_completed(future_to_src):
             src_name = future_to_src[future].get('name')
             try:
-                local = future.result()
+                local, err = future.result()
+                if err:
+                    failed_sources.append(err)
                 for url, rec in local.items():
                     lectures[url] = rec
                     all_fetched.append(rec)
             except Exception as e:
+                failed_sources.append(f'{src_name}: {e}')
                 print(f'[ERROR] 合并信息源「{src_name}」结果失败：{e}', file=sys.stderr)
 
     # 同源去重：同一学院标题相似的只保留一条
@@ -970,8 +978,22 @@ def main():
                        {'updatedAt': now_iso, 'data': out})
     # 局部修复模式不更新 last_scrape.json，避免影响下一次全量/定时增量调度
     if not args.source:
-        _atomic_write_json(last_scrape_path,
-                           {'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'})
+        if failed_sources:
+            # 体检修复（严重-3）：存在失败源时绝不推进水位。否则水位越过失败时段，
+            # 这些源在该时段内发布的讲座在后续增量中永远补不回（「增量陷阱」）。
+            # 保留旧水位并记录失败源：下一次运行以同一区间重抓自动补回。
+            # 首次运行即失败（无旧水位）时不写 last_scrape 字段 → 下次自动全量重建。
+            payload = {'mode': 'incremental' if is_incremental else 'full',
+                       'attempted_at': now_iso,
+                       'failed_sources': failed_sources}
+            if since:
+                payload['last_scrape'] = since
+            _atomic_write_json(last_scrape_path, payload)
+            print(f'[WARN] 本次 {len(failed_sources)} 个信息源失败，水位未推进（下次自动重试）：'
+                  + '；'.join(failed_sources), file=sys.stderr)
+        else:
+            _atomic_write_json(last_scrape_path,
+                               {'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'})
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
           f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
 

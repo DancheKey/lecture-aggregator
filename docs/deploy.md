@@ -14,7 +14,7 @@ site/                 ← 前端（Vue3 + Tailwind CDN，纯静态）
   stats.html          学院/部处 × 年份 统计表
   sources.html        信息源管理（需后端）
   app.js / style.css
-  lectures.json       ← 静态数据源（部署副本，由脚本从 data/ 同步）
+  lectures.json       ← 静态数据源（切片脚本生成：排除名单过滤 + unitType 标注，勿用 cp 覆盖）
   scnu-emblem.png / motto.png / site-title.png
 data/lectures.json    ← 爬虫产出的唯一数据源
 scraper/               ← Python 爬虫（requests + bs4 + RapidOCR）
@@ -35,17 +35,23 @@ server.py              ← 本地开发/全栈后端（静态托管 + /api/*）
 
 ### 1. 更新数据后重新发布
 
-数据由爬虫在**本机**生成，再同步到 `site/` 并重新部署：
+数据由爬虫在**本机**生成，再由切片脚本生成前端静态数据并重新部署：
 
 ```bash
 # 1) 本机运行爬虫（增量抓取新讲座）
 cd scraper && python scraper.py          # 或 python scraper.py --since <上次时间>
 
-# 2) 同步数据到前端静态目录
-cp data/lectures.json site/lectures.json
+# 2) 生成前端静态数据（含排除名单过滤与场次/期数标注）
+python scripts/generate_frontend_data.py
 
 # 3) 重新部署（CloudStudio / 见下方其它托管）
 ```
+
+> ⚠️ **切勿用 `cp data/lectures.json site/lectures.json` 同步数据**（2026-08-05 体检修正）。
+> `site/lectures.json` 不是 `data/lectures.json` 的副本，而是
+> `scripts/generate_frontend_data.py` 的**加工产物**：过滤了 `data/excluded_urls.json`
+> 排除名单、并为拆分记录附加 `unitType`（场/期）。直接 cp 会让被排除的非讲座
+> 在公网复活、unitType 丢失（前端全部回退显示「期」）。
 
 > 仅 CloudStudio 部署：在本项目对话里说「重新部署 site 目录」即可；
 > 其它平台按各自方式上传 `site/` 整个目录。
@@ -67,11 +73,16 @@ cp data/lectures.json site/lectures.json
 
 把仓库推到 GitHub 后，已内置 `.github/workflows/daily.yml`：
 
-- **定时**：北京时间**每天凌晨 3:00**（cron `0 19 * * *`，GitHub 用 UTC）自动运行爬虫增量更新；
+- **定时**：每天两班（GitHub cron 用 UTC）——**03:00 UTC（北京时间 11:00）** 与
+  **17:00 UTC（北京时间次日 01:00）** 自动运行爬虫增量更新（2026-08-05 按 daily.yml 实际配置修正）；
 - **手动**：Actions 页面 `Run workflow`，或通过网站「抓取新数据」按钮经代理触发（见 SECURITY.md R6）；
-- 运行方式：GitHub 临时云机器装 Python + 依赖（含 RapidOCR，已缓存模型）→ 跑 `scraper/scraper.py`
-  （增量，**只补新讲座，不会重复解析已抓过的旧 URL**）→ 把 `data/lectures.json` 同步为
-  `site/lectures.json` → 提交并推送 → Pages 自动重新发布。
+- 运行方式：GitHub 临时云机器装 Python + 依赖（含 RapidOCR，已缓存 pip）→ 跑 `scraper/scraper.py`
+  （增量，**只补新讲座，不会重复解析已抓过的旧 URL**）→ 跑 `scripts/generate_frontend_data.py`
+  生成前端切片（`site/lectures.json`、`site/lectures/latest.json`、`site/lectures/stats.json`）
+  → 校验数据不变量 → 提交并推送 → Pages 自动重新发布。
+- **失败保护**（2026-08-05 新增）：若某些信息源抓取失败，增量水位**不推进**
+  （`data/last_scrape.json` 保留旧水位并记录 `failed_sources`），下次运行自动补回；
+  工作流以失败（红色）结束以触发告警，但已成功抓到的数据照常提交部署。
 - **全程免费、无需服务器、无需你每次操作**，访问者每天都能看到最新讲座。
 
 > ⚠️ **增量陷阱（务必理解，否则旧数据永远修不了）**
@@ -85,9 +96,8 @@ cp data/lectures.json site/lectures.json
 > python -c "import json;p='data/lectures.json';o=json.load(open(p,encoding='utf-8'));o['data']=[x for x in o['data'] if x.get('sourceUrl')!='<URL>'];json.dump(o,open(p,'w',encoding='utf-8'),ensure_ascii=False,indent=2)"
 > # 2) 重新抓取该院（该 URL 已不在基底，会重新下载并用新解析器解析）
 > python scraper/scraper.py --source <学院名>
-> # 3) 重新生成前端切片 + 同步静态副本
+> # 3) 重新生成前端切片（已包含写入 site/lectures.json，无需也不得再 cp）
 > python scripts/generate_frontend_data.py
-> cp data/lectures.json site/lectures.json
 > # 4) git add + commit + push（触发 Pages 重新部署）
 > ```
 > 详见 `docs/PARSING_RULES.md` 的「运维约定 / 增量陷阱」一节。
@@ -99,16 +109,18 @@ cp data/lectures.json site/lectures.json
 
 > 发布前请确保：① `site/.nojekyll` 已存在（避免 Pages 用 Jekyll 处理静态文件）；
 > ② `data/last_scrape.json` 已随仓库提交（增量基线，否则每次全量重扫）；
-> ③ Pages 来源设为「分支 main / 目录 /site」。
+> ③ Pages 来源设为 **GitHub Actions**（本仓库用 `actions/upload-pages-artifact` +
+> `actions/deploy-pages` 部署；若误选「Deploy from a branch」，deploy.yml 会部署失败）。
 
 ### 4. 发布到 GitHub Pages 的具体步骤
 
 1. 在 GitHub 新建仓库（公开/私有均可，代码本身无密钥）；
 2. 把本项目（含 `site/`、`scraper/`、`data/`、`server.py`、`.github/`）推到 `main` 分支；
-3. 仓库 `Settings → Pages → Build and deployment → Source` 选 **Deploy from a branch**，
-   Branch 选 **main**，目录选 **/site**，保存；
+3. 仓库 `Settings → Pages → Build and deployment → Source` 选 **GitHub Actions**
+   （2026-08-05 修正：此前文档误写为「Deploy from a branch / main /site」，
+   与本仓库的 Actions 部署方式冲突，照旧文档配置会导致部署失败）；
 4. 约 1 分钟后访问 `https://<用户名>.github.io/<仓库名>/`；
-5. 此后每天 03:00 自动更新；也可在 Actions 页手动触发。
+5. 此后每天两班自动更新（北京时间 11:00 与次日 01:00）；也可在 Actions 页手动触发。
 
 ---
 
@@ -154,7 +166,7 @@ server {
 | 公网访问 | 已完成 | CloudStudio 链接已可所有人访问 |
 | 自定义域名 | 可选 | 在 CloudStudio/托管平台绑定你自己的域名 |
 | ICP 备案 | 仅国内服务器 | 若用方案 B + 国内云服务器，域名必须备案 |
-| 数据更新 | ✅ 已自动化 | GitHub Actions 每日凌晨 3 点自动抓取并更新（见上 §3）；临时手动更新可在 Actions 页 Run workflow |
+| 数据更新 | ✅ 已自动化 | GitHub Actions 每天两班自动抓取并更新（北京时间 11:00 与次日 01:00，见上 §3）；临时手动更新可在 Actions 页 Run workflow |
 | HTTPS | 建议 | CloudStudio 已带 HTTPS；自有域名用 Let's Encrypt 免费证书 |
 | 点赞跨设备共享 | 可选增强 | 当前点赞存浏览器本地，不跨设备；若要全局共享需加一个后端存储 |
 

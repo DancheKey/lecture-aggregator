@@ -1,3 +1,5 @@
-requests
-beautifulsoup4
-pyyaml
+# server.py 本地后端最小依赖（爬虫完整依赖见 scraper/requirements.txt）
+# 2026-08-05 体检修复（中等-21）：固定版本并与 scraper/requirements.txt 对齐
+requests==2.32.4
+beautifulsoup4==4.14.2
+pyyaml==6.0.2

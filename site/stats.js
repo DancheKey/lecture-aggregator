@@ -282,7 +282,10 @@ createApp({
       return v || '—';
     },
     // 读取每条讲座的访问/点赞：优先后端，无后端时回退本机。
-    // 后端返回的 URL 会覆盖本地同名键，避免本机残留旧测试数据与后端不一致。
+    // 修复（2026-08-05 体检 中等-12）：与 app.js 对齐为「按 URL 字段级合并」。
+    // 此前是整条覆盖（{...localStats, ...j.stats}）——服务端旧记录可能缺 wants
+    // 字段，整条覆盖会把本机离线积累的 wants 抹掉（首页图标高亮但计数为 0）。
+    // 字段级合并：后端没有的字段保留本地值，后端有的字段以后端权威值覆盖。
     loadLectureStats() {
       let localStats = {};
       try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
@@ -291,9 +294,12 @@ createApp({
         .then(r => r.json())
         .then(j => {
           if (j && j.stats) {
-            // 后端优先：后端有的 URL 直接覆盖本地；后端没有的保留本地
-            this.lectureStats = { ...localStats, ...j.stats };
-            localStorage.setItem(STAT_KEY, JSON.stringify(this.lectureStats));
+            const merged = { ...localStats };
+            for (const [url, serverSt] of Object.entries(j.stats)) {
+              merged[url] = { ...(merged[url] || {}), ...serverSt };
+            }
+            this.lectureStats = merged;
+            localStorage.setItem(STAT_KEY, JSON.stringify(merged));
           } else {
             this.lectureStats = localStats;
           }

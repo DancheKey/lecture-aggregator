@@ -25,9 +25,10 @@ parsers.parse_detail(html, url, college, campus)
    │  └─ 新闻过滤 is_news_record + is_news_article（两层）
    ▼
 data/lectures.json  { updatedAt, data:[...] }     ← 爬虫唯一数据源
-   │  cp 同步
+   │  scripts/generate_frontend_data.py 加工（排除名单过滤 + unitType 标注）
+   │  ⚠️ 不是 cp 副本：直接 cp 会让排除名单失效、unitType 丢失（2026-08-05 体检修正）
    ▼
-site/lectures.json  +  scripts/generate_frontend_data.py  →  site/lectures/{latest,stats}.json
+site/lectures.json  +  site/lectures/{latest,stats}.json
    │
    ▼
 前端 site/index.html + app.js（GitHub Pages 后台加载 site/lectures.json）
@@ -189,7 +190,10 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
 ---
 
 ### 1.7 前端切片（`scripts/generate_frontend_data.py`）
-- `site/lectures.json`（全量回退）与 `latest.json`（前 50 条，首页首屏）**保留全部字段**（含 `abstract`/`speakerBio`）。
+- `site/lectures.json`（全量回退）**保留全部字段**（含 `abstract`/`speakerBio`）；
+  `latest.json`（前 50 条，首页首屏）字段集与全量一致，但 `abstract`/`speakerBio`
+  截断至 220 字符（`LATEST_PREVIEW_LEN`）以让首屏秒开——展开/详情仍由全量补齐。
+  （2026-08-05 体检修正：旧文档称 latest.json「保留全部字段」未提截断，易误导。）
 - ⚠️ 历史上曾为减小体积剥离这两字段，导致**公网卡片比本地少「简介/内容摘要」两行**——这是切片裁剪不是数据缺失。任何「优化体积」而裁剪字段的冲动，先确认该字段在首页卡片被渲染。
 
 ---
@@ -211,7 +215,7 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
 13. **speakerBio 误触发**：海报「简介」二字常被标题误触发，使 `speakerBio` 变整段海报文字。守卫：若 `speakerBio` 来自 OCR 且含 `时间/地点/日期` 关键词则清空。
 14. **OCR 沙箱硬崩**：RapidOCR 已无 torch 依赖，批量修数据无需禁用；若个别环境崩，`parsers._img_to_text = lambda img: ''` 置空即可降级。
 15. **URL 路径日期被 SLASH_MONTHDAY 误匹配**：URL 路径 `2025/0507/` 中的 `25/05` 会被误当「月=25/日=05」触发异常。`timeparse._build` 已加 mo∈[1,12]、d∈[1,31]、y>0 校验，非法返回 None 回退其他模式。
-16. **数据双份一致性**：`data/lectures.json`（爬虫产出）与 `site/lectures.json`（Pages 实际读）必须一致；手动改数据后务必 `cp data/lectures.json site/lectures.json`。
+16. **数据双份一致性**：`data/lectures.json`（爬虫产出）与 `site/lectures.json`（Pages 实际读）必须一致；手动改数据后务必运行 `python scripts/generate_frontend_data.py` 重新生成全部前端切片。（2026-08-05 体检修正：**不得用 `cp data/lectures.json site/lectures.json`**——site 那份是脚本加工产物，含排除名单过滤与 unitType 标注，cp 会使其失效。）
 17. **正文时间标注里的「号」字导致未来年污染**：中文日期结尾有「日」也有「号」（如「2023年12月29号下午14:00」）。`timeparse._parse_segment` 完整中文日期正则只写了 `\s*日`，没兼容 `号`，导致命中正文 `时间：2023年12月29号` 后完整年份未被识别，回退到 `M月D日` 并用 `default_year=当前系统年`（如 2026）填充，生成 `2026-12-29` 这种错误。根因修复：`timeparse._parse_segment` 第 1 步改为 `\s*[日号]`。同时 `parsers.py` 高优先级时间标注递归调用传入 `title_year`/`url_year` 作为年份回退（仍不传 `publish_time`，防旧讲座重发被抬年）。修复后必须删旧记录重抓（计算机学院 2026-12-29 等 4 条即此修复）。
 18. **dedup 误删不同讲座（致命隐性丢数据）**：`scraper.dedup` 原判定键为 `(college, _normalize_title(title))`。当某院列表标题是通用词（如「学术报告通知」「学术讲座信息」），且 §1.3 的 `_clean_title` 已把锚文本里的日期前缀去掉后，多个**不同日期、不同 URL**的讲座会归一化成同一标题 → 撞键被合并成 1 条，其余**静默丢弃**。计算机学院曾因此从列表可达的 42 条掉到 21 条（如 `2682`「学术报告通知」与 `2715`「学术报告通知」撞键只留 1 条，零散丢失、不易察觉）。根因修复：`dedup` 判定键改为 `(college, 归一化标题, 讲座日期, 来源URL)`——**只要 sourceUrl 不同就视为不同讲座，绝不合并且丢弃**；同 URL 真重复仍正确合并（保留字段更完整的）。⚠️ 以后新增/修源若发现某院条数明显少于列表可达数，先怀疑 dedup 而非增量。
 19. **首页 / 统计页数字动画定格在旧数 + 统计页访问量为 0**：
@@ -226,17 +230,27 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
 ### 3.1 ⚠️ 增量陷阱（最重要）
 - `scraper.py --source` 以 `data/lectures.json` 为基底，**已抓过的 URL 不会再次下载解析**。
 - 后果：① 解析器升级/修 bug 后旧讲座**不会自动修正**；② 某条旧记录错了，daily 自动跑**永远修不了**。
-- 修复步骤（详见 `deploy.md` §3 警示框）：从 `data/lectures.json` 删该 URL → `--source <院>` 重抓 → `generate_frontend_data.py` → `cp` 同步 → commit/push。
+- 修复步骤（详见 `deploy.md` §3 警示框）：从 `data/lectures.json` 删该 URL → `--source <院>` 重抓 → `generate_frontend_data.py` 重新生成切片 → commit/push。
 - 多源串行跑（都写同一 `data/lectures.json`，并行会互相覆盖）。
 
 ### 3.2 数据双份 + 同步
-- `data/lectures.json` 是唯一数据源；`site/lectures.json` 是 GitHub Pages 实际读取的静态副本。
-- **手动改数据后**：`python scripts/generate_frontend_data.py` 生成 `site/lectures/{latest,lite,stats}.json`，再 `cp data/lectures.json site/lectures.json`。
+- `data/lectures.json` 是唯一数据源；`site/lectures.json` 是 GitHub Pages 实际读取的静态切片。
+- **手动改数据后**：运行 `python scripts/generate_frontend_data.py`，它会一次性生成/更新
+  `site/lectures.json`、`site/lectures/{latest,stats}.json`（并给 JS 打内容 hash 版本号）。
+  （2026-08-05 体检修正：**不要再执行 `cp data/lectures.json site/lectures.json`**——
+  site 切片需经脚本做排除名单过滤与 unitType 标注；旧文档提到的 `lite.json` 已不存在，
+  现为 `latest.json`。）
 - `data/last_scrape.json` 是每日增量基线，**须入库**（`.gitignore` 已注明），否则每次全量重扫。
 
 ### 3.3 daily.yml 的边界
-- `.github/workflows/daily.yml` 每日 03:00（UTC 19:00）跑 `scraper/scraper.py` 增量 → 同步 `site/` → 提交推送 → Pages 重发布。
-- daily.yml 只 `git add` 数据文件和 `site/` 切片，**不 add `scripts/generate_frontend_data.py` 等脚本**。改了脚本须**手动 commit** 并 push，否则下次自动跑仍用旧脚本生成切片。
+- `.github/workflows/daily.yml` 每天两班（UTC 03:00 / 17:00）跑 `scraper/scraper.py` 增量 →
+  `generate_frontend_data.py` 生成切片 → 不变量校验 → 提交推送 → Pages 重发布。
+  （2026-08-05 体检修正：旧文档「每日 03:00（UTC 19:00）」一班制已过时。）
+- 部分信息源失败时：增量水位不推进（`failed_sources` 记入 `last_scrape.json`），
+  下次运行自动补回；工作流末尾检查到失败源会以红色结束（告警），成功数据照常部署。
+- daily.yml 只 `git add` 数据文件、`site/` 切片与 `site/index.html`、`site/stats.html`
+  （后两者承载 JS 缓存破坏版本号），**不 add `scripts/generate_frontend_data.py` 等脚本**。
+  改了脚本须**手动 commit** 并 push，否则下次自动跑仍用旧脚本生成切片。
 - daily.yml 已适配 RapidOCR：移除 easyocr 的 `libgl1` 系统依赖与 `~/.EasyOCR` 模型缓存步骤；RapidOCR 模型随包分发 + `opencv-python-headless` 无需 GL 库。
 
 ### 3.4 本地预览（开发用）

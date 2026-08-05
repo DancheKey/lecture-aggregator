@@ -7,116 +7,126 @@ golden-case 回归测试（Q3）——锁定 parser 关键案例，防止改候�
   python tests/test_parser_golden.py            # 直接跑（stdlib unittest）
   python -m unittest tests.test_parser_golden   # 或这样
 
-特性：
-- 禁用 VLM（_load_vlm_config 打桩），零 API 成本，纯文本/OCR 路径。
-- HTML 缓存优先：tmp_diag/<basename> 或 tmp_diag/*<basename> 命中即用；
-  未命中则直播抓取（CI 环境无缓存，走直播；抓取失败则该 case 自动 skip，不红）。
-- 每个 case 独立成一个测试方法，单个 skip/fail 不影响其余。
-- 断言：条数 / speaker 列表 / topic 无垃圾值（如 ctld4391 旧值 '0- 17'）/
-  无跨讲者 bio 泄漏（psy899 式）。
+密封化（2026-08-05 体检修复 严重-6）：
+- HTML 已固化为 tests/fixtures/html/*.html（python tests/fetch_fixtures.py 可刷新）。
+  有 fixture 的 case 完全离线可跑；解析失败直接红（不再 skip），
+  杜绝「网络抖动 → 整体 skip → 门禁空转、绿 ≠ 通过」。
+- VLM 走「录制回放」：VLM 响应固化在 tests/fixtures/vlm_cache.json，
+  测试把缓存路径指向该夹具、provider 配置打桩为不可达地址——
+  命中缓存即返回（无任何真实 API 调用、零 key、零成本、CI/本地完全一致）；
+  若某 case 的 VLM 响应未录制，会请求不可达地址并失败（红），而不是静默跳过。
+- ctld4409 原页已下线(404)且无本地副本，保留 may_404 skip 语义（文档化的唯一例外）。
+
+断言：条数 / speaker 列表 / topic 无垃圾值（如 ctld4391 旧值 '0- 17'）/
+无跨讲者 bio 泄漏（psy899 式）。
 
 案例来源：评审文档第六节 + 历次补丁验证（补丁4/16/17/9-10/abstract 泄漏）。
 """
-import glob
-import json
 import os
 import sys
 import unittest
-import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
-CACHE = os.path.join(ROOT, 'tmp_diag')
+FIXDIR = os.path.join(ROOT, 'tests', 'fixtures', 'html')
+VLM_CACHE_FIXTURE = os.path.join(ROOT, 'tests', 'fixtures', 'vlm_cache.json')
 
 import parsers as P
-P._load_vlm_configs = lambda: []  # 打桩 VLM：CI 无 key，本地也必须与 CI 一致走 OCR 路径
+
+# VLM 密封化：provider 配置打桩为「存在但不可达」（.invalid 为 RFC 6761 保留、永不解析）。
+# 配合缓存夹具：命中缓存直接返回（真实路径），缓存未命中才会请求该地址并快速失败。
+P._load_vlm_configs = lambda: [{'model': 'golden-replay', 'api_key': 'unused',
+                                'base_url': 'http://golden-test.invalid/vlm'}]
+P._vlm_cache_path = lambda: VLM_CACHE_FIXTURE      # 只读仓库内夹具，不依赖/不污染本机生产缓存
+P._vlm_cache_set = lambda key, val: None           # 测试期不落盘新缓存
 
 # 垃圾 topic 特征（历史上由表格/页眉误读产生）：如 '0- 17' / '0 -12' / 纯序号
 _FORBIDDEN_TOPIC = ('0-', '0 -', '0—')
 
 
-def load_html(url):
-    base = url.rstrip('/').split('/')[-1]
-    exact = os.path.join(CACHE, base)
-    if os.path.exists(exact):
-        with open(exact, encoding='utf-8', errors='replace') as f:
-            return f.read()
-    hits = glob.glob(os.path.join(CACHE, '*' + base))
-    if hits:
-        with open(hits[0], encoding='utf-8', errors='replace') as f:
-            return f.read()
-    last = None
-    for _attempt in range(2):  # 重试一次，容忍瞬时网络故障
+def load_html(case):
+    """优先读仓库 fixture；缺失且显式允许直播（GOLDEN_ALLOW_LIVE=1）才抓取。"""
+    path = os.path.join(FIXDIR, case['fixture'])
+    if os.path.exists(path):
+        with open(path, 'rb') as f:
+            raw = f.read()
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=25) as r:
-                raw = r.read()
-            try:
-                return raw.decode('utf-8')
-            except UnicodeDecodeError:
-                return raw.decode('gb18030', errors='replace')
-        except Exception as e:  # noqa: BLE001
-            last = e
-    if last:
-        raise last
+            return raw.decode('utf-8')
+        except UnicodeDecodeError:
+            return raw.decode('gb18030', errors='replace')
+    if os.environ.get('GOLDEN_ALLOW_LIVE') == '1' and not case.get('may_404'):
+        import urllib.request
+        req = urllib.request.Request(case['url'], headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=25) as r:
+            raw = r.read()
+        try:
+            return raw.decode('utf-8')
+        except UnicodeDecodeError:
+            return raw.decode('gb18030', errors='replace')
+    raise FileNotFoundError(
+        f'缺少 fixture：tests/fixtures/html/{case["fixture"]}。'
+        f'请运行 python tests/fetch_fixtures.py 固化该页后重试。')
 
 
-def parse(url):
-    html = load_html(url)
-    recs = P.parse_detail(html, url, college='', campus='', default_year=None)
+def parse(case):
+    html = load_html(case)
+    recs = P.parse_detail(html, case['url'], college='', campus='', default_year=None)
     return recs if isinstance(recs, list) else [recs]
 
 
 # ── golden cases ──────────────────────────────────────────────
 # count: 期望条数；speakers: 期望 speaker 列表（顺序，允许 ''）；
 # topic_sub: 每场 topic 应包含的片段（可选，用于强校验关键页）。
+# fixture: tests/fixtures/html/ 下的固化 HTML 文件名。
 CASES = [
     # 补丁4 表格解析：ctld4391 拆 2 期且字段正确（旧值 topic='0- 17' 垃圾）
-    {'url': 'http://ctld.scnu.edu.cn/a/20241111/4391.html', 'count': 2,
-     'speakers': ['穆肃', '黄卫祖'],
+    {'url': 'http://ctld.scnu.edu.cn/a/20241111/4391.html', 'fixture': 'ctld4391.html',
+     'count': 2, 'speakers': ['穆肃', '黄卫祖'],
      'topic_sub': ['人工智能在教育技术中的应用', '基于人工智能的个性化']},
     # 补丁17 已回退页：应单讲座、host 归位、不误拆
-    {'url': 'http://skc.scnu.edu.cn/a/20231116/786.html', 'count': 1,
-     'speakers': ['陈钊'], 'topic_sub': ['中国关键核心技术测度']},
-    {'url': 'http://skc.scnu.edu.cn/a/20230323/691.html', 'count': 1,
-     'speakers': ['王文斌'], 'topic_sub': ['国际中文教育']},
+    {'url': 'http://skc.scnu.edu.cn/a/20231116/786.html', 'fixture': 'skc786.html',
+     'count': 1, 'speakers': ['陈钊'], 'topic_sub': ['中国关键核心技术测度']},
+    {'url': 'http://skc.scnu.edu.cn/a/20230323/691.html', 'fixture': 'skc691.html',
+     'count': 1, 'speakers': ['王文斌'], 'topic_sub': ['国际中文教育']},
     # 纯文本多讲座：psy899 跨讲者 abstract/bio 不泄漏（蔡清/库逸轩 各独立）
-    {'url': 'http://psy.scnu.edu.cn/a/20151201/899.html', 'count': 2,
-     'speakers': ['蔡清', '库逸轩'],
+    {'url': 'http://psy.scnu.edu.cn/a/20151201/899.html', 'fixture': 'psy899.html',
+     'count': 2, 'speakers': ['蔡清', '库逸轩'],
      'topic_sub': ['What is atypical', 'Neural mechanisms']},
     # 裸专题并列：ctld4299 拆 2 期
-    {'url': 'http://ctld.scnu.edu.cn/a/20240408/4299.html', 'count': 2,
-     'speakers': ['谢幼如', '王颖'],
+    {'url': 'http://ctld.scnu.edu.cn/a/20240408/4299.html', 'fixture': 'ctld4299.html',
+     'count': 2, 'speakers': ['谢幼如', '王颖'],
      'topic_sub': ['数智赋能课程教学创新', '课程思政的教学设计与教学实践']},
     # CTLD 通识课「（第N场）：」结构：4408/4410 拆 2 期、location 无泄漏
-    {'url': 'http://ctld.scnu.edu.cn/a/20250303/4408.html', 'count': 2,
-     'speakers': ['汤庸', '穆肃'],
+    {'url': 'http://ctld.scnu.edu.cn/a/20250303/4408.html', 'fixture': 'ctld4408.html',
+     'count': 2, 'speakers': ['汤庸', '穆肃'],
      'topic_sub': ['DeepSeek与人工智能技术前沿', '中小学校如何开好人工智能课']},
-    {'url': 'http://ctld.scnu.edu.cn/a/20250317/4410.html', 'count': 2,
-     'speakers': ['胡国胜', '王红'],
+    {'url': 'http://ctld.scnu.edu.cn/a/20250317/4410.html', 'fixture': 'ctld4410.html',
+     'count': 2, 'speakers': ['胡国胜', '王红'],
      'topic_sub': ['价值引领的人工智能教育应用', '人工智能助力教师队伍新发展']},
     # xz 跨日期同主题系列：单页拆多期不误合。
-    # 注意：本页为行知书院讲座海报（OCR 提取），实际含 5 场不同主讲的研究报告，
-    # 应拆 5 条。旧基线 count=1 是错误值——当时 publishTime=None 导致 OCR 日期缺年份
-    # 上下文、5 场被错误合并；发布时间提取修复后正确拆 5 场。topic 当前 OCR 未提取到，
-    # 故 topic_sub 不强校验。
-    {'url': 'http://xz.scnu.edu.cn/a/20221026/65.html', 'count': 5,
+    # 注意：本页为行知书院讲座海报（VLM 提取，响应已录制于 tests/fixtures/vlm_cache.json），
+    # 实际含 5 场不同主讲的研究报告，应拆 5 条。旧基线 count=1 是错误值——
+    # 当时 publishTime=None 导致 OCR 日期缺年份上下文、5 场被错误合并；
+    # 发布时间提取修复后正确拆 5 场。topic 当前未提取到，故 topic_sub 不强校验。
+    {'url': 'http://xz.scnu.edu.cn/a/20221026/65.html', 'fixture': 'xz65.html',
+     'count': 5,
      'speakers': ['张曦', '黄佩瑶', '陈嘉仪', '林逸鑫', '龚雅云、黄嘉正'], 'topic_sub': [],
      'requires_vlm': True},
     # cs 多报告（同页 2 场不同主讲）
-    {'url': 'http://cs.scnu.edu.cn/a/20240516/5708.html', 'count': 2,
-     'speakers': ['罗富财', '林富春'],
+    {'url': 'http://cs.scnu.edu.cn/a/20240516/5708.html', 'fixture': 'cs5708.html',
+     'count': 2, 'speakers': ['罗富财', '林富春'],
      'topic_sub': ['Generic Construction', 'More Efficient Zero-Knowledge']},
     # ggy5666 同人 4 场（徐湘林 x4）——校验不误拆且 bio 不互串
-    {'url': 'http://ggy.scnu.edu.cn/a/20211116/5666.html', 'count': 4,
+    {'url': 'http://ggy.scnu.edu.cn/a/20211116/5666.html', 'fixture': 'ggy5666.html',
+     'count': 4,
      'speakers': ['徐湘林', '徐湘林', '徐湘林', '徐湘林'], 'topic_sub': []},
     # physics807 三场：嘉宾在主题之前（嘉宾：X → 主题：Y → 嘉宾简介：…教授），
     # 块末"嘉宾：下一场"指向下一场；核验前置 speaker 正确落位（刘玉鑫/吴小山/刘玉斌）
-    {'url': 'https://physics.scnu.edu.cn/a/20191118/807.html', 'count': 3,
-     'speakers': ['刘玉鑫', '吴小山', '刘玉斌'], 'topic_sub': []},
-    # 直播已下线(404)占位，抓取失败自动 skip（ctld4409 经本地缓存已回填，仅 CI 无缓存时 skip）
-    {'url': 'http://ctld.scnu.edu.cn/a/20250310/4409.html', 'count': 2,
-     'speakers': ['卢晓中', '赵淦森'], 'topic_sub': [], 'may_404': True},
+    {'url': 'https://physics.scnu.edu.cn/a/20191118/807.html', 'fixture': 'physics807.html',
+     'count': 3, 'speakers': ['刘玉鑫', '吴小山', '刘玉斌'], 'topic_sub': []},
+    # 直播已下线(404)且无本地副本：唯一保留 skip 语义的 case（文档化例外）。
+    {'url': 'http://ctld.scnu.edu.cn/a/20250310/4409.html', 'fixture': 'ctld4409.html',
+     'count': 2, 'speakers': ['卢晓中', '赵淦森'], 'topic_sub': [], 'may_404': True},
 ]
 
 
@@ -134,14 +144,11 @@ def _check_no_bio_leak(self, url, recs):
 
 def _make_test(case):
     def test(self):
-        if case.get('requires_vlm') and not P._load_vlm_configs():
-            self.skipTest('该 case 依赖 VLM 解析海报，CI 未配置 VLM key，跳过')
-        try:
-            recs = parse(case['url'])
-        except Exception as e:  # noqa: BLE001
-            # 任何抓取/解析异常（含 404、超时、瞬时故障）均跳过而非红，
-            # 避免 CI 因网络抖动误报；真实回归由断言失败暴露。
-            self.skipTest(f'fetch/parse failed: {type(e).__name__} {e}')
+        if case.get('may_404') and not os.path.exists(os.path.join(FIXDIR, case['fixture'])):
+            self.skipTest('该页已下线(404)且无本地 fixture——文档化的唯一 skip 例外；'
+                          '若能取得该页 HTML，放入 tests/fixtures/html/ 即可恢复校验')
+        # 密封化后：解析失败直接红（fixture 在仓库内，不存在网络抖动借口）
+        recs = parse(case)
         # 条数
         self.assertEqual(len(recs), case['count'],
                          f"条数期望 {case['count']}，实际 {len(recs)}")

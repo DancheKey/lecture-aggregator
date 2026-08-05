@@ -9,13 +9,22 @@ on:
 jobs:
   golden:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scraper/requirements.txt
       - name: Install deps
         run: pip install -r scraper/requirements.txt
+      # 密封化回归（HTML/VLM 响应均已固化为 tests/fixtures/，离线可跑；失败即红）
       - name: Run golden-case regression tests
         run: python tests/test_parser_golden.py
+      # 一致性守卫：server.py 下发路径与切片生成路径必须逐条一致
+      - name: Run frontend-consistency guard tests
+        run: python tests/test_frontend_consistency.py

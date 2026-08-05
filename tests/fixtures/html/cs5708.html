@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<!-- ========== Meta Tags ========== -->
+<meta charset="utf-8">
+<meta name="renderer" content="webkit">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="keywords" content="第61期学术报告" />
+<meta name="description" content="报告1题目：More Efficient Zero-Knowledge Protocols over ℤ_{2^k} via Galois Rings报告时间：5月18号上午9：30-10：30报告地点" />
+<meta property="og:title" content="第61期学术报告 - 新闻通知 - 华南师范大学计算机学院"/>
+<meta property="og:description" content="报告1题目：More Efficient Zero-Knowledge Protocols over ℤ_{2^k} via Galois Rings报告时间：5月18号上午9：30-10：30报告地点"/>
+<meta property="og:image" content="//statics.scnu.edu.cn/statics/images/scnu/scnu_logo_single.png"/>
+<!-- ========== Page Title ========== -->
+<title>第61期学术报告 - 新闻通知 - 华南师范大学计算机学院</title>
+<!-- ========== Favicon Icon ========== -->
+<link rel="shortcut icon" href="//statics.scnu.edu.cn/statics/images/favicon.ico" type="image/x-icon">
+<!-- ========== Start Stylesheet ========== -->
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/bootstrap.min.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/font-awesome.min.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/flaticon-set.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/magnific-popup.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/owl.carousel.min.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/owl.theme.default.min.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/animate.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/bootsnav.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/style.css" rel="stylesheet">
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/responsive.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/css/computer/customer.css?ver=Pg00Km" rel="stylesheet" />
+<!-- ========== End Stylesheet ========== -->
+<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+<!--[if lt IE 9]>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/html5/html5shiv.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/html5/respond.min.js"></script>
+<![endif]-->
+<!-- ========== Google Fonts ========== -->
+<link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css?family=Poppins:400,500,600,700,800" rel="stylesheet">
+<!-- jQuery MAIN -->
+<script src="//statics.scnu.edu.cn/statics/files/examin/js/jquery-1.12.4.min.js"></script>
+</head>
+
+<body>
+	<!-- Preloader Start -->
+	<div class="se-pre-con"></div>
+	<!-- Preloader Ends -->
+	<!-- Header
+	============================================= -->
+	<header id="home">
+		<!-- Start Navigation -->
+		<nav class="navbar navbar-default navbar-fixed navbar-transparent white pad-top bootsnav">
+			<div class="container">
+				<!-- Start Header Navigation -->
+				<div class="navbar-header">
+					<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-menu">
+						<i class="fa fa-bars"></i>
+					</button>
+					<a class="navbar-brand" href="http://cs.scnu.edu.cn" title="华南师范大学计算机学院">
+						<img src="//statics.scnu.edu.cn/pics/computer/2022/0323/20220323044329310.png" class="logo logo-display" alt="Logo">
+						<img src="//statics.scnu.edu.cn/pics/computer/2022/0323/20220323044329310.png" class="logo logo-scrolled" alt="Logo">
+					</a>
+				</div>
+				<!-- End Header Navigation -->
+			</div>
+			<div class="navmenu">
+				<div class="container">
+					<!-- Collect the nav links, forms, and other content for toggling -->
+					<div class="collapse navbar-collapse" id="navbar-menu">
+						<ul class="nav navbar-nav navbar-left" data-in="#" data-out="#">
+							<li><a href="http://cs.scnu.edu.cn/">主页</a></li>
+																												<li class="dropdown">
+								<a href="http://cs.scnu.edu.cn/xygk/" class="dropdown-toggle" data-toggle="dropdown">学院概况</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/xygk/xueyuanjianjie/">学院简介</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xygk/xuekezhuanye/">学科专业</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xygk/xianrenlingdao/">现任领导</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xygk/jigoushezhi/">机构设置</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xygk/lishiyange/">历史沿革</a></li>
+																										</ul>
+															</li>
+																					<li class="dropdown">
+								<a href="http://cs.scnu.edu.cn/shiziduiwu/" class="dropdown-toggle" data-toggle="dropdown">师资队伍</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/shiziduiwu/shizigaishu/">师资概述</a></li>
+																		<li><a href="http://faculty.scholat.com/homepage/scnu/cs">专职教师</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/shiziduiwu/shiyanzhongxin/">实验中心</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/shiziduiwu/xingzheng/">学院行政</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/shiziduiwu/kezuojiaoshou/">客座教授</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/shiziduiwu/hr/">人才招聘</a></li>
+																										</ul>
+															</li>
+																					<li class="dropdown">
+								<a href="http://cs.scnu.edu.cn/xueshukeyan/jiaoxuepingtai/" class="dropdown-toggle" data-toggle="dropdown">学术科研</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/xueshukeyan/jiaoxuepingtai/">科研平台</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xueshukeyan/keyanxinxi/">科研信息</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xueshukeyan/keyanhezuo/">科研合作</a></li>
+																										</ul>
+															</li>
+																					<li class="dropdown">
+								<a href="http://cs.scnu.edu.cn/jiaoxuegongzuo/" class="dropdown-toggle" data-toggle="dropdown">本科教育</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/jiaoxuegongzuo/engineeringaccreditation/">工程教育认证</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/jiaoxuegongzuo/cce/">继续教育</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/jiaoxuegongzuo/benkeshengpeiyang/">本科生培养</a></li>
+																										</ul>
+															</li>
+																					<li class="active" class="dropdown">
+								<a href="http://cs.scnu.edu.cn/yanjiusheng/" class="dropdown-toggle" data-toggle="dropdown">研究生教育</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/yanjiusheng/yanjiushengxwtz/">新闻通知</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/yanjiusheng/dsjs/">导师介绍</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/yanjiusheng/yanjiushengzhaosheng/">研究生招生</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/yanjiusheng/yjspyfa/">研究生培养</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/yanjiusheng/yanjiushengxinxi/">研究生信息</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/yanjiusheng/xiazaizhuanqu/">下载专区</a></li>
+																										</ul>
+															</li>
+																					<li class="dropdown">
+								<a href="http://cs.scnu.edu.cn/xueshenggongzuo/" class="dropdown-toggle" data-toggle="dropdown">学生工作</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/xueshenggongzuo/zuozuoxiaoyuan/">菁菁校园</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xueshenggongzuo/qingchunyinling/">青春引领</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xueshenggongzuo/fuwuguanli/">服务管理</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xueshenggongzuo/chengchangfazhan/">成长发展</a></li>
+																										</ul>
+															</li>
+																					<li class="dropdown">
+								<a href="http://cs.scnu.edu.cn/dangjiangongzuo/" class="dropdown-toggle" data-toggle="dropdown">党建工作</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/dangjiangongzuo/Notice and Announcement/">通知公告</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/dangjiangongzuo/dangjiandongtai/">党建动态</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/dangjiangongzuo/lilunxuexi/">理论学习</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/dangjiangongzuo/duiwujianshe/">队伍建设</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/dangjiangongzuo/xueyuandangxiao/">学院党校</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/dangjiangongzuo/zhidujianshe/">制度建设</a></li>
+																										</ul>
+															</li>
+																					<li class="dropdown">
+								<a href="http://cs.scnu.edu.cn/xywork/" class="dropdown-toggle" data-toggle="dropdown">校友工作</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/xywork/xiaoyouzixun/">校友资讯</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xywork/xiaoyoufengcai/">校友风采</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xywork/xiaoyoujuanzeng/">校友捐赠</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/xywork/xiaoyoulishihui/">校友理事会</a></li>
+																										</ul>
+															</li>
+																					<li class="dropdown">
+								<a href="http://cs.scnu.edu.cn/guide/" class="dropdown-toggle" data-toggle="dropdown">办事指南</a>
+																<ul class="dropdown-menu">
+																											<li><a href="http://cs.scnu.edu.cn/guide/1/">行政后勤</a></li>
+																		<li><a href="http://cs.scnu.edu.cn/guide/2/">本科教学</a></li>
+																										</ul>
+															</li>
+																				</ul>
+					</div><!-- /.navbar-collapse -->
+				</div>
+			</div>
+		</nav>
+		<!-- End Navigation -->
+	</header>
+	<!-- End Header -->
+	<!-- Start Breadcrumb
+	============================================= -->
+	<div class="breadcrumb-area shadow dark text-center bg-fixed text-light" style="background-image: url(//statics.scnu.edu.cn/statics/images/computer/catbg.jpg);">
+		<div class="container">
+			<div class="row">
+				<div class="col-md-12">
+					<h1>研究生教育</h1>
+					<ul class="breadcrumb">
+						<li><a href="http://cs.scnu.edu.cn/"><i class="fas fa-home"></i> 主页</a></li>
+						<li><a href="http://cs.scnu.edu.cn/yanjiusheng/yanjiushengxwtz/">新闻通知</a></li>
+						<li class="active">正文</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- End Breadcrumb -->
+
+	<!-- Start Article
+	============================================= -->
+	<div class="blog-area full-blog standard single-blog full-blog article-area default-padding">
+		<div class="container">
+			<div class="row">
+				<div class="blog-items">
+					<div class="blog-content col-md-12">
+						<div class="item-box">
+							<div class="item">
+								<div class="info">
+									<h3>第61期学术报告</h3>
+									<div class="meta">
+										<ul>
+											<li><a href="#"><i class="fas fa-user"></i> 华南师范大学计算机学院</a></li>
+											<li><a href="#"><i class="fas fa-time"></i> 2024-05-16 11:37:00</a></li>
+										</ul>
+									</div>
+																		<blockquote>
+										报告1题目：More Efficient Zero-Knowledge Protocols over ℤ_{2^k} via Galois Rings报告时间：5月18号上午9：30-10：30报告地点									</blockquote>
+																		<div class="article-content">
+										<p><strong><span style="font-family: 宋体;">报告1题目：</span></strong><span style="font-family: Calibri;">More Efficient Zero-Knowledge Protocols over </span><span style="font-family: ">ℤ</span><span style="font-family: Calibri;">_{2^k} via Galois Rings</span></p><p><strong><span style="font-family: 宋体;"><span style="font-family: 宋体; text-wrap: wrap;">报告1</span>时间：</span></strong><span style="font-family: Calibri;">5</span><span style="font-family: 宋体;">月<span style="font-family:Calibri">1</span></span><span style="font-family: Calibri;">8</span><span style="font-family: 宋体;">号上午<span style="font-family:Calibri">9</span>：</span><span style="font-family: Calibri;">30-10</span><span style="font-family: 宋体;">：<span style="font-family:Calibri">3</span></span><span style="font-family: Calibri;">0</span></p><p><strong><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体"><span style="font-family: 宋体; text-wrap: wrap;">报告1</span>地点：</span></span></strong><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体">学院</span><span style="font-family:Calibri">1</span></span><span style=";font-family:Calibri;font-size:16px">01</span><span style=";font-family:宋体;font-size:16px">会议室</span></p><p><strong><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体">报告1摘要：</span></span></strong><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体"></span><span style="font-family:Calibri">A recent line of works on zero-knowledge (ZK) protocols with a vector oblivious linear function evaluation (VOLE)-based offline phase provides a new paradigm for scalable ZK protocols featuring fast proving and small prover memory. Very recently, Baum</span></span><span style=";font-family:Calibri;font-size:16px">&nbsp;et al. (Crypto’23) proposed the VOLE-in-the-head technique, allowing such protocols to become publicly verifiable. Many practically efficient protocols for proving circuit satisfiability over any Galois field are implemented, while protocols over rings </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k} are significantly lagging behind, with only a proof-of-concept pioneering work called Appenzeller to Brie (CCS’21) and a first proposal called Moz</span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k}arella (Crypto</span><span style=";font-family:Calibri;font-size:16px">’</span><span style=";font-family:Calibri;font-size:16px">22). The ring </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^{32}} or </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^{64}} , though highly important (it captures computation in real-life programming and the computer architectures such as CPU words), presents non-trivial difficulties because, for example, unlike Galois fields F_{2^k} , the fraction of units in </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k} is 1/2. In this work, we first construct ZK protocols over a high degree Galois ring extension of </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k} (fraction of units close to 1) and then convert them to </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k} efficiently using amortization techniques. Our results greatly change the landscape of ZK protocols over </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k}.</span></p><p><span style=";font-family:Calibri;font-size:16px">(1) We propose a competing ZK protocol that has many advantages over the state-of-the-art Moz</span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k} are lla. We remove the undesirable dependence of communication complexity on the security parameter, and achieve (strict) linear communication complexity. Furthermore, our protocol has better concrete efficiency. For 40, 80 bits soundness on 32, 64-bit CPUs, we offer 1.15×–2.9× improvements in communication.</span></p><p><span style=";font-family:Calibri;font-size:16px">(2) Inspired by the recently proposed interactive message authentication code technique (Weng et al., CCS’22), we construct a constant round ZK protocol over </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k} with sublinear (in the circuit size) communication complexity, which was previously achieved only over fields.</span></p><p><span style=";font-family:Calibri;font-size:16px">(3) We adapt the VOLE-in-the-head technique, and apply it to our first ZK protocol, yielding the first publicly verifiable non-interactive ZK over </span><span style=";font-family:&#39;MS Gothic&#39;;font-size:16px">ℤ</span><span style=";font-family:Calibri;font-size:16px">_{2^k} with linear communication complexity. Also, we show that the pseudorandom correlation generator approach (incompatible with VOLE-in-the-head) can be adapted to efficiently implement VOLE over Galois rings, with analysis of the hardness of underlying assumptions.</span></p><p><strong><span style=";font-family:宋体;font-size:16px">报告人1：</span></strong><span style="font-family: 宋体;">林富春，现为上海交通大学助理研究员，博士毕业于新加坡南洋理工大学（</span><span style="font-family: Calibri;">Nanyang Technological University</span><span style="font-family: 宋体;">），先后在加拿大卡尔加里大学（</span><span style="font-family: Calibri;">University of Calgary</span><span style="font-family: 宋体;">）和英国帝国理工学院（</span><span style="font-family: Calibri;">Imperial College London</span><span style="font-family: 宋体;">）从事博士后研究，在编码与密码领域取得一系列重要成果：（</span><span style="font-family: Calibri;">1</span><span style="font-family: 宋体;">）基于代数格的安全编码和密码方面成果在信息论顶级期刊《</span><span style="font-family: Calibri;">IEEE Trans. Information Theory</span><span style="font-family: 宋体;">》、《中国科学》等国内外学术期刊发表；（</span><span style="font-family: Calibri;">2</span><span style="font-family: 宋体;">）基于代数编码的安全编码和密码协议方面成果在“四大安全顶会”之一的</span><span style="font-family: Calibri;">CCS</span><span style="font-family: 宋体;">、</span><span style="font-family: Calibri;">INFOCOM</span><span style="font-family: 宋体;">等国际学术会议发表；（</span><span style="font-family: Calibri;">3</span><span style="font-family: 宋体;">）秘密共享与安全多方计算方面成果在“三大密码会”的</span><span style="font-family: Calibri;">Crypto</span><span style="font-family: 宋体;">、</span><span style="font-family: Calibri;">ASIACRYPT</span><span style="font-family: 宋体;">、</span><span style="font-family: Calibri;">ITCS</span><span style="font-family: 宋体;">、</span><span style="font-family: Calibri;">ITC</span><span style="font-family: 宋体;">等国际学术会议发表。参与编写由国际</span><span style="font-family: Calibri;">CRC</span><span style="font-family: 宋体;">出版社出版的《</span><span style="font-family: Calibri;">Physical Layer Security in Wireless Communications</span><span style="font-family: 宋体;">》著作，主要负责“</span><span style="font-family: Calibri;">Coding for wiretap channels</span><span style="font-family: 宋体;">”部分编写；担任</span><span style="font-family: Calibri;">FOCS</span><span style="font-family: 宋体;">、</span><span style="font-family: Calibri;">EUROCRYPT</span><span style="font-family: 宋体;">、</span><span style="font-family: Calibri;">ASIACRYPT</span><span style="font-family: 宋体;">、</span><span style="font-family: Calibri;">IEEE Trans. IT</span><span style="font-family: 宋体;">等编码与密码领域著名国际学术会议或期刊的审稿人。</span></p><p><span style=";font-family:Calibri;font-size:16px">&nbsp;</span></p><p><span style=";font-family:Calibri;font-size:16px">&nbsp;</span></p><p><strong><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体">报告2题目：</span></span></strong><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体"></span><span style="font-family:Calibri">Generic Construction of Trace-and-Revoke Inner Product Functional Encryption</span></span></p><p><strong><span style=";font-family:宋体;font-size:16px"><span style="font-family: 宋体; text-wrap: wrap;">报告2</span>时间：</span></strong><span style=";font-family:Calibri;font-size:16px">5</span><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体">月</span><span style="font-family:Calibri">1</span></span><span style=";font-family:Calibri;font-size:16px">8</span><span style=";font-family:宋体;font-size:16px">号上午</span><span style=";font-family:Calibri;font-size:16px">10</span><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体">：</span><span style="font-family:Calibri">3</span></span><span style=";font-family:Calibri;font-size:16px">0-11</span><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体">：</span><span style="font-family:Calibri">3</span></span><span style=";font-family:Calibri;font-size:16px">0</span></p><p><strong><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体"><span style="font-family: 宋体; text-wrap: wrap;">报告2</span>地点：</span></span></strong><span style=";font-family:宋体;font-size:16px"><span style="font-family:宋体">学院</span><span style="font-family:Calibri">1</span></span><span style=";font-family:Calibri;font-size:16px">01</span><span style=";font-family:宋体;font-size:16px">会议室</span></p><p><strong><span style="font-family: 宋体;"><span style="font-family: 宋体; text-wrap: wrap;">报告2</span>内容简介：</span></strong><span style="font-family: 宋体;">叛逆者追踪（</span><span style="font-family: Calibri;">traitor tracing</span><span style="font-family: 宋体;">）系统是一种多接收方加密，允许权威机构或任意方（在公共可追踪性的情况下）识别出合谋创建了盗版解码器的恶意用户（叛逆者）。 跟踪和撤销（</span><span style="font-family: Calibri;">trace-and-revoke</span><span style="font-family: 宋体;">）系统是叛逆者跟踪系统的扩展，其中，存在一个用户撤销机制，用来撤销用户（例如，叛逆者）的解密能力。</span><span style="font-family: 宋体;">追踪和撤销系统</span><span style="font-family: 宋体;">在广播加密（</span><span style="font-family: Calibri;">BE</span><span style="font-family: 宋体;">）、基于身份加密（</span><span style="font-family: Calibri;">IBE</span><span style="font-family: 宋体;">）和基于属性加密（</span><span style="font-family: Calibri;">ABE</span><span style="font-family: 宋体;">）下得到了广泛的研究，但在函数加密（</span><span style="font-family: Calibri;">FE</span><span style="font-family: 宋体;">）下研究较少。 本报告将介绍我们构造的一个可追踪和可撤销内积函数加密通用性方案，该工作发表在</span><span style="font-family: Calibri;">ESORICS 2022</span><span style="font-family: 宋体;">。</span></p><p><strong><span style="font-family: 宋体;">报告人2：</span></strong><span style="font-family: 宋体;">罗富财，现为浙江工商大学副研究员。主要从事公钥密码、格密码、全同态加密以及可证明安全理论的基础理论和应用研究。在</span><span style="font-family: Calibri;">CCF </span><span style="font-family: 宋体;">推荐会议和期刊上以第一作者身份发表近</span><span style="font-family: Calibri;">20</span><span style="font-family: 宋体;">篇论文，包括 </span><span style="font-family: Calibri;">IEEE Transactions on Information Forensics and Security, IEEE Transactions on Dependable and Secure Computing, IEEE Transactions on Mobile Computing, Designs, Codes and Cryptography,Theoretical Computer Science, The Computer Journal, ESORICS 2022</span><span style="font-family: 宋体;">。主持一项国家自然科学基金青年项目。</span></p><p><br/></p>									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- End Article -->
+
+	<script src="//statics.scnu.edu.cn/statics/js/jquery.sgallery.js"></script>
+	<script type="text/javascript">
+	$(function(){
+		$('.article-content img').LoadImage(true, 550, 660,'//statics.scnu.edu.cn/statics/images/s_nopic.gif');
+	})
+	</script>
+
+	<!-- Start Footer
+	============================================= -->
+	<footer class="bg-fixed shadow dark-hard text-light">
+		<!-- Start Footer Bottom -->
+		<div class="footer-bottom bg-transparent">
+			<div class="container">
+				<div class="row">
+					<div class="col-md-6">
+						<p>华南师范大学 版权所有 <a href="http://beian.miit.gov.cn/" target="_blank">粤ICP备05008875号</a></p>
+						<p>Copyright &copy; 2026 South China Normal University. All Rights Reserved</p>
+						<p style="display:none"><script>
+  var _paq = window._paq = window._paq || [];
+  /* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+  _paq.push(['trackPageView']);
+  _paq.push(['enableLinkTracking']);
+  (function() {
+    var u="https://piwik.scnu.edu.cn/";
+    _paq.push(['setTrackerUrl', u+'matomo.php']);
+    _paq.push(['setSiteId', '21']);
+    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+    g.async=true; g.src=u+'matomo.js'; s.parentNode.insertBefore(g,s);
+  })();
+</script></p>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- End Footer Bottom -->
+	</footer>
+	<!-- End Footer -->
+
+	<!-- jQuery Frameworks
+	============================================= -->
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/bootstrap.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/equal-height.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/jquery.appear.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/jquery.easing.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/jquery.magnific-popup.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/modernizr.custom.13711.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/owl.carousel.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/wow.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/isotope.pkgd.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/imagesloaded.pkgd.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/count-to.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/bootsnav.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/main.js"></script>
+	<script src="https://res.wx.qq.com/open/js/jweixin-1.2.0.js"></script>
+	<script>
+	var wxshare = {
+		title: "第61期学术报告 - 新闻通知 - 华南师范大学计算机学院",
+		desc: "报告1题目：More Efficient Zero-Knowledge Protocols over ℤ_{2^k} via Galois Rings报告时间：5月18号上午9：30-10：30报告地点",
+		url: location.href,
+		img: "//statics.scnu.edu.cn/statics/images/scnu/scnu_logo_single.png"
+	};
+
+	$.ajax({
+		type: "GET",
+		url: "https://module.scnu.edu.cn/content/mwechat/share.html?url="+wxshare.url,
+		dataType: "jsonp",
+		jsonp: "callback",
+		jsonpCallback: "success_jsonpCallback",
+		success: function(data){
+			wx.config({
+				debug: false,
+				appId: data.appId,
+				timestamp: data.timestamp,
+				nonceStr: data.nonceStr,
+				signature: data.signature,
+				jsApiList: [
+					'onMenuShareTimeline',
+					'onMenuShareAppMessage',
+					'onMenuShareQQ',
+					'onMenuShareWeibo',
+					'onMenuShareQZone'
+				]
+			});
+		},
+		error:function(data) {
+			console.log("connect failed");
+		}
+	});
+
+	wx.ready(function() {
+		var shareData = {
+			title: wxshare.title,
+			desc: wxshare.desc,
+			link: wxshare.url,
+			imgUrl: wxshare.img
+		};
+		wx.onMenuShareAppMessage(shareData);
+		wx.onMenuShareTimeline(shareData);
+		wx.onMenuShareQQ(shareData);
+		wx.onMenuShareQZone(shareData);
+	});
+	wx.error(function(res) {
+		console.log(res.errMsg);
+	});
+	</script>
+</body>
+</html>

@@ -53,6 +53,15 @@ def _build(m, seg, y, mo, d):
         return None
     if not (1 <= mo_i <= 12) or not (1 <= d_i <= 31) or y_i <= 0:
         return None
+    # 修复（2026-08-05 体检 严重-2）：上面的范围校验只查「日≤31」，
+    # 「2026年2月31日」「4月31日」等 OCR 常见噪声能通过校验，随后构造
+    # datetime 抛 ValueError 一路上抛、整条讲座被静默丢弃——与本模块
+    # 「绝不直接构造 datetime 抛异常」的承诺相悖。此处做真实日历校验，
+    # 非法日期返回 None，调用方回退其他日期模式或留空。
+    try:
+        datetime(y_i, mo_i, d_i)
+    except ValueError:
+        return None
     seg = seg[m.start():]
     period = 0
     pm = re.search(r'(上午|早上|中午|下午|晚上|傍晚)', seg)

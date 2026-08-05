@@ -69,7 +69,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/lectures.json data/last_scrape.json site/lectures.json site/lectures/latest.json site/lectures/stats.json
+          # 2026-08-05 体检修复（中等-20）：generate_frontend_data.py 的缓存破坏
+          # 会改写 site/index.html / site/stats.html（追加 ?v=hash），必须一并提交，
+          # 否则 CI 侧的 JS 版本号更新被静默丢弃。
+          git add data/lectures.json data/last_scrape.json site/lectures.json site/lectures/latest.json site/lectures/stats.json site/index.html site/stats.html
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
@@ -91,3 +94,25 @@ jobs:
       - name: 部署到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # 失败源告警（2026-08-05 体检修复 严重-3）：爬虫在有源失败时不推进增量水位，
+      # 并把 failed_sources 写入 data/last_scrape.json（下次运行同区间自动补回）。
+      # 此步放在提交/部署之后：成功抓到的数据照常上线，但工作流以红色结束，
+      # 通过 GitHub 通知提醒维护者关注持续失败的源。
+      - name: 检查失败信息源（告警）
+        if: always()
+        run: |
+          python - <<'EOF'
+          import json, os, sys
+          p = 'data/last_scrape.json'
+          if not os.path.exists(p):
+              sys.exit(0)
+          with open(p, encoding='utf-8') as f:
+              d = json.load(f)
+          failed = d.get('failed_sources') or []
+          if failed:
+              print('::error::本次抓取有 %d 个信息源失败（增量水位未推进，下次自动重试）：%s'
+                    % (len(failed), '；'.join(failed)))
+              sys.exit(1)
+          print('所有信息源抓取成功。')
+          EOF

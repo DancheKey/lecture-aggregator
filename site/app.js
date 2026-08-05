@@ -777,8 +777,12 @@ const app = createApp({
         .then(r => r.json().then(j => ({ ok: r.ok, j })))
         .then(({ ok, j }) => {
           if (ok && j.ok) {
-            this.mtime = j.mtime || 0;
-            this.loadLectures(true);
+            // 修复（2026-08-05 体检 严重-5）：此前先把 mtime 更新为抓取后的新值，
+            // 再以 /api/lectures?since=<新mtime> 增量拉取——服务端比对 mtime 判定
+            // unchanged 返回空数组，页面既不刷新也无成功提示。抓取后文件必然已变，
+            // 直接全量加载并给出提示。
+            this.loadLectures(false);
+            this.showToast(j.message || '抓取完成');
           } else {
             this.showToast('抓取失败：' + ((j && j.message) || ''));
           }
