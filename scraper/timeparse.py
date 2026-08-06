@@ -16,7 +16,7 @@
 import re
 from datetime import datetime, date
 
-PERIOD_OFFSET = {'上午': 0, '早上': 0, '中午': 12, '下午': 12, '晚上': 12, '傍晚': 12}
+PERIOD_OFFSET = {'上午': 0, '早上': 0, '中午': '中午', '下午': 12, '晚上': 12, '傍晚': 12}
 
 FULL_PATTERNS = [
     r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]',
@@ -29,6 +29,14 @@ COLON = r'[:：]'
 
 
 def _apply_period(hh, period):
+    if period == '中午':
+        # 2026-08-05 体检修正：「中午」此前按 +12 一刀切，中午11点被错解为 23:00。
+        # 中午只覆盖 11–13 点语义：11点/12点保持原值，1–5 点视为午后（13–17 点）。
+        if hh in (11, 12):
+            return hh
+        if 1 <= hh <= 5:
+            return hh + 12
+        return hh % 24
     if period:
         if hh < 12:
             hh += period
@@ -71,12 +79,14 @@ def _build(m, seg, y, mo, d):
     if not times:
         # 中文「X点 / X点X分 / X点半」式时间（如「下午3点」「上午10点30分」），
         # 冒号时间缺失时兜底（常见于海报 OCR 文本）。
-        dot = re.findall(r'(\d{1,2})\s*点\s*(?:(\d{1,2})\s*分?|半)?', seg)
+        # 2026-08-05 体检修正：「半」改为仅匹配紧随「点」后的半（第 3 捕获组）。
+        # 此前对整个 seg 泛搜「半」字，「半决赛」「一半」等词也会让分钟误置 30。
+        dot = re.findall(r'(\d{1,2})\s*点\s*(?:(\d{1,2})\s*分?|(半))?', seg)
         if dot:
             hh = int(dot[0][0])
             if dot[0][1]:
                 mm = int(dot[0][1])
-            elif re.search(r'半', seg):
+            elif dot[0][2]:
                 mm = 30
             else:
                 mm = 0
@@ -341,11 +351,21 @@ def _resolve_year(url_year, title_year, publish_year, default_year):
 
 
 def _wrap_year(res, new_year):
-    """把解析结果整体平移年份（R6 跨年修正用）。"""
+    """把解析结果整体平移年份（R6 跨年修正用）。
+
+    2026-08-05 体检修正：闰年 2/29 平移到平年时 replace(year=...) 抛 ValueError
+    （未捕获会一路上抛丢记录），回退为 2/28。
+    """
     new = dict(res)
-    new['start'] = res['start'].replace(year=new_year)
+    try:
+        new['start'] = res['start'].replace(year=new_year)
+    except ValueError:
+        new['start'] = res['start'].replace(year=new_year, day=28)
     if res.get('end'):
-        new['end'] = res['end'].replace(year=new_year)
+        try:
+            new['end'] = res['end'].replace(year=new_year)
+        except ValueError:
+            new['end'] = res['end'].replace(year=new_year, day=28)
     return new
 
 
@@ -371,6 +391,12 @@ def _cross_year(res, publish_time, title, body_text, year, url_year, publish_yea
     # 跨年修正只在"讲座与发布分属不同日历年"时才有意义。
     if ls.year == pub.year:
         return res, 'high', 'same-year'
+
+    if not can_cross:
+        # 2026-08-05 体检修正：can_cross 此前算出后从未使用，R6 触发面比文档宽。
+        # 按模块头 R6 规格收紧：补年源不属于 {URL年, 发布年}（如标题年/低 Tier 标签年）
+        # 时年份本身可靠，即使讲座与发布分属不同日历年也不做 ±1 年平移。
+        return res, 'mid', 'year-source-reliable'
 
     if ls.date() < pub.date():
         # 讲座落在发布前
@@ -405,11 +431,21 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
         default_year: 当前年（补年最后兜底）。
         list_title: 列表标题（补充年份来源）。
     """
+    # 2026-08-05 体检修正：default_year=None 兜底，与 parse_cn_time 对齐。
+    # 此前 None 传入 _resolve_year 会在 R4 链末端返回 (None,'current')，
+    # None 再传 _parse_segment/_build 被 try 吞掉、仅月日的日期被静默丢弃。
+    if default_year is None:
+        default_year = date.today().year
     if list_title:
         ly = _year_from_text(list_title)
         if ly:
             title_year = title_year or ly
-    publish_year = int(publish_time[:4]) if publish_time else None
+    publish_year = None
+    if publish_time:
+        try:
+            publish_year = int(str(publish_time)[:4])
+        except (ValueError, TypeError):
+            publish_year = None
 
     # A-修复：正文中「发布时间：YYYY-MM-DD HH:MM:SS」会被 R2 通用解析当成讲座时间的另一个端点，
     # 污染 start/end（如生科院页面讲座时间行与发布时间行同处正文）。发布时间已由 _locate_publish_time
@@ -522,17 +558,19 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
 def parse_cn_time(text, default_year=None, publish_time=None, title_year=None, url_year=None):
     """底层原语：在给定文本里找第一个日期。
 
-    年份补年优先级：title_year > url_year > publish_time年份 > current_year。
+    年份补年优先级：url_year > title_year > publish_time年份 > current_year。
+    （2026-08-05 体检修正：与 R4/_resolve_year 统一为 url > title > publish；
+    此前本函数为 title > url，同一仅月日文本走不同路径会补出不同年份。）
     **不做任何字符串删除**（修 Bug A）；仅在完整日期循环中精确跳过发布日。
     用于 OCR 路径与列表标题兜底。
     """
     if default_year is None:
         default_year = date.today().year
     effective_default = default_year
-    if title_year is not None:
-        effective_default = title_year
-    elif url_year is not None:
+    if url_year is not None:
         effective_default = url_year
+    elif title_year is not None:
+        effective_default = title_year
     elif publish_time:
         try:
             effective_default = int(publish_time[:4])

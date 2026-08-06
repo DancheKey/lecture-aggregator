@@ -15,6 +15,12 @@ golden-case 回归测试（Q3）——锁定 parser 关键案例，防止改候�
   测试把缓存路径指向该夹具、provider 配置打桩为不可达地址——
   命中缓存即返回（无任何真实 API 调用、零 key、零成本、CI/本地完全一致）；
   若某 case 的 VLM 响应未录制，会请求不可达地址并失败（红），而不是静默跳过。
+
+  ⚠️ 新增 requires_vlm 用例时必须同步录制响应，否则 CI 必红。录制步骤：
+    1) 本机配置真实 VLM key（.env 的 ZHIPU_API_KEY），正常跑一次解析让响应
+       落入生产缓存 data/.vlm_cache.json（缓存键 = 图片 URL 集合的 md5）；
+    2) 用探测脚本找出该用例命中的缓存键（monkeypatch _vlm_cache_get 记录 key），
+       把对应条目追加进 tests/fixtures/vlm_cache.json 并提交。
 - ctld4409 原页已下线(404)且无本地副本，保留 may_404 skip 语义（文档化的唯一例外）。
 
 断言：条数 / speaker 列表 / topic 无垃圾值（如 ctld4391 旧值 '0- 17'）/

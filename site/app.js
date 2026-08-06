@@ -127,8 +127,9 @@ const app = createApp({
             hay = [l.location, ...(l.sources || []).map(s => s.location)]
               .filter(Boolean).join(' ').toLowerCase();
           } else if (this.searchField === 'topic') {
-            // 题目：标题 + 题目字段
-            hay = [l.title, l.topic, l.listTitle].filter(Boolean).join(' ').toLowerCase();
+            // 题目：标题 + 题目字段 + 主讲人（2026-08-05 体检修正 中等-15：
+            // 与占位提示「搜索题目 / 主讲…」对齐，此前 haystack 缺 speaker）
+            hay = [l.title, l.topic, l.listTitle, l.speaker].filter(Boolean).join(' ').toLowerCase();
           } else if (this.searchField === 'college') {
             // 单位：仅按主办单位匹配，避免场地在某单位的讲座被误配
             hay = [l.college, ...(l.sources || []).map(s => s.college)]
@@ -812,7 +813,9 @@ const app = createApp({
     this.loadLectureStats();
     // 公网静态托管不要先等 /api/lectures 超时；先秒开 latest.json，后台再补全量。
     // 本地后端（127.0.0.1/localhost）仍优先 /api/lectures，保证数据最新。
-    const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+    // 2026-08-05 体检修正（中等-15）：IPv6 回环时浏览器返回的 hostname 是「[::1]」
+    // （带方括号），裸 '::1' 永不匹配，一并覆盖。
+    const isLocal = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname);
     if (isLocal) {
       this.loadLectures(false);
     } else {

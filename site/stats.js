@@ -100,7 +100,10 @@ createApp({
       const lectures = (this.summary && this.summary.lectures) || [];
       let total = 0;
       lectures.forEach(l => {
-        if (cols && !cols.has(l.c)) return;
+        // 2026-08-05 体检修正（中等-13）：讲座任一归属单位（cs）在当前校区即计入，
+        // 与 matrix 的单位归属口径保持一致（此前只看主学院 l.c）。
+        const cs = (l.cs && l.cs.length) ? l.cs : [l.c];
+        if (cols && !cs.some(c => cols.has(c))) return;
         total += (l.s || 0);
       });
       return total;
@@ -202,14 +205,21 @@ createApp({
       this.years.forEach(y => { totals[y] = { year: y, count: counts[y] || 0, visits: 0, likes: 0 }; });
       const lectures = (this.summary && this.summary.lectures) || [];
       lectures.forEach(l => {
-        if (cols && !cols.has(l.c)) return;
         const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
         if (!st.visits && !st.likes) return;
         const y = l.y || UNKNOWN_YEAR;
-        const t = totals[y] || { year: y, count: 0, visits: 0, likes: 0 };
-        t.visits += (st.visits || 0);
-        t.likes += (st.likes || 0);
-        totals[y] = t;
+        // 2026-08-05 体检修正（中等-13）：与 matrix 同口径——按讲座归属的全部单位（cs）
+        // 展开、逐单位过校区筛选。此前只按主学院 cols.has(l.c) 过滤，跨源合并讲座
+        // 主学院不在当前校区、次学院在时，列里计入了、合计行却漏掉，
+        // 「按访问数/点赞数」模式下合计行小于各列之和。
+        const cs = (l.cs && l.cs.length) ? l.cs : [l.c || '未分类'];
+        cs.forEach(c => {
+          if (cols && !cols.has(c)) return;
+          const t = totals[y] || { year: y, count: 0, visits: 0, likes: 0 };
+          t.visits += (st.visits || 0);
+          t.likes += (st.likes || 0);
+          totals[y] = t;
+        });
       });
       return this.years.map(y => totals[y] || { year: y, count: 0, visits: 0, likes: 0 });
     },

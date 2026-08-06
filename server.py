@@ -331,6 +331,9 @@ class Handler(SimpleHTTPRequestHandler):
         """
         ip = self._client_ip()
         now = time.time()
+        # 2026-08-05 体检修正（中等-16）：锁内只改状态，锁外发响应。
+        # 此前在 with _stat_lock 内直接 _send_json，慢客户端写响应期间
+        # 会持锁阻塞所有其它统计请求。
         with _stat_lock:
             last = _recent_site_ip.get(ip, 0)
             if now - last >= VISIT_THROTTLE:
@@ -340,12 +343,15 @@ class Handler(SimpleHTTPRequestHandler):
                 bd[today] = bd.get(today, 0) + 1
                 _recent_site_ip[ip] = now
                 _save_visits()
-            return self._send_json({'ok': True, 'total': _site_visits.get('total', 0), 'by_day': _site_visits.get('by_day', {})})
+            payload = {'ok': True, 'total': _site_visits.get('total', 0), 'by_day': dict(_site_visits.get('by_day', {}))}
+        return self._send_json(payload)
 
     def _api_lecture_stats_get(self):
         """返回每条讲座的访问/点赞统计：{url: {visits, likes}}。"""
+        # 锁内浅拷贝快照、锁外发响应（同 中等-16 修正；避免慢客户端持锁）。
         with _stat_lock:
-            return self._send_json({'ok': True, 'stats': _lecture_stats})
+            snapshot = {u: dict(st) for u, st in _lecture_stats.items()}
+        return self._send_json({'ok': True, 'stats': snapshot})
 
     def _read_body_json(self):
         length = int(self.headers.get('Content-Length', 0) or 0)
@@ -375,7 +381,8 @@ class Handler(SimpleHTTPRequestHandler):
                 _recent_lecture[key] = now
                 _save_lecture_stats()
             cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
-            return self._send_json({'ok': True, 'visits': cur.get('visits', 0)})
+            payload = {'ok': True, 'visits': cur.get('visits', 0)}
+        return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_like_post(self):
         """记录一次点赞：前端已做本机 toggle（奇数次赞、偶数次取消）。
@@ -397,12 +404,14 @@ class Handler(SimpleHTTPRequestHandler):
             if last and last[1] == 'like' and now - last[0] < LIKE_THROTTLE:
                 # 短时间内重复点赞：视为刷量，直接返回当前值，不累加
                 cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
-                return self._send_json({'ok': True, 'likes': cur.get('likes', 0), 'throttled': True})
-            st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
-            st['likes'] = st.get('likes', 0) + 1
-            _recent_like_action[key] = (now, 'like')
-            _save_lecture_stats()
-            return self._send_json({'ok': True, 'likes': st.get('likes', 0)})
+                payload = {'ok': True, 'likes': cur.get('likes', 0), 'throttled': True}
+            else:
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+                st['likes'] = st.get('likes', 0) + 1
+                _recent_like_action[key] = (now, 'like')
+                _save_lecture_stats()
+                payload = {'ok': True, 'likes': st.get('likes', 0)}
+        return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_unlike_post(self):
         """取消一次点赞：前端偶数次点击触发，这里累减（最小 0）。
@@ -422,12 +431,14 @@ class Handler(SimpleHTTPRequestHandler):
             last = _recent_like_action.get(key)
             if last and last[1] == 'unlike' and now - last[0] < LIKE_THROTTLE:
                 cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
-                return self._send_json({'ok': True, 'likes': cur.get('likes', 0), 'throttled': True})
-            st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
-            st['likes'] = max(0, st.get('likes', 0) - 1)
-            _recent_like_action[key] = (now, 'unlike')
-            _save_lecture_stats()
-            return self._send_json({'ok': True, 'likes': st.get('likes', 0)})
+                payload = {'ok': True, 'likes': cur.get('likes', 0), 'throttled': True}
+            else:
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+                st['likes'] = max(0, st.get('likes', 0) - 1)
+                _recent_like_action[key] = (now, 'unlike')
+                _save_lecture_stats()
+                payload = {'ok': True, 'likes': st.get('likes', 0)}
+        return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_want_post(self):
         """记录一次「想听」：前端已做本机 toggle（奇数次想听、偶数次取消）。
@@ -447,12 +458,14 @@ class Handler(SimpleHTTPRequestHandler):
             last = _recent_want_action.get(key)
             if last and last[1] == 'want' and now - last[0] < WANT_THROTTLE:
                 cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
-                return self._send_json({'ok': True, 'wants': cur.get('wants', 0), 'throttled': True})
-            st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
-            st['wants'] = st.get('wants', 0) + 1
-            _recent_want_action[key] = (now, 'want')
-            _save_lecture_stats()
-            return self._send_json({'ok': True, 'wants': st.get('wants', 0)})
+                payload = {'ok': True, 'wants': cur.get('wants', 0), 'throttled': True}
+            else:
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
+                st['wants'] = st.get('wants', 0) + 1
+                _recent_want_action[key] = (now, 'want')
+                _save_lecture_stats()
+                payload = {'ok': True, 'wants': st.get('wants', 0)}
+        return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_unwant_post(self):
         """取消一次「想听」：前端偶数次点击触发，这里累减（最小 0）。
@@ -472,12 +485,14 @@ class Handler(SimpleHTTPRequestHandler):
             last = _recent_want_action.get(key)
             if last and last[1] == 'unwant' and now - last[0] < WANT_THROTTLE:
                 cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
-                return self._send_json({'ok': True, 'wants': cur.get('wants', 0), 'throttled': True})
-            st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
-            st['wants'] = max(0, st.get('wants', 0) - 1)
-            _recent_want_action[key] = (now, 'unwant')
-            _save_lecture_stats()
-            return self._send_json({'ok': True, 'wants': st.get('wants', 0)})
+                payload = {'ok': True, 'wants': cur.get('wants', 0), 'throttled': True}
+            else:
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
+                st['wants'] = max(0, st.get('wants', 0) - 1)
+                _recent_want_action[key] = (now, 'unwant')
+                _save_lecture_stats()
+                payload = {'ok': True, 'wants': st.get('wants', 0)}
+        return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def do_GET(self):
         if self.path.split('?')[0] == '/api/visits':
@@ -503,8 +518,13 @@ class Handler(SimpleHTTPRequestHandler):
             data = []
             updated_at = ''
             if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
-                    raw = json.load(f)
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        raw = json.load(f)
+                except (json.JSONDecodeError, ValueError, OSError) as e:
+                    # 2026-08-05 体检修正（中等-17）：数据文件损坏/读取失败时
+                    # 返回明确的 500 与原因，而不是未捕获异常导致裸 traceback。
+                    return self._send_json({'ok': False, 'message': f'lectures.json 读取失败：{e}'}, 500)
                 # 兼容包裹格式 {updatedAt, data} 与旧版纯数组
                 if isinstance(raw, dict) and 'data' in raw:
                     data = raw.get('data', []) or []
@@ -554,7 +574,7 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 if proc.returncode != 0:
                     tail = (proc.stderr or proc.stdout or '')[-400:]
-                    self._send_json({'ok': False, 'message': '采集失败（请确认运行 server.py 的 Python 已安装 requests/bs4/easyocr 等依赖）：' + tail}, 500)
+                    self._send_json({'ok': False, 'message': '采集失败（请确认运行 server.py 的 Python 已安装 requests/bs4/rapidocr 等依赖）：' + tail}, 500)
                     return
                 path = os.path.join(DATA_DIR, 'lectures.json')
                 count = 0
@@ -607,7 +627,8 @@ class Handler(SimpleHTTPRequestHandler):
 def _prune_throttles():
     """定期清理防刷字典中超出窗口的旧条目，避免内存无限增长（内存泄漏）。
 
-    三个防刷字典只增不减：_recent_site_ip / _recent_lecture / _recent_like_action。
+    四个防刷字典只增不减：_recent_site_ip / _recent_lecture / _recent_like_action
+    / _recent_want_action（2026-08-05 体检修正文案：此前 docstring 误写「三个」）。
     每 60 秒惰性删除已超过对应节流窗口的条目。
     """
     while True:

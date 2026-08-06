@@ -93,19 +93,20 @@ def _clean_ocr_text(ocr_text):
     """清理图片 OCR 后常见的海报抬头、Logo、边框乱码等噪声。
 
     O3b 收窄：校名抬头只删「明确校名」(华南师范大学/华南师大/华师/SCNU/SOUTH CHINA NORMAL
-    UNIVERSITY)，且只删 OCR 文本前 5 行内的校名；其余位置（中下部的 affiliation）与泛化
+    UNIVERSITY)，且只删位于文本开头的校名；其余位置（中下部的 affiliation）与泛化
     「UNIVERSITY OF XXX」一律保留，避免误删真实主讲人单位。
+
+    2026-08-05 体检修正：旧实现先 re.sub(r'\\s+',' ') 折叠换行再 split('\\n') 取「前 5 行」，
+    单行输入下该逻辑退化为死代码、与 docstring 声称的按行语义不符；_img_to_text 的输出
+    本就是空格拼接单行（与原 easyocr 输出一致），故明确为「开头锚定」删除，行为不变。
     """
     t = ocr_text
-    # 合并连续空格
+    # 合并连续空白（OCR 行结构已在 _img_to_text 以空格拼接，此处统一为单行）
     t = re.sub(r'\s+', ' ', t).strip()
-    # O3b：仅明确校名、仅前 5 行
+    # O3b：仅删「位于文本开头」的明确校名抬头（中下部 affiliation 不受影响）
     _SCHOOL = ['华南师范大学', '华南师大', '华师', 'SCNU', 'SOUTH CHINA NORMAL UNIVERSITY']
-    lines = t.split('\n')
-    head = '\n'.join(lines[:5])
     for s in _SCHOOL:
-        head = re.sub(rf'^\s*{re.escape(s)}\s*', '', head)
-    t = (head + '\n' + '\n'.join(lines[5:])).strip()
+        t = re.sub(rf'^\s*{re.escape(s)}\s*', '', t)
     # 常见顶部系列讲座抬头（行知书院等海报常见），仅删位于开头、前面无汉字的短词
     header_words = [
         '行知书院', '研究生会', '学生会', '学术讲座', '系列讲座', '讲座预告', 'LECTURE',
@@ -1394,16 +1395,17 @@ def is_news_record(rec, poster_page=False):
 
 # ---- RT0 非讲座内容硬拦截（与新闻/回顾稿区分：这些根本不是公开讲座）----
 # 标题命中即跳过（不进聚合）。基于现有 EXCLUDE_KW 扩展，覆盖「学术喜讯/获奖/征文/招聘/
-# 答辩/改期通知」等明确非讲座类通知。这些词均不会出现在真实讲座预告标题中。
-# 注：改期/延期/暂停举办 按 PDF 的 reschedule_notice 也归为拦截（视为非预告），如需保留
-# 该类「讲座改期通知」可移除此 4 项。
+# 答辩」等明确非讲座类通知。这些词均不会出现在真实讲座预告标题中。
+# 2026-08-05 体检修正（改期策略对齐）：列表级 RT0（2026-07-19）已明确放行「改期」
+# （改期通知是真实讲座的时间变更，不应在列表阶段跳过），但详情级此清单此前仍拦截
+# 「改期/延期/暂停举办/暂缓举行」，最终效果仍是全部丢弃、列表级放行失去意义。
+# 现移除这 4 项与列表级对齐——改期通知按讲座解析（可取得新日期）。
 _NON_LECTURE_KW = [
     '喜讯', '喜报', '获奖', '获奖名单',
     '入选名单', '录用名单', '录取名单',
     '征文', '征稿', '招聘', '招贤', '招募', '招新', '纳新',
     '答辩', '开题', '中期考核',
     '公示名单',
-    '改期', '延期', '暂停举办', '暂缓举行',
     # 与 EXCLUDE_KW 对齐（仅加明确的新闻类词，不放"招生"等语境词——讲座主题里可能出现）：
     '纪实', '侧记', '花絮', '速递', '快讯',
     '展览', '作品展', '开幕', '拉开帷幕', '启动', '启动仪式',
@@ -2478,7 +2480,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 _pdf_data = _safe_fetch(_abs_pdf)
                 if _pdf_data is None:
                     _pdf_host = urlparse(_abs_pdf).hostname or ''
-                    if _pdf_host.endswith('scnu.edu.cn'):
+                    # 2026-08-05 复查修正：endswith('scnu.edu.cn') 会被
+                    # evilscnu.edu.cn 之类的域名绕过，必须锁定域名边界
+                    if _pdf_host == 'scnu.edu.cn' or _pdf_host.endswith('.scnu.edu.cn'):
                         _pdf_data = _safe_fetch(_abs_pdf, verify=False)
                 if _pdf_data and _pdf_data[:5] == b'%PDF-':
                     import io
@@ -3214,8 +3218,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
 
     # --- OCR 决策（T2 关键字段缺失 + T3 讲座页内容不完整）---
     # 通用、不按院：仅依据「页面内容特征 + 标题关键词 + 是否含图」判断，避免为特定学院写白名单例外。
-    LECTURE_KW = ('讲座', '报告', '工作坊', '沙龙', '论坛', '研讨会', '讲坛', '座谈会')
-    title_is_lecture = bool(title) and any(kw in title for kw in LECTURE_KW)
+    # 2026-08-05 体检修正：改名避免遮蔽模块级 LECTURE_KW（L711，is_lecture 使用），
+    # 二者内容不同，同名极易误改。本表仅用于 OCR 触发判定。
+    _OCR_TITLE_KW = ('讲座', '报告', '工作坊', '沙龙', '论坛', '研讨会', '讲坛', '座谈会')
+    title_is_lecture = bool(title) and any(kw in title for kw in _OCR_TITLE_KW)
     # T2：时间/地点/主讲/题目 任一关键字段缺失且含图 → OCR 补充（仅补缺失、不覆盖已有）
     missing_key = (not result.get('lectureStart') or not result.get('location')
                    or not result.get('speaker') or not result.get('topic'))
@@ -3258,7 +3264,13 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 result['speakerAffiliation'] = _aff
             result['speakerSource'] = _src or 'ocr'
             if _src == 'pattern4':
-                result['notes'] = (result.get('notes') or '') + '；主讲人来自 Pattern4 夹逼定位，置信度低，建议人工核验'
+                # 2026-08-05 体检修正：notes 统一为 list（拆分路径本就是 list/append，
+                # 单条路径此前是字符串拼接，同字段两种类型下游序列化必踩坑）。
+                _notes = result.get('notes')
+                if not isinstance(_notes, list):
+                    _notes = [str(_notes)] if _notes else []
+                _notes.append('主讲人来自 Pattern4 夹逼定位，置信度低，建议人工核验')
+                result['notes'] = _notes
             # 海报模板「活动主题：姓名+主题」会导致 topic 前缀含讲者名，去掉前导名
             _tp = (result.get('topic') or '').strip()
             if _tp.startswith(_sp) and len(_tp) > len(_sp):
@@ -3573,7 +3585,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # - 其它源：保留原 extract_ad_title（抽引号内讲座名）行为不变，不影响 skc 等。
     _title = result.get('title') or ''
     if college == '教师发展中心':
-        _shell = strip_admin_shell(result.get('listTitle') or _title)
+        # 2026-08-05 体检修正：listTitle 是 scraper 在 parse_detail 返回后才写入
+        # result 的字段，函数内 result.get('listTitle') 恒为 None；应使用参数 list_title。
+        _shell = strip_admin_shell(list_title or _title)
         if _shell:
             result['title'] = _shell
     else:
@@ -3869,6 +3883,15 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         _vlm_recs = []
         for partial, pt in _vlm_sessions:
             r = partial
+            # 2026-08-05 体检修正：partial 是 R3 作废 publishTime / 回写 publishTimeSource /
+            # timeConfidence / timeNote 之前的浅拷贝，会把已被作废的 publishTime 带出去、
+            # 且缺来源与置信字段，与单条路径产出不一致。此处用 result 终值同步。
+            r['publishTime'] = result.get('publishTime')
+            r['publishTimeSource'] = result.get('publishTimeSource')
+            if result.get('timeConfidence') is not None:
+                r['timeConfidence'] = result.get('timeConfidence')
+            if result.get('timeNote') is not None:
+                r['timeNote'] = result.get('timeNote')
             # 应用全局后处理（与返回单条时一致）
             if r.get('location'):
                 r['location'] = _clean_location(r['location'], r.get('title') or r.get('topic'))
