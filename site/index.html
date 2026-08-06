@@ -121,10 +121,23 @@
           <!-- 统计 + 筛选工具栏：同一行，筛选时左侧文字切换为"当前筛选"，避免控件跳行 -->
           <div v-if="!loading" class="mb-5">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <!-- 左侧统计文字：筛选时显示"当前筛选"，否则显示"更新于"；搜索时隐藏"覆盖N条来源通知"以腾出空间 -->
+              <!-- 左侧统计文字：partial 阶段明确提示“加载中”，失败时显示重试，避免 50 条误导 -->
               <div class="text-[12pt] text-slate-500 flex flex-wrap items-center gap-1">
-                共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
-                <template v-if="!hasActiveFilter">
+                <template v-if="dataStage === 'partial'">
+                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
+                  <span class="text-slate-300">·</span>
+                  <span class="text-slate-400">完整数据加载中…</span>
+                </template>
+                <template v-else-if="dataStage === 'partial-error'">
+                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
+                  <span class="text-slate-300">·</span>
+                  <button type="button" @click="retryLoadFull" class="text-blue-600 hover:underline">完整数据加载失败，点击重试</button>
+                </template>
+                <template v-else>
+                  共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
+                </template>
+
+                <template v-if="!hasActiveFilter && dataStage === 'full'">
                   <span class="text-slate-300">·</span>
                   覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知
                 </template>
@@ -132,28 +145,37 @@
                   <span class="text-slate-300">·</span>
                   当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
                 </template>
-                <template v-else-if="updatedAt && !hasActiveFilter">
+                <template v-else-if="updatedAt && !hasActiveFilter && dataStage === 'full'">
                   <span class="text-slate-300">·</span>
                   更新于 {{ updatedAt.slice(0, 10) }}
                 </template>
               </div>
-              <!-- 右侧筛选控件：固定不换行，避免输入时跳行 -->
-              <div class="flex items-center gap-2 flex-nowrap shrink-0 overflow-hidden">
-                <div class="relative shrink-0">
+              <!-- 右侧筛选控件：移动端占满整行，搜索框弹性展开 -->
+              <div class="flex items-center gap-1 sm:gap-2 flex-nowrap w-full">
+                <div class="relative flex-1 min-w-0 max-w-full overflow-hidden" style="width:0">
+                  <!-- 移动端：短 placeholder，避免撑开搜索框挤掉年份下拉 -->
+                  <input v-model="query" type="search" placeholder="搜索…"
+                    class="w-full min-w-0 max-w-full box-border px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 sm:hidden search-pad" />
+                  <!-- 桌面端：保留维度化的长 placeholder -->
                   <input v-model="query" type="search" :placeholder="searchPlaceholder"
-                    class="w-8 sm:w-44 min-w-0 px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 shrink-0 search-pad" />
+                    class="w-full min-w-0 max-w-full box-border px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 hidden sm:block search-pad" />
                   <button v-if="query" type="button" @click="query = ''"
                     class="hidden sm:flex search-clear"
                     aria-label="清空搜索" title="清空搜索">×</button>
                 </div>
                 <!-- 搜索维度：与搜索框做 AND 组合（全部/单位/地点/题目） -->
-                <select v-model="searchField" class="w-10 sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-0.5 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
+                <select v-model="searchField" class="w-16 sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-0.5 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
                   <option value="">全部</option>
                   <option value="college">单位</option>
                   <option value="location">地点</option>
                   <option value="topic">题目</option>
                 </select>
-                <select v-model="year" class="w-24 sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-0.5 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
+                <!-- 年份：移动端与桌面端分别使用短/长文案，避免 option 文字撑开 select 宽度 -->
+                <select v-model="year" class="w-20 sm:hidden text-[12pt] rounded-lg border border-slate-200 px-0.5 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
+                  <option value="">年份</option>
+                  <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
+                </select>
+                <select v-model="year" class="hidden sm:block sm:w-auto text-[12pt] rounded-lg border border-slate-200 px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none shrink-0">
                   <option value="">全部年份</option>
                   <option v-for="y in years" :key="y" :value="y">{{ y }} 年</option>
                 </select>

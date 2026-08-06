@@ -44,7 +44,7 @@ const app = createApp({
       wants: {},          // url -> count（本地想听数）
       wantedUrls: new Set(), // 当前浏览器已标记想听的 url 集合
       loading: true,       // 首屏数据加载中（避免闪现空列表）
-      dataStage: 'loading', // 'loading' | 'partial' | 'full'：渐进加载阶段
+      dataStage: 'loading', // 'loading' | 'partial' | 'partial-error' | 'full'：渐进加载阶段
       siteVisits: cachedVisits, // 站点总访问量（null 表示尚未从任何来源拿到）
       hasBackend: cachedVisits != null, // 是否已从本地后端或第三方拿到有效值
       lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
@@ -90,7 +90,7 @@ const app = createApp({
       return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
     },
 
-    // 搜索框占位提示：随所选维度变化
+    // 搜索框占位提示：随所选维度变化（移动端使用单独短 placeholder，见 index.html）
     searchPlaceholder() {
       return {
         '': '搜索讲座 / 主讲人 / 地点…',
@@ -719,7 +719,13 @@ const app = createApp({
           this._applyLectureData(resp);
           this.dataStage = 'full';
         })
-        .catch(e => { console.error('加载完整讲座数据失败', e); this.finalizeCountAnimation(); });
+        .catch(e => {
+          console.error('加载完整讲座数据失败', e);
+          // 标记为 partial-error，让界面显示重试入口；
+          // finalize 到当前 partial 真实值，避免数字继续滚动造成“还在加载”的错觉。
+          this.dataStage = 'partial-error';
+          this.finalizeCountAnimation();
+        });
     },
 
     /* ---------- 顶部数字滚动动画 ----------
@@ -769,6 +775,19 @@ const app = createApp({
       this._fromSource = this.displaySource;
       this._toTotal = this.totalCount;
       this._toSource = this.sourceNoticeCount;
+    },
+    resetCountAnimation() {
+      this._finalized = false;
+      this._finalStart = 0;
+      if (this._countRAF) {
+        cancelAnimationFrame(this._countRAF);
+        this._countRAF = null;
+      }
+    },
+    retryLoadFull() {
+      this.dataStage = 'partial';
+      this.resetCountAnimation();
+      this._loadStaticFull();
     },
 
     /* ---------- 触发后端抓取 ---------- */
