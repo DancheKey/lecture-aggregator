@@ -124,14 +124,14 @@
               <!-- 左侧统计文字：桌面端单行左侧 -->
               <div class="text-[12pt] text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
                 <template v-if="dataStage === 'partial'">
-                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
+                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
                   <span class="text-slate-300">·</span>
                   <span class="text-slate-400">完整数据加载中…</span>
                 </template>
                 <template v-else-if="dataStage === 'partial-error'">
-                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
+                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
                   <span class="text-slate-300">·</span>
-                  <button type="button" @click="retryLoadFull" class="text-blue-600 hover:underline">完整数据加载失败，点击重试</button>
+                  <button type="button" @click="retryLoadFull" class="px-2 py-0.5 text-[11pt] font-medium text-white bg-blue-500 hover:bg-blue-600 rounded transition">点击加载全部讲座</button>
                 </template>
                 <template v-else>
                   共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
@@ -315,6 +315,6 @@
     </transition>
   </div>
 
-  <script defer src="app.js?v=e9d474c025"></script>
+  <script defer src="app.js?v=ce6989e413"></script>
 </body>
 </html>

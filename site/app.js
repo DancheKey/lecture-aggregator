@@ -57,6 +57,7 @@ const app = createApp({
       // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
       displayTotal: 1,
       displaySource: 1,
+      loadedChunks: 0,   // 分片加载断点续传：已成功加载的分片数
     };
   },
 
@@ -703,17 +704,64 @@ const app = createApp({
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
+          this.loadedChunks = 0;     // 全新一次完整加载，从第 0 片开始
           this.dataStage = 'partial';
           this.loading = false;
-          // 后台继续加载完整数据（lectures.json，启用完整筛选翻页）
+          this.bumpCount();          // 数字先滚到 50（首屏已加载真实条数）
+          // 后台继续分片加载完整数据（启用完整筛选翻页）
           this._loadStaticFull();
         })
         .catch(() => { this._loadStaticFull(true); });
     },
 
     _loadStaticFull(fallbackToOriginal = false) {
-      const path = 'lectures.json';
-      fetch(path, { cache: 'default' })
+      // 分片加载（更小请求、逐片重试、数字渐进滚动）；fallbackToOriginal 时回退整文件。
+      if (fallbackToOriginal) return this._loadFullSingle();
+      this._loadChunks();
+    },
+
+    async _loadChunks() {
+      let manifest;
+      try {
+        const mres = await fetch('lectures/chunks.json', { cache: 'default' });
+        if (!mres.ok) throw new Error('no-manifest');
+        manifest = await mres.json();
+      } catch (e) {
+        // 分片清单缺失（旧部署 / 生成失败）：回退整文件 lectures.json
+        return this._loadFullSingle();
+      }
+      const chunks = (manifest && manifest.chunks) || [];
+      if (!chunks.length) return this._loadFullSingle();
+      this.dataStage = 'partial';
+      for (let i = this.loadedChunks || 0; i < chunks.length; i++) {
+        let ok = false;
+        for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+          try {
+            const cres = await fetch(chunks[i], { cache: 'default' });
+            if (!cres.ok) throw new Error('chunk-' + cres.status);
+            const cj = await cres.json();
+            this._mergeChunk((cj && cj.data) || []);
+            this.bumpCount();
+            ok = true;
+          } catch (err) {
+            console.warn(`讲座分片 ${chunks[i]} 第 ${attempt + 1} 次加载失败`, err);
+            if (attempt < 2) await this._sleep(800 * Math.pow(2, attempt));
+          }
+        }
+        if (!ok) {
+          // 该分片最终失败：保留已加载的真实条数，展示重试入口；
+          // 绝不 finalize 到 50 死值，避免手机端数字定格成假数据。
+          this.dataStage = 'partial-error';
+          return;
+        }
+        this.loadedChunks = i + 1;
+      }
+      this.loadedChunks = 0;
+      this.dataStage = 'full';
+    },
+
+    _loadFullSingle() {
+      fetch('lectures.json', { cache: 'default' })
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
@@ -721,72 +769,78 @@ const app = createApp({
         })
         .catch(e => {
           console.error('加载完整讲座数据失败', e);
-          // 标记为 partial-error，让界面显示重试入口；
-          // finalize 到当前 partial 真实值，避免数字继续滚动造成“还在加载”的错觉。
+          // 不 finalize 到 50 死值；保留已加载真实条数，可点击重试。
           this.dataStage = 'partial-error';
-          this.finalizeCountAnimation();
         });
     },
 
-    /* ---------- 顶部数字滚动动画 ----------
-     * 页面加载即开始从 1 缓慢向上滚动；完整数据（dataStage='full'）到达后，
-     * 从当前滚动值平滑过渡到真实值，定格在 totalCount / sourceNoticeCount。
-     * 关键：不预设硬上限（如 950），避免旧数据残留在屏幕上「定格」数秒。
-     */
-    startCountAnimation() {
-      if (this._countRAF) return;
-      // 加载阶段：线性慢速增长，明确是「加载中占位」而非真实数据；
-      // 不封顶在像真实值的数字上，避免误导。完整数据到达后由 finalize 快速滚到真实值。
-      const SPEED = 65;       // 每秒约 65，视觉上慢慢滚但不会定格成假数字
-      const LOADING_CAP = 50000;  // 加载占位上限：数据量>3000 后不会停在 2000
-      const t0 = performance.now();
-      const tick = (now) => {
-        if (!this._finalized) {
-          const elapsed = (now - t0) / 1000;
-          const v = Math.min(LOADING_CAP, Math.max(1, Math.floor(1 + SPEED * elapsed)));
-          this.displayTotal = v;
-          this.displaySource = Math.min(LOADING_CAP, Math.max(1, Math.floor(v * 1.02)));
-          this._countRAF = requestAnimationFrame(tick);
+    _mergeChunk(arr) {
+      // 将分片数据并入 this.all：首屏 latest 的 50 条是全集子集，
+      // 用完整分片覆盖首屏预览（abstract/speakerBio 更全），其余追加。
+      const keyOf = it => (it.sourceUrl || '') + '|' + (it.lectureStart || '') + '|'
+        + (it.title || '') + '|' + (it.lectureIndex != null ? it.lectureIndex : '');
+      const idxMap = new Map();
+      this.all.forEach((it, idx) => idxMap.set(keyOf(it), idx));
+      for (const it of arr) {
+        const k = keyOf(it);
+        if (idxMap.has(k)) {
+          this.all[idxMap.get(k)] = it;   // 完整数据覆盖首屏预览
         } else {
-          // 数据到达后快速（300ms）滚到真实值，营造「最后冲刺」感
-          const dt = Math.min((now - this._finalStart) / 300, 1);
-          const e = 1 - Math.pow(1 - dt, 3);
-          // 关键：起始值不超过目标值，保证动画只向上、绝不「先超后落」
-          const fromT = Math.min(this._fromTotal, this._toTotal);
-          const fromS = Math.min(this._fromSource, this._toSource);
-          this.displayTotal = Math.round(fromT + e * (this._toTotal - fromT));
-          this.displaySource = Math.round(fromS + e * (this._toSource - fromS));
-          if (dt >= 1) {
-            this.displayTotal = this._toTotal;
-            this.displaySource = this._toSource;
-            this._countRAF = null;
-            return;
-          }
-          this._countRAF = requestAnimationFrame(tick);
+          idxMap.set(k, this.all.length);
+          this.all.push(it);
         }
-      };
-      this._countRAF = requestAnimationFrame(tick);
-    },
-    finalizeCountAnimation() {
-      if (this._finalized) return;
-      this._finalized = true;
-      this._finalStart = performance.now();
-      this._fromTotal = this.displayTotal;
-      this._fromSource = this.displaySource;
-      this._toTotal = this.totalCount;
-      this._toSource = this.sourceNoticeCount;
-    },
-    resetCountAnimation() {
-      this._finalized = false;
-      this._finalStart = 0;
-      if (this._countRAF) {
-        cancelAnimationFrame(this._countRAF);
-        this._countRAF = null;
       }
     },
+
+    _sleep(ms) { return new Promise(res => setTimeout(res, ms)); },
+
+    /* ---------- 顶部数字滚动动画（目标驱动）----------
+     * displayTotal 始终向 this._countTarget 平滑靠拢；每加载一片数据就调用 bumpCount()，
+     * 把目标抬到当前已加载真实条数，数字持续向上滚动（50 -> 1100 -> ... -> 3000+），
+     * 不会中途定格成死值。任一时刻数字都代表「已加载的真实条数」。
+     */
+    startCountAnimation() {
+      this._countFrom = 0;
+      this._countSourceFrom = 0;
+      this._countTarget = 0;
+      this._countSourceTarget = 0;
+      this._countStart = performance.now();
+      this._countDur = 600;
+      if (!this._countRAF) this._countRAF = requestAnimationFrame(this._countTick);
+    },
+    _countTick(now) {
+      const t = Math.min((now - this._countStart) / this._countDur, 1);
+      const e = 1 - Math.pow(1 - t, 3);
+      const from = this._countFrom, to = this._countTarget;
+      this.displayTotal = Math.round(from + e * (to - from));
+      this.displaySource = Math.round(this._countSourceFrom + e * (this._countSourceTarget - this._countSourceFrom));
+      if (t >= 1) {
+        this.displayTotal = to;
+        this.displaySource = this._countSourceTarget;
+        this._countRAF = null;
+        return;
+      }
+      this._countRAF = requestAnimationFrame(this._countTick);
+    },
+    bumpCount() {
+      // 把滚动目标抬到当前已加载真实条数，并从当前显示值平滑接续；
+      // 若 RAF 已停（动画定格），重新启动一段滚动；运行中则就地更新目标，无跳变。
+      this._countFrom = this.displayTotal;
+      this._countSourceFrom = this.displaySource;
+      this._countTarget = this.totalCount;
+      this._countSourceTarget = this.sourceNoticeCount;
+      this._countStart = performance.now();
+      this._countDur = 500;
+      if (!this._countRAF) this._countRAF = requestAnimationFrame(this._countTick);
+    },
+    resetCountAnimation() {
+      if (this._countRAF) { cancelAnimationFrame(this._countRAF); this._countRAF = null; }
+      this._countFrom = this._countTarget = 0;
+      this._countSourceFrom = this._countSourceTarget = 0;
+    },
     retryLoadFull() {
+      // 断点续传：从失败的分片继续，已加载条数保留并显示，不回退到 50。
       this.dataStage = 'partial';
-      this.resetCountAnimation();
       this._loadStaticFull();
     },
 
@@ -862,7 +916,7 @@ const app = createApp({
     showLikedOnly() { this.currentPage = 1; },
     // 数据阶段从 partial 变 full 时，如果当前没有筛选，保持当前页；否则回到第一页
     dataStage(newVal, oldVal) {
-      if (newVal === 'full') this.finalizeCountAnimation();
+      if (newVal === 'full') this.bumpCount();
       if (oldVal === 'partial' && newVal === 'full') {
         if (!this.query && !this.campus && !this.college && !this.year && !this.showLikedOnly) {
           // 无筛选时，full 数据已包含当前 50 条，保持页面不跳变

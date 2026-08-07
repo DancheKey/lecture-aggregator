@@ -22,6 +22,7 @@ DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
 SITE_LECTURES_PATH = os.path.join(ROOT, 'site', 'lectures.json')
 SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
 LATEST_SIZE = 50
+CHUNK_SIZE = 500        # 公网分片加载：每片 500 条，失败可单独重试，数字渐进滚动
 UNKNOWN_YEAR = '其他'
 # 首页首屏（latest.json）只需要列表卡片展示字段，长文本按首页 truncate 长度截断，
 # 让首屏秒开；详情字段在 site/lectures.json 中仍完整保留，确保展开/查看时信息齐全。
@@ -237,6 +238,31 @@ def with_unit(item, url_dates):
     return it
 
 
+def write_chunks(data, updated_at):
+    """将全量数据切片为 chunk_NNNN.json，并写入 chunks.json 清单。
+
+    公网（GitHub Pages）下前端改为逐片加载：每片 ~1MB（500 条），比整文件 6MB 更抗弱网；
+    任一片失败仅重试该片，不影响其它片；每片到达数字滚动到已加载真实条数，
+    彻底解决「手机端一次性拉 6MB 失败 -> 数字定格在 50」的问题。
+    """
+    chunks = []
+    n = len(data)
+    for i in range(0, n, CHUNK_SIZE):
+        part = data[i:i + CHUNK_SIZE]
+        idx = i // CHUNK_SIZE + 1
+        fname = 'chunk_%04d.json' % idx
+        atomic_write(os.path.join(SITE_DIR, fname), {'updatedAt': updated_at, 'data': part})
+        chunks.append('lectures/' + fname)
+    manifest = {
+        'updatedAt': updated_at,
+        'total': n,
+        'chunkSize': CHUNK_SIZE,
+        'chunks': chunks,
+    }
+    atomic_write(os.path.join(SITE_DIR, 'chunks.json'), manifest)
+    print(f'[done] chunks.json + {len(chunks)} 片 (每片 {CHUNK_SIZE} 条, 共 {n} 条)')
+
+
 def main():
     os.makedirs(SITE_DIR, exist_ok=True)
     data, updated_at = load_lectures()
@@ -265,11 +291,13 @@ def main():
     sorted_data = sort_for_latest(data)
     latest = [latest_preview(with_unit(item, url_dates)) for item in sorted_data[:LATEST_SIZE]]
     stats = build_stats(data, updated_at)
+    full_data = [with_unit(item, url_dates) for item in data]
 
     # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
-    atomic_write(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': [with_unit(item, url_dates) for item in data]})
+    atomic_write(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': full_data})
     atomic_write(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
     atomic_write(os.path.join(SITE_DIR, 'stats.json'), stats)
+    write_chunks(full_data, updated_at)
 
     latest_bytes = os.path.getsize(os.path.join(SITE_DIR, 'latest.json'))
     stats_bytes = os.path.getsize(os.path.join(SITE_DIR, 'stats.json'))
