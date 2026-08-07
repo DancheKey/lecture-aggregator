@@ -150,15 +150,15 @@
                   更新于 {{ updatedAt.slice(0, 10) }}
                 </template>
               </div>
-              <!-- 右侧筛选控件：移动端占满整行，搜索框弹性展开 -->
-              <div class="flex items-center gap-1 sm:gap-2 flex-nowrap w-full">
-                <div class="relative flex-1 min-w-0 max-w-full overflow-hidden" style="width:0">
-                  <!-- 移动端：短 placeholder，避免撑开搜索框挤掉年份下拉 -->
+              <!-- 右侧筛选控件：移动端占满整行，桌面端保持原有固定宽度 -->
+              <div class="flex items-center gap-1 sm:gap-2 flex-nowrap w-full sm:w-auto shrink-0 overflow-hidden">
+                <div class="relative flex-1 min-w-0 sm:shrink-0">
+                  <!-- 移动端：短 placeholder，搜索框弹性展开 -->
                   <input v-model="query" type="search" placeholder="搜索…"
-                    class="w-full min-w-0 max-w-full box-border px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 sm:hidden search-pad" />
-                  <!-- 桌面端：保留维度化的长 placeholder -->
+                    class="w-full sm:w-44 min-w-0 px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 sm:hidden search-pad" />
+                  <!-- 桌面端：保留维度化的长 placeholder 与固定宽度 -->
                   <input v-model="query" type="search" :placeholder="searchPlaceholder"
-                    class="w-full min-w-0 max-w-full box-border px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 hidden sm:block search-pad" />
+                    class="w-full sm:w-44 min-w-0 px-1 sm:px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 hidden sm:block search-pad" />
                   <button v-if="query" type="button" @click="query = ''"
                     class="hidden sm:flex search-clear"
                     aria-label="清空搜索" title="清空搜索">×</button>
