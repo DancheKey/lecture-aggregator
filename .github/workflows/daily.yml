@@ -77,6 +77,8 @@ jobs:
             echo "数据无变化，跳过提交"
           else
             git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')"
+            # 运行期间若仓库被其他提交推进（如人工推送），先 rebase 再 push，避免 non-fast-forward 失败
+            git pull --rebase origin main
             git push
           fi
 
