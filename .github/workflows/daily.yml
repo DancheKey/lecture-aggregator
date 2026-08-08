@@ -67,19 +67,35 @@ jobs:
 
       - name: 提交并推送（仅在有变化时）
         run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # 2026-08-05 体检修复（中等-20）：generate_frontend_data.py 的缓存破坏
           # 会改写 site/index.html / site/stats.html（追加 ?v=hash），必须一并提交，
           # 否则 CI 侧的 JS 版本号更新被静默丢弃。
-          git add data/lectures.json data/last_scrape.json site/lectures.json site/lectures/latest.json site/lectures/stats.json site/index.html site/stats.html
+          # 2026-08-08 修复：补充分片产物，确保手机端分片加载可用。
+          git add \
+            data/lectures.json \
+            data/last_scrape.json \
+            site/lectures.json \
+            site/lectures/latest.json \
+            site/lectures/stats.json \
+            site/lectures/chunk_*.json \
+            site/lectures/chunks.json \
+            site/index.html \
+            site/stats.html
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
+            echo "存在变更，准备提交..."
+            git status --short
             git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')"
+            echo "提交成功，同步远端..."
             # 运行期间若仓库被其他提交推进（如人工推送），先 rebase 再 push，避免 non-fast-forward 失败
-            git pull --rebase origin main
-            git push
+            git pull --rebase origin main || { echo "::error::git pull --rebase 失败"; exit 1; }
+            echo "推送到 origin/main..."
+            git push origin main || { echo "::error::git push 失败（请检查仓库 Settings -> Actions -> General -> Workflow permissions 是否为 Read and write permissions）"; exit 1; }
+            echo "推送成功"
           fi
 
       # 下面步骤将 site/ 发布为 GitHub Pages。
