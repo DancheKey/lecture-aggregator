@@ -18,10 +18,10 @@
     </style>
   </head>
   <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-    <div id="app" v-cloak class="min-h-screen flex flex-col">
+    <div id="app" v-cloak class="flex flex-col" style="height:100vh;overflow:hidden">
 
     <!-- 顶部栏 -->
-    <header id="stats-header" class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
+    <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
       <div class="max-w-6xl mx-auto px-4">
         <div class="flex items-center gap-3 h-14">
           <a href="./" class="flex items-center gap-2 shrink-0">
@@ -51,24 +51,8 @@
         </div>
       </div>
     </header>
-    <script>
-      // 移动端 header 高度不固定（含校区导航条），动态把表头 sticky 偏移设为 header 高度，
-      // 避免表格上滑时 thead 被 header 盖住。
-      (function() {
-        var header = document.getElementById('stats-header');
-        if (!header) return;
-        function update() {
-          document.documentElement.style.setProperty('--header-height', header.getBoundingClientRect().height + 'px');
-        }
-        update();
-        window.addEventListener('resize', update);
-        if (typeof ResizeObserver !== 'undefined') {
-          new ResizeObserver(update).observe(header);
-        }
-      })();
-    </script>
 
-    <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
+    <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full flex flex-col" style="min-height:0">
       <div class="mb-4">
         <h1 class="text-[18pt] font-bold text-slate-800">各学院 / 部处讲座统计</h1>
         <p class="text-[12pt] text-slate-500 mt-1">
@@ -97,10 +81,10 @@
       </div>
 
       <!-- 统计表格：横向可滚动、首列固定；纵向随页面自然展开 -->
-      <div v-if="summary && summary.lectureCount" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
+      <div v-if="summary && summary.lectureCount" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" style="flex:1;min-height:0">
+        <div style="flex:1;min-height:0;overflow:auto">
           <table class="min-w-full text-[12pt] border-collapse">
-            <thead class="bg-slate-50 text-slate-600" style="position:sticky;top:var(--header-height,0px);z-index:20">
+            <thead class="bg-slate-50 text-slate-600 sticky top-0 z-20">
               <tr>
                 <th class="text-center px-2 py-3 font-semibold border-b border-slate-200 sticky left-0 z-40 bg-slate-50 min-w-[48px] whitespace-nowrap hidden sm:table-cell">序号</th>
                 <th @click="toggleSort('college')" class="cursor-pointer select-none text-left px-4 py-3 font-semibold border-b border-slate-200 sticky left-0 z-40 bg-slate-50 max-w-[140px] break-words sm:sticky sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">
@@ -141,12 +125,11 @@
               </tr>
             </tbody>
           </table>
+          <p v-if="summary && summary.lectureCount" class="mt-3 px-4 text-[11pt] text-slate-400 leading-relaxed">
+            说明：同一讲座若由多个单位联合发布（跨源合并），会在每个相关单位各计 1 次，因此「各单位计数之和」会大于顶部「去重后讲座总数」。各单位的讲座明细与首页按单位筛选的结果完全一致。
+          </p>
         </div>
       </div>
-
-      <p v-if="summary && summary.lectureCount" class="mt-3 text-[11pt] text-slate-400 leading-relaxed">
-        说明：同一讲座若由多个单位联合发布（跨源合并），会在每个相关单位各计 1 次，因此「各单位计数之和」会大于顶部「去重后讲座总数」。各单位的讲座明细与首页按单位筛选的结果完全一致。
-      </p>
 
       <div v-else-if="loading" class="text-center text-slate-400 py-16 text-[12pt]">数据加载中…</div>
       <div v-else-if="loadError" class="text-center text-red-500 py-16 text-[12pt]">{{ loadError }}</div>
