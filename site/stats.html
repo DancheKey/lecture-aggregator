@@ -21,7 +21,7 @@
     <div id="app" v-cloak class="min-h-screen flex flex-col">
 
     <!-- 顶部栏 -->
-    <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
+    <header id="stats-header" class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
       <div class="max-w-6xl mx-auto px-4">
         <div class="flex items-center gap-3 h-14">
           <a href="./" class="flex items-center gap-2 shrink-0">
@@ -51,6 +51,22 @@
         </div>
       </div>
     </header>
+    <script>
+      // 移动端 header 高度不固定（含校区导航条），动态把表头 sticky 偏移设为 header 高度，
+      // 避免表格上滑时 thead 被 header 盖住。
+      (function() {
+        var header = document.getElementById('stats-header');
+        if (!header) return;
+        function update() {
+          document.documentElement.style.setProperty('--header-height', header.getBoundingClientRect().height + 'px');
+        }
+        update();
+        window.addEventListener('resize', update);
+        if (typeof ResizeObserver !== 'undefined') {
+          new ResizeObserver(update).observe(header);
+        }
+      })();
+    </script>
 
     <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
       <div class="mb-4">
@@ -84,10 +100,10 @@
       <div v-if="summary && summary.lectureCount" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
           <table class="min-w-full text-[12pt] border-collapse">
-            <thead class="bg-slate-50 text-slate-600 sticky top-0 z-20">
+            <thead class="bg-slate-50 text-slate-600" style="position:sticky;top:var(--header-height,0px);z-index:20">
               <tr>
-                <th class="text-center px-2 py-3 font-semibold border-b border-slate-200 sticky left-0 top-0 z-40 bg-slate-50 min-w-[48px] whitespace-nowrap hidden sm:table-cell">序号</th>
-                <th @click="toggleSort('college')" class="cursor-pointer select-none text-left px-4 py-3 font-semibold border-b border-slate-200 sticky left-0 top-0 z-40 bg-slate-50 max-w-[140px] break-words sm:sticky sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">
+                <th class="text-center px-2 py-3 font-semibold border-b border-slate-200 sticky left-0 z-40 bg-slate-50 min-w-[48px] whitespace-nowrap hidden sm:table-cell">序号</th>
+                <th @click="toggleSort('college')" class="cursor-pointer select-none text-left px-4 py-3 font-semibold border-b border-slate-200 sticky left-0 z-40 bg-slate-50 max-w-[140px] break-words sm:sticky sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">
                   <span class="inline-flex items-center gap-1 hover:text-slate-800">学院 / 部处 <span class="text-slate-400 text-[10pt]">{{ sortIcon('college') }}</span></span>
                 </th>
                 <th v-if="mode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 min-w-[80px] whitespace-nowrap">
