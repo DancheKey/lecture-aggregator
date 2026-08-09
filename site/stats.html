@@ -80,9 +80,11 @@
         </div>
       </div>
 
-      <!-- 统计表格：内部可滚动，表头与首两列冻结（纯 CSS，避开 CSP 对内联脚本的拦截） -->
-      <div v-if="summary && summary.lectureCount" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div style="overflow:auto; max-height: calc(100vh - 13rem)">
+      <!-- 统计区：桌面端表格 / 移动端卡片，纯 CSS 响应式切换（避开 CSP 对内联脚本的拦截） -->
+      <div v-if="summary && summary.lectureCount">
+        <!-- 桌面端：表格，表头与首列冻结，内部滚动 -->
+        <div class="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div style="overflow:auto; max-height: calc(100vh - 13rem)">
           <table class="min-w-full text-[12pt] border-collapse">
             <thead class="bg-slate-50 text-slate-600">
               <tr>
@@ -127,6 +129,49 @@
           </table>
           <p v-if="summary && summary.lectureCount" class="mt-3 px-4 text-[11pt] text-slate-400 leading-relaxed">
             说明：同一讲座若由多个单位联合发布（跨源合并），会在每个相关单位各计 1 次，因此「各单位计数之和」会大于顶部「去重后讲座总数」。各单位的讲座明细与首页按单位筛选的结果完全一致。
+          </p>
+          </div>
+        </div>
+
+        <!-- 移动端：每个学院一张卡片，免横向滚动与冻结列错乱，数据随卡片纵向自然排列 -->
+        <div class="sm:hidden space-y-3">
+          <div v-for="(row, idx) in rows" :key="row.college" class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div class="flex items-baseline justify-between mb-2 gap-2">
+              <span class="text-[13pt] font-semibold text-slate-800 truncate">
+                <span class="text-slate-400 font-normal mr-1">{{ idx + 1 }}.</span>{{ row.college || '未分类' }}
+              </span>
+              <span class="text-[12pt] text-slate-500 whitespace-nowrap shrink-0">
+                {{ mode === 'visits' ? '访问' : mode === 'likes' ? '点赞' : '总计' }}
+                <b class="text-slate-800 text-[13pt] ml-1">{{ mode === 'count' ? row.total : mode === 'visits' ? row.visitsTotal : row.likesTotal }}</b>
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-x-5 gap-y-0">
+              <div v-for="(n, ci) in row.cells" :key="years[ci]" class="flex items-center justify-between text-[12pt] py-1 border-b border-slate-100">
+                <span class="text-slate-500">{{ years[ci] }} 年</span>
+                <span :class="['font-medium', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">{{ cellDisplay(n) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 移动端合计卡片 -->
+          <div class="bg-slate-50 rounded-xl border border-slate-200 shadow-sm p-4">
+            <div class="flex items-baseline justify-between mb-2 gap-2">
+              <span class="text-[13pt] font-bold text-slate-800">合计</span>
+              <span class="text-[12pt] text-slate-500 whitespace-nowrap shrink-0">
+                {{ mode === 'visits' ? '访问' : mode === 'likes' ? '点赞' : '总计' }}
+                <b class="text-slate-800 text-[13pt] ml-1">{{ mode === 'count' ? grandTotal : mode === 'visits' ? grandVisits : grandLikes }}</b>
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-x-5 gap-y-0">
+              <div v-for="n in yearTotals" :key="n.year" class="flex items-center justify-between text-[12pt] py-1 border-b border-slate-100">
+                <span class="text-slate-500">{{ n.year }} 年</span>
+                <span class="font-semibold text-slate-700">{{ mode === 'count' ? n.count : mode === 'visits' ? n.visits : n.likes }}</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="px-1 text-[11pt] text-slate-400 leading-relaxed">
+            说明：同一讲座若由多个单位联合发布（跨源合并），会在每个相关单位各计 1 次，因此「各单位计数之和」会大于顶部「去重后讲座总数」。
           </p>
         </div>
       </div>
