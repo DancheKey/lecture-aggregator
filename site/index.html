@@ -191,7 +191,7 @@
                 <div class="flex items-center gap-2 text-[11pt] text-slate-400 mb-1.5 flex-nowrap">
                   <span class="font-medium text-slate-500 truncate min-w-0 max-w-[45%]">{{ l.college }}</span>
                   <span class="text-slate-300 shrink-0">·</span>
-                  <span class="whitespace-nowrap">{{ fmtDateTime(l.lectureStart) }}</span>
+                  <span class="whitespace-nowrap">{{ fmtDateTime(l) }}</span>
                   <span :class="['ml-auto px-2 py-0.5 rounded text-[11pt] font-semibold shrink-0 whitespace-nowrap', statusInfo(l.lectureStart).hot ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400']">{{ statusInfo(l.lectureStart).label }}</span>
                 </div>
                 <!-- 标题 -->
@@ -315,6 +315,6 @@
     </transition>
   </div>
 
-  <script defer src="app.js?v=ce6989e413"></script>
+  <script defer src="app.js?v=2ae2b01e47"></script>
 </body>
 </html>

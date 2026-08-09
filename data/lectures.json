@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-06T20:19:22+08:00",
+  "updatedAt": "2026-08-09 21:56:29",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260804/8806.html",
@@ -2468,7 +2468,7 @@
       "campus": "大学城",
       "title": "物理学院学术报告（第26期）深圳技术大学揭建文副研究员",
       "topic": "量子开放系统中的非平衡周期振荡：",
-      "lectureStart": "2026-05-18 08:00:00",
+      "lectureStart": "2026-05-18 15:30:00",
       "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "揭建文",
@@ -2482,7 +2482,8 @@
       "listTitle": "物理学院学术报告（第26期）深圳技术大学揭建文副研究员",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260517/8711.html",
@@ -6347,12 +6348,13 @@
       "publishTime": "2025-12-28 00:00:00",
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "authoritative-label",
       "abstract": "我们研究量子力学中的一类非线性Klein-Gordon-Dirac方程组的非相对论极限问题。在量子力学理论研究中有不同尺度的模型,其经典模型是线性或非线性薛定谔方程,其相对论复杂模型为非线性Klein-Gordon方程组、Dirac方程组,或通过Yukawa作用下的非线性耦合Klein-Gordon-Dirac方程组,更一般的情形是电磁场作用下的Klein-Gordon-Dirac方程组。为了判别该理论的重要性和模型的有效性,建立电磁场作用下的量子力学模型到经典的薛定谔方程是量子力学理论的基本问题,其在凝聚态物理和非线性几何光学理论中有重要应用。本报告将报告在数学理论和计算方法上关于这一理论的最新进展,并报告我们的最新进展,我们从数学上严格证明了电磁场作用下的非线性Klein-Gordon-Dirac方程组的非相对论极限,在适当的振荡初值的光滑假设下,获得了电磁场作用下的高维非线性Klein-Gordon-Dirac方程组的解到带电势原项的线性Schrodinger方程解在Sobolev范数意义下的收敛速率。 欢迎老师、同学们参加、交流！",
       "listTitle": "勷勤数学•专家报告-王术",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251226/8578.html",
@@ -6756,8 +6758,8 @@
       "campus": "石牌",
       "title": "美墨边境华人史研究的选题、方法与实践",
       "topic": "",
-      "lectureStart": "2025-12-19 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2025-12-19 14:30:00",
+      "lectureEnd": "2025-12-19 16:00:00",
       "location": "文科楼423会议室",
       "speaker": "张守岳",
       "speakerTitle": "",
@@ -6779,7 +6781,8 @@
         "http://statics.scnu.edu.cn/pics/lswh/2025/1217/1765954324891265.jpg"
       ],
       "imageParseMethod": "vlm",
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20251218/6651.html",
@@ -7595,8 +7598,8 @@
       "campus": "石牌",
       "title": "丝绸之路上的璀璨明珠——敦煌历史与文化",
       "topic": "",
-      "lectureStart": "2025-12-05 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2025-12-05 15:00:00",
+      "lectureEnd": "2025-12-05 17:00:00",
       "location": "文科楼423会议室",
       "speaker": "张小贵",
       "speakerTitle": "",
@@ -7618,7 +7621,8 @@
         "http://statics.scnu.edu.cn/pics/lswh/2025/1203/1764729400854492.png"
       ],
       "imageParseMethod": "vlm",
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20251201/309.html",
@@ -7801,8 +7805,8 @@
       "campus": "石牌",
       "title": "观察与反思：民间通灵漫谈",
       "topic": "",
-      "lectureStart": "2025-12-03 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2025-12-03 14:30:00",
+      "lectureEnd": "2025-12-03 16:30:00",
       "location": "文科楼423会议室",
       "speaker": "刘平",
       "speakerTitle": "教授、博士生导师",
@@ -7824,7 +7828,8 @@
         "http://statics.scnu.edu.cn/pics/lswh/2025/1202/1764658687294494.png"
       ],
       "imageParseMethod": "vlm",
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20251126/6617.html",
@@ -8030,7 +8035,7 @@
       "campus": "石牌",
       "title": "AI应用于历史学学术研究与教学实操",
       "topic": "",
-      "lectureStart": "2025-11-30 08:00:00",
+      "lectureStart": "2025-11-30 14:30:00",
       "lectureEnd": null,
       "location": "文科楼423会议室",
       "speaker": "夏翠娟",
@@ -8053,7 +8058,8 @@
         "http://statics.scnu.edu.cn/pics/lswh/2025/1128/1764319460106903.jpg"
       ],
       "imageParseMethod": "vlm",
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20251124/1028.html",
@@ -8135,8 +8141,8 @@
       "campus": "石牌",
       "title": "耶稣会士与儒家经典",
       "topic": "",
-      "lectureStart": "2025-11-28 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2025-11-28 15:30:00",
+      "lectureEnd": "2025-11-28 17:30:00",
       "location": "文科楼423会议室",
       "speaker": "梅谦立",
       "speakerTitle": "",
@@ -8158,7 +8164,8 @@
         "http://statics.scnu.edu.cn/pics/lswh/2025/1128/1764292886209991.jpg"
       ],
       "imageParseMethod": "vlm",
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20251126/1382.html",
@@ -9344,8 +9351,8 @@
       "campus": "石牌",
       "title": "“是华人，又不是华人”——土生华人的双重边缘化",
       "topic": "",
-      "lectureStart": "2025-11-14 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2025-11-14 19:30:00",
+      "lectureEnd": "2025-11-14 21:30:00",
       "location": "文科楼423会议室",
       "speaker": "王纯强",
       "speakerTitle": "",
@@ -9367,7 +9374,8 @@
         "http://statics.scnu.edu.cn/pics/lswh/2025/1113/1763023021153686.jpg"
       ],
       "imageParseMethod": "vlm",
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251111/13132.html",
@@ -10097,7 +10105,8 @@
       "abstract": "",
       "images": [
         "http://statics.scnu.edu.cn/pics/aol/2025/1030/1761806280239166.jpg"
-      ]
+      ],
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251029/13116.html",
@@ -10957,9 +10966,9 @@
       "college": "历史文化学院",
       "campus": "石牌",
       "title": "史学理论和史学史前沿理论专题",
-      "topic": "",
-      "lectureStart": "2025-10-13 08:00:00",
-      "lectureEnd": null,
+      "topic": "什么是历史主义",
+      "lectureStart": "2025-10-13 09:00:00",
+      "lectureEnd": "2025-10-13 11:45:00",
       "location": "文科楼423会议室",
       "speaker": "李红岩",
       "speakerTitle": "",
@@ -10970,7 +10979,7 @@
       "publishTime": null,
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "multi-session",
       "listTitle": "史学理论和史学史前沿理论专题",
       "sources": [],
       "merged": false,
@@ -10981,7 +10990,112 @@
         "http://statics.scnu.edu.cn/pics/lswh/2025/1013/1760319779907531.jpg"
       ],
       "imageParseMethod": "vlm",
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "lectureIndex": 1,
+      "timeUnknown": false,
+      "isMultiLecture": true
+    },
+    {
+      "sourceUrl": "http://lswh.scnu.edu.cn/a/20251013/65.html",
+      "college": "历史文化学院",
+      "campus": "石牌",
+      "title": "史学理论和史学史前沿理论专题",
+      "topic": "中国马克思主义史学的来龙去脉",
+      "lectureStart": "2025-10-13 15:00:00",
+      "lectureEnd": "2025-10-13 17:45:00",
+      "location": "文科楼423会议室",
+      "speaker": "李红岩",
+      "speakerTitle": "",
+      "speakerAffiliation": "华南师范大学",
+      "inviter": "",
+      "speakerBio": "李红岩，华南师范大学兼职特聘教授。中国编辑学会副会长，国务院特殊津贴专家，中国史学会理事、史学理论分会副会长，曾任中国社会科学杂志社副总编辑，兼任《历史研究》《中国社会科学文摘》《中国社会科学评价》主编，《中国社会科学报》编辑部主任。主要研究阐释学、史学理论、史学史。在《历史研究》《近代史研究》《文史哲》《人民日报》《光明日报》等刊物发表各类文章200余篇。出版《阐释生成与历史阐释》《中国近代史学史论》《新中国马克思主义史学思想》《钱锺书与近代学人》《史学的光与影》等专著十余部。",
+      "organizer": "历史文化学院",
+      "publishTime": null,
+      "publishTimeSource": "url_proxy",
+      "timeConfidence": "high",
+      "timeNote": "multi-session",
+      "listTitle": "史学理论和史学史前沿理论专题",
+      "sources": [],
+      "merged": false,
+      "sourceCount": 1,
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1013/1760319779907531.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "lectureIndex": 2,
+      "timeUnknown": false,
+      "isMultiLecture": true
+    },
+    {
+      "sourceUrl": "http://lswh.scnu.edu.cn/a/20251013/65.html",
+      "college": "历史文化学院",
+      "campus": "石牌",
+      "title": "史学理论和史学史前沿理论专题",
+      "topic": "世界主要文明体对历史与史学的看法",
+      "lectureStart": "2025-10-14 09:00:00",
+      "lectureEnd": "2025-10-14 11:45:00",
+      "location": "文科楼423会议室",
+      "speaker": "李红岩",
+      "speakerTitle": "",
+      "speakerAffiliation": "华南师范大学",
+      "inviter": "",
+      "speakerBio": "李红岩，华南师范大学兼职特聘教授。中国编辑学会副会长，国务院特殊津贴专家，中国史学会理事、史学理论分会副会长，曾任中国社会科学杂志社副总编辑，兼任《历史研究》《中国社会科学文摘》《中国社会科学评价》主编，《中国社会科学报》编辑部主任。主要研究阐释学、史学理论、史学史。在《历史研究》《近代史研究》《文史哲》《人民日报》《光明日报》等刊物发表各类文章200余篇。出版《阐释生成与历史阐释》《中国近代史学史论》《新中国马克思主义史学思想》《钱锺书与近代学人》《史学的光与影》等专著十余部。",
+      "organizer": "历史文化学院",
+      "publishTime": null,
+      "publishTimeSource": "url_proxy",
+      "timeConfidence": "high",
+      "timeNote": "multi-session",
+      "listTitle": "史学理论和史学史前沿理论专题",
+      "sources": [],
+      "merged": false,
+      "sourceCount": 1,
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1013/1760319779907531.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "lectureIndex": 3,
+      "timeUnknown": false,
+      "isMultiLecture": true
+    },
+    {
+      "sourceUrl": "http://lswh.scnu.edu.cn/a/20251013/65.html",
+      "college": "历史文化学院",
+      "campus": "石牌",
+      "title": "史学理论和史学史前沿理论专题",
+      "topic": "历史学的基本概念与史家的基本素养",
+      "lectureStart": "2025-10-14 15:00:00",
+      "lectureEnd": "2025-10-14 17:45:00",
+      "location": "文科楼423会议室",
+      "speaker": "李红岩",
+      "speakerTitle": "",
+      "speakerAffiliation": "华南师范大学",
+      "inviter": "",
+      "speakerBio": "李红岩，华南师范大学兼职特聘教授。中国编辑学会副会长，国务院特殊津贴专家，中国史学会理事、史学理论分会副会长，曾任中国社会科学杂志社副总编辑，兼任《历史研究》《中国社会科学文摘》《中国社会科学评价》主编，《中国社会科学报》编辑部主任。主要研究阐释学、史学理论、史学史。在《历史研究》《近代史研究》《文史哲》《人民日报》《光明日报》等刊物发表各类文章200余篇。出版《阐释生成与历史阐释》《中国近代史学史论》《新中国马克思主义史学思想》《钱锺书与近代学人》《史学的光与影》等专著十余部。",
+      "organizer": "历史文化学院",
+      "publishTime": null,
+      "publishTimeSource": "url_proxy",
+      "timeConfidence": "high",
+      "timeNote": "multi-session",
+      "listTitle": "史学理论和史学史前沿理论专题",
+      "sources": [],
+      "merged": false,
+      "sourceCount": 1,
+      "abstract": "",
+      "hasPosterImage": true,
+      "images": [
+        "http://statics.scnu.edu.cn/pics/lswh/2025/1013/1760319779907531.jpg"
+      ],
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "lectureIndex": 4,
+      "timeUnknown": false,
+      "isMultiLecture": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20250925/6577.html",
@@ -12773,8 +12887,8 @@
       "campus": "石牌",
       "title": "勷勤数学•专家报告-尹思露",
       "topic": "$H^{\\frac{7/4}}$ ill-posedness of the compressible ideal MHD system in 2D",
-      "lectureStart": "2025-07-04 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2025-06-20 16:30:00",
+      "lectureEnd": "2025-06-20 17:30:00",
       "location": "数科院西楼114",
       "speaker": "尹思露",
       "speakerTitle": "",
@@ -12785,12 +12899,13 @@
       "publishTime": "2025-06-21 07:45:00",
       "publishTimeSource": "position",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "authoritative-label",
       "abstract": "In this talk, we investigate the ill-posedness of the non-strictly hyperbolic compressible ideal MHD (IMHD) system in two dimensions, which exhibits multiple propagation speeds. For scalar quasilinear wave equation, Smith-Tataru showed its local well-posedness in $H^{\\frac{11/4}+} \\times H^{\\frac{7/4}+}$. Here, we construct a counterexample to the local existence of low-regularity solutions to the IMHD system in the borderline space $H^{\\frac{7/4}}$. Our proof is based on a coalition of a carefully designed algebraic approach and Christodoulou's geometric approach. We give a complete description of solutions' dynamics up to the earliest singular event, when a shock forms. This talk is based on a joint work with Xinliang An (NUS) and Haoyang Chen (NUS). 欢迎老师、同学们参加、交流！",
       "listTitle": "勷勤数学•专家报告-尹思露",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250702/8424.html",
@@ -13294,7 +13409,8 @@
       "timeNote": "general-body-full",
       "abstract": "上海交通大学长聘教授、博士生导师,中国书法文化国际传播研究所所长,同时兼任教育部中国书法教育指导委员会委员、 \"书法小联合国\"(联合国NGO)主席、国际儒学联合会理事,中华文化发展促进会理事,上海市民俗文化学会会长、中国书法家协会会员、上海市书法家协会常务理事等。书法作品入展全国第四届、第八届书法篆刻展,第八届全国中青年书法篆刻展、当代书坛名家系统工程 -五百家书法精品展,应邀参加第十三届中国艺术节全国优秀书法篆刻作品展等,并在\"当代书法创作研究暨中国书法如何走向世界\"国际论坛、\"谢稚柳书法艺术提名展\"中获奖。2009年入选教育部新世纪优秀人才支持计划。",
       "listTitle": "华南师范大学砺儒讲坛第137讲：中文——增进文明对话（周斌教授）",
-      "host": "陈志平"
+      "host": "陈志平",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250619/8397.html",
@@ -21270,7 +21386,8 @@
       "listTitle": "戏剧游戏在中小学课堂中的应用",
       "imageParseMethod": "vlm",
       "hasPosterImage": true,
-      "abstract": ""
+      "abstract": "",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241125/6339.html",
@@ -21319,7 +21436,8 @@
       "timeNote": "authoritative-label",
       "abstract": "中国社会科学院登峰战略产业经济学学科负责人、首席专家。中国社科院能源经济研究中心主任,《中国工业经济》、《经济管理》主编。中组部、人社部 \"万人计划\"国家高层次人才特殊支持计划、哲学社会科学领军人才,中宣部文化名家暨\"四个一批\"人才。",
       "listTitle": "华南师范大学砺儒讲坛第127讲：新质生产力、新型工业化与我国的战略机遇（史丹研究员）",
-      "host": "彭壁玉"
+      "host": "彭壁玉",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20241124/1029.html",
@@ -21538,7 +21656,8 @@
       "sourceCount": 1,
       "isMultiLecture": null,
       "lectureIndex": null,
-      "lectureCount": null
+      "lectureCount": null,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241118/6328.html",
@@ -21785,7 +21904,8 @@
       "timeNote": "authoritative-label",
       "abstract": "研究领域为西方史学史与史学理论、西方城市史。马克思主义理论研究和建设工程重点教材《外国史学史》首席专家、国家社科基金重大项目 \"多卷本《西方城市史》\"首席专家。教育部新世纪人才、\"万人计划\"哲学社会科学领军人才、教育部高等学校教学指导委员会委员(历史学);上海市曙光学者、上海市学位委员会学科评议组成员(历史学)、上海市世界史学会副会长、上海市社联副主席等。",
       "listTitle": "华南师范大学砺儒讲坛第126讲：五百年来的中国与世界（陈恒教授）",
-      "host": "刘晓东"
+      "host": "刘晓东",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241118/6327.html",
@@ -30468,8 +30588,8 @@
       "campus": "石牌",
       "title": "学术报告-许左权",
       "topic": "Dynamic optimal reinsurance and dividend-payout in a finite time horizon",
-      "lectureStart": "2024-03-27 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2024-03-27 16:00:00",
+      "lectureEnd": "2024-03-27 17:00:00",
       "location": "数科院西楼二楼会议室",
       "speaker": "许左权",
       "speakerTitle": "",
@@ -30480,12 +30600,13 @@
       "publishTime": "2024-03-27 00:00:00",
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "authoritative-label",
       "abstract": "We study a dynamic optimal reinsurance and dividend-payout problem for an insurance company in a finite time horizon. The goal of the company is to maximize the expected cumulative discounted dividend payouts until bankruptcy or maturity which comes earlier. The company is allowed to buy reinsurance contracts dynamically over the whole time horizon to cede its risk exposure with other reinsurance companies. This is a mixed singular-classical control problem and the corresponding Hamilton-Jacobi-Bellman equation is a variational inequality with a fully nonlinear operator and subject to a gradient constraint. We obtain the C2,1 smoothness of the value function and a comparison principle for its gradient function by the penalty approximation method so that one can establish an efficient numerical scheme to compute the value function. We find that the surplus-time space can be divided into three non-overlapping regions by a risk-magnitude and time-dependent reinsurance barrier and a time-dependent dividend-payout barrier. The insurance company should be exposed to a higher risk as its surplus increases; be exposed to the entire risk once its surplus upward crosses the reinsurance barrier; and pay out all its reserves exceeding the dividend-payout barrier. The estimated localities of these regions are also provided. This is a joint work with Guan Chonghu and Zhou Rui. 欢迎老师、同学们参加、交流！",
       "listTitle": "学术报告-许左权",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20240325/197.html",
@@ -34062,8 +34183,8 @@
       "campus": "石牌",
       "title": "学术报告-金含清",
       "topic": "Optimal stopping without time consistency",
-      "lectureStart": "2023-12-11 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2023-12-11 11:00:00",
+      "lectureEnd": "2023-12-11 12:00:00",
       "location": "数科院西楼二楼会议室",
       "speaker": "金含清",
       "speakerTitle": "",
@@ -34074,12 +34195,13 @@
       "publishTime": "2023-12-11 00:00:00",
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "authoritative-label",
       "abstract": "We study a continuous time dynamic optimal stopping problem with a flow of preferences, which can be in non-expectation form and can depend on both the current time and state of the system in general. We will define a solution to the problem by the rationality of the agent, and compare it with other solutions appeared in literature. 欢迎老师、同学们参加、交流！",
       "listTitle": "学术报告-金含清",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20231206/12523.html",
@@ -36568,7 +36690,8 @@
       "publishTime": null,
       "publishTimeSource": "url_proxy",
       "abstract": "1.华南师范大学第四届教师教学大赛汕尾校区参赛教师示范课展示; 2.校区教师说课磨课。",
-      "listTitle": "华南师范大学汕尾校区第6期教学工作坊"
+      "listTitle": "华南师范大学汕尾校区第6期教学工作坊",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20231030/6025.html",
@@ -38310,7 +38433,8 @@
       "hasPosterImage": true,
       "abstract": "黎夏 ，华东 师范大学地理科学学院教授、博士生导师、国际欧亚科学院院士，英国社会科学院院士、教育部“长江学者”特聘教授、国家杰出青年科学基金获得者、 国家重点基础研究发展计划首席专家、国家人事部首批新世纪百千万人才工程国家级人选。中国地理信息系统协会理论与方法专业委员会副主任、中国地理学会地理模型与地理信息分析专业委员会副主任、中国可持续发展研究会时空信息专业委员会副主任。 黎 夏教 授长期从 事地理元胞自动机、多智能体与空间优化、高精度全球土地利用变化建模与环境影响分析等方面的研究。提出了地理模拟系统理论，研发了GeoSOS系列地理模拟与优化软件，应用于城市规划、国土空间优化等领域。出版著作8部,在Nature Communications、Nature Sustainability等国内外刊物发表学术论文300余篇，多篇论文成果位列SCI地理学领域引用前1%，多次入选 Elsevier 中国高被引学者、科睿唯安全球高被引科学家。入选“中国百篇最具影响国际学术论文”、“中国地理科学十大研究进展”。有关研究被同行评价为先驱研究；获发展中国家科学院(TWAS)地球科学奖。",
       "listTitle": "讲座通知丨青年教师如何做好科研",
-      "affiliation": "华东师范大学"
+      "affiliation": "华东师范大学",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230725/7626.html",
@@ -39386,12 +39510,13 @@
       "publishTime": "2023-06-16 00:00:00",
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "authoritative-label",
       "abstract": "Subsampling reduces computational burden and maintains statistical efficiency for big data. We review subsampling techniques for different models. If data volume is too large, nonuniform subsampling with replacement is infeasible. Poisson subsampling solves this problem. A distributed subsampling framework computes statistics on smaller data partitions. Strategies are evaluated through numerical experiments.",
       "listTitle": "学术报告-艾明要",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230608/12324.html",
@@ -39911,7 +40036,8 @@
       "listTitle": "行知书院科学教育发展与创新训练营",
       "imageParseMethod": "vlm",
       "hasPosterImage": true,
-      "abstract": ""
+      "abstract": "",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230526/12310.html",
@@ -44118,7 +44244,7 @@
       "campus": "大学城",
       "title": "中国工程物理学院研究生院陈宇博士学术报告",
       "topic": "开放系统中的",
-      "lectureStart": "2023-03-06 08:00:00",
+      "lectureStart": "2023-03-06 14:00:00",
       "lectureEnd": null,
       "location": "理六栋302会议室",
       "speaker": "陈宇",
@@ -44132,7 +44258,8 @@
       "listTitle": "中国工程物理学院研究生院陈宇博士学术报告",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230303/12201.html",
@@ -44784,7 +44911,9 @@
       "abstract": "",
       "timeConfidence": "high",
       "timeNote": "authoritative-label;cv-url-date-mismatch",
-      "lectureIndex": 1
+      "lectureIndex": 1,
+      "timeUnknown": true,
+      "isMultiLecture": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20221212/4108.html",
@@ -46016,7 +46145,8 @@
       "notes": [],
       "splitMode": "repeated-label",
       "speakerSource": "block",
-      "listTitle": "人工智能学术论坛"
+      "listTitle": "人工智能学术论坛",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20221118/7446.html",
@@ -46523,7 +46653,8 @@
       "notes": [],
       "splitMode": "repeated-label",
       "speakerSource": "block",
-      "listTitle": "人工智能学术论坛"
+      "listTitle": "人工智能学术论坛",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://ai.scnu.edu.cn/a/20220928/163.html",
@@ -46553,7 +46684,8 @@
       "notes": [],
       "splitMode": "repeated-label",
       "speakerSource": "block",
-      "listTitle": "人工智能学术论坛"
+      "listTitle": "人工智能学术论坛",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221026/65.html",
@@ -47215,7 +47347,8 @@
       "notes": [],
       "splitMode": "repeated-label",
       "speakerSource": "block",
-      "listTitle": "人工智能学术论坛"
+      "listTitle": "人工智能学术论坛",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20221012/7422.html",
@@ -47463,8 +47596,8 @@
       "campus": "石牌",
       "title": "学术报告-王格非",
       "topic": "On the cohomology of spin hyperelliptic mapping class groups",
-      "lectureStart": "2022-09-29 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2022-09-29 15:00:00",
+      "lectureEnd": "2022-09-29 16:00:00",
       "location": "西楼二楼会议室",
       "speaker": "王格非",
       "speakerTitle": "",
@@ -47478,7 +47611,10 @@
       "listTitle": "学术报告-王格非",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220923/12104.html",
@@ -47531,8 +47667,8 @@
       "campus": "石牌",
       "title": "学术报告-管崇虎",
       "topic": "Dynamic Optimal Reinsurance and Dividend Payout in Finite Time Horizon",
-      "lectureStart": "2022-09-27 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2022-09-27 14:30:00",
+      "lectureEnd": "2022-09-27 15:30:00",
       "location": "东楼401",
       "speaker": "管崇虎",
       "speakerTitle": "",
@@ -47546,7 +47682,10 @@
       "listTitle": "学术报告-管崇虎",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220923/12102.html",
@@ -47944,8 +48083,8 @@
       "campus": "石牌",
       "title": "学术报告-杨磊",
       "topic": "Exploring Sparse Solutions of a Class of Constrained Optimization Problems (Authors: Lei Yang, Xiaojun Chen, Shuhuang Xiang)",
-      "lectureStart": "2022-09-21 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2022-09-21 16:00:00",
+      "lectureEnd": "2022-09-21 17:00:00",
       "location": "西楼二楼会议室",
       "speaker": "杨磊",
       "speakerTitle": "",
@@ -47959,7 +48098,10 @@
       "listTitle": "学术报告-杨磊",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20220920/7401.html",
@@ -47967,8 +48109,8 @@
       "campus": "石牌",
       "title": "学术报告-姚海祥",
       "topic": "基于绩效正则化法的均值-下偏矩的投资组合选择",
-      "lectureStart": "2022-09-20 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2022-09-20 15:30:00",
+      "lectureEnd": "2022-09-20 17:00:00",
       "location": "东楼401",
       "speaker": "姚海祥",
       "speakerTitle": "",
@@ -47982,7 +48124,10 @@
       "listTitle": "学术报告-姚海祥",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2022/0920/29.html",
@@ -48002,7 +48147,8 @@
       "publishTime": null,
       "publishTimeSource": "url_proxy",
       "listTitle": "“广东省基础与应用基础研究基金——项目资助体系”专题讲座",
-      "abstract": ""
+      "abstract": "",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220914/12086.html",
@@ -48032,8 +48178,8 @@
       "campus": "石牌",
       "title": "学术报告-邬恩信",
       "topic": "From calculus and vector bundles to smooth homological algebra",
-      "lectureStart": "2022-09-19 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2022-09-19 14:30:00",
+      "lectureEnd": "2022-09-19 16:00:00",
       "location": "东楼401",
       "speaker": "邬恩信",
       "speakerTitle": "",
@@ -48047,7 +48193,10 @@
       "listTitle": "学术报告-邬恩信",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20220917/54.html",
@@ -48498,7 +48647,7 @@
       "campus": "汕尾",
       "title": "《大学（青年）教师课堂教学“基本功”的历练：认知与行动》",
       "topic": "大学(青年)教师课堂教学\"基本功\"的历练:认知与行动 2022 07/04 文学学士插学学土教育字项士、博士学位体学量华南师范大字通尾校区委合教学科研办 Am900 极辽宁师是大学教育学院博士生导师华南师是大学特瑞教授百教宇楼102教室",
-      "lectureStart": "2022-07-04 08:00:00",
+      "lectureStart": "2022-07-04 09:00:00",
       "lectureEnd": null,
       "location": "",
       "speaker": "张桂春",
@@ -48512,7 +48661,10 @@
       "imageParseMethod": "ocr",
       "listTitle": "《大学（青年）教师课堂教学“基本功”的历练：认知与行动》",
       "hasPosterImage": true,
-      "abstract": ""
+      "abstract": "",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220628/11991.html",
@@ -48579,7 +48731,8 @@
       "publishTime": null,
       "publishTimeSource": "url_proxy",
       "abstract": "面对新时代的挑战,人才资源需要有效培养,其核心是提升人才多元化能力培养。报告将探讨国际上对新时代教育目标的关注方向,其核心认知能力培养目标包括构建深度理解(深度学习)和广度融合的知识体系,已及提升科学思维和创造力等高端思维能力。通过案例分析,报告将重点介绍知识整合和科学思维方面的最新研究发展,并讨论其对中国教育创新发展可以有的启示,通过借鉴融合的自主开发优化,更好地服务中国的教育目标。",
-      "listTitle": "科学思维助力新时代人才培养"
+      "listTitle": "科学思维助力新时代人才培养",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20220620/2322.html",
@@ -49222,7 +49375,7 @@
       "campus": "大学城",
       "title": "科学把握碳达峰碳中和双碳战略",
       "topic": "",
-      "lectureStart": "2022-05-23 08:00:00",
+      "lectureStart": "2022-05-23 10:00:00",
       "lectureEnd": null,
       "location": "环境研究院理三栋六楼会议室",
       "speaker": "张修玉",
@@ -49236,7 +49389,8 @@
       "listTitle": "科学把握碳达峰碳中和双碳战略",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220518/11943.html",
@@ -50377,7 +50531,8 @@
       "timeNote": "authoritative-label",
       "abstract": "本次讲座中,景庆虹教授将与与会教师",
       "listTitle": "【每周一课】教师教学能力提升—思政课教师课堂言语表达力与教学效果的提升",
-      "__idx": 2024
+      "__idx": 2024,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2021/1203/2993.html",
@@ -50554,7 +50709,8 @@
       "listTitle": "中国心理学会学习心理专业委员会（筹）第一届学术年会 暨莫雷教授从教50周年学术研讨会第二轮会议通知",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20211123/5662.html",
@@ -51219,7 +51375,8 @@
       "timeConfidence": "high",
       "timeNote": "same-day-normal",
       "abstract": "社科处处长张宏宝对近期学校文科科研工作进行总结,详细介绍了科研工作的有关政策及近期科研主要工作安排和部署,尤其对2022年国家社科基金项目的申报和组织工作进行详细指导。",
-      "listTitle": "张宏宝——2022年国家社科基金项目政策解读"
+      "listTitle": "张宏宝——2022年国家社科基金项目政策解读",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/1104/16.html",
@@ -51239,7 +51396,8 @@
       "publishTime": null,
       "publishTimeSource": "url_proxy",
       "abstract": "那张纸\"上的\"填充物\"——你拥有多少:论社会选择与大学生的生涯规划及发展。",
-      "listTitle": "职业生涯规划主题讲座"
+      "listTitle": "职业生涯规划主题讲座",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20211101/183.html",
@@ -51314,7 +51472,8 @@
       "timeNote": "authoritative-label",
       "abstract": "大学物理是一门自然科学的基础课,在为学生打好科学基础、培养学生科学素养和创新潜能中具有重要作用。本门讲座由中国民航学院理学院宋庆功教授主讲,宋教授将围绕\"高校物理基础课教学与创新\"的主题和收看直播的老师们一起探讨如何深化教学改革研究,提升教育教学质量、促进教育教学创新。",
       "listTitle": "【每周一课】高校物理基础课教学与创新",
-      "__idx": 2058
+      "__idx": 2058,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211029/11747.html",
@@ -51400,7 +51559,8 @@
       ],
       "imageParseMethod": "vlm",
       "vlmExtracted": true,
-      "ocrExtracted": false
+      "ocrExtracted": false,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://swc.scnu.edu.cn/collaborative/2021/1026/28.html",
@@ -52163,7 +52323,8 @@
       "timeNote": "authoritative-label",
       "abstract": "自古即有\"因材施教\"的教育理念和教学规程,在教学改革如火如荼的今天,应当更加重视并大力倡导\"因学施教\"的课程活动模式。两者虽一字之差,却有着更加丰富、具体的实在意义——强调根据学生个体和群体的综合学情,积极开展行之有效的课程教学活动。本次讲座中,中共中央党校的张玉杰教授将围绕\"怎样因学施教\"这一主题,为大家",
       "listTitle": "【每周一课】怎样因学施教",
-      "__idx": 2086
+      "__idx": 2086,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210906/11691.html",
@@ -52797,7 +52958,8 @@
       "publishTime": "2021-07-07 16:09:00",
       "publishTimeSource": "position",
       "listTitle": "POA在大学英语教学中的应用",
-      "abstract": ""
+      "abstract": "",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0705/34.html",
@@ -53528,7 +53690,8 @@
       "timeNote": "authoritative-label",
       "abstract": "\"后真相\"是指人们只在意情绪或主张而不管事实和道理的现象,反映了民众态度的形成和决定,在社交媒体时代具有鲜明的集体非理性特点。\"媒介素养\"是指社会公众对于媒介信息的解读和批判能力,以及使用所获得的媒介信息为其个人生活乃至社会发展所用的综合能力。本次讲座中,金兼斌教授将从后真相时代媒体社会面临的挑战出发,从几个维度阐述媒介素养的概念,探析后真相时代下的媒介素养问题以及如何培养自身媒介素养。",
       "listTitle": "【每周一课】后真相时代的媒介素养",
-      "__idx": 2137
+      "__idx": 2137,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210525/11626.html",
@@ -53937,7 +54100,8 @@
       "timeNote": "authoritative-label",
       "abstract": "党旗是中国共产党的象征和标志,从一个侧面记录了中国共产党人披荆斩棘、求索奋进的苦难辉煌。本次讲座中,主讲人郑彦良教授将以党旗诞生历程为主脉,结合\"中国共产党党旗诞生历程珍贵档案展\"的资料、照片和文献,带领党员同志们从\"高高打出共产党的旗子\"、\"战斗的旗帜\"、\"高举团结抗战的大旗\"、\"七大期间的公开征集\"、\"历时八十一载写入党章\"等五个方面回顾党旗漫长、曲折的诞生历程,通过一百多张珍贵的历史照片,展示中国共产党自诞生至今近一个世纪里的各个重要历史节点上的党旗样貌。通过党旗的演进确立过程,回顾中国共产党百年的发展历程,普及党史关键节点的知识,教育广大党员、群众坚定跟党走的信心。",
       "listTitle": "【每周一课】不忘初心，从党旗诞生的苦难与辉煌讲起——纪念中共建党一百周年专题",
-      "__idx": 2154
+      "__idx": 2154,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20210510/5492.html",
@@ -54032,7 +54196,8 @@
       "timeNote": "authoritative-label",
       "abstract": "教师本职工作应是\"教书育人\"、\"立德树人\",信息化的发展带来的生活越便捷,就越要时刻谨记坚守师德底线,教师们的职责不仅仅是传授学识,更要给学生们带来以身作则的好习惯和老师这个称谓所带来的责任感。本次讲座中,",
       "listTitle": "【每周一课】师德之美，尽在跨界和细节之中",
-      "__idx": 2159
+      "__idx": 2159,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20210423/2094.html",
@@ -54434,7 +54599,8 @@
       "timeNote": "authoritative-label",
       "abstract": "本次讲座中,杨教授将从自身多年思想政治教育创新与实践的教学经验出发,深入结合习近平新时代中国特色社会主义思想,全面落实全国教育大会、全国高校思想政治工作会议和思想政治理论课教师座谈会精神,结合当今时政热点问题",
       "listTitle": "【每周一课】新时代思想政治教育理论创新与实践",
-      "__idx": 2176
+      "__idx": 2176,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210407/11565.html",
@@ -54532,7 +54698,8 @@
       "timeNote": "authoritative-label",
       "abstract": "十三届全国人大四次会议3月11日表决通过了《中华人民共和国国民经济和社会发展第十四个五年规划和2035年远景目标纲要》,作为起草工作参与者,张力秘书长将结合相关背景资料,对我国教育形势和国家政策导向进行深入解析。",
       "listTitle": "【每周一课】对“十四五”教育改革和规划的展望与分析：“十四五”时期建设高质量教育体系的形势和政策导向",
-      "__idx": 2180
+      "__idx": 2180,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210326/11560.html",
@@ -55432,7 +55599,8 @@
       "speakerSource": null,
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2020/1124/45.html",
@@ -55616,7 +55784,8 @@
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "abstract": "10:00- 10:45 议题二: 中国共产党与中国之治陈潭 (主持人) 肖滨、金太军、 赵成根、胡元梓、黄新华 (发言嘉宾) 10:45- 11:00 茶歇 11:00- 11:30 议题三: 改革开放40年与中国特色的公共管理创新杨爱平 (主持人) 彭勃、马卫红、 彭未名、史传林 (发言嘉宾) 11:30- 12:30 议题四: 中国公共管理学科建设的经验与展望 (线上会议) 倪星 (主持人) 姜晓萍、张贤明、彭宗超、 张雷、章文光、郅庭瑾 (发言嘉宾) 15:00- 17:30 公共管理学科建设闭门会议 (208会议室) 主持人:胡中锋院长倪星:华南师范大学公共管理一级学科博士点发展情况介绍参会嘉宾发表意见建议(注:参会者为省外嘉宾和学院学科点负责人) 蒋达勇副校长总结讲话二、参会嘉宾名单(按姓氏拼音排序) 姓名工作单位职称/职务包国宪兰州大学管理学院教授、名誉院长蔡立辉暨南大学公共管理学院教授、院长陈潭广州大学公共管理学院教授、院长高小平中国行政管理学会研究员、原执行副会长胡象明北京航空航天大学公共管理学院教授胡元梓 《新华文摘》杂志社研究员、高级编审黄新华厦门大学公共事务学院教授、党委书记姜晓萍四川大学公共管理学院教授、长江学者金太军南京审计大学公共管理学院教授、院长、长江学者马卫红深圳大学管理学院教授、副院长彭勃上海交通大学国际与公共事务学院教授、副院长彭未名广东外语外贸大学社会与公共管理学院教授、院长彭宗超清华大学公共管理学院教授、党委书记史传林华南农业大学公共管理学院教授、院长肖滨中山大学政治与公共事务管理学院教授、长江学者徐晓林华中科技大学公共管理学院教授张雷东北大学文法学院教授、院长张贤明吉林大学行政学院教授、院长、长江学者章文光北京师范大学政府管理学院教授、院长赵成根北京大学政府管理学院教授郅庭瑾华东师范大学教育学部教授、副院长朱正威西安交通大学公共政策与管理学院教授竺乾威复旦大学国际关系与公共事务学院教授。",
-      "listTitle": "首届“华南公共治理高峰论坛暨公共管理学科建设”研讨会"
+      "listTitle": "首届“华南公共治理高峰论坛暨公共管理学科建设”研讨会",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20201117/5322.html",
@@ -56360,7 +56529,7 @@
       "campus": "大学城",
       "title": "计算毒理学与化学品风险防控",
       "topic": "",
-      "lectureStart": "2020-10-24 08:00:00",
+      "lectureStart": "2020-10-24 15:00:00",
       "lectureEnd": null,
       "location": "华师大学城校区理3栋，环境研究院6楼会议室",
       "speaker": "陈景文",
@@ -56374,7 +56543,8 @@
       "listTitle": "计算毒理学与化学品风险防控",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2020/1020/43.html",
@@ -56382,7 +56552,7 @@
       "campus": "大学城",
       "title": "基于铁循环的环境修复策略及材料",
       "topic": "",
-      "lectureStart": "2020-10-24 08:00:00",
+      "lectureStart": "2020-10-24 15:00:00",
       "lectureEnd": null,
       "location": "华师大学城校区理3栋，环境研究院6楼会议室",
       "speaker": "张礼知",
@@ -56396,7 +56566,8 @@
       "listTitle": "基于铁循环的环境修复策略及材料",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20201022/848.html",
@@ -57725,7 +57896,8 @@
       "abstract": "中国大学MOOC 華南師花大学疫情时期在线教学疫情就是命令,防控就是责任。本课程彰显华南师范大学国家\"211工程\"和\"双一流\"重点建设大学的社会责任担当,依托教育技术学国家重点学科,直击解决一线教师对在线教学价值的认识不到位、在线教学创新的理论指导匮乏、 在线教学能力的培训缺失等问题,保障\"停课不停学\"线上教学高效开展。 课程团队课程特色直击解决当下在线教学问题为一线教师在线教学\"减负\" 对在线教学价值的认识不到位对在线教学创新的理论指导匮乏对在线教学能力的培训缺失 2周8学时,轻松个性学浓缩精华,学习体验\"短平快\" 自定步调,学习内容\"个性化\" 丰富一线案例,助你落地实践粤港澳大湾区高校在线开放课程联盟、地方高校优课联盟联合抗击疫情公益课(节选) 广东省本科高校在线开放课程指导委员会征集评选出119件案例课程内容 01在线教学基本原理 1.1战\"疫\"与在线教学 1.2在线教学基本理论 1.3疫情时期在线教学特点 1.4疫情时期基于慕课\"1+3\"在线教学典型案例 02疫情时期在线教学设计 2.1在线教学设计概述 2.2在线课程资源设计 2.3在线学习支持服务设计 03疫情时期在线教学模式 3.1在线教学模式概述 3.2疫情时期四种在线教学模式 3.3在线直播同步教学模式案例 3.4在线课程异步教学模式案例 3.5在线双师协同教学模式案例 3.6在线混合多元教学模式案例 04疫情时期在线教学案例 4.1疫情时期在线教学案例分析维度 4.2疫情时期中小学在线教学典型案例 4.3疫情时期高等学校在线教学典型案例 4.4疫情时期高校专业在线教学典型案例 4.5疫情时期高校课程在线教学典型案例 3月20日开课,扫码加入课程！ 中国大学MOOC搜索疫情时期在线教学 https://www.icourse163.org/course/scnu-1455405166",
       "listTitle": "【网教不停学】精准施策：谢幼如教授团队推出战“疫”慕课《疫情时期在线教学》",
       "__idx": 2311,
-      "vlmExtracted": true
+      "vlmExtracted": true,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20200310/1128.html",
@@ -58988,7 +59160,8 @@
       "timeNote": "authoritative-label",
       "abstract": "随着高教系统改革的全面推行,给高校教师带来全新发展机遇的同时,也带来了更大的挑战和压力,这使得大学的教育对教师的综合素质、科研能力等带来了更高的要求与全新的挑战。一些教师由此产生了种种心理困扰。过高的压力会使人形成一种消极的心理状态,缺乏工作激情,教学科研工作效率低下。近年来,人们对大学生的心理健康状况日益关注,但对高校教师的心理健康问题却关注很少。徐花老师就目前高校教师的心理压力来源、教师心理问题的现状等方面给予专门的指导,来帮助教师有效地缓解压力,从而使教师能够自觉克服负面情绪、减轻和缓解不良情绪,自觉地提高心理素质修养及心理承受能力,促进自身的心理成熟,保持健康心态,以更好地促进教学与科研质量的提升和学校发展。",
       "listTitle": "【每周一课】高校教师心理调试与压力缓解",
-      "__idx": 2362
+      "__idx": 2362,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20191126/96.html",
@@ -59716,7 +59889,8 @@
       "timeNote": "authoritative-label",
       "abstract": "本次讲座,清华大学土木工程系的冯鹏教授将结合自身的从教经历,从\"为什么要当教师\"这一问题切入,",
       "listTitle": "【每周一课】从讲好到学好——高校青年教师的教学成长路径",
-      "__idx": 2390
+      "__idx": 2390,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20191101/1837.html",
@@ -60004,7 +60178,8 @@
       "timeNote": "authoritative-label",
       "abstract": "在解析深度学习的要义和理论模型基础上,分析融合评价、教学法和技术环境的APT教学框架,提出基于APT的教学促进学生深度学习的模型,以\"教育技术学研究方法\"课程教学为例,介绍智慧教室环境中基于APT框架设计的几个典型教学案例,包括形成性评价的互动教学、PBL项目式教学、翻转课堂教学及基于交互式微视频的虚拟实验教学,",
       "listTitle": "【每周一课】智慧教室中基于APT教学促进学生深度学习",
-      "__idx": 2401
+      "__idx": 2401,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20191105/802.html",
@@ -60187,7 +60362,8 @@
       "timeNote": "authoritative-label",
       "abstract": "2018年 8 月 ,教育部《关于狠抓新时代全国高等学校本科教育工作会议精神落实的通知》正式发布,提出\"各高校要全面梳理各门课程的教学内容,淘汰'水课'、打造'金课',合理提升学业挑战度、增加课程难度、拓展课程深度,切实提高课程教学质量\"。整顿高等学校的教学秩序,\"淘汰水课、打造金课\"首次正式写入教育部的文件。嵩天教授将结合教学中存在的问题,从混合式金课和轻量级混合式教学的定义出发,介绍混合式金课的设计思路与建设方法。通过对混合学习设计与传统教学设计做出区别,指出影响混合式金课的因素和混合式教学的设计步骤,并给出了切实的建议。本次课程为推动信息技术与教育教学深度融合的课程改革和课堂革命,为混合式金课与混合式教学方法的深度融合提供新的路径与策略。",
       "listTitle": "【每周一课】混合式金课与轻量级混合式教学方法探索",
-      "__idx": 2408
+      "__idx": 2408,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20191024/91.html",
@@ -60384,7 +60560,8 @@
       "timeNote": "authoritative-label",
       "abstract": "进入21世纪以来,应用型大学的转型与应用型人才的培养,成为我国高等教育领域的热点话题。本次讲座,甘教授将结合中国大学改革和转型中面临的种种问题,从人才培养、课程改革、流程管理等维度,对应用型大学转型的必要性、转型的关键策略,及地方高校转型的应对之策等问题展开深入探讨。",
       "listTitle": "【每周一课】应用型大学的转型与人才培养方案的制定",
-      "__idx": 2416
+      "__idx": 2416,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20191018/81.html",
@@ -62590,7 +62767,8 @@
       "timeConfidence": "high",
       "timeNote": "general-body-full",
       "abstract": "近年来,为能更入探讨学生的学习方法与策略,邱教授亦使用眼球追踪技术来分析学生学习多重表征和进行计算机游戏时的视觉注意力分布情形,以进一步推测学生从事相关数位学习时的认知历程。",
-      "listTitle": "砺儒讲坛第63讲：质性研究方法简介（邱国力教授）"
+      "listTitle": "砺儒讲坛第63讲：质性研究方法简介（邱国力教授）",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20190425/106.html",
@@ -64247,7 +64425,8 @@
       "abstract": "全英教学（EMI）理论与实践国际研讨会，2018年11月23–25日在华南师范大学举行（23日会前工作坊，24–25日正式大会）。",
       "listTitle": "全英教学（EMI）理论与实践国际研讨会",
       "timeConfidence": "medium",
-      "timeNote": "conference-first-day 2018-11-23；无具体时段，默认 08:00（Conference dates: Nov 23-25, 2018）"
+      "timeNote": "conference-first-day 2018-11-23；无具体时段，默认 08:00（Conference dates: Nov 23-25, 2018）",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181116/1633.html",
@@ -66820,7 +66999,8 @@
       "listTitle": "大气污染和大气化学动力学研究",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2017/1209/4.html",
@@ -67591,7 +67771,8 @@
       "timeNote": "same-year",
       "listTitle": "“互联网+”混合式课堂教学系列工作坊",
       "__idx": 2704,
-      "abstract": ""
+      "abstract": "",
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20170925/1356.html",
@@ -68086,7 +68267,8 @@
       "listTitle": "关于召开第二届广东省高中学生发展指导高峰论坛的通知（第一轮）",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20170531/405.html",
@@ -68972,7 +69154,8 @@
       "listTitle": "污水处理微生物生态学中宏基因组方法的应用",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20170222/1226.html",
@@ -69153,7 +69336,8 @@
       "listTitle": "关于召开广东省高中学生发展指导高峰论坛的通知（第一轮通知）",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20161228/14.html",
@@ -69209,7 +69393,7 @@
       "campus": "石牌",
       "title": "中国城市时空间行为研究及其规划应用",
       "topic": "中国城市时空间行为研究及其规划应用",
-      "lectureStart": "2016-12-26 08:00:00",
+      "lectureStart": "2016-12-26 15:00:00",
       "lectureEnd": null,
       "location": "地理科学学院101讲学厅",
       "speaker": "柴彦威",
@@ -69221,7 +69405,10 @@
       "publishTime": null,
       "publishTimeSource": "url_proxy",
       "abstract": "中国地理学会常务理事及城市地理专业委员会主任,时间地理学与行为地理学学术带头人。主持国家级科研项目 20 余项,发表学术论文 200 度篇,出版专著译著 20 多部,担当国内外 10 多个学术期刊的编委或副主编。",
-      "listTitle": "2016-12-26中国城市时空间行为研究及其规划应用"
+      "listTitle": "2016-12-26中国城市时空间行为研究及其规划应用",
+      "timeUnknown": false,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20161219/1208.html",
@@ -69554,7 +69741,7 @@
       "campus": "石牌",
       "title": "Our pasts are in foreign countries – and their pasts are in ours: The challenge of transnationalising industrial heritage",
       "topic": "Our pasts are in foreign countries – and their pasts are in ours: The challenge of transnationalising industrial heritage",
-      "lectureStart": "2016-12-08 08:00:00",
+      "lectureStart": "2016-12-08 19:30:00",
       "lectureEnd": null,
       "location": "地理科学学院101讲学厅研究方向:遗产旅游",
       "speaker": "Dietrich Soyez",
@@ -69567,7 +69754,10 @@
       "publishTimeSource": "url_proxy",
       "speakerSource": "label",
       "abstract": "在《 Geoforum 》、《 The Canadian Geographer 》 、《 Geojournal 》等刊物上发表多篇论文。",
-      "listTitle": "2016-12-08Our pasts are in foreign countries – and their pasts are in ours: The challenge of transnationalising industrial heritage"
+      "listTitle": "2016-12-08Our pasts are in foreign countries – and their pasts are in ours: The challenge of transnationalising industrial heritage",
+      "timeUnknown": false,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label"
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20161128/309.html",
@@ -69666,7 +69856,8 @@
       "listTitle": "第一届认知控制学术研讨会",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20161121/303.html",
@@ -71341,7 +71532,7 @@
       "campus": "石牌",
       "title": "浙江大学曹立人教授学术讲座、座谈会--心理系建系三十周年暨建院三周年系列学术活动",
       "topic": "怎样考得更好？",
-      "lectureStart": "2015-12-23 08:00:00",
+      "lectureStart": "2015-12-23 15:00:00",
       "lectureEnd": null,
       "location": "心理学院5楼报告厅二、座谈会",
       "speaker": "曹立人",
@@ -71358,7 +71549,8 @@
       "listTitle": "浙江大学曹立人教授学术讲座、座谈会--心理系建系三十周年暨建院三周年系列学术活动",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20151217/928.html",
@@ -71601,7 +71793,8 @@
       "listTitle": "事件相关光学成像技术研讨会",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20151201/899.html",
@@ -72223,7 +72416,8 @@
       "listTitle": "关于“举办全省中小学心理教师心理咨询督导”和”心理辅导技术工作坊“的通知",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": true
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20150630/736.html",
@@ -72751,8 +72945,8 @@
       "campus": "石牌",
       "title": "学术讲座",
       "topic": "具身心灵 ---- 脑功能成像研究中的心理生理信号测量",
-      "lectureStart": "2015-04-09 08:00:00",
-      "lectureEnd": "2015-04-09 09:30:00",
+      "lectureStart": "2015-04-09 20:00:00",
+      "lectureEnd": null,
       "location": "心理学院201室",
       "speaker": "范津",
       "speakerTitle": "",
@@ -72768,7 +72962,8 @@
       "listTitle": "学术讲座",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeUnknown": false
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20150403/332.html",
@@ -75120,7 +75315,7 @@
       "campus": "大学城",
       "title": "[讲座]清洁新能源团队分享",
       "topic": "",
-      "lectureStart": "2010-12-01 08:00:00",
+      "lectureStart": "2010-12-01 10:00:00",
       "lectureEnd": null,
       "location": "理六栋405房间清洁新能源团队",
       "speaker": "高进伟",
@@ -75132,7 +75327,10 @@
       "listTitle": "[讲座]清洁新能源团队分享",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20101124/788.html",
@@ -75162,7 +75360,7 @@
       "campus": "大学城",
       "title": "[讲座]有机-无机共混太阳能电池",
       "topic": "有机-无机共混太阳能电池 (organic/inorganic hybrid photovoltaics) 主要内容：介绍聚合物电池、共混电池的研究现状，有待解决的问题，及她做的相关工作。 组织单位：材料物理团队 欢迎有兴趣的老师参加 量子信息材料与绿色高效能源材料高水平创新团队",
-      "lectureStart": "2010-11-18 08:00:00",
+      "lectureStart": "2010-11-18 14:00:00",
       "lectureEnd": null,
       "location": "理六栋405会议室",
       "speaker": "",
@@ -75174,7 +75372,10 @@
       "listTitle": "[讲座]有机-无机共混太阳能电池",
       "sources": [],
       "merged": false,
-      "sourceCount": 1
+      "sourceCount": 1,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknown": false
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20090331/785.html",

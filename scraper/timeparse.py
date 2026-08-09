@@ -51,6 +51,17 @@ def _apply_period(hh, period):
     return hh % 24
 
 
+def _apply_ampm(hh, suffix):
+    """中英混排 am/pm 后缀：pm 在 <12 时 +12；am 在 12 时归 0；否则保持。"""
+    if suffix == 'pm':
+        if hh < 12:
+            hh += 12
+    elif suffix == 'am':
+        if hh == 12:
+            hh = 0
+    return hh
+
+
 def _build(m, seg, y, mo, d):
     # 防御：月份/日期/年份越界（如 URL 路径 2025/0507 被 SLASH_MONTHDAY 误匹配成
     # "月=25/日=05"）直接返回 None，避免构造 datetime 抛异常导致整条解析失败；
@@ -75,8 +86,19 @@ def _build(m, seg, y, mo, d):
     pm = re.search(r'(上午|早上|中午|下午|晚上|傍晚)', seg)
     if pm:
         period = PERIOD_OFFSET[pm.group(1)]
-    times = re.findall(r'(\d{1,2})\s*' + COLON + r'\s*(\d{2})', seg)
-    if not times:
+    # 时钟时间抽取（支持 冒号 / 中文点 / 中英混排 am·pm 前缀或后缀，大小写）：
+    # 2026-08-09 修复——seri 海报「上午10am」「15:00pm」、swc 海报「Am 9：00」
+    # （全角冒号已由 COLON 覆盖）此前未被识别，导致真实时刻被写成 08:00 占位。
+    raw_times = []
+    for tm in re.finditer(r'(\d{1,2})\s*' + COLON + r'\s*(\d{2})\s*(am|pm|AM|PM)?', seg, re.I):
+        raw_times.append((int(tm.group(1)), int(tm.group(2)), (tm.group(3) or '').lower()))
+    if not raw_times:
+        for tm in re.finditer(r'(am|pm|AM|PM)\s*(\d{1,2})\s*' + COLON + r'\s*(\d{2})', seg, re.I):
+            raw_times.append((int(tm.group(2)), int(tm.group(3)), tm.group(1).lower()))
+    if not raw_times:
+        for tm in re.finditer(r'(?<![\d:])\s*(\d{1,2})\s*(am|pm|AM|PM)\b', seg, re.I):
+            raw_times.append((int(tm.group(1)), 0, tm.group(2).lower()))
+    if not raw_times:
         # 中文「X点 / X点X分 / X点半」式时间（如「下午3点」「上午10点30分」），
         # 冒号时间缺失时兜底（常见于海报 OCR 文本）。
         # 2026-08-05 体检修正：「半」改为仅匹配紧随「点」后的半（第 3 捕获组）。
@@ -84,32 +106,29 @@ def _build(m, seg, y, mo, d):
         dot = re.findall(r'(\d{1,2})\s*点\s*(?:(\d{1,2})\s*分?|(半))?', seg)
         if dot:
             hh = int(dot[0][0])
-            if dot[0][1]:
-                mm = int(dot[0][1])
-            elif dot[0][2]:
-                mm = 30
-            else:
-                mm = 0
-            times = [(str(hh), str(mm).zfill(2))]
-    if not times:
+            mm = int(dot[0][1]) if dot[0][1] else (30 if dot[0][2] else 0)
+            raw_times.append((hh, mm, ''))
+    if not raw_times:
         return {'start': datetime(y_i, mo_i, d_i, 0, 0),
                 'end': None, 'has_time': False}
-    # 时间合法性校验：OCR/编码噪声可能抓出 "11:60" / "25:00" 等非法时间。
-    # 一旦非法则退回「仅日期」（has_time=False），绝不直接构造 datetime 抛异常——
-    # 否则整条解析失败、讲座被静默丢弃。
+    # 每个时间：优先用自身 am/pm 后缀/前缀，否则用中文 period（上午/下午…）
+    def _final_hh(hh, suffix):
+        if suffix in ('am', 'pm'):
+            return _apply_ampm(hh, suffix)
+        return _apply_period(hh, period)
     def _valid(hh, mm):
         return 0 <= hh <= 23 and 0 <= mm <= 59
-    h0_raw, m0_raw = int(times[0][0]), int(times[0][1])
+    h0_raw, m0_raw, s0 = raw_times[0]
     if not _valid(h0_raw, m0_raw):
         return {'start': datetime(y_i, mo_i, d_i, 0, 0),
                 'end': None, 'has_time': False}
-    h0 = _apply_period(h0_raw, period)
+    h0 = _final_hh(h0_raw, s0)
     start = datetime(y_i, mo_i, d_i, h0, m0_raw)
     end = None
-    if len(times) > 1:
-        h1_raw, m1_raw = int(times[1][0]), int(times[1][1])
+    if len(raw_times) > 1:
+        h1_raw, m1_raw, s1 = raw_times[1]
         if _valid(h1_raw, m1_raw):
-            h1 = _apply_period(h1_raw, period)
+            h1 = _final_hh(h1_raw, s1)
             end = datetime(y_i, mo_i, d_i, h1, m1_raw)
     return {'start': start, 'end': end, 'has_time': True}
 
@@ -282,7 +301,7 @@ _EXCLUDE_PREFIX = ['报名', '报名截止', '截止', '直播', '提交', '签�
 _LABEL_RE = re.compile(
     r'(讲座时间|报告时间|学术报告时间|开讲时间|开课时间|会议时间|研讨会\s*日期|研讨\s*日期'
     r'|讲座\s*日期|报告\s*日期|举办\s*日期|举办\s*时间|seminar\s*时间'
-    r'|Seminar\s*Time\s*:?|Time\s*:?|时间|时闻)\s*[：:]?\s*(.{0,50})',
+    r'|Seminar\s*Time\s*:?|Time\s*:?|时\s*间|时\s*闻)\s*[：:]?\s*(.{0,50})',
     re.IGNORECASE)
 _RETRO_WORDS = ['成功', '已举办', '已举行', '圆满', '回顾', '报道', '纪实', '日前']
 _PREVIEW_WORDS = ['将', '拟', '定于', '将于', '预告', '即将', '本周', '下周']
@@ -579,7 +598,7 @@ def parse_cn_time(text, default_year=None, publish_time=None, title_year=None, u
     if not text:
         return None
     lm = re.search(
-        r'(时间|时闻|讲座时间|讲座时闻|报告时间|学术报告时间|开讲时间|开课时间|会议时间)\s*[：:]?\s*(.{0,80})',
+        r'(时\s*间|时\s*闻|讲座时间|讲座时闻|报告时间|学术报告时间|开讲时间|开课时间|会议时间)\s*[：:]?\s*(.{0,80})',
         text)
     if lm:
         res = _parse_segment(lm.group(2), effective_default, publish_time)

@@ -244,17 +244,35 @@ const app = createApp({
       const m = (l.publishTime || '').match(/^(\d{4})/) || (l.title || '').match(/(\d{4})/);
       return m ? m[1] : '';
     },
-    fmtDateTime(iso) {
+    // 判断是否「时间待定」：
+    // 优先使用结构化标记 timeUnknown；未设置时回落旧启发式
+    // （占位哨兵 08:00 / 00:00 表示页面未抽取到具体时刻）。
+    // timeUnknown===false 时即使时刻为 08:00 也按真实时间展示，
+    // 杜绝「真 8 点讲座」被误判为时间待定。
+    isTimeTBD(l) {
+      if (!l) return true;
+      if (l.timeUnknown === true) return true;
+      if (l.timeUnknown === false) return false;
+      const iso = l.lectureStart;
+      if (!iso || typeof iso !== 'string') return true;
+      const d = new Date(iso.replace(' ', 'T'));
+      if (isNaN(d)) return true;
+      const hh = d.getHours(), mm = d.getMinutes();
+      return (hh === 8 && mm === 0) || (hh === 0 && mm === 0);
+    },
+    fmtDateTime(l) {
+      if (!l) return '待定';
+      const iso = l.lectureStart;
       if (!iso || typeof iso !== 'string') return '待定';
       const d = new Date(iso.replace(' ', 'T'));
       if (isNaN(d)) return '待定';
       const wk = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
-      // 占位时间（08:00 / 00:00 表示页面未抽取到具体时刻）→ 不显示虚假时刻，标注「时间待定」
       const hh = d.getHours(), mm = d.getMinutes();
-      if ((hh === 8 && mm === 0) || (hh === 0 && mm === 0)) {
+      const clock = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+      if (this.isTimeTBD(l)) {
         return `${d.getMonth() + 1}月${d.getDate()}日 周${wk} 时间待定`;
       }
-      return `${d.getMonth() + 1}月${d.getDate()}日 周${wk} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+      return `${d.getMonth() + 1}月${d.getDate()}日 周${wk} ${clock}`;
     },
     dayKey(iso) {
       if (!iso || typeof iso !== 'string') return '时间待定';
