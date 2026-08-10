@@ -161,15 +161,15 @@
                   点赞数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('likes') }}</span>
                 </div>
                 <div v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none w-[60px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
-                  {{ y }} 年 <span class="text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span>
+                  {{ y }}<span class="ml-1 text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span>
                 </div>
               </div>
             </div>
             <div v-for="(row, idx) in rows" :key="row.college" class="flex min-w-max border-b border-slate-100">
               <div class="sticky left-0 z-20 bg-white w-[96px] shrink-0 px-2 py-3 font-medium text-slate-700 border-r border-slate-100 break-words" style="position:sticky;left:0;z-index:20">{{ row.college || '未分类' }}</div>
-              <div v-if="mode === 'count'" class="w-[64px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ row.total }}</div>
-              <div v-else-if="mode === 'visits'" class="w-[64px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700">{{ row.visitsTotal }}</div>
-              <div v-else-if="mode === 'likes'" class="w-[64px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700">{{ row.likesTotal }}</div>
+              <div v-if="mode === 'count'" class="w-[64px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ row.total }}</div>
+              <div v-else-if="mode === 'visits'" class="w-[64px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.visitsTotal }}</div>
+              <div v-else-if="mode === 'likes'" class="w-[64px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.likesTotal }}</div>
               <div v-for="(n, ci) in row.cells" :key="years[ci]" :class="['w-[60px] shrink-0 px-2 py-3 text-right border-r border-slate-100', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
                 {{ cellDisplay(n) }}
               </div>

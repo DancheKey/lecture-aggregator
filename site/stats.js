@@ -361,15 +361,24 @@ createApp({
     },
     // 移动端 div 表格：数据区（m-scrollx）横向滚动时，同步平移表头其余列（m-thead-rest），
     // 使表头「总计/年份」列与数据列始终对齐；表头角格（学院）与数据首列各自 sticky，不参与平移。
-    // 绑定一次即可（v-for 只重建内部行，容器与表头容器不重建）。
+    // 使用 RAF 持续轮询：微信 X5、部分安卓 WebView 的 scroll 事件可能不触发或滞后，
+    // 用 RAF 每帧同步 scrollLeft 是最稳的方案（性能影响极小：transform 不变时浏览器不重新合成）。
     initMobileSticky() {
       const sc = document.getElementById('m-scrollx');
       const th = document.getElementById('m-thead-rest');
       if (!sc || !th || th.dataset.bound) return;
       th.dataset.bound = '1';
-      sc.addEventListener('scroll', () => {
-        th.style.transform = 'translateX(' + (-sc.scrollLeft) + 'px)';
-      });
+      th.style.willChange = 'transform';
+      let last = -1;
+      const tick = () => {
+        const x = -sc.scrollLeft;
+        if (x !== last) {
+          th.style.transform = 'translate3d(' + x + 'px, 0, 0)';
+          last = x;
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
     },
     // 以预计算的 lectures/stats.json 为唯一权威数据源。
     // 统计页只渲染 matrix/yearTotals/campusMap 与访问/点赞数，不需要 lectures.json 全量明细。
