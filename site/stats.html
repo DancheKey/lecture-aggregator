@@ -136,34 +136,35 @@
           </div>
         </div>
 
-        <!-- 移动端（<640px）：div 行式表格。不用 table 单元格 sticky（部分安卓 WebView 对 th/td 的 sticky 支持不稳），
-             改为：表头容器整体 sticky top-0 钉视口顶（div 级 sticky 全浏览器稳定）；
-             数据区 overflow-x-auto 横向滚动，首列 sticky left-0 钉左；
-             表头其余列（总计/年份）由 stats.js 随数据区 scrollLeft 同步平移对齐。 -->
-        <div class="sm:hidden bg-white rounded-xl border border-slate-200 shadow-sm">
-          <!-- 表头：整体钉视口顶；inline style 兜底避免部分 WebView 对 Tailwind sticky 类的解析问题 -->
-          <div class="sticky top-0 z-30 flex bg-slate-50 border-b border-slate-200 shadow-sm" style="position:sticky;top:0;z-index:30">
-            <div @click="toggleSort('college')" class="cursor-pointer select-none w-[96px] shrink-0 px-2 py-3 font-semibold text-left border-r border-slate-200 break-words">
-              学院 / 部处 <span class="text-slate-400 text-[10pt]">{{ sortIcon('college') }}</span>
-            </div>
-            <div id="m-thead-rest" class="flex min-w-max">
-              <div v-if="mode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
-                总计 <span class="text-slate-400 text-[10pt]">{{ sortIcon('total') }}</span>
-              </div>
-              <div v-else-if="mode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
-                访问数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('visits') }}</span>
-              </div>
-              <div v-else-if="mode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
-                点赞数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('likes') }}</span>
-              </div>
-              <div v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none w-[60px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
-                {{ y }} 年 <span class="text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 数据区：横向滚动容器，首列 sticky 钉左 -->
+        <!-- 移动端（<640px）：div 行式表格 + 表头/数据共用一个横滑容器。
+             表头与数据都在 #m-scrollx（overflow-x-auto）内：表格总宽只在容器内滚动，
+             页面宽度不会被撑大（= header 宽度）；表头 sticky top-0 钉容器顶（即视口顶），
+             角格 sticky left-0 + z-40 钉容器左缘并盖住横滑后的年份列，杜绝与角格文字重叠。 -->
+        <div class="sm:hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <!-- 数据区：横向滚动容器；表头与数据都在其内共享滚动上下文（页面宽度不会被撑大）。
+               sticky top-0 让表头钉容器顶（容器顶部滚到视口顶时表头即钉顶）；
+               角格 sticky left-0 + z-40，横滑时盖住 m-thead-rest 平移过来的年份列，不再重叠。 -->
           <div id="m-scrollx" class="overflow-x-auto">
+            <!-- 表头行（#m-scrollx 内第一行） -->
+            <div class="sticky top-0 z-30 flex bg-slate-50 border-b border-slate-200 shadow-sm" style="position:sticky;top:0;z-index:30">
+              <div @click="toggleSort('college')" class="cursor-pointer select-none sticky left-0 z-40 bg-slate-50 w-[96px] shrink-0 px-2 py-3 font-semibold text-left border-r border-slate-200 break-words" style="position:sticky;left:0;z-index:40">
+                学院 / 部处 <span class="text-slate-400 text-[10pt]">{{ sortIcon('college') }}</span>
+              </div>
+              <div id="m-thead-rest" class="flex min-w-max">
+                <div v-if="mode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+                  总计 <span class="text-slate-400 text-[10pt]">{{ sortIcon('total') }}</span>
+                </div>
+                <div v-else-if="mode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+                  访问数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('visits') }}</span>
+                </div>
+                <div v-else-if="mode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+                  点赞数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('likes') }}</span>
+                </div>
+                <div v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none w-[60px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+                  {{ y }} 年 <span class="text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span>
+                </div>
+              </div>
+            </div>
             <div v-for="(row, idx) in rows" :key="row.college" class="flex min-w-max border-b border-slate-100">
               <div class="sticky left-0 z-20 bg-white w-[96px] shrink-0 px-2 py-3 font-medium text-slate-700 border-r border-slate-100 break-words" style="position:sticky;left:0;z-index:20">{{ row.college || '未分类' }}</div>
               <div v-if="mode === 'count'" class="w-[64px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ row.total }}</div>
