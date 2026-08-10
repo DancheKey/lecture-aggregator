@@ -360,16 +360,16 @@ createApp({
       this._toS = this.sourceNoticeCount;
     },
     // 移动端 div 表格：表头与数据各自独立的横滑容器（#m-thead-scroll / #m-scrollx），
-    // 双向同步它们的 scrollLeft；同时用 RAF 轮询把所有 .mobile-sticky-left 元素
-    // 反向 translate3d 抵消滚动（CSS sticky left-0 在元素自然位置 > 容器左缘时不生效，
-    // 所以必须用 transform 强制钉左）。
+    // 双向同步它们的 scrollLeft，仅用于让表头年份列与数据年份列横向对齐。
+    // 首列（学院名）的固定改用 CSS 原生 sticky left-0（写在 HTML 元素的 sticky left-0 工具类上），
+    // 由浏览器合成层原生钉住、零帧延迟、无抖动；此处不再用 JS translate3d 推回。
     initMobileSticky() {
       const headSc = document.getElementById('m-thead-scroll');
       const dataSc = document.getElementById('m-scrollx');
       if (!headSc || !dataSc || headSc.dataset.bound) return;
       headSc.dataset.bound = '1';
 
-      // 双向同步两个滚动容器的 scrollLeft（syncing 标志防止循环）
+      // 双向同步两个滚动容器的 scrollLeft（syncing 标志防止循环），仅用于年份列对齐
       let syncing = false;
       const sync = (src, dst) => {
         if (syncing) return;
@@ -379,22 +379,6 @@ createApp({
       };
       headSc.addEventListener('scroll', () => sync(headSc, dataSc), { passive: true });
       dataSc.addEventListener('scroll', () => sync(dataSc, headSc), { passive: true });
-
-      // RAF 轮询：把 .mobile-sticky-left 元素正向平移 +scrollLeft，
-      // 抵消容器滚动带来的左移，使其视觉上始终钉在视口左缘。
-      let last = -1;
-      const tick = () => {
-        const x = dataSc.scrollLeft;
-        if (x !== last) {
-          const els = document.querySelectorAll('.mobile-sticky-left');
-          for (let i = 0; i < els.length; i++) {
-            els[i].style.transform = 'translate3d(' + x + 'px, 0, 0)';
-          }
-          last = x;
-        }
-        requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
     },
     // 以预计算的 lectures/stats.json 为唯一权威数据源。
     // 统计页只渲染 matrix/yearTotals/campusMap 与访问/点赞数，不需要 lectures.json 全量明细。
