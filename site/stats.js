@@ -359,6 +359,18 @@ createApp({
       this._toL = this.lectureCount;
       this._toS = this.sourceNoticeCount;
     },
+    // 移动端 div 表格：数据区（m-scrollx）横向滚动时，同步平移表头其余列（m-thead-rest），
+    // 使表头「总计/年份」列与数据列始终对齐；表头角格（学院）与数据首列各自 sticky，不参与平移。
+    // 绑定一次即可（v-for 只重建内部行，容器与表头容器不重建）。
+    initMobileSticky() {
+      const sc = document.getElementById('m-scrollx');
+      const th = document.getElementById('m-thead-rest');
+      if (!sc || !th || th.dataset.bound) return;
+      th.dataset.bound = '1';
+      sc.addEventListener('scroll', () => {
+        th.style.transform = 'translateX(' + (-sc.scrollLeft) + 'px)';
+      });
+    },
     // 以预计算的 lectures/stats.json 为唯一权威数据源。
     // 统计页只渲染 matrix/yearTotals/campusMap 与访问/点赞数，不需要 lectures.json 全量明细。
     load() {
@@ -369,6 +381,8 @@ createApp({
           this.summary = resp || null;
           this.loading = false;
           this.finalizeCountAnimation();
+          // 数据渲染完成后绑定移动端表头滚动同步（元素此时才存在）
+          this.$nextTick(() => this.initMobileSticky());
         })
         .catch(e => {
           console.error('加载统计数据失败', e);

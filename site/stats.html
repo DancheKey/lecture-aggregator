@@ -82,9 +82,10 @@
         </div>
       </div>
 
-      <!-- 统计区：单一表格。桌面端（≥640px）冻结表头/首列并内部滚动；移动端不锁高度、整页自然竖向滚动，表头与首列 sticky 到视口（看数据时可辨学院与年份） -->
+      <!-- 统计区。桌面端：table 冻结表头/首列 + 内部滚动框；移动端：div 行式表格（见下方，兼容安卓 WebView 的 sticky） -->
       <div v-if="summary && summary.lectureCount">
-        <div class="sm:bg-white sm:rounded-xl sm:border sm:border-slate-200 sm:shadow-sm">
+        <!-- 桌面端（≥640px）：表格，冻结表头/首列，内部滚动 -->
+        <div class="hidden sm:block sm:bg-white sm:rounded-xl sm:border sm:border-slate-200 sm:shadow-sm sm:overflow-hidden">
           <div class="sm:overflow-auto sm:max-h-[calc(100vh_-_13rem)]">
           <!-- border-separate + spacing-0：iOS Safari 下 border-collapse 会使单元格上的 position:sticky 失效（经典 WebKit bug），必须用 separate 模式才能让表头/首列钉住视口 -->
           <table class="min-w-full text-[12pt] border-separate border-spacing-0">
@@ -133,6 +134,59 @@
             说明：同一讲座若由多个单位联合发布（跨源合并），会在每个相关单位各计 1 次，因此「各单位计数之和」会大于顶部「去重后讲座总数」。各单位的讲座明细与首页按单位筛选的结果完全一致。
           </p>
           </div>
+        </div>
+
+        <!-- 移动端（<640px）：div 行式表格。不用 table 单元格 sticky（部分安卓 WebView 对 th/td 的 sticky 支持不稳），
+             改为：表头容器整体 sticky top-0 钉视口顶（div 级 sticky 全浏览器稳定）；
+             数据区 overflow-x-auto 横向滚动，首列 sticky left-0 钉左；
+             表头其余列（总计/年份）由 stats.js 随数据区 scrollLeft 同步平移对齐。 -->
+        <div class="sm:hidden bg-white rounded-xl border border-slate-200 shadow-sm">
+          <!-- 表头：整体钉视口顶 -->
+          <div class="sticky top-0 z-30 flex bg-slate-50 border-b border-slate-200">
+            <div @click="toggleSort('college')" class="cursor-pointer select-none w-[140px] shrink-0 px-2 py-3 font-semibold text-left border-r border-slate-200">
+              学院 / 部处 <span class="text-slate-400 text-[10pt]">{{ sortIcon('college') }}</span>
+            </div>
+            <div id="m-thead-rest" class="flex min-w-max">
+              <div v-if="mode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none w-[80px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+                总计 <span class="text-slate-400 text-[10pt]">{{ sortIcon('total') }}</span>
+              </div>
+              <div v-else-if="mode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none w-[80px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+                访问数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('visits') }}</span>
+              </div>
+              <div v-else-if="mode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none w-[80px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+                点赞数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('likes') }}</span>
+              </div>
+              <div v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none w-[80px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+                {{ y }} 年 <span class="text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 数据区：横向滚动容器，首列 sticky 钉左 -->
+          <div id="m-scrollx" class="overflow-x-auto">
+            <div v-for="(row, idx) in rows" :key="row.college" class="flex min-w-max border-b border-slate-100">
+              <div class="sticky left-0 z-20 bg-white w-[140px] shrink-0 px-2 py-3 font-medium text-slate-700 border-r border-slate-100 break-words">{{ row.college || '未分类' }}</div>
+              <div v-if="mode === 'count'" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ row.total }}</div>
+              <div v-else-if="mode === 'visits'" class="w-[80px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700">{{ row.visitsTotal }}</div>
+              <div v-else-if="mode === 'likes'" class="w-[80px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700">{{ row.likesTotal }}</div>
+              <div v-for="(n, ci) in row.cells" :key="years[ci]" :class="['w-[80px] shrink-0 px-2 py-3 text-right border-r border-slate-100', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
+                {{ cellDisplay(n) }}
+              </div>
+            </div>
+
+            <!-- 合计行 -->
+            <div class="flex min-w-max bg-slate-50">
+              <div class="sticky left-0 z-20 bg-slate-50 w-[140px] shrink-0 px-2 py-3 font-semibold text-slate-700 border-r border-slate-100">合计</div>
+              <div v-if="mode === 'count'" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandTotal }}</div>
+              <div v-else-if="mode === 'visits'" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandVisits }}</div>
+              <div v-else-if="mode === 'likes'" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandLikes }}</div>
+              <div v-for="t in yearTotals" :key="t.year" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ mode === 'count' ? t.count : (mode === 'visits' ? t.visits : t.likes) }}</div>
+            </div>
+          </div>
+
+          <p class="mt-3 px-4 pb-4 text-[11pt] text-slate-400 leading-relaxed">
+            说明：同一讲座若由多个单位联合发布（跨源合并），会在每个相关单位各计 1 次，因此「各单位计数之和」会大于顶部「去重后讲座总数」。左右滑动查看各年份数据。
+          </p>
         </div>
       </div>
 
