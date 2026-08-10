@@ -141,22 +141,22 @@
              数据区 overflow-x-auto 横向滚动，首列 sticky left-0 钉左；
              表头其余列（总计/年份）由 stats.js 随数据区 scrollLeft 同步平移对齐。 -->
         <div class="sm:hidden bg-white rounded-xl border border-slate-200 shadow-sm">
-          <!-- 表头：整体钉视口顶 -->
-          <div class="sticky top-0 z-30 flex bg-slate-50 border-b border-slate-200">
-            <div @click="toggleSort('college')" class="cursor-pointer select-none w-[140px] shrink-0 px-2 py-3 font-semibold text-left border-r border-slate-200">
+          <!-- 表头：整体钉视口顶；inline style 兜底避免部分 WebView 对 Tailwind sticky 类的解析问题 -->
+          <div class="sticky top-0 z-30 flex bg-slate-50 border-b border-slate-200 shadow-sm" style="position:sticky;top:0;z-index:30">
+            <div @click="toggleSort('college')" class="cursor-pointer select-none w-[96px] shrink-0 px-2 py-3 font-semibold text-left border-r border-slate-200 break-words">
               学院 / 部处 <span class="text-slate-400 text-[10pt]">{{ sortIcon('college') }}</span>
             </div>
             <div id="m-thead-rest" class="flex min-w-max">
-              <div v-if="mode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none w-[80px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+              <div v-if="mode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
                 总计 <span class="text-slate-400 text-[10pt]">{{ sortIcon('total') }}</span>
               </div>
-              <div v-else-if="mode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none w-[80px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+              <div v-else-if="mode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
                 访问数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('visits') }}</span>
               </div>
-              <div v-else-if="mode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none w-[80px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+              <div v-else-if="mode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none w-[64px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
                 点赞数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('likes') }}</span>
               </div>
-              <div v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none w-[80px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
+              <div v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none w-[60px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200">
                 {{ y }} 年 <span class="text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span>
               </div>
             </div>
@@ -165,22 +165,22 @@
           <!-- 数据区：横向滚动容器，首列 sticky 钉左 -->
           <div id="m-scrollx" class="overflow-x-auto">
             <div v-for="(row, idx) in rows" :key="row.college" class="flex min-w-max border-b border-slate-100">
-              <div class="sticky left-0 z-20 bg-white w-[140px] shrink-0 px-2 py-3 font-medium text-slate-700 border-r border-slate-100 break-words">{{ row.college || '未分类' }}</div>
-              <div v-if="mode === 'count'" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ row.total }}</div>
-              <div v-else-if="mode === 'visits'" class="w-[80px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700">{{ row.visitsTotal }}</div>
-              <div v-else-if="mode === 'likes'" class="w-[80px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700">{{ row.likesTotal }}</div>
-              <div v-for="(n, ci) in row.cells" :key="years[ci]" :class="['w-[80px] shrink-0 px-2 py-3 text-right border-r border-slate-100', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
+              <div class="sticky left-0 z-20 bg-white w-[96px] shrink-0 px-2 py-3 font-medium text-slate-700 border-r border-slate-100 break-words" style="position:sticky;left:0;z-index:20">{{ row.college || '未分类' }}</div>
+              <div v-if="mode === 'count'" class="w-[64px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ row.total }}</div>
+              <div v-else-if="mode === 'visits'" class="w-[64px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700">{{ row.visitsTotal }}</div>
+              <div v-else-if="mode === 'likes'" class="w-[64px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700">{{ row.likesTotal }}</div>
+              <div v-for="(n, ci) in row.cells" :key="years[ci]" :class="['w-[60px] shrink-0 px-2 py-3 text-right border-r border-slate-100', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
                 {{ cellDisplay(n) }}
               </div>
             </div>
 
             <!-- 合计行 -->
             <div class="flex min-w-max bg-slate-50">
-              <div class="sticky left-0 z-20 bg-slate-50 w-[140px] shrink-0 px-2 py-3 font-semibold text-slate-700 border-r border-slate-100">合计</div>
-              <div v-if="mode === 'count'" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandTotal }}</div>
-              <div v-else-if="mode === 'visits'" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandVisits }}</div>
-              <div v-else-if="mode === 'likes'" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandLikes }}</div>
-              <div v-for="t in yearTotals" :key="t.year" class="w-[80px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ mode === 'count' ? t.count : (mode === 'visits' ? t.visits : t.likes) }}</div>
+              <div class="sticky left-0 z-20 bg-slate-50 w-[96px] shrink-0 px-2 py-3 font-semibold text-slate-700 border-r border-slate-100" style="position:sticky;left:0;z-index:20">合计</div>
+              <div v-if="mode === 'count'" class="w-[64px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandTotal }}</div>
+              <div v-else-if="mode === 'visits'" class="w-[64px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandVisits }}</div>
+              <div v-else-if="mode === 'likes'" class="w-[64px] shrink-0 px-2 py-3 text-right font-bold text-slate-800">{{ grandLikes }}</div>
+              <div v-for="t in yearTotals" :key="t.year" class="w-[60px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ mode === 'count' ? t.count : (mode === 'visits' ? t.visits : t.likes) }}</div>
             </div>
           </div>
 
