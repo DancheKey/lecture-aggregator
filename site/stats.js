@@ -359,21 +359,36 @@ createApp({
       this._toL = this.lectureCount;
       this._toS = this.sourceNoticeCount;
     },
-    // 移动端 div 表格：数据区（m-scrollx）横向滚动时，同步平移表头其余列（m-thead-rest），
-    // 使表头「总计/年份」列与数据列始终对齐；表头角格（学院）与数据首列各自 sticky，不参与平移。
-    // 使用 RAF 持续轮询：微信 X5、部分安卓 WebView 的 scroll 事件可能不触发或滞后，
-    // 用 RAF 每帧同步 scrollLeft 是最稳的方案（性能影响极小：transform 不变时浏览器不重新合成）。
+    // 移动端 div 表格：表头与数据各自独立的横滑容器（#m-thead-scroll / #m-scrollx），
+    // 双向同步它们的 scrollLeft；同时用 RAF 轮询把所有 .mobile-sticky-left 元素
+    // 反向 translate3d 抵消滚动（CSS sticky left-0 在元素自然位置 > 容器左缘时不生效，
+    // 所以必须用 transform 强制钉左）。
     initMobileSticky() {
-      const sc = document.getElementById('m-scrollx');
-      const th = document.getElementById('m-thead-rest');
-      if (!sc || !th || th.dataset.bound) return;
-      th.dataset.bound = '1';
-      th.style.willChange = 'transform';
+      const headSc = document.getElementById('m-thead-scroll');
+      const dataSc = document.getElementById('m-scrollx');
+      if (!headSc || !dataSc || headSc.dataset.bound) return;
+      headSc.dataset.bound = '1';
+
+      // 双向同步两个滚动容器的 scrollLeft（syncing 标志防止循环）
+      let syncing = false;
+      const sync = (src, dst) => {
+        if (syncing) return;
+        syncing = true;
+        dst.scrollLeft = src.scrollLeft;
+        requestAnimationFrame(() => { syncing = false; });
+      };
+      headSc.addEventListener('scroll', () => sync(headSc, dataSc), { passive: true });
+      dataSc.addEventListener('scroll', () => sync(dataSc, headSc), { passive: true });
+
+      // RAF 轮询：把所有 .mobile-sticky-left 反向平移抵消滚动
       let last = -1;
       const tick = () => {
-        const x = -sc.scrollLeft;
+        const x = -dataSc.scrollLeft;
         if (x !== last) {
-          th.style.transform = 'translate3d(' + x + 'px, 0, 0)';
+          const els = document.querySelectorAll('.mobile-sticky-left');
+          for (let i = 0; i < els.length; i++) {
+            els[i].style.transform = 'translate3d(' + x + 'px, 0, 0)';
+          }
           last = x;
         }
         requestAnimationFrame(tick);
