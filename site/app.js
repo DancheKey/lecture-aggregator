@@ -918,10 +918,21 @@ const app = createApp({
     // 监听滚动，下滑超过阈值时显示「回到顶部」按钮
     this.onScroll();
     window.addEventListener('scroll', this.onScroll);
+    // 点击顶部菜单外部时自动关闭（修复移动端因 mouseenter+click 竞态需点两次）
+    this._closeMenuHandler = (e) => {
+      const container = this.$refs.menuContainer;
+      if (this.showMenu && container && !container.contains(e.target)) {
+        this.showMenu = false;
+      }
+    };
+    document.addEventListener('click', this._closeMenuHandler);
   },
 
   beforeUnmount() {
     window.removeEventListener('scroll', this.onScroll);
+    if (this._closeMenuHandler) {
+      document.removeEventListener('click', this._closeMenuHandler);
+    }
   },
 
   watch: {

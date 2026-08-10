@@ -74,8 +74,8 @@
             </button>
           </nav>
 
-          <div class="relative ml-auto" @mouseenter="showMenu = true" @mouseleave="showMenu = false">
-            <button @click="showMenu = !showMenu"
+          <div ref="menuContainer" class="relative ml-auto">
+            <button @click.stop="showMenu = !showMenu"
               class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition"
               aria-label="更多操作">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
