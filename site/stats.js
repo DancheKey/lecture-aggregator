@@ -380,10 +380,11 @@ createApp({
       headSc.addEventListener('scroll', () => sync(headSc, dataSc), { passive: true });
       dataSc.addEventListener('scroll', () => sync(dataSc, headSc), { passive: true });
 
-      // RAF 轮询：把所有 .mobile-sticky-left 反向平移抵消滚动
+      // RAF 轮询：把 .mobile-sticky-left 元素正向平移 +scrollLeft，
+      // 抵消容器滚动带来的左移，使其视觉上始终钉在视口左缘。
       let last = -1;
       const tick = () => {
-        const x = -dataSc.scrollLeft;
+        const x = dataSc.scrollLeft;
         if (x !== last) {
           const els = document.querySelectorAll('.mobile-sticky-left');
           for (let i = 0; i < els.length; i++) {
