@@ -88,7 +88,7 @@ sources:
 - name: 继续教育学院
   campus: 石牌
   base: http://cce.scnu.edu.cn
-  # http://cce.scnu.edu.cn/tongzhigonggao/ 返回空页（200/69B），无内容，待修复
+  # 等待修复：http://cce.scnu.edu.cn/tongzhigonggao/ 返回空页（200/69B），无内容
   list_urls: []
 - name: 脑科学与康复医学研究院
   campus: 石牌
@@ -127,7 +127,7 @@ sources:
 - name: 经济与管理学院
   campus: 大学城
   base: http://em.scnu.edu.cn
-  # 404 死链：http://em.scnu.edu.cn/tongzhigonggao/ 整列失效，待修复
+  # 等待修复：http://em.scnu.edu.cn/tongzhigonggao/ 整列失效（404 死链）
   list_urls: []
 - name: 法学院
   campus: 大学城

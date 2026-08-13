@@ -665,7 +665,7 @@ def incremental_merge(existing, new_records):
         if not u:
             continue
         li = r.get('lectureIndex')
-        key = u + ('#' + str(li) if li else '')
+        key = u + ('#' + str(li) if li is not None else '')
         base_map[key] = r
     seen = set(base_map.keys())
 
@@ -686,7 +686,7 @@ def incremental_merge(existing, new_records):
     final_new = []
     skip = 0
     for r in new_deduped:
-        key = _norm_url(r.get('sourceUrl')) + ('#' + str(r.get('lectureIndex')) if r.get('lectureIndex') else '')
+        key = _norm_url(r.get('sourceUrl')) + ('#' + str(r.get('lectureIndex')) if r.get('lectureIndex') is not None else '')
         if key in seen:
             continue
         if _cross_source_dup_with_existing(r, existing_index):
@@ -844,7 +844,7 @@ def main():
                 # 多讲座拆分：同 sourceUrl 多条用 (url, lectureIndex) 区分，
                 # 避免两条互相覆盖只剩 1 条（与 _process_source 的 key 保持一致）
                 li = r.get('lectureIndex')
-                key = u + (('#' + str(li)) if li else '')
+                key = u + (('#' + str(li)) if li is not None else '')
                 lectures[key] = r
 
     sources = cfg['sources']
@@ -915,8 +915,8 @@ def main():
         # 此前 `since` 只用于设置 is_incremental 布尔，从未过滤讲座，导致增量退化成
         # 「URL 不在 existing 就抓」的全量追加——列表页新翻到的任何历史 URL（含 2014/
         # 2021 等远古旧讲座）都被当新事件灌入主数据，CI 每跑一次数据就变。
-        # 修复：增量新增的讲座，其有效时间必须 ≥ since - GRACE_DAYS，否则丢弃（不计入
-        # 增量），既保留「近期/未来讲座补入」能力，又杜绝历史旧讲座冒充当新事件。
+        # 修复：增量新增的讲座，其有效时间必须 ≥ since，否则丢弃（不计入增量），
+        # 既保留「近期/未来讲座补入」能力，又杜绝历史旧讲座冒充当新事件。
         # 全量模式（--full）不走此分支，仍抓全历史建库。
         cutoff = _parse_iso(since) if since else None
         if cutoff is not None:
@@ -957,7 +957,6 @@ def main():
         if not args.out:
             out = cross_source_dedup(out)
     out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)
-    import datetime
     # 用北京时间（Asia/Shanghai）记录更新时间，避免 GitHub Runner 默认 UTC 导致日期差一天
     try:
         from zoneinfo import ZoneInfo

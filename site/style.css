@@ -181,8 +181,8 @@ body {
 .status.ended { color: var(--muted); background: var(--tag-bg); }
 .status.soon { color: #fff; background: var(--accent); }
 
-/* 原来的 details 已替换为 .details（结构化信息区），保留此规则以防旧 HTML */
-
+/* 以下样式原为旧版首页使用，当前首页已迁移至 Tailwind。保留以防旧 HTML 引用。 */
+/* 如需清理，先确认无页面引用这些 class。 */
 .empty { text-align: center; color: var(--muted); padding: 40px 0; }
 
 .site-footer {

@@ -255,6 +255,8 @@ def main():
     }
 
     data_js = "var SEED=" + json.dumps(seed, ensure_ascii=False) + ";var META=" + json.dumps(meta, ensure_ascii=False) + ";"
+    # 注：json.dumps 默认不转义 < >，但 seed/meta 数据仅含数字与日期字符串，
+    # 不会产生 </script> 注入，安全。
     html = SHELL.replace("__DATA__", data_js).replace("__RENDER__", RENDER_JS)
 
     os.makedirs(OUT_DIR, exist_ok=True)

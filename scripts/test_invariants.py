@@ -7,11 +7,12 @@
   - 手动 push 的坏数据上线（deploy.yml 也会跑一次）。
 
 校验项：
-  1) sourceUrl 唯一（无重复记录键）。
+  1) sourceUrl 与 lectureIndex 复合键唯一（无重复记录键）。
   2) 凡含 listTitle 的记录，title 必须等于 clean_title(listTitle)
      —— 直接防止「把 topic 拼进 title」「title 被覆盖成题目」这类回归。
   3) 社科处(skc)记录：若 topic 非空，则 title != topic（防止二者被合并）。
-  4) 增量合并函数 incremental_merge 单元测试：基底锁定、只追加、不重复。
+  4) images 字段不含本地文件系统路径（C:\、D:\、/tmp/ 等）。
+  5) 增量合并函数 incremental_merge 单元测试：基底锁定、只追加、不重复。
 
 说明：clean_title / _strip_nav_noise 为 scraper/parsers.py 的**镜像副本**，
 仅用于校验「已提交数据」是否与生成逻辑一致。若 parsers.py 改动标题清洗逻辑，
@@ -122,6 +123,18 @@ def check_composite_key_unique(recs, errors):
         seen[k] = True
 
 
+def check_images_no_local_path(recs, errors):
+    """images 字段不应包含本地文件系统路径（如 C:\、D:\、/tmp/），
+    这些是 PDF 转图临时产物，部署后前端无法访问。"""
+    for r in recs:
+        imgs = r.get("images") or []
+        if isinstance(imgs, list):
+            for img in imgs:
+                if isinstance(img, str) and re.search(r'^[A-Za-z]:[\\/]|^/tmp/', img):
+                    errors.append(f"[local image path] {r.get('sourceUrl','')} img={img[:80]!r}")
+                    break
+
+
 _SERIES_RE = re.compile(r"第[一二三四五六七八九十百零\d]+[场期讲]")
 
 
@@ -197,6 +210,7 @@ def main():
     check_composite_key_unique(recs, errors)
     check_skc_title_integrity(recs, errors)
     check_ctld_topic_not_equal_title(recs, errors)
+    check_images_no_local_path(recs, errors)
     test_incremental_merge_unit(errors)
 
     if errors:

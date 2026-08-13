@@ -19,10 +19,10 @@ from timeparse import parse_cn_time, _year_from_text, resolve_lecture_time, _dat
 def _n1a_normalize(text, keep_word_boundaries=True):
     """N1a：CJK 内部空格处理。
 
-    keep_word_boundaries=False（默认，HTML 正文路径）：删除所有 CJK 间单/双空格
+    keep_word_boundaries=False（HTML 正文路径）：删除所有 CJK 间单/双空格
     （原行为，保证「主讲人：张三 教授」→「主讲人：张三教授」被姓名清洗正确识别）。
 
-    keep_word_boundaries=True（仅 OCR 海报路径）：仅当空格两侧均 ≥2 字时才保留
+    keep_word_boundaries=True（默认，仅 OCR 海报路径）：仅当空格两侧均 ≥2 字时才保留
     （词块边界，如「维护 王婧 传统」），否则仍删除（单字间 OCR 噪声，如「题 目」→「题目」）。
     这是 O3a 修正——OCR 海报里姓名常被空格隔成孤立词，需保留边界供 O6d-2.5 夹逼定位。
     """
@@ -228,7 +228,7 @@ def _looks_like_real_name(s):
         # 首字偶不在集合时宁可少抓（仍可走 Pattern4/F4 或人工核验），避免误收非人名。
         if not _SURNAME_RE.match(s):
             return False
-        stripped = re.sub('|'.join(_NON_NAME_TOKENS), '', s)
+        stripped = re.sub('|'.join(_NON_NAME_TOKENS), '', s)  # 词表固定（约120项），非用户输入，无 ReDoS 风险
         if not stripped:
             return False
         return True
@@ -353,7 +353,7 @@ def _extract_speaker_from_ocr(text):
                            '主持', '活动', '论坛', '沙龙', '研讨', '学者', '讲坛')
             if (rest and len(rest) < 40
                     and not re.search(r'[楼室厅馆校区校园中心广场会议教室礼堂报告厅学术厅综合楼行政楼教学楼信息院楼大楼]', rest[:8])
-                    and not re.search('|'.join(_AFF_FORBID), rest)):
+                    and not re.search('|'.join(_AFF_FORBID), rest)):  # 词表固定短词，非用户输入，无 ReDoS 风险
                 aff = rest
         return name, aff, 'label'
     # 3) 海报「专家姓名」标签被 OCR 误读为空，姓名并到「活动主题：姓名+主题」一行，
@@ -2630,7 +2630,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         default_year=default_year,
         list_title=list_title,
     )
-    # VLM 优先路径：海报经多模态模型结构化提取，成功则填字段并旁路 OCR 补字段。
+    # VLM 预填路径：海报经多模态模型结构化提取，成功则预填字段并旁路 OCR 补字段。
+    # 正文 `rt` 仍可覆盖 VLM 结果（正文时间通常比海报 OCR 更可靠），非严格优先。
     # 支持多讲座海报：VLM 返回 list 时对每场讲座生成独立记录（isMultiLecture/lectureIndex/lectureCount）。
     # 注：空字段的 VLM 结果（VLM 实际未识别到内容）视为失败，须放行文本/OCR 兜底与多讲座拆分。
     if vlm_fields and _vlm_fields_useful(vlm_fields):
@@ -2736,24 +2737,6 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     if t:
         result['lectureStart'] = t['start'].isoformat(sep=' ')
         result['lectureEnd'] = t['end'].isoformat(sep=' ') if t.get('end') else None
-
-    # 把地点字段里分离出的时间区间回填到讲座时间：
-    #  - 若已有日期但时间完全缺失（00:00），用分离出的区间补全 start/end；
-    #  - 若 start 已有时间但 end 缺失，用分离出的结束时间补全 end；
-    # 这样海报中「地点: 南教-209教室14:30-17:00」式 OCR 能补全完整的起止时间。
-    if loc_times and result['lectureStart']:
-        h0, m0, h1, m1 = loc_times[0]
-        try:
-            st = datetime.datetime.fromisoformat(result['lectureStart'])
-            if st.hour == 0 and st.minute == 0:
-                st = st.replace(hour=h0, minute=m0)
-                result['lectureStart'] = st.isoformat(sep=' ')
-                if not result['lectureEnd']:
-                    result['lectureEnd'] = st.replace(hour=h1, minute=m1).isoformat(sep=' ')
-            elif not result['lectureEnd'] and (h1, m1) != (st.hour, st.minute):
-                result['lectureEnd'] = st.replace(hour=h1, minute=m1).isoformat(sep=' ')
-        except (ValueError, TypeError):
-            pass
 
     # 字段标签前瞻——每个字段只取到下一个标签为止
     # 美术学院常见标签：讲座题目、主讲嘉宾、学术主持、主办单位、上一篇/下一篇
@@ -2870,6 +2853,25 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             r'|Venue|Location)[：:]\s*([^：:\n]{2,40})', ocr_text)
         if loc_ocr and len(loc_ocr.group(1).strip()) >= 2:
             result['location'] = loc_ocr.group(1).strip()
+
+    # 把地点字段里分离出的时间区间回填到讲座时间：
+    #  - 若已有日期但时间完全缺失（00:00），用分离出的区间补全 start/end；
+    #  - 若 start 已有时间但 end 缺失，用分离出的结束时间补全 end；
+    # 这样海报中「地点: 南教-209教室14:30-17:00」式 OCR 能补全完整的起止时间。
+    # 注意：回填必须在所有地点处理分支之后（loc_times 已完成填充）。
+    if loc_times and result['lectureStart']:
+        h0, m0, h1, m1 = loc_times[0]
+        try:
+            st = datetime.datetime.fromisoformat(result['lectureStart'])
+            if st.hour == 0 and st.minute == 0:
+                st = st.replace(hour=h0, minute=m0)
+                result['lectureStart'] = st.isoformat(sep=' ')
+                if not result['lectureEnd']:
+                    result['lectureEnd'] = st.replace(hour=h1, minute=m1).isoformat(sep=' ')
+            elif not result['lectureEnd'] and (h1, m1) != (st.hour, st.minute):
+                result['lectureEnd'] = st.replace(hour=h1, minute=m1).isoformat(sep=' ')
+        except (ValueError, TypeError):
+            pass
 
     # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
     # 注意：排除「主讲《…》」（正文里「主讲《课程名》」是动宾短语，不是主讲人标签），
@@ -3027,8 +3029,6 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         mt_title = None
         sp = None
         m = re.search(_ocr_sp_pat, text)
-        if m:
-            speaker_label_found = True
         if m:
             speaker_label_found = True
             sp = m.group(1).strip()
@@ -3585,8 +3585,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # - 其它源：保留原 extract_ad_title（抽引号内讲座名）行为不变，不影响 skc 等。
     _title = result.get('title') or ''
     if college == '教师发展中心':
-        # 2026-08-05 体检修正：listTitle 是 scraper 在 parse_detail 返回后才写入
-        # result 的字段，函数内 result.get('listTitle') 恒为 None；应使用参数 list_title。
+        # 教师发展中心走「去掉行政壳」路径：使用调用方传的 list_title（而非
+        # result.get('listTitle')，后者在函数内恒为 None），去除类似「关于举办」前缀。
         _shell = strip_admin_shell(list_title or _title)
         if _shell:
             result['title'] = _shell

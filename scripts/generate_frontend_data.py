@@ -29,25 +29,17 @@ UNKNOWN_YEAR = '其他'
 LATEST_PREVIEW_LEN = 220
 
 
-def atomic_write(path, content, mode='text'):
-    """将内容写入 .tmp 文件，再用 os.replace 原子替换目标文件。
-    避免写入过程中读者读到半份文件。"""
-    tmp = path + '.tmp'
-    if mode == 'text':
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(content, f, ensure_ascii=False, separators=(',', ':'))
-    else:
-        with open(tmp, 'wb') as f:
-            f.write(content)
-    os.replace(tmp, path)
-
-
 def atomic_write_text(path, content):
     """文本文件的原子写入（用于改写 HTML 等）。"""
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
         f.write(content)
     os.replace(tmp, path)
+
+
+def atomic_write_json(path, data):
+    """JSON 文件的原子写入（用于改写切片等）。"""
+    atomic_write_text(path, json.dumps(data, ensure_ascii=False, separators=(',', ':')))
 
 
 def _short_hash(path, length=10):
@@ -101,7 +93,7 @@ def year_of(item):
     if m and m.isdigit():
         return m
     t = (item.get('title') or '')
-    m2 = __import__('re').search(r'(\d{4})', t)
+    m2 = re.search(r'(\d{4})', t)
     if m2:
         return m2.group(1)
     return UNKNOWN_YEAR
@@ -251,7 +243,7 @@ def write_chunks(data, updated_at):
         part = data[i:i + CHUNK_SIZE]
         idx = i // CHUNK_SIZE + 1
         fname = 'chunk_%04d.json' % idx
-        atomic_write(os.path.join(SITE_DIR, fname), {'updatedAt': updated_at, 'data': part})
+        atomic_write_json(os.path.join(SITE_DIR, fname), {'updatedAt': updated_at, 'data': part})
         chunks.append('lectures/' + fname)
     manifest = {
         'updatedAt': updated_at,
@@ -259,7 +251,7 @@ def write_chunks(data, updated_at):
         'chunkSize': CHUNK_SIZE,
         'chunks': chunks,
     }
-    atomic_write(os.path.join(SITE_DIR, 'chunks.json'), manifest)
+    atomic_write_json(os.path.join(SITE_DIR, 'chunks.json'), manifest)
     print(f'[done] chunks.json + {len(chunks)} 片 (每片 {CHUNK_SIZE} 条, 共 {n} 条)')
 
 
@@ -294,9 +286,9 @@ def main():
     full_data = [with_unit(item, url_dates) for item in data]
 
     # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
-    atomic_write(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': full_data})
-    atomic_write(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
-    atomic_write(os.path.join(SITE_DIR, 'stats.json'), stats)
+    atomic_write_json(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': full_data})
+    atomic_write_json(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
+    atomic_write_json(os.path.join(SITE_DIR, 'stats.json'), stats)
     write_chunks(full_data, updated_at)
 
     latest_bytes = os.path.getsize(os.path.join(SITE_DIR, 'latest.json'))

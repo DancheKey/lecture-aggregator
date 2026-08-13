@@ -27,14 +27,14 @@ SCRAPER = os.path.join(ROOT, 'scraper', 'scraper.py')
 SOURCES_PATH = os.path.join(ROOT, 'scraper', 'sources.yaml')
 
 VISITS_PATH = os.path.join(DATA_DIR, 'visits.json')          # 站点访问量：{"total": N}
-LECTURE_STATS_PATH = os.path.join(DATA_DIR, 'lecture_stats.json')  # 每条讲座的访问/点赞：{url:{visits,likes}}
+LECTURE_STATS_PATH = os.path.join(DATA_DIR, 'lecture_stats.json')  # 每条讲座的访问/点赞/想听：{url:{visits,likes,wants}}
 
 _scrape_lock = threading.Lock()
 _stat_lock = threading.Lock()
 
 # ---- 访问量 / 点赞统计的运行时状态（文件持久化 + 内存防刷窗口） ----
 _site_visits = {'total': 0}            # 站点总访问量
-_lecture_stats = {}                     # url -> {"visits": N, "likes": M}
+_lecture_stats = {}                     # url -> {"visits": N, "likes": M, "wants": W}
 _recent_site_ip = {}                   # ip -> 最近一次计数的时间戳（站点访问防刷）
 _recent_lecture = {}                   # (ip, url) -> 时间戳（单讲座访问防刷）
 _recent_like_action = {}               # (ip, url) -> (时间戳, 'like'|'unlike')（点赞防刷，区分动作）

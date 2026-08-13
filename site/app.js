@@ -7,7 +7,7 @@ const LIKE_KEY = 'lecture_likes_v1';
 const LIKED_KEY = 'lecture_liked_urls_v1';
 const WANT_KEY = 'lecture_wants_v1';
 const WANTED_KEY = 'lecture_wanted_urls_v1';
-const STAT_KEY = 'lecture_stats_v1';      // 本机讲座访问/点赞/想听统计（公网无后端时降级使用）
+const STAT_KEY = 'lecture_stats_v1';      // 本地缓存 + 后端合并后的讲座访问/点赞/想听统计
 const COUNT_CAP = 300;                    // 点赞/想听超过此值显示 "300+"，防止虚高数字
 
 // 配置项：若已部署「工作流触发代理」（持有 PAT 的 Cloudflare Worker / Vercel Function 等，
@@ -128,8 +128,7 @@ const app = createApp({
             hay = [l.location, ...(l.sources || []).map(s => s.location)]
               .filter(Boolean).join(' ').toLowerCase();
           } else if (this.searchField === 'topic') {
-            // 题目：标题 + 题目字段 + 主讲人（2026-08-05 体检修正 中等-15：
-            // 与占位提示「搜索题目 / 主讲…」对齐，此前 haystack 缺 speaker）
+            // 题目：标题 + 题目字段 + 主讲人（与占位提示「搜索题目 / 主讲…」对齐）
             hay = [l.title, l.topic, l.listTitle, l.speaker].filter(Boolean).join(' ').toLowerCase();
           } else if (this.searchField === 'college') {
             // 单位：仅按主办单位匹配，避免场地在某单位的讲座被误配
@@ -154,9 +153,24 @@ const app = createApp({
         const da = ta.slice(0, 10), db = tb.slice(0, 10);
         if (da !== db) return db.localeCompare(da);
         // 同一天同系列（砺儒讲坛第X讲等）按编号倒序，让133讲在132讲之上
+        // 中文数字（第三讲、第十二期）也支持，映射到 int 后比较
+        const _cn2num = (s) => {
+          const map = {零:0,一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,百:100};
+          let r = 0, acc = 0;
+          for (const ch of s) {
+            const v = map[ch];
+            if (v === undefined) return NaN;
+            if (v >= 10) { acc = acc || 1; r += acc * v; acc = 0; }
+            else acc = acc * 10 + v;
+          }
+          return r + (acc || 0);
+        };
         const seriesNo = (title) => {
-          const m = String(title || '').match(/第(\d+)(?:讲|场|期|届)/);
-          return m ? parseInt(m[1], 10) : 0;
+          const t = String(title || '');
+          let m = t.match(/第(\d+)(?:讲|场|期|届)/);
+          if (m) return parseInt(m[1], 10);
+          m = t.match(/第([一二三四五六七八九十百零]+)(?:讲|场|期|届)/);
+          return m ? _cn2num(m[1]) : 0;
         };
         const sa = seriesNo(a.title), sb = seriesNo(b.title);
         if (sa && sb && sa !== sb) return sb - sa;
@@ -308,7 +322,7 @@ const app = createApp({
     cleanFooter(s) {
       return String(s == null ? '' : s).replace(/(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved)[\s\S]*/i, '').trim();
     },
-    // 安全渲染 notes（已在上方的 notesText 统一处理，含内部标记过滤）
+    // 安全渲染 abstract 字段（已将内部技术标记过滤，可安全展示）
     abstractOf(l) {
       const ab = String(l.abstract || '').trim();
       if (!ab) return '';
@@ -708,8 +722,8 @@ const app = createApp({
       let arr = resp.data;
       let updatedAt = resp.updatedAt || '';
       if (arr && typeof arr === 'object' && !Array.isArray(arr) && Array.isArray(arr.data)) {
-        arr = arr.data;
         if (!updatedAt) updatedAt = arr.updatedAt || '';
+        arr = arr.data;
       }
       this.all = Array.isArray(arr) ? arr : [];
       this.mtime = resp.mtime || 0;
@@ -904,8 +918,7 @@ const app = createApp({
     this.loadLectureStats();
     // 公网静态托管不要先等 /api/lectures 超时；先秒开 latest.json，后台再补全量。
     // 本地后端（127.0.0.1/localhost）仍优先 /api/lectures，保证数据最新。
-    // 2026-08-05 体检修正（中等-15）：IPv6 回环时浏览器返回的 hostname 是「[::1]」
-    // （带方括号），裸 '::1' 永不匹配，一并覆盖。
+    // IPv6 回环时浏览器返回的 hostname 是「[::1]」（带方括号），一并覆盖
     const isLocal = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname);
     if (isLocal) {
       this.loadLectures(false);

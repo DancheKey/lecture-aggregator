@@ -1,20 +1,11 @@
 /* 木铎金声 · 讲座统计页（Vue 3）
  * 从 stats.html 外部化，避免内联脚本在 file:// 或严格 CSP 下被拦截。
  *
- * 2026-07-22 改版：不再依赖预计算的 lectures/stats.json，改为直接加载 lectures.json
- * 并在客户端计算统计摘要——确保统计页与首页使用同一份数据、计数口径完全一致。
- * stats.json 仍作为 fallback（网络异常或旧版部署时兜底）。
+ * 以 lectures/stats.json 为唯一权威数据源，约 300KB（含预计算
+ * matrix/yearTotals/campusMap 与最小讲座索引），避免加载 ~5.7MB 全量 lectures.json。
+ * 数据一致性由 scripts/generate_frontend_data.py 保证。
  * 访问/点赞数仍通过 /api/lecture/stats 与本机 localStorage 动态合并后计算。
- *
- * 2026-07-30 改版：统计页重新以 lectures/stats.json 为唯一权威数据源。
- * 原因：
- *   1) stats.json 仅 ~300KB（含预计算 matrix/yearTotals/campusMap 与最小讲座索引），
- *      而 lectures.json 全量 ~5.7MB；统计页渲染表格/排序/筛选完全不需要明细字段。
- *   2) 数据一致性由 scripts/generate_frontend_data.py 保证：每次更新 data/lectures.json
- *      都会同步重写 stats.json，与 daily.yml / deploy.yml 配套。
- *   3) 使用 cache:'default' 允许浏览器/GitHub Pages CDN 缓存，避免每次冷加载都回源。
- *      统计数据日更（每天凌晨 3 点），600s 缓存窗口带来的 10 分钟延迟可接受。
- * 失败时直接提示错误，不再 fallback 到 5.7MB 全量 lectures.json。
+ * 失败时直接提示错误，不再 fallback。
  */
 const { createApp } = Vue;
 
@@ -78,10 +69,8 @@ createApp({
       return (this.summary && this.summary.years) || [];
     },
 
-    // 当前展示模式：count（讲座数）/ visits（访问量）/ likes（点赞量）
-    mode() {
-      return this.displayMode;
-    },
+    // 当前展示模式：count（讲座数）/ visits（访问量）/ likes（点赞量）—— stats.html 直接引用 displayMode
+    //（mode 计算属性已在 2026-08-13 清理冗余时删除，模板统一使用 displayMode）
 
     // 当前校区筛选下的学院集合（'' = 全部学院）
     campusColleges() {
@@ -100,8 +89,7 @@ createApp({
       const lectures = (this.summary && this.summary.lectures) || [];
       let total = 0;
       lectures.forEach(l => {
-        // 2026-08-05 体检修正（中等-13）：讲座任一归属单位（cs）在当前校区即计入，
-        // 与 matrix 的单位归属口径保持一致（此前只看主学院 l.c）。
+        // 讲座任一归属单位（cs）在当前校区即计入，与 matrix 的单位归属口径保持一致
         const cs = (l.cs && l.cs.length) ? l.cs : [l.c];
         if (cols && !cs.some(c => cols.has(c))) return;
         total += (l.s || 0);
@@ -208,8 +196,7 @@ createApp({
         const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
         if (!st.visits && !st.likes) return;
         const y = l.y || UNKNOWN_YEAR;
-        // 2026-08-05 体检修正（中等-13）：与 matrix 同口径——按讲座归属的全部单位（cs）
-        // 展开、逐单位过校区筛选。此前只按主学院 cols.has(l.c) 过滤，跨源合并讲座
+        // 与 matrix 同口径——按讲座归属的全部单位（cs）展开、逐单位过校区筛选。
         // 主学院不在当前校区、次学院在时，列里计入了、合计行却漏掉，
         // 「按访问数/点赞数」模式下合计行小于各列之和。
         const cs = (l.cs && l.cs.length) ? l.cs : [l.c || '未分类'];
@@ -292,9 +279,7 @@ createApp({
       return v || '—';
     },
     // 读取每条讲座的访问/点赞：优先后端，无后端时回退本机。
-    // 修复（2026-08-05 体检 中等-12）：与 app.js 对齐为「按 URL 字段级合并」。
-    // 此前是整条覆盖（{...localStats, ...j.stats}）——服务端旧记录可能缺 wants
-    // 字段，整条覆盖会把本机离线积累的 wants 抹掉（首页图标高亮但计数为 0）。
+    // 按 URL 字段级合并，避免整条覆盖丢失 wants 字段。
     // 字段级合并：后端没有的字段保留本地值，后端有的字段以后端权威值覆盖。
     loadLectureStats() {
       let localStats = {};
