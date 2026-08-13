@@ -547,9 +547,9 @@ const app = createApp({
         }).catch(() => {});
       }
     },
-    // 加载站点访问量：优先级 本地后端 > 本地 localStorage 自增计数
-    // 本地后端（server.py）直接返回真实总数；公网静态版无后端时，由本机计数方案
-    // 每隔 3 分钟自增一次，存到 localStorage，确保数字会跟随访问而变化。
+    // 加载站点访问量：优先级 本地后端 > 本地 localStorage 自增计数（页面占位）
+    // 注：真正的全网去重访客数（UV/PV）由百度统计后台提供（见 index.html/stats.html 的 hm.js 埋点），
+    //     这里的 localStorage 自增仅作为页面上的临时占位数字，非权威值。
     loadSiteVisits() {
       // 0) 优先读共享缓存（任一页面成功获取后写入）
       const cached = parseInt(localStorage.getItem('site_visits_total') || '0', 10);

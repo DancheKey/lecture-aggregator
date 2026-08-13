@@ -6,9 +6,20 @@
   <!-- CSP 说明：
        - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
          站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
-       - 本站已不使用不蒜子计数服务，改用 localStorage 本地自增计数，无需外部脚本。
+       - 画面访问量接入百度统计（tongji.baidu.com），script-src 需放行 hm.baidu.com；
+         本地 localStorage 自增仍保留作页面占位显示，百度统计后台提供权威 UV/PV。
        - connect-src 仅放行同源，避免任何外部数据外泄。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://hm.baidu.com https://hmcdn.baidu.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://hm.baidu.com; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <!-- 百度统计：全网去重访客统计（UV/PV），后台见 https://tongji.baidu.com -->
+  <script>
+  var _hmt = _hmt || [];
+  (function() {
+    var hm = document.createElement("script");
+    hm.src = "https://hm.baidu.com/hm.js?525e13027513085e9175da73b7ec2580";
+    var s = document.getElementsByTagName("script")[0]; 
+    s.parentNode.insertBefore(hm, s);
+  })();
+  </script>
   <meta name="referrer" content="no-referrer" />
   <title>各学院讲座统计 - 木铎金声</title>
   <link rel="stylesheet" href="vendor/tailwind.css" />
