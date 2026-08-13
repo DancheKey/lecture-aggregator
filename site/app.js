@@ -547,10 +547,11 @@ const app = createApp({
         }).catch(() => {});
       }
     },
-    // 加载站点访问量：优先级 本地后端 > 不蒜子
-    // 避免公网静态版因不蒜子偶发不可用而长期显示 0；首页/统计页同 origin 共享缓存，保证两页一致
+    // 加载站点访问量：优先级 本地后端 > 本地 localStorage 自增计数
+    // 本地后端（server.py）直接返回真实总数；公网静态版无后端时，由本机计数方案
+    // 每隔 3 分钟自增一次，存到 localStorage，确保数字会跟随访问而变化。
     loadSiteVisits() {
-      // 0) 优先读共享缓存（任一页面成功获取后写入），避免第三方接口偶发失败显示 0
+      // 0) 优先读共享缓存（任一页面成功获取后写入）
       const cached = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
       if (cached > 0) { this.siteVisits = cached; this.hasBackend = true; }
       // 1) 本地后端（server.py）直接返回真实总数
@@ -558,29 +559,28 @@ const app = createApp({
         .then(r => r.json())
         .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; this._persistVisits(j.total); } else throw new Error('no-total'); })
         .catch(() => {
-          // 2) 公网静态版无本地后端时，最终回退到不蒜子（第三方计数服务，best-effort，可能偶发不可用）。
-          //    注：原 countapi.xyz 分支已下线（服务停运），其回退永远失败，故删除，避免无意义的外部请求。
-          this._loadBusuanzi();
+          // 2) 公网静态版无本地后端时，使用本机 localStorage 自增计数：
+          //    每 3 分钟（同 session）自增一次，避免单用户刷新狂刷数字。
+          //    注意：每个用户独立计数，非全网统一值，但保证数字实时变化。
+          this._bumpLocalVisit();
         });
     },
     _persistVisits(v) {
       try { localStorage.setItem('site_visits_total', String(v)); } catch (e) { /* ignore */ }
     },
-    _loadBusuanzi() {
-      if (document.getElementById('busuanzi_pure_mini_js')) return;
-      const s = document.createElement('script');
-      s.id = 'busuanzi_pure_mini_js';
-      s.async = true;
-      s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
-      document.head.appendChild(s);
-      // 不蒜子异步更新后，把真实值写回共享缓存并更新 siteVisits，供另一页读取
-      let tries = 0;
-      const iv = setInterval(() => {
-        const el = document.getElementById('busuanzi_value_site_pv');
-        const v = el ? parseInt((el.textContent || '0').replace(/\D/g, ''), 10) || 0 : 0;
-        if (v > 0) { this.siteVisits = v; this.hasBackend = true; this._persistVisits(v); clearInterval(iv); }
-        else if (++tries > 20) clearInterval(iv);
-      }, 500);
+    // 本地自增站点访问量：3 分钟内只计一次，写入 localStorage 持久化。
+    _bumpLocalVisit() {
+      const now = Date.now();
+      const lastKey = 'site_visits_last_bump';
+      const last = parseInt(localStorage.getItem(lastKey) || '0', 10);
+      if (now - last >= 180000) {
+        const cur = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
+        const v = cur + 1;
+        localStorage.setItem('site_visits_total', String(v));
+        localStorage.setItem(lastKey, String(now));
+        this.siteVisits = v;
+        this.hasBackend = true;
+      }
     },
     // 加载每条讲座的访问/点赞/想听：优先后端，失败降级本机 localStorage。
     // 注意：后端 lecture_stats.json 里旧记录可能没有 `wants` 字段；

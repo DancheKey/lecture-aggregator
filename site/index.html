@@ -6,9 +6,9 @@
   <!-- CSP 说明：
        - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
          站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
-       - 外链脚本仅允许不蒜子计数服务（busuanzi.ibruce.info）。
-       - connect-src 仅放行同源与 busuanzi，避免任何外部数据外泄。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.ibruce.info; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.ibruce.info; object-src 'none'; base-uri 'self'; form-action 'self'" />
+       - 本站已不使用不蒜子计数服务，改用 localStorage 本地自增计数，无需外部脚本。
+       - connect-src 仅放行同源，避免任何外部数据外泄。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="referrer" content="no-referrer" />
   <title>木铎金声</title>
   <link rel="stylesheet" href="vendor/tailwind.css" />
@@ -296,8 +296,7 @@
       <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
         · 本站总访问量 <span v-if="siteVisits != null">{{ siteVisits }}</span><span v-else>—</span> 次
       </span>
-      <!-- 不蒜子只作为隐藏数据源，不再直接显示 0；JS 会读取其值后更新 siteVisits -->
-      <span id="busuanzi_value_site_pv" style="display:none">0</span>
+      <!-- 站点访问量由 localStorage 本地自增计数，首页与统计页共享缓存 -->
     </footer>
 
     <!-- Toast 提示 -->
