@@ -6,20 +6,11 @@
   <!-- CSP 说明：
        - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
          站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
-       - 画面访问量接入百度统计（tongji.baidu.com），script-src 需放行 hm.baidu.com；
-         本地 localStorage 自增仍保留作页面占位显示，百度统计后台提供权威 UV/PV。
-       - connect-src 仅放行同源，避免任何外部数据外泄。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://hm.baidu.com https://hmcdn.baidu.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://hm.baidu.com; object-src 'none'; base-uri 'self'; form-action 'self'" />
-  <!-- 百度统计：全网去重访客统计（UV/PV），后台见 https://tongji.baidu.com -->
-  <script>
-  var _hmt = _hmt || [];
-  (function() {
-    var hm = document.createElement("script");
-    hm.src = "https://hm.baidu.com/hm.js?525e13027513085e9175da73b7ec2580";
-    var s = document.getElementsByTagName("script")[0]; 
-    s.parentNode.insertBefore(hm, s);
-  })();
-  </script>
+       - 访问量显示使用不蒜子兼容服务 busuanzi.aspark.cc（免费、免注册、全网统一 PV），
+         script-src / connect-src 需放行 busuanzi.aspark.cc。
+       - connect-src 仅放行同源与 aspark，避免任何外部数据外泄。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <!-- site_pv/site_uv 元素的渲染由 busuanzi.aspark.cc/js 脚本完成 -->
   <meta name="referrer" content="no-referrer" />
   <title>木铎金声</title>
   <link rel="stylesheet" href="vendor/tailwind.css" />
@@ -61,6 +52,8 @@
       .motto-side { display: block; }
     }
   </style>
+  <!-- 访问量计数脚本（busuanzi.aspark.cc，兼容原版不蒜子写法，填入 id="busuanzi_site_pv" 的 span） -->
+  <script async src="https://busuanzi.aspark.cc/js"></script>
 </head>
 <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <div id="app" v-cloak class="min-h-screen flex flex-col">
@@ -305,9 +298,9 @@
     <footer class="border-t border-slate-200 text-center text-[12pt] text-slate-400 py-6 bg-white">
       数据来源于华南师范大学各学院/部处公开站点，仅供师生参考，请以官方原文为准。
       <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
-        · 本站总访问量 <span v-if="siteVisits != null">{{ siteVisits }}</span><span v-else>—</span> 次
+        · 本站总访问量 <span id="busuanzi_site_pv">—</span> 次
       </span>
-      <!-- 站点访问量由 localStorage 本地自增计数，首页与统计页共享缓存 -->
+      <!-- 总访问量由 busuanzi.aspark.cc 统计并回填（免费、全网统一），纯静态页无需后端 -->
     </footer>
 
     <!-- Toast 提示 -->

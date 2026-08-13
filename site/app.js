@@ -18,13 +18,6 @@ const WORKFLOW_DISPATCH_URL = '';
 
 const app = createApp({
   data() {
-    // 页面加载瞬间就从共享缓存读访问量，避免一开始显示 0；没有缓存则显示占位符 —
-    const cachedVisits = (() => {
-      try {
-        const v = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
-        return v > 0 ? v : null;
-      } catch (e) { return null; }
-    })();
     return {
       all: [],
       mtime: 0,
@@ -45,8 +38,7 @@ const app = createApp({
       wantedUrls: new Set(), // 当前浏览器已标记想听的 url 集合
       loading: true,       // 首屏数据加载中（避免闪现空列表）
       dataStage: 'loading', // 'loading' | 'partial' | 'partial-error' | 'full'：渐进加载阶段
-      siteVisits: cachedVisits, // 站点总访问量（null 表示尚未从任何来源拿到）
-      hasBackend: cachedVisits != null, // 是否已从本地后端或第三方拿到有效值
+      siteVisits: null, // 站点总访问量（已弃用，改由 busuanzi.aspark.cc 独立渲染到 <span id="busuanzi_site_pv">）
       lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
       toast: { show: false, message: '', timer: null },
       pageSize: 25,        // 每页显示条数（配合渐进式加载，首屏更快）
@@ -547,41 +539,6 @@ const app = createApp({
         }).catch(() => {});
       }
     },
-    // 加载站点访问量：优先级 本地后端 > 本地 localStorage 自增计数（页面占位）
-    // 注：真正的全网去重访客数（UV/PV）由百度统计后台提供（见 index.html/stats.html 的 hm.js 埋点），
-    //     这里的 localStorage 自增仅作为页面上的临时占位数字，非权威值。
-    loadSiteVisits() {
-      // 0) 优先读共享缓存（任一页面成功获取后写入）
-      const cached = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
-      if (cached > 0) { this.siteVisits = cached; this.hasBackend = true; }
-      // 1) 本地后端（server.py）直接返回真实总数
-      fetch('/api/visits', { cache: 'no-store' })
-        .then(r => r.json())
-        .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; this._persistVisits(j.total); } else throw new Error('no-total'); })
-        .catch(() => {
-          // 2) 公网静态版无本地后端时，使用本机 localStorage 自增计数：
-          //    每 3 分钟（同 session）自增一次，避免单用户刷新狂刷数字。
-          //    注意：每个用户独立计数，非全网统一值，但保证数字实时变化。
-          this._bumpLocalVisit();
-        });
-    },
-    _persistVisits(v) {
-      try { localStorage.setItem('site_visits_total', String(v)); } catch (e) { /* ignore */ }
-    },
-    // 本地自增站点访问量：3 分钟内只计一次，写入 localStorage 持久化。
-    _bumpLocalVisit() {
-      const now = Date.now();
-      const lastKey = 'site_visits_last_bump';
-      const last = parseInt(localStorage.getItem(lastKey) || '0', 10);
-      if (now - last >= 180000) {
-        const cur = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
-        const v = cur + 1;
-        localStorage.setItem('site_visits_total', String(v));
-        localStorage.setItem(lastKey, String(now));
-        this.siteVisits = v;
-        this.hasBackend = true;
-      }
-    },
     // 加载每条讲座的访问/点赞/想听：优先后端，失败降级本机 localStorage。
     // 注意：后端 lecture_stats.json 里旧记录可能没有 `wants` 字段；
     // 若直接 `this.lectureStats = j.stats` 覆盖，会把本机 STAT_KEY 中已保存
@@ -914,7 +871,6 @@ const app = createApp({
     this.startCountAnimation();
     this.loadLikes();
     this.loadWants();
-    this.loadSiteVisits();
     this.loadLectureStats();
     // 公网静态托管不要先等 /api/lectures 超时；先秒开 latest.json，后台再补全量。
     // 本地后端（127.0.0.1/localhost）仍优先 /api/lectures，保证数据最新。

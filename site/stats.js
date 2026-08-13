@@ -24,13 +24,6 @@ const CAMPUSES = ['', '石牌', '大学城', '佛山', '汕尾', '校级'];
 // 表格首列固定、表头固定，未来年份多、学院多时仍可一页内滚动查看。
 createApp({
   data() {
-    // 页面加载瞬间就从共享缓存读访问量，避免一开始显示 0；没有缓存则显示占位符 —
-    const cachedVisits = (() => {
-      try {
-        const v = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
-        return v > 0 ? v : null;
-      } catch (e) { return null; }
-    })();
     return {
       // 来自 lectures/stats.json 的预计算数据
       summary: null,
@@ -56,10 +49,6 @@ createApp({
       // 顶部数字「从 1 滚动增长」动画的展示值（数据到达后平滑定格）
       displayLecture: 1,
       displaySource: 1,
-      // 站点总访问量（null 表示尚未从任何来源拿到）
-      siteVisits: cachedVisits,
-      // 是否已从本地后端或第三方拿到有效值
-      hasBackend: cachedVisits != null,
     };
   },
 
@@ -385,48 +374,12 @@ createApp({
           this.finalizeCountAnimation();
         });
     },
-    // 加载站点总访问量：优先级 本地后端 > 不蒜子
-    // 避免公网静态版因不蒜子偶发不可用而长期显示 0；首页/统计页同 origin 共享缓存，保证两页一致
-    loadSiteVisits() {
-      // 0) 优先读共享缓存（任一页面成功获取后写入），避免第三方接口偶发失败显示 0
-      const cached = parseInt(localStorage.getItem('site_visits_total') || '0', 10);
-      if (cached > 0) { this.siteVisits = cached; this.hasBackend = true; }
-      // 1) 本地后端（server.py）直接返回真实总数
-      fetch('/api/visits', { cache: 'no-store' })
-        .then(r => r.json())
-        .then(j => { if (j && j.total != null) { this.siteVisits = j.total; this.hasBackend = true; this._persistVisits(j.total); } else throw new Error('no-total'); })
-        .catch(() => {
-          // 2) 公网静态版无本地后端时，最终回退到不蒜子（第三方计数服务，best-effort，可能偶发不可用）。
-          //    注：原 countapi.xyz 分支已下线（服务停运），其回退永远失败，故删除，避免无意义的外部请求。
-          this._loadBusuanzi();
-        });
-    },
-    _persistVisits(v) {
-      try { localStorage.setItem('site_visits_total', String(v)); } catch (e) { /* ignore */ }
-    },
-    _loadBusuanzi() {
-      if (document.getElementById('busuanzi_pure_mini_js')) return;
-      const s = document.createElement('script');
-      s.id = 'busuanzi_pure_mini_js';
-      s.async = true;
-      s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
-      document.head.appendChild(s);
-      // 不蒜子异步更新后，把真实值写回共享缓存并更新 siteVisits，供另一页读取
-      let tries = 0;
-      const iv = setInterval(() => {
-        const el = document.getElementById('busuanzi_value_site_pv');
-        const v = el ? parseInt((el.textContent || '0').replace(/\D/g, ''), 10) || 0 : 0;
-        if (v > 0) { this.siteVisits = v; this.hasBackend = true; this._persistVisits(v); clearInterval(iv); }
-        else if (++tries > 20) clearInterval(iv);
-      }, 500);
-    },
   },
 
   mounted() {
     this.startCountAnimation();
     this.load();
     this.loadLectureStats();
-    this.loadSiteVisits();
   },
 
   // 切换校区 / 输入学院名时，若动画已结束则即时更新顶部数字（不再重播动画）。
