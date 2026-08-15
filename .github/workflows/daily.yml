@@ -92,7 +92,8 @@ jobs:
             git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')"
             echo "提交成功，同步远端..."
             # 运行期间若仓库被其他提交推进（如人工推送），先 rebase 再 push，避免 non-fast-forward 失败
-            git pull --rebase origin main || { echo "::warning::git pull --rebase 失败（远程在此期间有推送，重试前先重新生成切片）"; python scripts/generate_frontend_data.py; git add site/lectures.json site/lectures/latest.json site/lectures/stats.json site/lectures/chunk_*.json site/lectures/chunks.json site/index.html site/stats.html; git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')" --allow-empty; git pull --rebase origin main || { echo "::error::git pull --rebase 再次失败"; exit 1; }; }
+            # rebase 失败时 abort 退出，交给下一班 cron 重跑（已有 concurrency 排队，重跑成本低）
+            git pull --rebase origin main || { echo "::error::git pull --rebase 失败，中止 rebase 等待下次 cron 重试"; git rebase --abort; exit 1; }
             echo "推送到 origin/main..."
             # 最多重试 3 次 push，应对短时并发冲突
             for i in 1 2 3; do

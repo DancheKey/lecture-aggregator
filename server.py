@@ -25,6 +25,10 @@ SITE_DIR = os.path.join(ROOT, 'site')
 DATA_DIR = os.path.join(ROOT, 'data')
 SCRAPER = os.path.join(ROOT, 'scraper', 'scraper.py')
 SOURCES_PATH = os.path.join(ROOT, 'scraper', 'sources.yaml')
+# 确保 scripts/ 下的共享模块可被导入（如 excluded_urls）
+sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+from excluded_urls import load_excluded
+
 
 VISITS_PATH = os.path.join(DATA_DIR, 'visits.json')          # 站点访问量：{"total": N}
 LECTURE_STATS_PATH = os.path.join(DATA_DIR, 'lecture_stats.json')  # 每条讲座的访问/点赞/想听：{url:{visits,likes,wants}}
@@ -42,21 +46,6 @@ _recent_want_action = {}               # (ip, url) -> (时间戳, 'want'|'unwant
 VISIT_THROTTLE = 180                   # 同一 IP / 同一讲座 3 分钟内只计 1 次
 LIKE_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同点赞动作只接受一次（允许 like↔unlike 交替）
 WANT_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同想听动作只接受一次（允许 want↔unwant 交替）
-
-
-def _load_excluded():
-    """读取全局排除名单 data/excluded_urls.json。
-
-    该名单既被爬虫用于增量抓取时跳过，也必须在展示端过滤——凡是列入的 URL
-    不应出现在聚合页面 / 统计中（否则 excluded 形同虚设，非讲座会反复回潮）。
-    """
-    p = os.path.join(DATA_DIR, 'excluded_urls.json')
-    try:
-        with open(p, 'r', encoding='utf-8') as f:
-            lst = json.load(f)
-        return set(lst) if isinstance(lst, list) else set()
-    except Exception:
-        return set()
 
 
 def _attach_unit_types(data):
@@ -277,6 +266,19 @@ class Handler(SimpleHTTPRequestHandler):
         except (json.JSONDecodeError, ValueError):
             self._send_json({'ok': False, 'message': '无效的 JSON'}, 400)
             return
+        # 类型校验：防止把 list_urls 写成字符串等非预期类型导致 scraper 读取 sources.yaml 崩溃
+        for k in ('name', 'campus', 'base'):
+            if k in body and not isinstance(body[k], str):
+                self._send_json({'ok': False, 'message': f'{k} 必须为字符串'}, 400)
+                return
+        if 'list_urls' in body:
+            if not isinstance(body['list_urls'], list):
+                self._send_json({'ok': False, 'message': 'list_urls 必须为数组'}, 400)
+                return
+            for i, lu in enumerate(body['list_urls']):
+                if not isinstance(lu, (str, dict)):
+                    self._send_json({'ok': False, 'message': f'list_urls[{i}] 必须为字符串或对象'}, 400)
+                    return
         src = data['sources'][idx]
         for k in ('name', 'campus', 'base', 'list_urls'):
             if k in body:
@@ -310,12 +312,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _is_local_origin(self):
         """写接口 CSRF 防护：Origin/Referer 缺失放行（curl/本机脚本）；
-        存在时必须指向 127.0.0.1/localhost，拒绝跨站表单/fetch 触发本机写接口。"""
+        存在时必须指向 127.0.0.1/localhost/[::1]，拒绝跨站表单/fetch 触发本机写接口。"""
         for h in ('Origin', 'Referer'):
             v = (self.headers.get(h) or '').strip()
             if not v:
                 continue
-            if re.match(r'^https?://(127\.0\.0\.1|localhost)(:\d+)?(/|$)', v, re.I):
+            if re.match(r'^https?://(127\.0\.0\.1|\[::1\]|localhost)(:\d+)?(/|$)', v, re.I):
                 return True
             return False
         return True
@@ -532,9 +534,9 @@ class Handler(SimpleHTTPRequestHandler):
                 else:
                     data = raw if isinstance(raw, list) else []
             # 全局排除名单过滤：凡是列入的 URL 不应展示（与公网静态切片一致）。
-            excluded = _load_excluded()
+            excluded = load_excluded()
             if excluded:
-                data = [r for r in data if (r.get('sourceUrl') or '') not in excluded]
+                data = [r for r in data if (r.get('sourceUrl') or '').rstrip('/') not in excluded]
             # 本地下发的 /api/lectures 须与公网静态切片一致地补上 unitType（场/期），
             # 否则 app.js 拿不到该字段会全部回退显示「期」。
             data = _attach_unit_types(data)

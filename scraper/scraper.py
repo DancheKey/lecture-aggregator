@@ -9,10 +9,14 @@ import datetime
 import requests
 import charset_normalizer
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
 from parsers import parse_detail, is_lecture, is_news_record  # noqa: E402
+from excluded_urls import load_excluded  # noqa: E402
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; SCNULectureAggregator/0.1)'}
 TIMEOUT = 15
@@ -70,20 +74,51 @@ def _decode_html(raw):
     return raw.decode('utf-8', errors='replace')
 
 
-def fetch(url, _retries=3):
+def fetch(url, _retries=3, allowed_domains=None):
     """下载页面并鲁棒解码。
 
     网络层异常（连接重置 ECONNRESET / 超时 / 断流 等 requests.RequestException）
-    做指数退避重试，避免偶发抖动被误判为死链而漏抓；死链（HTTP 4xx/5xx，
-    requests 不抛异常）直接返回解码文本，不重试。重试耗尽仍失败返回 None
+    做指数退避重试，避免偶发抖动被误判为死链而漏抓；死链（HTTP 4xx/5xx）
+    返回 None，不重试（错误页无正文可解析）。重试耗尽仍失败返回 None
     （调用方按死链处理）。
+
+    安全加固（2026-08-15）：
+      - 响应大小上限 20MB（stream=True 限量读取），避免超大响应撑爆内存；
+      - 状态码校验：仅 200 视为成功，其余返回 None；
+      - 可选域名白名单 allowed_domains（如 ['scnu.edu.cn']），限制只允许抓取
+        本源或授权域名，防止页面内注入的恶意 URL 触发 SSRF；
+        None 表示跳过校验（兼容无白名单的调用场景）。
     """
     import random
+    from urllib.parse import urlparse
     last_err = None
     for _i in range(_retries):
         try:
-            r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-            return _decode_html(r.content)
+            # 域名白名单校验（可选）：限制只允许抓取本源或授权域名
+            if allowed_domains:
+                host = urlparse(url).netloc
+                if not any(host == d or host.endswith('.' + d) for d in allowed_domains):
+                    print(f'[WARN] fetch: 域名不在白名单 {url}', file=sys.stderr)
+                    return None
+
+            r = requests.get(url, headers=HEADERS, timeout=TIMEOUT, stream=True)
+
+            # 状态码校验：仅 200 视为成功，4xx/5xx 返回 None
+            if r.status_code != 200:
+                r.close()
+                print(f'[WARN] fetch: HTTP {r.status_code} {url}', file=sys.stderr)
+                return None
+
+            # 响应大小限制：最多读取 20MB，避免超大响应撑爆内存
+            content = bytearray()
+            for chunk in r.iter_content(chunk_size=65536):
+                content.extend(chunk)
+                if len(content) > 20 * 1024 * 1024:
+                    r.close()
+                    print(f'[WARN] fetch: 响应超过 20MB 上限 {url}', file=sys.stderr)
+                    return None
+            r.close()
+            return _decode_html(bytes(content))
         except requests.exceptions.RequestException as e:
             last_err = e
             if _i < _retries - 1:
@@ -110,12 +145,16 @@ EXCLUDE_TITLE_KW = ['通知', '招聘', '答辩', '公示', '大赛', '初赛', 
 _CONTENT_URL_RE = re.compile(r'/((a/\d{8}/\d+\.html)|(\d{4}/\d{4}/\d+\.html)|(\d{4}/\d{2}/\d{2}/.*\.html))', re.I)
 
 
-def _abs_url(href, base):
+def _abs_url(href, page_url):
+    """将 href 按当前页 URL RFC 3986 规范解析为绝对地址。
+
+    page_url 为当前正在解析的页面 URL（非站点根 base），
+    这样裸相对路径（如 "123.html"）才会相对于当前页解析，
+    而非错误地拼到站点根目录。
+    """
     if href.startswith('http'):
         return href
-    if href.startswith('/'):
-        return base.rstrip('/') + href
-    return base.rstrip('/') + '/' + href
+    return urljoin(page_url, href)
 
 
 def collect_links(html, base, list_url=None, collect_mode='auto'):
@@ -142,7 +181,7 @@ def collect_links(html, base, list_url=None, collect_mode='auto'):
         # 跳过占位/包装链接：外层 <a> 里还包着真实 <a>，它的 href 通常是 content.html / # 等
         if a.find('a'):
             continue
-        url = _abs_url(href, base)
+        url = _abs_url(href, list_url or base)
         if list_url_norm and url.rstrip('/') == list_url_norm:
             continue
         # 跳过明显无意义的占位文件名（如 content.html 本身是包装，index.html 是栏目首页）
@@ -177,12 +216,14 @@ def collect_links(html, base, list_url=None, collect_mode='auto'):
 _NEXT_PAGE_KW = ('下一页', '下页', '下一頁', '下一页»', '»', '>>', 'Next', 'next', 'NEXT')
 
 
-def _next_page_url(html, base):
+def _next_page_url(html, page_url):
     """从列表页提取「下一页」链接的绝对地址；无则 None。
 
     用于自动跟随分页：从首列表页开始，沿「下一页」依次抓取，
     直到末页（「下一页」缺失 / 指向自身 / 已访问）为止。避免像
     tongzhigonggao/2.html 那样手工罗列每个分页地址。
+
+    page_url 为当前列表页 URL，供 _abs_url 正确解析相对路径。
     """
     if not html:
         return None
@@ -194,7 +235,7 @@ def _next_page_url(html, base):
         h = a.get('href')
         if not h or h.startswith('javascript') or h == '#' or h.startswith('#'):
             continue
-        return _abs_url(h, base)
+        return _abs_url(h, page_url)
     return None
 
 
@@ -704,6 +745,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
     name = src['name']
     campus = src.get('campus', '')
     base = src['base']
+    # 域名白名单：限制只允许抓取华师域名（scnu.edu.cn 及其子域），
+    # 容错各学院列表页跨子域链接的详情页，避免静默丢数据
     src_list_norm = set()
     for lu in src.get('list_urls', []):
         u = lu['url'] if isinstance(lu, dict) else lu
@@ -723,7 +766,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
             cur = list_url
             while cur and cur.rstrip('/') not in visited_pages:
                 visited_pages.add(cur.rstrip('/'))
-                html = fetch(cur)
+                html = fetch(cur, allowed_domains=['scnu.edu.cn'])
                 new_count = 0
                 for href, txt in collect_links(html, base, list_url=cur, collect_mode=collect_mode):
                     href_norm = href.rstrip('/')
@@ -738,7 +781,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     if href_norm in src_list_norm:
                         continue
-                    d = fetch(href)
+                    d = fetch(href, allowed_domains=['scnu.edu.cn'])
                     if not d:
                         continue
                     try:
@@ -759,7 +802,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         local[key] = r
                         tag = f' (第{r["lectureIndex"]}期)' if r.get('lectureIndex') else ''
                         print(f'[OK] {name} | {r.get("lectureStart")} | {txt}{tag}')
-                nxt = _next_page_url(html, base) if html else None
+                nxt = _next_page_url(html, cur) if html else None
                 sequential = False
                 if not nxt and new_count > 0:
                     cand = _sequential_candidate(cur)
@@ -768,8 +811,6 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         sequential = True
                 if (not nxt or nxt.rstrip('/') in visited_pages
                         or nxt.rstrip('/') == cur.rstrip('/')):
-                    break
-                if sequential and new_count == 0:
                     break
                 cur = nxt
                 if len(visited_pages) > 300:
@@ -856,19 +897,10 @@ def main():
 
     # 全局排除名单：被人工确认删除的非讲座/新闻类 URL，cron 增量与全量均跳过，避免污染。
     # 由数据清洗时把「本地已删、cron 曾误加回」的 URL 写入 data/excluded_urls.json 生成。
-    global_excluded = set()
-    _ge_path = os.path.join(ROOT, 'data', 'excluded_urls.json')
-    if os.path.exists(_ge_path):
-        try:
-            _ge = json.load(open(_ge_path, encoding='utf-8'))
-            if isinstance(_ge, list):
-                global_excluded = {str(u).rstrip('/') for u in _ge}
-            elif isinstance(_ge, dict) and 'urls' in _ge:
-                global_excluded = {str(u).rstrip('/') for u in _ge['urls']}
-            if global_excluded:
-                print(f'[INFO] 已加载全局排除名单 {len(global_excluded)} 条')
-        except Exception as e:
-            print(f'[WARN] 加载全局排除名单失败：{e}', file=sys.stderr)
+    # 读取逻辑已统一至 scripts/excluded_urls.py（scraper / generate / server 三点共用）。
+    global_excluded = load_excluded()
+    if global_excluded:
+        print(f'[INFO] 已加载全局排除名单 {len(global_excluded)} 条')
 
     # 并发抓取各信息源：源与源之间独立，大幅缩短 GitHub Actions 全量/增量耗时
     max_workers = 1 if args.source else 5

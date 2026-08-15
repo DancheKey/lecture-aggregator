@@ -33,6 +33,7 @@ def _load_module(name, path):
 
 gen = _load_module('gen_frontend', os.path.join(ROOT, 'scripts', 'generate_frontend_data.py'))
 srv = _load_module('server_mod', os.path.join(ROOT, 'server.py'))
+scr = _load_module('scraper_mod', os.path.join(ROOT, 'scraper', 'scraper.py'))
 
 
 def _pipeline_gen(data, excluded):
@@ -91,8 +92,12 @@ class ConsistencyTest(unittest.TestCase):
         self.assertEqual(got_gen[5].get('unitType'), 'issue')     # 无日期 → 期（与现状一致）
 
     def test_excluded_filter_equal(self):
-        """排除名单读取：两条实现必须返回相同集合。"""
-        self.assertEqual(gen.load_excluded(), srv._load_excluded())
+        """排除名单读取：三条路径必须返回相同集合（generate ↔ server ↔ scraper）。"""
+        gen_ex = gen.load_excluded()
+        srv_ex = srv.load_excluded()
+        scr_ex = scr.load_excluded()
+        self.assertEqual(gen_ex, srv_ex, 'generate ↔ server 排除名单不一致')
+        self.assertEqual(gen_ex, scr_ex, 'generate ↔ scraper 排除名单不一致')
 
     def test_real_data_pipelines_equal(self):
         """真实 data/lectures.json：两条实现输出必须逐条相等（全量回归）。"""

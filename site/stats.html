@@ -206,18 +206,7 @@
         · 本站总访问量 <span id="busuanzi_site_pv">—</span> 次
       </span>
       <!-- 叠加旧版访问量基数（416），aspark 写入数字后自动加上基数 -->
-      <script>(function(){
-        var el = document.getElementById('busuanzi_site_pv');
-        if (!el) return;
-        var BASE = 416;
-        var obs = new MutationObserver(function() {
-          var v = parseInt(el.textContent.replace(/\s/g,''), 10);
-          if (!isNaN(v) && v >= 0) { el.textContent = v + BASE; obs.disconnect(); }
-        });
-        obs.observe(el, { characterData: true, childList: true, subtree: true });
-        var v0 = parseInt(el.textContent.replace(/\s/g,''), 10);
-        if (!isNaN(v0) && v0 >= 0 && v0 < 100) { el.textContent = v0 + BASE; }
-      })();</script>
+      <script defer src="footer-counter.js"></script>
       <!-- 总访问量由 busuanzi.aspark.cc 统计并回填（免费、全网统一） -->
     </footer>
 

@@ -38,8 +38,7 @@ const app = createApp({
       wantedUrls: new Set(), // 当前浏览器已标记想听的 url 集合
       loading: true,       // 首屏数据加载中（避免闪现空列表）
       dataStage: 'loading', // 'loading' | 'partial' | 'partial-error' | 'full'：渐进加载阶段
-      siteVisits: null, // 站点总访问量（已弃用，改由 busuanzi.aspark.cc 独立渲染到 <span id="busuanzi_site_pv">）
-      lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
+    lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
       toast: { show: false, message: '', timer: null },
       pageSize: 25,        // 每页显示条数（配合渐进式加载，首屏更快）
       currentPage: 1,      // 当前页码
@@ -175,21 +174,6 @@ const app = createApp({
         return tb.localeCompare(ta);
       });
       return list;
-    },
-
-    // 按天分组（倒序），供时间线渲染
-    grouped() {
-      const groups = {};
-      this.filtered.forEach(l => {
-        const k = this.dayKey(l.lectureStart);
-        (groups[k] = groups[k] || []).push(l);
-      });
-      const keys = Object.keys(groups).sort((a, b) => {
-        if (a === '时间待定') return 1;
-        if (b === '时间待定') return -1;
-        return b.localeCompare(a);
-      });
-      return keys.map(k => ({ key: k, items: groups[k] }));
     },
 
     // 总页数
@@ -405,7 +389,6 @@ const app = createApp({
       const willLike = !this.hasLiked(url);
       // 本地 UI 立即切换（乐观更新），保证点击即时反馈
       if (willLike) { this.likedUrls.add(url); } else { this.likedUrls.delete(url); }
-      this.saveLikes();
       const delta = willLike ? 1 : -1;
       // 乐观更新展示计数；后端返回真实值后会被覆盖（统一数据源，消除首页/统计页不一致）
       // 用 typeof 判断，避免 lectureStats.likes === 0 时被 || 误判为缺失而回退到旧本地值。
@@ -472,7 +455,6 @@ const app = createApp({
       if (!url) return;
       const willWant = !this.hasWanted(url);
       if (willWant) { this.wantedUrls.add(url); } else { this.wantedUrls.delete(url); }
-      this.saveWants();
       const delta = willWant ? 1 : -1;
       // 用 typeof 判断，避免 lectureStats.wants === 0 时被 || 误判为缺失而回退到旧本地值。
       const s = this.lectureStats[url];
@@ -514,13 +496,6 @@ const app = createApp({
     },
     saveLocalStats() {
       try { localStorage.setItem(STAT_KEY, JSON.stringify(this.lectureStats)); } catch (e) { /* ignore */ }
-    },
-    // 本机累计一次统计（公网无后端时降级使用，带 3 分钟防刷）
-    bumpLocalStat(url, field, delta = 1) {
-      const s = this.lectureStats[url] || { visits: 0, likes: 0 };
-      s[field] = Math.max(0, (s[field] || 0) + delta);
-      this.lectureStats[url] = s;
-      this.saveLocalStats();
     },
     // 点击讲座标题时记录一次访问（fire-and-forget；后端优先，失败降级本机）
     recordVisit(url) {
@@ -649,11 +624,8 @@ const app = createApp({
      * 浏览器缓存使用 default，让 GitHub Pages 的 max-age=600 生效，避免每次刷新
      * 都重新下载 6MB 的 lectures.json。
      */
-    loadLectures(incremental) {
-      const url = (incremental && this.mtime)
-        ? `/api/lectures?since=${this.mtime}`
-        : '/api/lectures';
-      fetch(url, { cache: 'default' })
+    loadLectures() {
+      fetch('/api/lectures', { cache: 'default' })
         .then(r => {
           if (!r.ok) throw new Error('api-unavailable');
           return r.json();
@@ -666,7 +638,6 @@ const app = createApp({
         })
         .catch(() => {
           // 静态托管（无后端）时回退：先 fastest latest，再 full lite
-          if (incremental) return;
           this._loadStaticLatest();
         });
     },
@@ -755,11 +726,13 @@ const app = createApp({
         .then(resp => {
           this._applyLectureData(resp);
           this.dataStage = 'full';
+          this.loading = false;
         })
         .catch(e => {
           console.error('加载完整讲座数据失败', e);
           // 不 finalize 到 50 死值；保留已加载真实条数，可点击重试。
           this.dataStage = 'partial-error';
+          this.loading = false;
         });
     },
 
@@ -822,11 +795,6 @@ const app = createApp({
       this._countDur = 500;
       if (!this._countRAF) this._countRAF = requestAnimationFrame(this._countTick);
     },
-    resetCountAnimation() {
-      if (this._countRAF) { cancelAnimationFrame(this._countRAF); this._countRAF = null; }
-      this._countFrom = this._countTarget = 0;
-      this._countSourceFrom = this._countSourceTarget = 0;
-    },
     retryLoadFull() {
       // 断点续传：从失败的分片继续，已加载条数保留并显示，不回退到 50。
       this.dataStage = 'partial';
@@ -882,8 +850,7 @@ const app = createApp({
       this._loadStaticLatest();
     }
     // 隐藏初始 loading 占位，避免 Vue 挂载前显示原始模板
-    const pl = document.getElementById('page-loading');
-    if (pl) pl.style.display = 'none';
+    // （v-cloak 已替代，无需手动隐藏 page-loading）
     // 监听滚动，下滑超过阈值时显示「回到顶部」按钮
     this.onScroll();
     window.addEventListener('scroll', this.onScroll);

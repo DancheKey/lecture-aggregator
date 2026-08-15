@@ -37,7 +37,7 @@ def _apply_period(hh, period):
         if 1 <= hh <= 5:
             return hh + 12
         return hh % 24
-    if period:
+    if period is not None:
         if hh < 12:
             hh += period
         elif period == 12 and hh == 12:
@@ -287,11 +287,6 @@ def _date_from_title(title):
 # R1 权威标签分级扫描
 # ============================================================================
 # 注：Tier 分级逻辑已内联到 _LABEL_RE 的 if/elif 分支中（见 331-345 行），
-# 以下变量保留为文档参考，不再被引用。
-# Tier-1 强权威（优先）
-_TIER1_KW = ['讲座时间', '报告时间', '学术报告时间', 'seminar时间', 'Time:']
-# Tier-2 弱权威
-_TIER2_KW = ['开讲时间', '开课时间', '会议时间', '时间', '时闻']
 # 排除（非讲座时间）：标签关键词「时间」前若含这些词，视为 CMS 文章元数据而非讲座时间。
 # 注意：_LABEL_RE 匹配「发布时间」时命中的关键词是裸「时间」（发布时间不在正则备选里），
 # pre 窗口只含其前的「发布」等短词，故此处必须用短形式（发布/更新…），写「发布时间」等长形式反而匹配不到。
@@ -519,11 +514,12 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
                 'confidence': 'high', 'note': 'monthday-nopublish'}
 
     # ---- R2：通用解析只扫正文 ----
+    # 年份优先级与 R4/_resolve_year 统一：url_year > title_year > publish_year
     eff = default_year
-    if title_year:
-        eff = title_year
-    elif url_year:
+    if url_year:
         eff = url_year
+    elif title_year:
+        eff = title_year
     elif publish_year:
         eff = publish_year
     g = _parse_segment(body_text, eff, publish_time)

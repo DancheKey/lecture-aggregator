@@ -16,6 +16,10 @@ import hashlib
 import json
 import os
 import re
+import sys
+
+# 确保 scripts/ 下的共享模块（如 excluded_urls）可被 import
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
@@ -107,28 +111,15 @@ def load_lectures():
     return raw if isinstance(raw, list) else [], ''
 
 
-def load_excluded():
-    """读取全局排除名单 data/excluded_urls.json。
-
-    该名单既被爬虫用于增量抓取时跳过，也必须在展示端过滤——凡是列入的 URL
-    不应出现在聚合页面 / 统计中（否则 excluded 形同虚设，非讲座会反复回潮）。
-    """
-    p = os.path.join(ROOT, 'data', 'excluded_urls.json')
-    if not os.path.exists(p):
-        return set()
-    try:
-        with open(p, 'r', encoding='utf-8') as f:
-            lst = json.load(f)
-        return set(lst) if isinstance(lst, list) else set()
-    except Exception:
-        return set()
+# load_excluded 已迁移至 scripts/excluded_urls.py（scraper / generate / server 三点共用）
+from excluded_urls import load_excluded  # noqa: E402,F811
 
 
 def sort_for_latest(data):
     """按 lectureStart 降序，缺失时间排最后。"""
     def key(item):
         start = item.get('lectureStart') or ''
-        return ('0' if start else '1', start)
+        return ('1' if start else '0', start)
     return sorted(data, key=key, reverse=True)
 
 
@@ -237,6 +228,10 @@ def write_chunks(data, updated_at):
     任一片失败仅重试该片，不影响其它片；每片到达数字滚动到已加载真实条数，
     彻底解决「手机端一次性拉 6MB 失败 -> 数字定格在 50」的问题。
     """
+    # 清理旧分片：数据量减少时不残留（如 100 片缩到 50 片后旧的 chunk_0051+ 仍会被 git add 提交）
+    import glob
+    for old in glob.glob(os.path.join(SITE_DIR, 'chunk_*.json')):
+        os.remove(old)
     chunks = []
     n = len(data)
     for i in range(0, n, CHUNK_SIZE):
@@ -267,7 +262,7 @@ def main():
     excluded = load_excluded()
     if excluded:
         before = len(data)
-        data = [r for r in data if (r.get('sourceUrl') or '') not in excluded]
+        data = [r for r in data if (r.get('sourceUrl') or '').rstrip('/') not in excluded]
         print(f'[filter] 排除名单过滤: {before} -> {len(data)} (移除 {before - len(data)} 条)')
 
     # 构建 sourceUrl -> 讲座日期集合，用于区分「同一活动的多场」（同天=场）

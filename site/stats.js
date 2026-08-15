@@ -72,20 +72,6 @@ createApp({
       return set;
     },
 
-    // 当前校区下、各年份的来源通知合计（用于顶部摘要"覆盖 N 条来源通知"）
-    filteredSourceCount() {
-      const cols = this.campusColleges;
-      const lectures = (this.summary && this.summary.lectures) || [];
-      let total = 0;
-      lectures.forEach(l => {
-        // 讲座任一归属单位（cs）在当前校区即计入，与 matrix 的单位归属口径保持一致
-        const cs = (l.cs && l.cs.length) ? l.cs : [l.c];
-        if (cols && !cs.some(c => cols.has(c))) return;
-        total += (l.s || 0);
-      });
-      return total;
-    },
-
     // 去重后讲座总数
     lectureCount() {
       return (this.summary && this.summary.lectureCount) || 0;
@@ -141,7 +127,6 @@ createApp({
         return { college, cells, total, visitsTotal, likesTotal };
       }).filter(row => {
         if (!row) return false;
-        if (cols && !cols.has(row.college)) return false;
         if (!this.collegeFilter) return true;
         return (row.college || '').toLowerCase().includes(this.collegeFilter.toLowerCase());
       });
@@ -160,8 +145,8 @@ createApp({
           // 按具体年份列排序（当前模式下对应的数值）
           const idx = this.years.indexOf(key);
           if (idx >= 0) {
-            if (this.mode === 'visits') cmp = (a.cells[idx].visits || 0) - (b.cells[idx].visits || 0);
-            else if (this.mode === 'likes') cmp = (a.cells[idx].likes || 0) - (b.cells[idx].likes || 0);
+            if (this.displayMode === 'visits') cmp = (a.cells[idx].visits || 0) - (b.cells[idx].visits || 0);
+            else if (this.displayMode === 'likes') cmp = (a.cells[idx].likes || 0) - (b.cells[idx].likes || 0);
             else cmp = (a.cells[idx].count || 0) - (b.cells[idx].count || 0);
           }
         }
@@ -198,11 +183,6 @@ createApp({
         });
       });
       return this.years.map(y => totals[y] || { year: y, count: 0, visits: 0, likes: 0 });
-    },
-
-    // 当前筛选（校区 + 学院名）下的讲座总数
-    filteredLectureCount() {
-      return this.rows.reduce((a, r) => a + r.total, 0);
     },
 
     // 当前筛选（校区 + 学院名）下的学院/部处（单位）数量
@@ -258,8 +238,8 @@ createApp({
     },
     // 根据当前模式取单元格数值
     cellValue(cell) {
-      if (this.mode === 'visits') return cell.visits || 0;
-      if (this.mode === 'likes') return cell.likes || 0;
+      if (this.displayMode === 'visits') return cell.visits || 0;
+      if (this.displayMode === 'likes') return cell.likes || 0;
       return cell.count || 0;
     },
     // 单元格显示：0 显示为 —，非 0 显示数值
@@ -384,18 +364,6 @@ createApp({
 
   // 切换校区 / 输入学院名时，若动画已结束则即时更新顶部数字（不再重播动画）。
   // 顶部展示唯一讲座总数 / 来源通知总数（去重口径），不随筛选改变单位计数口径。
-  watch: {
-    campusFilter() {
-      if (this._finalized) {
-        this.displayLecture = this.lectureCount;
-        this.displaySource = this.sourceNoticeCount;
-      }
-    },
-    collegeFilter() {
-      if (this._finalized) {
-        this.displayLecture = this.lectureCount;
-        this.displaySource = this.sourceNoticeCount;
-      }
-    },
+  // 注意：lectureCount / sourceNoticeCount 来自预计算 summary，筛选不影响其值，故无需 watch 重赋。
   },
 }).mount('#app');

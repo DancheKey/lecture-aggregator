@@ -4399,16 +4399,6 @@ def _split_by_speakers(base, speakers):
     return out
 
 
-def _parse_title_no_range(title):
-    """从标题解析「第A-B期」连续期号范围，返回 (start, end) 或 None。"""
-    m = re.search(r'第\s*(\d{1,3})\s*-\s*(\d{1,3})\s*期', title or '')
-    if m:
-        a, b = int(m.group(1)), int(m.group(2))
-        if 1 <= a < b <= 999:
-            return a, b
-    return None
-
-
 def _extract_block_field(block, label_re, max_len=40):
     """从块文本提取某标签后的短字段值（遇到下一个字段标签/中文日期/时段即止）。"""
     m = re.search(rf'{label_re}[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
@@ -4909,6 +4899,10 @@ def detect_multi_session(text, title='', default_year=None, publish_time=None,
     # ctld/4290 拆成 75/76/77，既违反「按 start 升序赋 lectureIndex」约定，又让增量去重
     # 键 (sourceUrl, lectureIndex) 与存量 1/2/3 不一致而产生重复记录。期号语义如需展示
     # 应由前端从 title 推导。
+    # 记录拆前文档顺序（1-based），供 split_record_by_sessions 用会议号映射匹配
+    # 专题序号。注意 sessions 随后可能被按 start 时间排序，时间序≠文档序，故须在此先存。
+    for i, s in enumerate(sessions):
+        s['_doc_no'] = i + 1
     if all(s.get('start') for s in sessions):
         sessions.sort(key=lambda s: s['start'])
     for i, s in enumerate(sessions):
@@ -5061,7 +5055,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
                 'Zoom' if 'zoom' in block.lower() else
                 'Webex' if 'webex' in block.lower() else '')
         elif meeting_map:
-            mid = meeting_map.get(i + 1)  # session 在文档中的顺序即专题序号
+            mid = meeting_map.get(s['_doc_no'])  # 用拆前文档顺序匹配专题序号
             if mid:
                 rec['meetingId'] = mid
                 rec['meetingPlatform'] = platform_hint
