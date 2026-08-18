@@ -6,11 +6,11 @@
   <!-- CSP 说明：
        - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
          站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
-       - 访问量显示使用不蒜子兼容服务 busuanzi.aspark.cc（免费、免注册、全网统一 PV），
-         script-src / connect-src 需放行 busuanzi.aspark.cc。
-       - connect-src 仅放行同源与 aspark，避免任何外部数据外泄。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc; object-src 'none'; base-uri 'self'; form-action 'self'" />
-  <!-- site_pv/site_uv 元素的渲染由 busuanzi.aspark.cc/js 脚本完成 -->
+       - 访问量显示使用 localStorage + sessionStorage 实现防重复计数，
+         同一会话内只计 1 次，切换页面不重复计数。
+       - connect-src 仅放行同源，避免任何外部数据外泄。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <!-- 访问量由 footer-counter.js 通过 localStorage + sessionStorage 统计 -->
   <meta name="referrer" content="no-referrer" />
   <title>木铎金声</title>
   <link rel="stylesheet" href="vendor/tailwind.css" />
@@ -52,8 +52,6 @@
       .motto-side { display: block; }
     }
   </style>
-  <!-- 访问量计数脚本（busuanzi.aspark.cc，兼容原版不蒜子写法，填入 id="busuanzi_site_pv" 的 span） -->
-  <script async src="https://busuanzi.aspark.cc/js"></script>
 </head>
 <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <div id="app" v-cloak class="min-h-screen flex flex-col">
@@ -300,9 +298,8 @@
       <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
         · 本站总访问量 <span id="busuanzi_site_pv">—</span> 次
       </span>
-<!-- footer-counter.js 仅做兜底观测，不修改 aspark 写入的数字 -->
-<script defer src="footer-counter.js"></script>
-<!-- 总访问量由 busuanzi.aspark.cc 统计并回填（免费、全网统一），纯静态页无需后端 -->
+<!-- footer-counter.js 通过 localStorage + sessionStorage 实现防重复计数 -->
+<script defer src="footer-counter.js?v=5c348920b3"></script>
     </footer>
 
     <!-- Toast 提示 -->

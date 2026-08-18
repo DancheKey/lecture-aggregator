@@ -296,6 +296,8 @@ def main():
     # 给前端脚本打内容 hash 版本号，避免浏览器长期缓存旧 JS（见 stamp_script_version 注释）。
     stamp_script_version('stats.html', 'stats.js')
     stamp_script_version('index.html', 'app.js')
+    stamp_script_version('index.html', 'footer-counter.js')
+    stamp_script_version('stats.html', 'footer-counter.js')
 
 
 if __name__ == '__main__':
