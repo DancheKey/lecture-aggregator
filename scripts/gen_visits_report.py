@@ -195,6 +195,12 @@ RENDER_JS = r'''
             yt[y] = s; g += s;
           });
           SEED.years = Y; SEED.monthTot = mt; SEED.yearTot = yt; SEED.grand = g; META.maxv = mv;
+          // 关键修复：使用服务端返回的 total（含历史遗留数据），而非仅 by_day 合计
+          // 否则会出现总数跳降（如 851 -> 28）的问题
+          if (typeof j.total === "number" && j.total >= g) {
+            META.total = j.total;
+            META.legacy = Math.max(0, j.total - g);
+          }
           META.note = "已拉取实时数据 · " + META.note;
           build();
         }

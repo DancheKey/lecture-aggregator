@@ -361,9 +361,4 @@ createApp({
     this.load();
     this.loadLectureStats();
   },
-
-  // 切换校区 / 输入学院名时，若动画已结束则即时更新顶部数字（不再重播动画）。
-  // 顶部展示唯一讲座总数 / 来源通知总数（去重口径），不随筛选改变单位计数口径。
-  // 注意：lectureCount / sourceNoticeCount 来自预计算 summary，筛选不影响其值，故无需 watch 重赋。
-  },
 }).mount('#app');
