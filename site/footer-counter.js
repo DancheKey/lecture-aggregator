@@ -1,50 +1,66 @@
-/* 页脚访问量：基于 sessionStorage 的防重复计数。
- * 同一个浏览器会话（session）内只计 1 次访问，切换页面不重复计数。
- * 使用 localStorage 持久化存储总访问量，页面刷新/重新打开后仍保留。
+/* 页脚访问量：全网统一计数（CountAPI + sessionStorage 防重复）。
+ * 所有访客看到同一个总数；同一会话内只计 1 次，切换页面不重复计数。
  *
- * 注：不再依赖 busuanzi.aspark.cc，避免不同页面 URL 导致计数不一致。
+ * CountAPI：免费、免认证、支持 CORS 与 HTTPS。
+ * 参考：https://countapi.xyz/
  */
 (function () {
   var el = document.getElementById('busuanzi_site_pv');
   if (!el) return;
 
-  var STORAGE_KEY = 'lecture_site_total_visits';
-  var SESSION_KEY = 'lecture_site_session_counted';
-
-  // 获取当前总访问量
-  function getCount() {
-    var raw = localStorage.getItem(STORAGE_KEY);
-    var n = parseInt(raw, 10);
-    return isNaN(n) ? 0 : n;
-  }
-
-  // 设置总访问量
-  function setCount(n) {
-    localStorage.setItem(STORAGE_KEY, String(n));
-  }
+  var NAMESPACE = 'scnu-lecture';
+  var KEY = 'site-pv';
+  var SESSION_KEY = 'lecture_site_counted_this_session';
 
   // 检查当前会话是否已计数
   function isSessionCounted() {
     return sessionStorage.getItem(SESSION_KEY) === '1';
   }
 
-  // 标记当前会话已计数
   function markSessionCounted() {
     sessionStorage.setItem(SESSION_KEY, '1');
   }
 
-  // 初始化计数
-  function init() {
-    // 如果当前会话未计数，则 +1
-    if (!isSessionCounted()) {
-      var newCount = getCount() + 1;
-      setCount(newCount);
-      markSessionCounted();
-    }
-    // 显示当前总访问量
-    el.textContent = getCount();
+  // 递增计数并显示结果
+  function hitAndShow() {
+    fetch('https://api.countapi.xyz/hit/' + NAMESPACE + '/' + KEY, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && typeof d.value === 'number') {
+          el.textContent = d.value;
+          markSessionCounted();
+        }
+      })
+      .catch(function () {
+        // 网络故障时显示本地备用值（localStorage 缓存的上次数值）
+        var fallback = localStorage.getItem('lecture_site_pv_backup');
+        if (fallback) el.textContent = fallback;
+      });
   }
 
-  // 启动
+  // 仅获取当前值（不递增）
+  function getAndShow() {
+    fetch('https://api.countapi.xyz/get/' + NAMESPACE + '/' + KEY, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && typeof d.value === 'number') {
+          el.textContent = d.value;
+          // 缓存备用（网络故障时使用）
+          localStorage.setItem('lecture_site_pv_backup', String(d.value));
+        }
+      })
+      .catch(function () {});
+  }
+
+  function init() {
+    if (isSessionCounted()) {
+      // 本会话已计数过，只获取当前值不递增
+      getAndShow();
+    } else {
+      // 本会话首次访问，递增计数
+      hitAndShow();
+    }
+  }
+
   init();
 })();
