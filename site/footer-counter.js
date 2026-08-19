@@ -1,5 +1,5 @@
-/* 页脚访问量：全网统一计数（CountAPI + sessionStorage 防重复）。
- * 所有访客看到同一个总数；同一会话内只计 1 次，切换页面不重复计数。
+/* 页脚访问量：全网统一计数（CountAPI + 3 分钟防刷节流）。
+ * 所有访客看到同一个总数；同一浏览器 3 分钟内只计 1 次，防恶意刷新刷量。
  *
  * CountAPI：免费、免认证、支持 CORS 与 HTTPS。
  * 参考：https://countapi.xyz/
@@ -10,15 +10,19 @@
 
   var NAMESPACE = 'scnu-lecture';
   var KEY = 'site-pv';
-  var SESSION_KEY = 'lecture_site_counted_this_session';
+  var THROTTLE_MS = 180 * 1000;            // 3 分钟节流窗口
+  var HIT_AT_KEY = 'lecture_site_last_hit_at'; // localStorage 键：上次成功_INCREMENT_的时间戳
 
-  // 检查当前会话是否已计数
-  function isSessionCounted() {
-    return sessionStorage.getItem(SESSION_KEY) === '1';
+  // 检查距离上次计数是否已过节流窗口
+  function canCountNow() {
+    var last = parseInt(localStorage.getItem(HIT_AT_KEY), 10);
+    if (isNaN(last)) return true;           // 从未计数过，允许
+    return Date.now() - last >= THROTTLE_MS;
   }
 
-  function markSessionCounted() {
-    sessionStorage.setItem(SESSION_KEY, '1');
+  // 记录本次计数时间戳
+  function markCounted() {
+    localStorage.setItem(HIT_AT_KEY, String(Date.now()));
   }
 
   // 递增计数并显示结果
@@ -28,11 +32,11 @@
       .then(function (d) {
         if (d && typeof d.value === 'number') {
           el.textContent = d.value;
-          markSessionCounted();
+          markCounted();
         }
       })
       .catch(function () {
-        // 网络故障时显示本地备用值（localStorage 缓存的上次数值）
+        // 网络故障时显示本地备用值
         var fallback = localStorage.getItem('lecture_site_pv_backup');
         if (fallback) el.textContent = fallback;
       });
@@ -45,7 +49,6 @@
       .then(function (d) {
         if (d && typeof d.value === 'number') {
           el.textContent = d.value;
-          // 缓存备用（网络故障时使用）
           localStorage.setItem('lecture_site_pv_backup', String(d.value));
         }
       })
@@ -53,12 +56,12 @@
   }
 
   function init() {
-    if (isSessionCounted()) {
-      // 本会话已计数过，只获取当前值不递增
-      getAndShow();
-    } else {
-      // 本会话首次访问，递增计数
+    if (canCountNow()) {
+      // 已过节流窗口，递增计数
       hitAndShow();
+    } else {
+      // 节流窗口内，只获取不递增
+      getAndShow();
     }
   }
 
