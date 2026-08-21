@@ -9,9 +9,7 @@
        - 访问量使用 busuanzi.aspark.cc（国内可用的免费计数服务，兼容原版不蒜子写法），
          script-src / connect-src 需放行 busuanzi.aspark.cc；sessionStorage 防同会话重复计数。 -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc; object-src 'none'; base-uri 'self'; form-action 'self'" />
-  <!-- 访问量计数脚本（busuanzi.aspark.cc，兼容原版不蒜子写法） -->
-  <script async src="https://busuanzi.aspark.cc/js"></script>
-  <!-- footer-counter.js 用 sessionStorage 防同会话重复计数 -->
+  <!-- footer-counter.js 动态加载 busuanzi，同会话只计 1 次 -->
   <meta name="referrer" content="no-referrer" />
   <title>木铎金声</title>
   <link rel="stylesheet" href="vendor/tailwind.css" />
@@ -299,8 +297,8 @@
       <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
         · 本站总访问量 <span id="busuanzi_site_pv">—</span> 次
       </span>
-<!-- footer-counter.js 用 sessionStorage 防同会话重复计数 -->
-<script defer src="footer-counter.js?v=b572c6c0de"></script>
+<!-- footer-counter.js 动态加载 busuanzi，同会话只计 1 次 -->
+<script defer src="footer-counter.js?v=77719b65b7"></script>
     </footer>
 
     <!-- Toast 提示 -->
