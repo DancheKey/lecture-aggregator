@@ -7,40 +7,58 @@
  * busuanzi.aspark.cc 是国内可用的免费计数服务（兼容原版不蒜子写法）。
  */
 (function () {
-  var el = document.getElementById('busuanzi_site_pv');
-  if (!el) return;
-
   var SESSION_KEY = 'lecture_site_counted';
   var COUNT_KEY = 'lecture_site_count_value';
 
+  // 获取计数值元素（每次重新查询，防止 Vue 重建 DOM 后引用失效）
+  function getEl() {
+    return document.getElementById('busuanzi_site_pv');
+  }
+
   // 当前会话已计数 → 不加载 busuanzi，直接显示缓存值
   function showCached() {
+    var el = getEl();
+    if (!el) return;
     var cached = sessionStorage.getItem(COUNT_KEY);
     if (cached) el.textContent = cached;
   }
 
-  // 当前会话未计数 → 动态加载 busuanzi，监听写入后缓存
-  function loadBusuanziAndCapture() {
-    // 监听 busuanzi 写入计数值
-    var observer = new MutationObserver(function () {
-      var txt = (el.textContent || '').trim();
-      if (txt !== '—' && txt !== '' && /^\d+$/.test(txt)) {
-        // 缓存数值并标记会话已计数
-        sessionStorage.setItem(COUNT_KEY, txt);
-        sessionStorage.setItem(SESSION_KEY, '1');
-        observer.disconnect();
-      }
-    });
-
-    observer.observe(el, { childList: true, characterData: true, subtree: true });
-
-    // 兜底：如果 busuanzi 已写入（observer 可能错过）
+  // 从元素中提取数字
+  function extractCount(el) {
     var txt = (el.textContent || '').trim();
-    if (txt !== '—' && txt !== '' && /^\d+$/.test(txt)) {
-      sessionStorage.setItem(COUNT_KEY, txt);
+    if (txt !== '—' && txt !== '' && /^\d+$/.test(txt)) return txt;
+    return null;
+  }
+
+  // 当前会话未计数 → 动态加载 busuanzi，轮询等待写入后缓存
+  function loadBusuanziAndCapture() {
+    var el = getEl();
+    if (!el) return;
+
+    // 如果元素已有数值（busuanzi 已完成），直接缓存
+    var existing = extractCount(el);
+    if (existing) {
+      sessionStorage.setItem(COUNT_KEY, existing);
       sessionStorage.setItem(SESSION_KEY, '1');
       return;
     }
+
+    // 轮询等待 busuanzi 写入数值（最多等 5 秒）
+    var pollCount = 0;
+    var pollTimer = setInterval(function () {
+      pollCount++;
+      el = getEl(); // 重新查询（Vue 可能已重建 DOM）
+      if (!el) { clearInterval(pollTimer); return; }
+
+      var val = extractCount(el);
+      if (val) {
+        sessionStorage.setItem(COUNT_KEY, val);
+        sessionStorage.setItem(SESSION_KEY, '1');
+        clearInterval(pollTimer);
+      } else if (pollCount >= 50) { // 5 秒超时（每 100ms 一次）
+        clearInterval(pollTimer);
+      }
+    }, 100);
 
     // 动态加载 busuanzi 脚本
     var script = document.createElement('script');
@@ -50,9 +68,18 @@
   }
 
   // 启动
-  if (sessionStorage.getItem(SESSION_KEY) === '1') {
-    showCached();
+  function init() {
+    if (sessionStorage.getItem(SESSION_KEY) === '1') {
+      showCached();
+    } else {
+      loadBusuanziAndCapture();
+    }
+  }
+
+  // 确保 DOM 就绪后启动
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    loadBusuanziAndCapture();
+    init();
   }
 })();
