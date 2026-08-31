@@ -637,11 +637,8 @@ def _cross_source_dup_with_existing(rec, existing_index):
 
     用于增量模式：命中则新增记录不追加（避免重复），existing 基底保持原样
     （包括其 merged 状态不变）。判定与 cross_source_dedup 一致：
-      - 同单位（同学院）同主讲同日且 lectureIndex 相同 → 强制视为重复
-        （lectureIndex 均 None 时不强制，避免误删同单位同日的两场不同讲座，
-         如 bd/66 与 bd/67）；
-      - 其余情形（含同单位不满足强信号的）同主讲同日 + topic/title
-        相似度 ≥ 0.25 → 视为重复。
+      - 同单位（同学院）同主讲同日不同 URL → 强制视为重复；
+      - 跨单位同主讲同日 + topic/title 相似度 ≥ 0.25 → 视为重复。
     """
     spk = _normalize_speaker(rec.get('speaker') or '')
     if not _is_valid_speaker_name(spk):
@@ -656,13 +653,7 @@ def _cross_source_dup_with_existing(rec, existing_index):
         if _norm_url(r2.get('sourceUrl')) == u1:
             continue  # 同 URL 由 seen 处理，不在此判
         if rec.get('college', '') and rec.get('college') == r2.get('college'):
-            # 同单位系列分期强信号：同主讲、同日、同 lectureIndex 才强制视为重复
-            #（与 cross_source_dedup 一致；同单位同日也可能是两场不同讲座，
-            #  如 bd/66 vs bd/67，lectureIndex 均 None 不会触发，落入下方相似度判定）。
-            li_a = rec.get('lectureIndex')
-            li_b = r2.get('lectureIndex')
-            if li_a is not None and li_a == li_b:
-                return True
+            return True  # 同单位同主讲同日（系列分期重复发布）
         ti_b = r2.get('topic', '') or r2.get('title', '')
         sim = max(
             _topic_similarity(rec.get('topic', ''), r2.get('topic', '')),

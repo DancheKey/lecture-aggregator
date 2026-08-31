@@ -881,15 +881,10 @@ def _load_dotenv():
 
 
 def _load_vlm_configs():
-    """返回 VLM provider 配置列表（按优先级顺序，_vlm_extract_fields 依次尝试，前一个
-    失败则落下一个，全部失败回落本地 RapidOCR）：
-      1) 智谱 GLM（主通道，国内直连、免费稳定，海报结构化首选）
-      2) Agnes-ai（GLM 不可用时的备用通道，OpenAI 兼容 /v1/chat/completions）
-    无 key 返回空列表（调用方降级 OCR）。
-    """
+    """返回 VLM provider 配置列表（智谱 GLM 主通道）；无 key 返回空列表（调用方降级 OCR）。"""
     env = _load_dotenv()
     cfgs = []
-    # 主通道：智谱 GLM
+    # 主通道：智谱 GLM（国内直连、免费稳定，海报结构化首选；不可用则回落本地 RapidOCR）
     zkey = _os.environ.get('ZHIPU_API_KEY') or env.get('ZHIPU_API_KEY')
     if zkey:
         cfgs.append({
@@ -898,16 +893,6 @@ def _load_vlm_configs():
             'model': (_os.environ.get('VLM_MODEL') or env.get('VLM_MODEL') or 'glm-4v-flash'),
             'base_url': (_os.environ.get('VLM_BASE_URL') or env.get('VLM_BASE_URL')
                          or 'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
-        })
-    # 备用通道：Agnes-ai（GLM 不可用时第二顺位；再不行回落 RapidOCR）
-    akey = _os.environ.get('AGNES_API_KEY') or env.get('AGNES_API_KEY')
-    if akey:
-        cfgs.append({
-            'name': 'agnes',
-            'api_key': akey,
-            'model': (_os.environ.get('AGNES_MODEL') or env.get('AGNES_MODEL') or 'agnes-2.5-flash'),
-            'base_url': (_os.environ.get('AGNES_BASE_URL') or env.get('AGNES_BASE_URL')
-                         or 'https://api.agnes-ai.cn/v1/chat/completions'),
         })
     return cfgs
 
@@ -1154,9 +1139,6 @@ def _vlm_try_one_provider(message, cfg, proxies):
     for attempt in range(3):
         try:
             r = requests.post(cfg['base_url'], headers=headers, json=payload, timeout=60, proxies=proxies)
-            if r.status_code in (401, 403):
-                # 鉴权失败（key 失效/无权限）：重试无意义，立即放弃并回落下一 provider / OCR
-                return None
             if r.status_code == 429:
                 # 免费层限流（"访问量过大"）：快速失败，避免指数退避空耗超时。
                 # 最多 2 次短退避（5s/10s）后放弃，回落下一个 provider / RapidOCR。
@@ -2458,17 +2440,13 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 优先取带日期路径的图片（海报多上传到 /YYYY/MM/ 目录），其余兜底
     dated = [c for c in imgs if re.search(r'/\d{4}[/-]\d{1,2}[/-]', c)]
     imgs = dated or imgs
-    # 铁律：images 全量落库，禁止 [:3] 截断；截断只应用于下方 OCR/VLM 的输入候选
+    imgs = imgs[:3]
 
     # PDF-INLINE: 部分站点（如工学部）正文仅含 <iframe> 嵌入 PDF 或 .pdf 下载链接，
     # HTML 本身无结构化讲座信息。检测此类情况并自动下载 PDF 提取文本，
     # 作为 body_text 的补充来源参与后续字段抽取（speaker/location/time/abstract 等）。
     _pdf_text = ''
     _pdf_poster_converted = False
-    # PDF 首页转出的本地图片路径：仅供 OCR/VLM 输入，绝不并入 images
-    # （防本地路径落库——该 bug 曾触发 test_invariants.check_images_no_local_path
-    #  拦截导致公网部署连续失败）
-    _pdf_local_imgs = []
     if len(body_text.strip()) < 150:
         _pdf_url = None
         # 策略1：从 iframe src 中提取 PDF URL（工学部用 viewer2.html#URL 格式）
@@ -2538,7 +2516,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                                 if max(_im.size) > 2000:
                                     _im.thumbnail((2000, 2000))
                                     _im.save(_tmp_path)
-                                _pdf_local_imgs.append(_tmp_path)
+                                imgs.append(_tmp_path)
                                 _pdf_poster_converted = True
                             except Exception:
                                 pass  # PDF 转图失败不阻塞主流程
@@ -2553,10 +2531,9 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
         nonlocal ocr_text, body_text, text
-        candidates = imgs[:3] + _pdf_local_imgs
-        if ocr_text or not candidates:
+        if ocr_text or not imgs:
             return
-        raw = ' '.join(_img_to_text(img) for img in candidates)
+        raw = ' '.join(_img_to_text(img) for img in imgs[:3])
         if raw:
             # 清理 OCR 中常见的顶部/底部噪声
             ocr_text = _clean_ocr_text(raw)
@@ -2584,12 +2561,11 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                    or _pdf_poster_converted)
     if poster_only:
         # 优先用多模态 LLM 结构化提取海报；无 key / 失败则降级回 rapidocr。
-        # 逐张尝试候选图（URL 图取前 3 张，另加 PDF 转出的本地图；不拼接发送）：
-        # 海报页常混入 logo/横幅/其他讲座图，拼接发送会干扰 VLM 提取
-        # （如阿伯丁 362.html 图1 为学院标识、图2 才是讲座海报，
+        # 逐张尝试 imgs（而非前 N 张拼接发送）：海报页常混入 logo/横幅/其他讲座图，
+        # 拼接发送会干扰 VLM 提取（如阿伯丁 362.html 图1 为学院标识、图2 才是讲座海报，
         # 两图同发导致 VLM 失败回退 OCR）。逐张取首个返回有效字段的图即可正确命中。
         vlm_fields = None
-        for _u in imgs[:3] + _pdf_local_imgs:
+        for _u in imgs[:3]:
             _f = _vlm_extract_fields([_u], _load_vlm_configs())
             if _f:
                 vlm_fields = _f
