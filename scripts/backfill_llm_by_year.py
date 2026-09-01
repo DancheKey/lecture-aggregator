@@ -28,9 +28,43 @@ sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 
 import requests  # noqa: E402
 from bs4 import BeautifulSoup  # noqa: E402
+import charset_normalizer  # noqa: E402
 import parsers  # noqa: E402
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; SCNULectureAggregator/0.1)'}
+
+
+def _decode_html(raw):
+    """鲁棒解码 HTML：优先 <meta charset> 声明，其次 UTF-8 严格，再次 GB18030 兜底。"""
+    try:
+        head = raw[:2048].decode('latin-1', errors='ignore')
+        m = re.search(r'charset\s*=\s*[\'\"]?\s*([a-z0-9\-_]+)', head, re.I)
+        if m:
+            enc = m.group(1).strip().lower()
+            if enc in ('gb2312', 'gbk', 'gb18030', 'gbk2312'):
+                enc = 'gb18030'
+            elif enc in ('big5', 'big5hkscs'):
+                enc = 'big5'
+            if enc not in ('utf-8', 'utf8', 'us-ascii', 'ascii', 'iso-8859-1'):
+                try:
+                    return raw.decode(enc)
+                except UnicodeDecodeError:
+                    pass
+    except Exception:
+        pass
+    try:
+        return raw.decode('utf-8')
+    except UnicodeDecodeError:
+        pass
+    try:
+        return raw.decode('gb18030')
+    except UnicodeDecodeError:
+        pass
+    best = charset_normalizer.from_bytes(raw).best()
+    if best:
+        return str(best)
+    return raw.decode('utf-8', errors='replace')
+
 
 # 复刻 parsers.parse_detail 对正文容器的选取（稳定小片段，避免耦合其内部实现）
 _CONTENT_DIV_CLASSES = (
@@ -70,7 +104,13 @@ def extract_body_text(html, url):
         content_div = soup.find('article')
     body = content_div.get_text(' ') if content_div else text
     body = parsers._n1_normalize(parsers._normalize_label_text(re.sub(r'\s+', ' ', body).strip()))
-    return parsers._strip_footer(body)
+    body = parsers._strip_footer(body)
+    # JS 渲染站点（maths/physics 等）正文容器只含导航骨架，但 meta description 中保存了
+    # 完整讲座摘要。把 meta 追加进 body，保证 LLM 能读到主讲人/时间/地点。
+    if meta_parts:
+        body = body + ' ' + ' '.join(meta_parts)
+        body = parsers._n1_normalize(parsers._normalize_label_text(re.sub(r'\s+', ' ', body).strip()))
+    return body
 
 
 def main():
@@ -126,7 +166,10 @@ def main():
             print(f'  [{i}/{len(urls)}] ERR {url} -> {e}')
             continue
 
-        body = extract_body_text(r.text, url)
+        # 用 bytes + 鲁棒解码（与 scraper.py fetch 一致），避免 requests.text 按 ISO-8859-1
+        # 错误解码华师 UTF-8 页面导致中文乱码、LLM 认错人名。
+        html = _decode_html(r.content)
+        body = extract_body_text(html, url)
         if len(body) < 30:
             stat['no_llm'] += 1
             print(f'  [{i}/{len(urls)}] NO_LLM body_too_short(len={len(body)}) {url}')

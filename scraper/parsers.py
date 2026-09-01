@@ -1268,9 +1268,10 @@ def _edit_distance(a, b):
 def _correct_speaker_from_title(result):
     """用 title/listTitle 中明确出现的人名校正 LLM 可能认错的 speaker。
 
-    LLM 对生僻/形近字容易误判（如把「李骥」读成「李骁」）。
+    LLM 对生僻/形近字容易误判（如把「李骥」读成「李骁」、「郑炜」读成「郑焱」）。
     标题/列表标题一般是发布者手工录入，可信度更高；当标题里的人名与
-    LLM 给出的 speaker「同姓且仅一字之差」时，采用标题里的写法。
+    LLM 给出的 speaker「同姓且仅少量差异」时，采用标题里的写法。
+    支持 title 中常见的「姓名+职称」模式（如「郑炜教授」→ 提取「郑炜」）。
     """
     speaker = (result.get('speaker') or '').strip()
     if not speaker or len(speaker) < 2:
@@ -1278,16 +1279,40 @@ def _correct_speaker_from_title(result):
     # 只处理中文姓名（2-4 个汉字）
     if not re.match(r'^[\u4e00-\u9fa5]{2,4}$', speaker):
         return
+
     # 从 title / listTitle 收集候选姓名
     candidates = set()
+    # 常见职称/后缀，用于从「姓名+职称」中提取姓名
+    titles = ('教授', '副教授', '讲师', '研究员', '副研究员', '高级工程师',
+              '博士', '院士', '专家', '主任', '院长', '所长', '博导', '硕导')
+    # 常见单位后缀，用于识别「单位名+姓名」结构
+    unit_suffixes = ('大学', '学院', '研究院', '研究所', '研究中心', '实验室',
+                     '师大', '理工', '科大', '医科', '农大', '林大')
     for src in (result.get('title') or '', result.get('listTitle') or ''):
         if not src:
             continue
+        # 1. 显式人名标记：主讲人/报告人/主讲/报告人[:：]X...
+        for pat in (r'(?:主讲|报告人|主讲人|报告)[:：\s]*([\u4e00-\u9fa5]{2,4})',
+                    r'(?:主讲人|报告人)\s*[:：]\s*([\u4e00-\u9fa5]{2,4})'):
+            for m in re.finditer(pat, src):
+                w = m.group(1)
+                if w and len(w) >= 2 and w not in titles:
+                    candidates.add(w)
+        # 2. 「单位名+姓名+职称」中提取姓名（避免 greedy 吞掉单位名）
+        #    如「中国科学技术大学郑炜教授」→ 提取「郑炜」
+        unit_pat = '(?:' + '|'.join(re.escape(u) for u in unit_suffixes) + r')\s*([\u4e00-\u9fa5]{2,4})\s*(?:' + '|'.join(re.escape(t) for t in titles) + ')'
+        for m in re.finditer(unit_pat, src):
+            w = m.group(1)
+            if w and len(w) >= 2:
+                candidates.add(w)
+        # 3. 兜底：连续 2-4 个汉字，过滤常见非人名词
         for m in re.finditer(r'[\u4e00-\u9fa5]{2,4}', src):
             w = m.group()
-            # 简单过滤：常见非人名词（地名/学科/职务等）可继续扩展
-            if w in ('讲座', '报告', '学术', '论坛', '通知', '公告', '简介', '时间', '地点',
-                     '报告人', '主讲人', '主持人', '嘉宾', '教授', '副教授', '博士', '院士'):
+            if w in ('讲座', '报告', '学术', '论坛', '通知', '公告', '简介',
+                     '时间', '地点', '报告人', '主讲人', '主持人', '嘉宾',
+                     '教授', '副教授', '博士', '院士', '中国科学技术大学',
+                     '华南师范大学', '北京师范大学', '华中科技大学',
+                     '西安交通大学', '中山大学', '清华大学', '北京大学'):
                 continue
             if len(w) >= 2:
                 candidates.add(w)
@@ -1306,7 +1331,6 @@ def _correct_speaker_from_title(result):
             continue
         dist = _edit_distance(c, speaker)
         if dist <= 1:
-            # 用 ratio 作为优先级排序
             import difflib
             score = difflib.SequenceMatcher(None, c, speaker).ratio()
             if score > best_score:
@@ -2654,6 +2678,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     body_text = _n1_normalize(body_text)  # N1：全角标点统一为半角
     body_text = _normalize_label_text(body_text)
     body_text = _strip_footer(body_text)
+    # JS 渲染站点（如 maths/physics）的正文容器可能只含导航骨架，但 meta description
+    # 中保存了完整讲座摘要。即便 content_div 已命中，也要把 meta 摘要补进 body_text，
+    # 保证 LLM/OCR 能读到主讲人/时间/地点等关键字段。
+    if meta_parts:
+        body_text = body_text + ' ' + ' '.join(meta_parts)
+        body_text = re.sub(r'\s+', ' ', body_text).strip()
     ocr_text = ''
     # 提前从 URL 解析年份/完整日期（供 OCR 图片年份门控、CV1 校验、最终兜底共用）
     url_year = _year_from_url(url)
