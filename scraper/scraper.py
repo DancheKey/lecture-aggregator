@@ -912,7 +912,14 @@ def main():
         print(f'[INFO] 已加载全局排除名单 {len(global_excluded)} 条')
 
     # 并发抓取各信息源：源与源之间独立，大幅缩短 GitHub Actions 全量/增量耗时
-    max_workers = 1 if args.source else 5
+    # 全量模式降并发到 3：配合 parsers 内 LLM 全局限速锁（文本 3s/次、视觉 6s/次），
+    # 避免高并发瞬间冲爆 Agnes 免费层 RPM；增量量小保持 5。
+    if args.source:
+        max_workers = 1
+    elif is_incremental:
+        max_workers = 5
+    else:
+        max_workers = 3
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
     with ThreadPoolExecutor(max_workers=max_workers) as executor:

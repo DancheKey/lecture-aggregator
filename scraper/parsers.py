@@ -854,6 +854,34 @@ VLM_PROMPT = """你是一个学术讲座海报信息提取助手。下面是一�
 - speaker 字段只放姓名，职称放到 speakerTitle，单位放到 speakerAffiliation"""
 
 
+LLM_TEXT_PROMPT = """你是一个学术讲座信息提取助手。从下面的讲座通知正文中提取结构化字段，只输出一个 JSON 对象，不要任何解释或 markdown 代码块。
+
+字段定义：
+{
+  "title": "讲座系列名或整篇标题（如「物理学院学术报告（第48期）」）",
+  "topic": "单场讲座题目，若无则空字符串",
+  "speaker": "主讲人姓名（只写姓名，不含职称/单位/职务）",
+  "speakerTitle": "职称如 教授/研究员/博士，若无则空字符串",
+  "speakerAffiliation": "主讲人单位/院系",
+  "lectureStart": "讲座开始时间，ISO8601 如 2026-08-21 15:00，未知则 null",
+  "lectureEnd": "讲座结束时间，ISO8601，未知则 null",
+  "location": "地点（精确到楼栋房号，不含校名）",
+  "abstract": "摘要内容，若无则空字符串",
+  "speakerBio": "主讲人简介，若无则空字符串"
+}
+
+输出规则：
+- 只输出 JSON，不要 markdown 代码块、不要解释
+- 字段缺失则对应值为空字符串 "" 或 null（时间未知用 null）
+- 不要编造信息，正文中不存在的字段就留空
+- speaker 只放姓名，职称放到 speakerTitle，单位放到 speakerAffiliation
+- 时间必须基于正文明确写出的日期与时间，不要猜测年份
+
+正文：
+{text}
+"""
+
+
 _VLM_ENV_LOADED = False
 _VLM_ENV = {}
 
@@ -881,25 +909,15 @@ def _load_dotenv():
 
 
 def _load_vlm_configs():
-    """返回 VLM provider 配置列表（按优先级顺序，_vlm_extract_fields 依次尝试，前一个
-    失败则落下一个，全部失败回落本地 RapidOCR）：
-      1) 智谱 GLM（主通道，国内直连、免费稳定，海报结构化首选）
-      2) Agnes-ai（GLM 不可用时的备用通道，OpenAI 兼容 /v1/chat/completions）
+    """返回 VLM（海报视觉）provider 配置列表（按优先级顺序，_vlm_extract_fields 依次尝试，
+    前一个失败则落下一个，全部失败回落本地 RapidOCR）：
+      1) Agnes-ai（免费、OpenAI 兼容 /v1/chat/completions，海报结构化首选）
+      2) 智谱 GLM（Agnes 不可用时的备用通道）
     无 key 返回空列表（调用方降级 OCR）。
     """
     env = _load_dotenv()
     cfgs = []
-    # 主通道：智谱 GLM
-    zkey = _os.environ.get('ZHIPU_API_KEY') or env.get('ZHIPU_API_KEY')
-    if zkey:
-        cfgs.append({
-            'name': 'zhipu',
-            'api_key': zkey,
-            'model': (_os.environ.get('VLM_MODEL') or env.get('VLM_MODEL') or 'glm-4v-flash'),
-            'base_url': (_os.environ.get('VLM_BASE_URL') or env.get('VLM_BASE_URL')
-                         or 'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
-        })
-    # 备用通道：Agnes-ai（GLM 不可用时第二顺位；再不行回落 RapidOCR）
+    # 主通道：Agnes-ai（免费、稳定，海报结构化首选）
     akey = _os.environ.get('AGNES_API_KEY') or env.get('AGNES_API_KEY')
     if akey:
         cfgs.append({
@@ -909,7 +927,36 @@ def _load_vlm_configs():
             'base_url': (_os.environ.get('AGNES_BASE_URL') or env.get('AGNES_BASE_URL')
                          or 'https://api.agnes-ai.cn/v1/chat/completions'),
         })
+    # 备用通道：智谱 GLM（Agnes 不可用时第二顺位；再不行回落 RapidOCR）
+    zkey = _os.environ.get('ZHIPU_API_KEY') or env.get('ZHIPU_API_KEY')
+    if zkey:
+        cfgs.append({
+            'name': 'zhipu',
+            'api_key': zkey,
+            'model': (_os.environ.get('VLM_MODEL') or env.get('VLM_MODEL') or 'glm-4v-flash'),
+            'base_url': (_os.environ.get('VLM_BASE_URL') or env.get('VLM_BASE_URL')
+                         or 'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
+        })
     return cfgs
+
+
+def _load_text_llm_configs():
+    """返回文本 LLM 通道配置（仅 Agnes，用于网页正文结构化提取）。无 key 返回空列表。
+
+    与 _load_vlm_configs() 区别：海报视觉允许 Agnes→GLM 双通道兜底；
+    而网页文本解析按用户约定仅用 Agnes（Agnes 不可用则直接回落规则，不滚 GLM）。
+    """
+    env = _load_dotenv()
+    akey = _os.environ.get('AGNES_API_KEY') or env.get('AGNES_API_KEY')
+    if not akey:
+        return []
+    return [{
+        'name': 'agnes',
+        'api_key': akey,
+        'model': (_os.environ.get('AGNES_MODEL') or env.get('AGNES_MODEL') or 'agnes-2.5-flash'),
+        'base_url': (_os.environ.get('AGNES_BASE_URL') or env.get('AGNES_BASE_URL')
+                     or 'https://api.agnes-ai.cn/v1/chat/completions'),
+    }]
 
 
 def _vlm_cache_path():
@@ -1108,6 +1155,41 @@ def _parse_vlm_datetime(s, default_year, publish_time, title_year, url_year):
     return None
 
 
+# ---------------------------------------------------------------------------
+# LLM 调用全局限速（应对 Agnes 免费层 RPM 上限：文本 20 RPM、视觉 1K/20·2K/10·3K+ /1）
+# 用 threading.Lock + 上次调用时间戳保证「任意两次调用间隔 ≥ min_interval」，
+# 跨源并发（scraper 的 max_workers）也安全。视觉比文本更严，单独限流器留出余量。
+# ---------------------------------------------------------------------------
+_LLM_TEXT_RLOCK = _threading.Lock()
+_LLM_TEXT_RLAST = [0.0]
+_VLM_RLOCK = _threading.Lock()
+_VLM_RLAST = [0.0]
+
+
+def _llm_text_rate_limit(min_interval=3.0):
+    """文本 LLM 调用限速（≈20 RPM，留余量）。"""
+    with _LLM_TEXT_RLOCK:
+        _now = _time.time()
+        _wait = min_interval - (_now - _LLM_TEXT_RLAST[0])
+        if _wait > 0:
+            _time.sleep(_wait)
+        _LLM_TEXT_RLAST[0] = _time.time()
+
+
+def _vlm_rate_limit(min_interval=6.0):
+    """视觉 VLM 调用限速（保守，应对 1K/20·2K/10·3K+/1 RPM）。"""
+    with _VLM_RLOCK:
+        _now = _time.time()
+        _wait = min_interval - (_now - _VLM_RLAST[0])
+        if _wait > 0:
+            _time.sleep(_wait)
+        _VLM_RLAST[0] = _time.time()
+
+
+# 文本 LLM 增强总开关（默认开启；SCNU_LLM_TEXT=0 关闭，用于调试或 key 失效时回退纯规则）
+_USE_LLM_TEXT = (_os.environ.get('SCNU_LLM_TEXT') or '1') not in ('0', 'false', 'False', '')
+
+
 def _vlm_extract_fields(img_urls, cfgs):
     """按优先级遍历 provider 调用 VLM 提取海报结构化字段。返回 dict 或 None（无 key / 失败 / 限流耗尽）。"""
     if not cfgs or not img_urls:
@@ -1135,16 +1217,108 @@ def _vlm_extract_fields(img_urls, cfgs):
         fields = _vlm_try_one_provider(message, cfg, _proxies or None)
         if fields:
             _vlm_cache_set(key, fields)
-            _time.sleep(1.5)  # 主动限速，串行调用避免触发 RPM 限流
+            _vlm_rate_limit(6.0)  # 全局视觉限速（保守，应对 1K/20·2K/10·3K+/1 RPM）
             return fields
     return None
 
 
+def _llm_extract_text_fields(body_text, url):
+    """用 Agnes 文本通道从讲座正文提取结构化字段（网页文本解析第一优先级）。返回 dict 或 None。
+
+    复用 _vlm_try_one_provider（通用发送函数，message 内容决定文本/视觉模式）。
+    仅走 Agnes（_load_text_llm_configs），Agnes 不可用则回落规则解析（由调用方处理）。
+    """
+    cfgs = _load_text_llm_configs()
+    if not cfgs or not body_text or len(body_text) < 30:
+        return None
+    key = _hash.md5(body_text.encode('utf-8')).hexdigest()
+    cached = _vlm_cache_get(key)
+    if cached is not None and _vlm_fields_useful(cached):
+        return cached
+    # 截断避免超长（多数讲座正文 < 2000 字，超长反而引入页脚噪声）
+    _txt = body_text[:3500]
+    # 国内域名直连（scnu 与 agnes-ai.cn 均不绕代理，与 scraper 一致）
+    message = [{"role": "user", "content": LLM_TEXT_PROMPT.replace('{text}', _txt)}]
+    for cfg in cfgs:
+        fields = _vlm_try_one_provider(message, cfg, None)
+        if fields:
+            _vlm_cache_set(key, fields)
+            _llm_text_rate_limit(3.0)  # 文本 20 RPM，3 秒间隔留余量
+            return fields
+    return None
+
+
+def _apply_llm_text_to_result(result, f, default_year, publish_time, title_year, url_year):
+    """把 LLM 文本提取结果合并进 result：LLM 优先填充非空字段，规则结果做守卫。
+
+    - 文本类字段（speaker/location/abstract/speakerBio/topic 等）：LLM 非空即采用，否则保留规则值
+    - 时间：LLM 与规则同日期 → 采用 LLM（含精确时刻，更准）；不同日期 → 保留规则（规则基于多源更稳）
+    - 不覆盖 title（规则已妥善处理系列名/列表标题）
+    """
+    f = _normalize_vlm_keys(f)
+    if isinstance(f, list):
+        f = f[0] if f and isinstance(f[0], dict) else None
+    if not isinstance(f, dict):
+        return
+
+    _NOISE = ('null', 'None', '无', '暂无', 'N/A', 'na', '-', '—')
+    def _prefer(field, llm_val):
+        _cur = (result.get(field) or '').strip()
+        _lv = (llm_val or '').strip()
+        if _lv and _lv not in _NOISE:
+            result[field] = _lv
+        # 否则保留 _cur（规则值）
+
+    _prefer('topic', f.get('topic'))
+    _prefer('speaker', f.get('speaker'))
+    _prefer('speakerTitle', f.get('speakerTitle'))
+    _prefer('speakerAffiliation', f.get('speakerAffiliation'))
+    _prefer('location', f.get('location'))
+    _prefer('abstract', f.get('abstract'))
+    _prefer('speakerBio', f.get('speakerBio'))
+
+    # 时间策略（宽松信任 LLM）：LLM 给出完整日期+时刻即采用；仅当 LLM 年份明显
+    # 不合理（早于 2018 / 晚于当前+2 年，属幻觉）才回落规则值。规则仅作「年份合理性」
+    # 守卫，不做同日期强约束——规则日期常来自 URL 发布日，LLM 从正文读到的才是真实
+    # 讲课日（如物理学院 URL 08-21→正文 08-28）。增量时间门在 scraper 层把关旧数据。
+    _now = datetime.datetime.now()
+    _year_lo, _year_hi = 2018, _now.year + 2
+
+    _ls_raw = f.get('lectureStart') or f.get('start')
+    if _ls_raw and str(_ls_raw).strip() not in ('', 'null', 'None'):
+        try:
+            _ls = datetime.datetime.fromisoformat(str(_ls_raw).replace('T', ' ').replace('Z', ''))
+            if _year_lo <= _ls.year <= _year_hi:
+                result['lectureStart'] = _ls.isoformat(sep=' ')
+                _le_raw = f.get('lectureEnd') or f.get('end')
+                if _le_raw and str(_le_raw).strip() not in ('', 'null', 'None'):
+                    try:
+                        _le = datetime.datetime.fromisoformat(
+                            str(_le_raw).replace('T', ' ').replace('Z', ''))
+                        if _year_lo <= _le.year <= _year_hi:
+                            result['lectureEnd'] = _le.isoformat(sep=' ')
+                    except Exception:
+                        pass
+                # 年份合理 → 采用 LLM 时间（含精确时刻）
+            # 年份不合理 → 保留规则时间（不采用 LLM 的）
+        except Exception:
+            pass  # LLM 时间解析失败 → 保留规则值
+
+    result['llmTextEnhanced'] = True
+
+
 def _vlm_try_one_provider(message, cfg, proxies):
     """单个 provider 的带重试提取；遇 429/5xx/异常最多 2 次短退避后放弃。返回 dict 或 None。"""
+    # message 两种形态：① 文本通道已封装好的 messages 列表 [{role,content}]
+    #              ② 海报视觉通道的 content parts 列表 [{type,text}/{type,image_url}]
+    # 前者直接作为 messages；后者包一层 {"role":"user","content": parts}。
+    if isinstance(message, list) and message and isinstance(message[0], dict) and 'role' in message[0]:
+        messages = message
+    else:
+        messages = [{"role": "user", "content": message}]
     payload = {
         "model": cfg['model'],
-        "messages": [{"role": "user", "content": message}],
+        "messages": messages,
         "temperature": 0.1,
     }
     headers = {
@@ -3874,6 +4048,18 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     if ('成立大会' in (title or '') or '成立大会' in (result.get('abstract') or '')) \
             and not result.get('speaker') and not result.get('lectureEnd'):
         return None
+
+    # ---- 文本 LLM 增强（Agnes 优先，规则守卫）----
+    # 仅当 Agnes 文本通道可用、全局开关开启、正文足够长时触发。LLM 提取的字段优先采用
+    #（更准确，尤其 abstract/speakerBio），规则结果用于守卫（时间交叉验证、补空字段）。
+    # 本块位于各类「跳过」return 之后，只对确会进入聚合的页面消耗 LLM 额度。
+    if _USE_LLM_TEXT:
+        _llm_cfg = _load_text_llm_configs()
+        if _llm_cfg and len(body_text) >= 80:
+            _lf = _llm_extract_text_fields(body_text, url)
+            if _lf:
+                _apply_llm_text_to_result(result, _lf, default_year, publish_time,
+                                           title_year, url_year)
 
     # ---- 多讲座公告拆分（MS1–MS5）----
     # 用 body_text（已合并OCR的正文文本）而非完整 text，避免把页眉/导航/页脚里的
