@@ -881,10 +881,15 @@ def _load_dotenv():
 
 
 def _load_vlm_configs():
-    """返回 VLM provider 配置列表（智谱 GLM 主通道）；无 key 返回空列表（调用方降级 OCR）。"""
+    """返回 VLM provider 配置列表（按优先级顺序，_vlm_extract_fields 依次尝试，前一个
+    失败则落下一个，全部失败回落本地 RapidOCR）：
+      1) 智谱 GLM（主通道，国内直连、免费稳定，海报结构化首选）
+      2) Agnes-ai（GLM 不可用时的备用通道，OpenAI 兼容 /v1/chat/completions）
+    无 key 返回空列表（调用方降级 OCR）。
+    """
     env = _load_dotenv()
     cfgs = []
-    # 主通道：智谱 GLM（国内直连、免费稳定，海报结构化首选；不可用则回落本地 RapidOCR）
+    # 主通道：智谱 GLM
     zkey = _os.environ.get('ZHIPU_API_KEY') or env.get('ZHIPU_API_KEY')
     if zkey:
         cfgs.append({
@@ -893,6 +898,16 @@ def _load_vlm_configs():
             'model': (_os.environ.get('VLM_MODEL') or env.get('VLM_MODEL') or 'glm-4v-flash'),
             'base_url': (_os.environ.get('VLM_BASE_URL') or env.get('VLM_BASE_URL')
                          or 'https://open.bigmodel.cn/api/paas/v4/chat/completions'),
+        })
+    # 备用通道：Agnes-ai（GLM 不可用时第二顺位；再不行回落 RapidOCR）
+    akey = _os.environ.get('AGNES_API_KEY') or env.get('AGNES_API_KEY')
+    if akey:
+        cfgs.append({
+            'name': 'agnes',
+            'api_key': akey,
+            'model': (_os.environ.get('AGNES_MODEL') or env.get('AGNES_MODEL') or 'agnes-2.5-flash'),
+            'base_url': (_os.environ.get('AGNES_BASE_URL') or env.get('AGNES_BASE_URL')
+                         or 'https://api.agnes-ai.cn/v1/chat/completions'),
         })
     return cfgs
 
@@ -1139,6 +1154,9 @@ def _vlm_try_one_provider(message, cfg, proxies):
     for attempt in range(3):
         try:
             r = requests.post(cfg['base_url'], headers=headers, json=payload, timeout=60, proxies=proxies)
+            if r.status_code in (401, 403):
+                # 鉴权失败（key 失效/无权限）：重试无意义，立即放弃并回落下一 provider / OCR
+                return None
             if r.status_code == 429:
                 # 免费层限流（"访问量过大"）：快速失败，避免指数退避空耗超时。
                 # 最多 2 次短退避（5s/10s）后放弃，回落下一个 provider / RapidOCR。
