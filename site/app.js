@@ -28,7 +28,7 @@ const app = createApp({
       college: '',
       year: '',
       query: '',
-      searchField: '',  // 搜索维度：''=全部 | college=单位 | location=地点 | topic=题目
+      searchField: '',  // 搜索维度：''=全部 | college=单位 | location=地点 | topic=题目 | abstract=摘要
       showLikedOnly: false,  // 仅显示已点赞讲座
       scraping: false,
       showMenu: false,    // 顶部栏更多操作下拉菜单
@@ -86,10 +86,11 @@ const app = createApp({
     searchPlaceholder() {
       return {
         '': '搜索讲座 / 主讲人 / 地点…',
-        college: '搜索单位…',
-        location: '搜索地点…',
-        topic: '搜索题目 / 主讲…'
-      }[this.searchField] || '搜索…';
+          college: '搜索单位…',
+          location: '搜索地点…',
+          topic: '搜索题目 / 主讲…',
+          abstract: '搜索摘要…'
+        }[this.searchField] || '搜索…';
     },
 
     // 是否有任何筛选条件激活（控制"清除"按钮显示）
@@ -121,6 +122,9 @@ const app = createApp({
           } else if (this.searchField === 'topic') {
             // 题目：标题 + 题目字段 + 主讲人（与占位提示「搜索题目 / 主讲…」对齐）
             hay = [l.title, l.topic, l.listTitle, l.speaker].filter(Boolean).join(' ').toLowerCase();
+          } else if (this.searchField === 'abstract') {
+            // 摘要：仅按讲座摘要匹配
+            hay = [l.abstract].filter(Boolean).join(' ').toLowerCase();
           } else if (this.searchField === 'college') {
             // 单位：仅按主办单位匹配，避免场地在某单位的讲座被误配
             hay = [l.college, ...(l.sources || []).map(s => s.college)]
@@ -128,7 +132,7 @@ const app = createApp({
           } else {
             // 全部（默认）：在所有常见字段中匹配
             hay = [l.title, l.topic, l.speaker, l.speakerAffiliation,
-              l.speakerBio, l.listTitle, l.college, l.location, l.campus, l.organizer]
+              l.speakerBio, l.listTitle, l.college, l.location, l.campus, l.organizer, l.abstract]
               .filter(Boolean).join(' ').toLowerCase();
           }
           if (!hay.includes(q)) return false;
