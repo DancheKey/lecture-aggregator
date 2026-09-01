@@ -1192,8 +1192,9 @@ def _vlm_rate_limit(min_interval=6.0):
         _VLM_RLAST[0] = _time.time()
 
 
-# 文本 LLM 增强总开关（默认开启；SCNU_LLM_TEXT=0 关闭，用于调试或 key 失效时回退纯规则）
-_USE_LLM_TEXT = (_os.environ.get('SCNU_LLM_TEXT') or '1') not in ('0', 'false', 'False', '')
+# 文本 LLM 增强总开关（2026-09-01 起默认关闭：经数据对比证实 LLM 对结构化字段不可信、
+# 且自由文本摘要/简介非必需，彻底放弃文本 LLM 增强。SCNU_LLM_TEXT=1 可手动重新开启）。
+_USE_LLM_TEXT = (_os.environ.get('SCNU_LLM_TEXT') or '0') not in ('0', 'false', 'False', '')
 
 
 def _vlm_extract_fields(img_urls, cfgs):
