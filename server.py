@@ -241,6 +241,20 @@ class Handler(SimpleHTTPRequestHandler):
         except (json.JSONDecodeError, ValueError):
             self._send_json({'ok': False, 'message': '无效的 JSON'}, 400)
             return
+        # 类型校验：与 PUT /api/sources/<i> 一致，防止把非预期类型写进
+        # sources.yaml 导致下次爬虫读取配置时崩溃
+        for k in ('name', 'campus', 'base'):
+            if k in body and not isinstance(body[k], str):
+                self._send_json({'ok': False, 'message': f'{k} 必须为字符串'}, 400)
+                return
+        if 'list_urls' in body:
+            if not isinstance(body['list_urls'], list):
+                self._send_json({'ok': False, 'message': 'list_urls 必须为数组'}, 400)
+                return
+            for i, lu in enumerate(body['list_urls']):
+                if not isinstance(lu, (str, dict)):
+                    self._send_json({'ok': False, 'message': f'list_urls[{i}] 必须为字符串或对象'}, 400)
+                    return
         name = (body.get('name') or '').strip()
         campus = (body.get('campus') or '').strip()
         base = (body.get('base') or '').strip()
