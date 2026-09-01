@@ -2440,13 +2440,17 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 优先取带日期路径的图片（海报多上传到 /YYYY/MM/ 目录），其余兜底
     dated = [c for c in imgs if re.search(r'/\d{4}[/-]\d{1,2}[/-]', c)]
     imgs = dated or imgs
-    imgs = imgs[:3]
+    # 铁律：images 全量落库，禁止 [:3] 截断；截断只应用于下方 OCR/VLM 的输入候选
 
     # PDF-INLINE: 部分站点（如工学部）正文仅含 <iframe> 嵌入 PDF 或 .pdf 下载链接，
     # HTML 本身无结构化讲座信息。检测此类情况并自动下载 PDF 提取文本，
     # 作为 body_text 的补充来源参与后续字段抽取（speaker/location/time/abstract 等）。
     _pdf_text = ''
     _pdf_poster_converted = False
+    # PDF 首页转出的本地图片路径：仅供 OCR/VLM 输入，绝不并入 images
+    # （防本地路径落库——该 bug 曾触发 test_invariants.check_images_no_local_path
+    #  拦截导致公网部署连续失败）
+    _pdf_local_imgs = []
     if len(body_text.strip()) < 150:
         _pdf_url = None
         # 策略1：从 iframe src 中提取 PDF URL（工学部用 viewer2.html#URL 格式）
@@ -2516,7 +2520,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                                 if max(_im.size) > 2000:
                                     _im.thumbnail((2000, 2000))
                                     _im.save(_tmp_path)
-                                imgs.append(_tmp_path)
+                                _pdf_local_imgs.append(_tmp_path)
                                 _pdf_poster_converted = True
                             except Exception:
                                 pass  # PDF 转图失败不阻塞主流程
@@ -2531,9 +2535,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
         nonlocal ocr_text, body_text, text
-        if ocr_text or not imgs:
+        candidates = imgs[:3] + _pdf_local_imgs
+        if ocr_text or not candidates:
             return
-        raw = ' '.join(_img_to_text(img) for img in imgs[:3])
+        raw = ' '.join(_img_to_text(img) for img in candidates)
         if raw:
             # 清理 OCR 中常见的顶部/底部噪声
             ocr_text = _clean_ocr_text(raw)
@@ -2561,11 +2566,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                    or _pdf_poster_converted)
     if poster_only:
         # 优先用多模态 LLM 结构化提取海报；无 key / 失败则降级回 rapidocr。
-        # 逐张尝试 imgs（而非前 N 张拼接发送）：海报页常混入 logo/横幅/其他讲座图，
-        # 拼接发送会干扰 VLM 提取（如阿伯丁 362.html 图1 为学院标识、图2 才是讲座海报，
+        # 逐张尝试候选图（URL 图取前 3 张，另加 PDF 转出的本地图；不拼接发送）：
+        # 海报页常混入 logo/横幅/其他讲座图，拼接发送会干扰 VLM 提取
+        # （如阿伯丁 362.html 图1 为学院标识、图2 才是讲座海报，
         # 两图同发导致 VLM 失败回退 OCR）。逐张取首个返回有效字段的图即可正确命中。
         vlm_fields = None
-        for _u in imgs[:3]:
+        for _u in imgs[:3] + _pdf_local_imgs:
             _f = _vlm_extract_fields([_u], _load_vlm_configs())
             if _f:
                 vlm_fields = _f
