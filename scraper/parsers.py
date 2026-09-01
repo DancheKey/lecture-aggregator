@@ -874,6 +874,7 @@ LLM_TEXT_PROMPT = """你是一个学术讲座信息提取助手。从下面的�
 - 只输出 JSON，不要 markdown 代码块、不要解释
 - 字段缺失则对应值为空字符串 "" 或 null（时间未知用 null）
 - 不要编造信息，正文中不存在的字段就留空
+- speaker 必须基于正文明确写出的主讲人姓名；若正文里没有明确人名，请返回空字符串，不要根据标题猜测
 - speaker 只放姓名，职称放到 speakerTitle，单位放到 speakerAffiliation
 - 时间必须基于正文明确写出的日期与时间，不要猜测年份
 
@@ -1248,6 +1249,73 @@ def _llm_extract_text_fields(body_text, url):
     return None
 
 
+def _edit_distance(a, b):
+    """计算两个字符串的 Levenshtein 距离（编辑距离）。"""
+    if len(a) < len(b):
+        return _edit_distance(b, a)
+    if len(b) == 0:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a):
+        cur = [i + 1]
+        for j, cb in enumerate(b):
+            cost = 0 if ca == cb else 1
+            cur.append(min(cur[-1] + 1, prev[j + 1] + 1, prev[j] + cost))
+        prev = cur
+    return prev[-1]
+
+
+def _correct_speaker_from_title(result):
+    """用 title/listTitle 中明确出现的人名校正 LLM 可能认错的 speaker。
+
+    LLM 对生僻/形近字容易误判（如把「李骥」读成「李骁」）。
+    标题/列表标题一般是发布者手工录入，可信度更高；当标题里的人名与
+    LLM 给出的 speaker「同姓且仅一字之差」时，采用标题里的写法。
+    """
+    speaker = (result.get('speaker') or '').strip()
+    if not speaker or len(speaker) < 2:
+        return
+    # 只处理中文姓名（2-4 个汉字）
+    if not re.match(r'^[\u4e00-\u9fa5]{2,4}$', speaker):
+        return
+    # 从 title / listTitle 收集候选姓名
+    candidates = set()
+    for src in (result.get('title') or '', result.get('listTitle') or ''):
+        if not src:
+            continue
+        for m in re.finditer(r'[\u4e00-\u9fa5]{2,4}', src):
+            w = m.group()
+            # 简单过滤：常见非人名词（地名/学科/职务等）可继续扩展
+            if w in ('讲座', '报告', '学术', '论坛', '通知', '公告', '简介', '时间', '地点',
+                     '报告人', '主讲人', '主持人', '嘉宾', '教授', '副教授', '博士', '院士'):
+                continue
+            if len(w) >= 2:
+                candidates.add(w)
+    if not candidates:
+        return
+    # LLM 结果已在候选中，无需校正
+    if speaker in candidates:
+        return
+    # 找「同姓且长度相近、编辑距离 <=1」的候选
+    best = None
+    best_score = 0.0
+    for c in candidates:
+        if len(c) < 2 or c[0] != speaker[0]:
+            continue
+        if abs(len(c) - len(speaker)) > 1:
+            continue
+        dist = _edit_distance(c, speaker)
+        if dist <= 1:
+            # 用 ratio 作为优先级排序
+            import difflib
+            score = difflib.SequenceMatcher(None, c, speaker).ratio()
+            if score > best_score:
+                best_score = score
+                best = c
+    if best and best != speaker:
+        result['speaker'] = best
+
+
 def _apply_llm_text_to_result(result, f, default_year, publish_time, title_year, url_year):
     """把 LLM 文本提取结果合并进 result：LLM 优先填充非空字段，规则结果做守卫。
 
@@ -1277,30 +1345,52 @@ def _apply_llm_text_to_result(result, f, default_year, publish_time, title_year,
     _prefer('abstract', f.get('abstract'))
     _prefer('speakerBio', f.get('speakerBio'))
 
-    # 时间策略（宽松信任 LLM）：LLM 给出完整日期+时刻即采用；仅当 LLM 年份明显
-    # 不合理（早于 2018 / 晚于当前+2 年，属幻觉）才回落规则值。规则仅作「年份合理性」
-    # 守卫，不做同日期强约束——规则日期常来自 URL 发布日，LLM 从正文读到的才是真实
-    # 讲课日（如物理学院 URL 08-21→正文 08-28）。增量时间门在 scraper 层把关旧数据。
-    _now = datetime.datetime.now()
-    _year_lo, _year_hi = 2018, _now.year + 2
+    # speaker 与 title/listTitle 交叉校验：LLM 容易把形近字/生僻字搞错
+    #（如把「李骥」认成「李骁」）。标题通常是人工发布的，可信度高于 LLM 推断。
+    _correct_speaker_from_title(result)
+
+    # 时间策略（严格对齐）：时间字段是讲座排序/时间门/去重的关键，不能轻信 LLM。
+    # 规则时间来自 URL 路径/页面权威标签，可信度高；LLM 易把发布日、报名截止、旧引用
+    # 错当讲座时间。因此只让 LLM 在「规则时间仅是个占位日期」时补充精确时刻/日。
+    # 采用条件：
+    #  1. LLM 给出的年份 == 规则已有 lectureStart 的年份（防年份幻觉）；
+    #  2. 规则 lectureStart 缺失，或规则 lectureStart 时刻为占位 00:00（说明只有日期）。
+    # 满足时：用 LLM 的日期+时刻覆盖；否则完全保留规则时间。
+    _rule_start = result.get('lectureStart')
+    _rule_year = None
+    _rule_has_time = False
+    if _rule_start:
+        try:
+            _rs = datetime.datetime.fromisoformat(str(_rule_start))
+            _rule_year = _rs.year
+            _rule_has_time = not (_rs.hour == 0 and _rs.minute == 0 and _rs.second == 0)
+        except Exception:
+            pass
 
     _ls_raw = f.get('lectureStart') or f.get('start')
     if _ls_raw and str(_ls_raw).strip() not in ('', 'null', 'None'):
         try:
             _ls = datetime.datetime.fromisoformat(str(_ls_raw).replace('T', ' ').replace('Z', ''))
-            if _year_lo <= _ls.year <= _year_hi:
-                result['lectureStart'] = _ls.isoformat(sep=' ')
-                _le_raw = f.get('lectureEnd') or f.get('end')
-                if _le_raw and str(_le_raw).strip() not in ('', 'null', 'None'):
-                    try:
-                        _le = datetime.datetime.fromisoformat(
-                            str(_le_raw).replace('T', ' ').replace('Z', ''))
-                        if _year_lo <= _le.year <= _year_hi:
-                            result['lectureEnd'] = _le.isoformat(sep=' ')
-                    except Exception:
-                        pass
-                # 年份合理 → 采用 LLM 时间（含精确时刻）
-            # 年份不合理 → 保留规则时间（不采用 LLM 的）
+            _llm_year = _ls.year
+            _now = datetime.datetime.now()
+            _year_lo, _year_hi = 2018, _now.year + 2
+            if _year_lo <= _llm_year <= _year_hi:
+                # 条件1：规则无时间；或规则有年份且 LLM 年份一致；或规则连年份都没有
+                _year_match = (_rule_year is None) or (_rule_year == _llm_year)
+                # 条件2：规则时间是占位 00:00 或缺失（允许 LLM 补精确时刻/日）
+                _rule_is_placeholder = (_rule_start is None) or (not _rule_has_time)
+                if _year_match and _rule_is_placeholder:
+                    result['lectureStart'] = _ls.isoformat(sep=' ')
+                    _le_raw = f.get('lectureEnd') or f.get('end')
+                    if _le_raw and str(_le_raw).strip() not in ('', 'null', 'None'):
+                        try:
+                            _le = datetime.datetime.fromisoformat(
+                                str(_le_raw).replace('T', ' ').replace('Z', ''))
+                            if _year_lo <= _le.year <= _year_hi:
+                                result['lectureEnd'] = _le.isoformat(sep=' ')
+                        except Exception:
+                            pass
+                # 否则：规则已有具体时间或年份不一致 → 完全保留规则时间
         except Exception:
             pass  # LLM 时间解析失败 → 保留规则值
 
