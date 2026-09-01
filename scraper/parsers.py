@@ -3257,13 +3257,30 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     _search_text = text
     while m:
         sp = m.group(1).strip()
-        if sp and not re.match(
+        _skip = False
+        if not sp:
+            _skip = True
+        elif re.match(
                 r'^(?:地点|时间|主题|题目|摘要|简介|内容简介|讲座简介|报告简介|'
-                r'报告人|主讲人|主讲|主持人|单位|邀请人)[：:]',
-                sp):
+                r'报告人|主讲人|主讲|主持人|单位|邀请人)[：:]', sp):
+            _skip = True
+        elif (re.search(r'[一-鿿]', sp) and not _looks_like_real_name(sp)
+              and (len(sp) > 5 or re.search(
+                  r'(报告|讲座|研究|基于|题目|主题|内容|摘要|简介|论坛|研讨会)', sp))):
+            # 值不像真实姓名且偏长/含主题词（如「报告人：基于单光子的路径积分实验研究
+            # 演讲人：温永立…」式反常格式，报告人后跟的是题目而非主讲人）→ 跳过，
+            # 继续找下一个主讲人标签（演讲人/主讲人）取真实姓名，避免误把题目当主讲人。
+            _skip = True
+        if not _skip:
             break
-        _search_text = _search_text[m.end():]
-        m = re.search(speaker_pat, _search_text)
+        # 仅在还有下一个主讲人标签时才继续，否则保留当前值（交由下方 F3 守卫判定），
+        # 避免误丢合法姓名（罕见姓氏、姓名+职称等长值经后续清洗可复原）。
+        _nxt = re.search(speaker_pat, _search_text[m.end():])
+        if _nxt:
+            _search_text = _search_text[m.end():]
+            m = _nxt
+        else:
+            break
     if m:
         speaker_label_found = True
         sp = m.group(1).strip()
@@ -3310,6 +3327,18 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             result['speaker'] = '、'.join(_names)
             result['speakerSource'] = 'label'
             _multi_name_matched = True
+        # 多主讲人（姓名+括号单位 并列，如「主讲人：黄国信（…）温春来（…）」）：
+        # lswh 等站点把多位主讲人挤在同一标签值内、各带括号单位，第二主讲人无引导词。
+        # 逐个「中文姓名(可选职称)（单位）」段校验姓名后合并为「、」分隔。
+        if not _multi_name_matched:
+            _ms = re.findall(
+                r'([一-鿿·]{2,4})'
+                r'(?:教授|研究员|副教授|助理教授|副研究员|助理研究员|讲师|博士后|博士|院士|老师|导师|先生|女士)?'
+                r'\s*[（(][^（）()]*[)）]', _sp_orig)
+            if len(_ms) >= 2 and all(_looks_like_real_name(n) for n in _ms):
+                result['speaker'] = '、'.join(_ms)
+                result['speakerSource'] = 'label'
+                _multi_name_matched = True
         if not _multi_name_matched:
             _en_name, _en_aff, _en_title = _split_english_speaker(sp)
             if _en_name:
@@ -4590,6 +4619,18 @@ def _extract_affiliation(rest):
     则清空，避免把垃圾当单位展示。
     """
     if not rest:
+        return ''
+    # 主讲人标签值常把「姓名（单位）日期…时间…地点…」连写：单位之后紧跟日期/时间/地点等
+    # 元数据片段。若不截断，会把「日期：3月3日时间：中午12:15，理6栋302」粘连进 affiliation
+    # （如 physics 12933：温永立（量子所）日期：3月3日… → affiliation 变成「量子所)日期:3月3日」）。
+    # 提取单位前先截到首个元数据标记之前，仅保留「姓名之后、元数据之前」的单位片段。
+    # 单位名绝不可能是 日期/时间/地点/主持人/联系方式 等元数据，故截断安全。
+    _rest_cut = re.split(
+        r'日期|时间|地点|主持人|会议时间|讲座时间|报告时间|联系电话|联系方式|Email|邮箱|联系人|Tel',
+        rest, 1)
+    if len(_rest_cut) > 1:
+        rest = _rest_cut[0]
+    if not rest.strip():
         return ''
     # 优先匹配「完整单位名」（含前缀，如「暨南大学」「北京大学计算机学院」），避免只取
     # 关键词「大学」而漏掉前缀「暨南/北京大学」。非贪婪匹配单位关键词前的最少汉字。
