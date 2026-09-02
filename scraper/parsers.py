@@ -4264,17 +4264,21 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
             and not result.get('speaker') and not result.get('lectureEnd'):
         return None
 
-    # ---- 文本 LLM 增强（Agnes 优先，规则守卫）----
-    # 仅当 Agnes 文本通道可用、全局开关开启、正文足够长时触发。LLM 提取的字段优先采用
-    #（更准确，尤其 abstract/speakerBio），规则结果用于守卫（时间交叉验证、补空字段）。
-    # 本块位于各类「跳过」return 之后，只对确会进入聚合的页面消耗 LLM 额度。
-    if _USE_LLM_TEXT:
-        _llm_cfg = _load_text_llm_configs()
-        if _llm_cfg and len(body_text) >= 80:
-            _lf = _llm_extract_text_fields(body_text, url)
-            if _lf:
-                _apply_llm_text_to_result(result, _lf, default_year, publish_time,
-                                           title_year, url_year)
+    # ---- 文本双轨解析 + 分歧裁决（规则常算保底，Agnes 优先，分歧调 B 裁决）----
+    # 仅当总开关 _USE_LLM_TEXT 开启、正文足够长、且文本模型可用时触发。规则结果在
+    # parse_detail 内已先行算出，本块异常或模型失效都只回落规则，绝不空库/阻塞。
+    # 海报页不走此路径（VLM 路线独立，见 _vlm_extract_fields）。
+    if _USE_LLM_TEXT and len(body_text) >= 80:
+        try:
+            from llm_provider import get_text_provider, get_judge_provider
+            from hybrid import apply_llm_text_hybrid
+            _provider = get_text_provider()
+            _judge = get_judge_provider()
+            if _provider is not None:
+                apply_llm_text_hybrid(result, body_text, url, _provider, _judge,
+                                      default_year, publish_time, title_year, url_year)
+        except Exception as _e:
+            print(f'[HYBRID_ERR] {url}: {_e}', file=sys.stderr)
 
     # ---- 多讲座公告拆分（MS1–MS5）----
     # 用 body_text（已合并OCR的正文文本）而非完整 text，避免把页眉/导航/页脚里的
