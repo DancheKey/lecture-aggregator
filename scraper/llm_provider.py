@@ -272,6 +272,87 @@ class AgnesProvider(ModelProvider):
         return {'verdict': 'unknown', 'fields': {}}
 
 
+class ZhipuProvider(ModelProvider):
+    """智谱 GLM 文本通道（OpenAI 兼容 /v1/chat/completions）。当前默认分歧裁决模型 B。"""
+
+    name = 'zhipu'
+
+    def __init__(self, api_key=None, base_url=None, model=None):
+        self.api_key = api_key or _get_env('ZHIPU_API_KEY')
+        self.base_url = (base_url or _get_env('ZHIPU_BASE_URL')
+                         or 'https://open.bigmodel.cn/api/paas/v4/chat/completions')
+        self.model = (model or _get_env('JUDGE_MODEL') or 'glm-4.7-flash')
+
+    def _post(self, messages, temperature):
+        if not self.api_key:
+            return None
+        payload = {"model": self.model, "messages": messages, "temperature": temperature}
+        headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
+        _hp = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
+        proxies = {'https': _hp, 'http': _hp} if _hp else None
+        for attempt in range(3):
+            try:
+                r = requests.post(self.base_url, headers=headers, json=payload,
+                                  timeout=60, proxies=proxies)
+                if r.status_code in (401, 403):
+                    return None
+                if r.status_code == 429 and attempt < 2:
+                    time.sleep(5 * (attempt + 1))
+                    continue
+                if r.status_code >= 500 and attempt < 2:
+                    time.sleep(3 * (attempt + 1))
+                    continue
+                r.raise_for_status()
+                return r.json()['choices'][0]['message']['content']
+            except Exception:
+                if attempt < 2:
+                    time.sleep(3 * (attempt + 1))
+                    continue
+                return None
+        return None
+
+    def extract_text(self, body_text, *, temperature=0.0):
+        """文本提取（备用）；默认不走此路径，但保留接口一致性。"""
+        if not self.api_key or not body_text or len(body_text) < 30:
+            return None
+        key = 'text:zhipu:' + hashlib.md5(body_text.encode('utf-8')).hexdigest()
+        cached = _cache_get(key)
+        if cached is not None and _fields_useful(cached):
+            return cached
+        txt = body_text[:3500]
+        messages = [
+            {"role": "system", "content": EXTRACTION_ONLY_SYSTEM},
+            {"role": "user", "content": "讲座正文：\n" + txt},
+        ]
+        raw = self._post(messages, temperature)
+        fields = _parse_model_json(raw) if raw else None
+        if fields and _fields_useful(fields):
+            _cache_set(key, fields)
+        return fields
+
+    def extract_verdict(self, body_text, rule_fields, llm_fields, *, temperature=0.0):
+        """分歧裁决：读原文 + 规则结果 + A 结果，返回裁决 dict。"""
+        if not self.api_key:
+            return {'verdict': 'unknown', 'fields': {}}
+        txt = (body_text or '')[:3500]
+        rule_s = json.dumps(rule_fields or {}, ensure_ascii=False)
+        llm_s = json.dumps(llm_fields or {}, ensure_ascii=False)
+        system = ("你是严格的讲座信息裁决员。只依据给定原文判断『规则解析结果』与『大模型解析结果』"
+                  "哪一方更准确，或是否都无法确定。禁止编造。输出严格 JSON："
+                  '{"verdict":"rule"|"llm"|"unknown","reason":"简述依据","fields":{采纳方的字段}}')
+        user = ("原文：\n" + txt +
+                "\n\n规则解析结果：\n" + rule_s +
+                "\n\n大模型解析结果：\n" + llm_s +
+                "\n\n请裁决：哪一方更准确？若大模型明显更准确且原文支持，verdict=llm 并把采纳字段放入 fields；"
+                "若规则更准确或无法判断，verdict=rule 或 unknown（fields 留空）。")
+        raw = self._post([{"role": "system", "content": system},
+                          {"role": "user", "content": user}], temperature)
+        parsed = _parse_model_json(raw) if raw else None
+        if isinstance(parsed, dict) and parsed.get('verdict') in ('rule', 'llm', 'unknown'):
+            return parsed
+        return {'verdict': 'unknown', 'fields': {}}
+
+
 class MockProvider(ModelProvider):
     """离线测试用：返回预设值，不发起任何网络请求。"""
 
@@ -298,7 +379,15 @@ def get_text_provider():
 
 
 def get_judge_provider():
-    """分歧裁决模型 B（当前复用 Agnes 同通道，可经 AGNES_JUDGE_MODEL 覆盖模型名）。"""
-    judge_model = _get_env('AGNES_JUDGE_MODEL')
-    p = AgnesProvider(model=judge_model) if judge_model else AgnesProvider()
+    """分歧裁决模型 B（当前智谱 GLM，可经 JUDGE_PROVIDER 覆盖为 agnes/zhipu/mock）。"""
+    provider_type = (_get_env('JUDGE_PROVIDER') or 'zhipu').lower()
+    if provider_type == 'agnes':
+        judge_model = _get_env('AGNES_JUDGE_MODEL')
+        p = AgnesProvider(model=judge_model) if judge_model else AgnesProvider()
+        return p if p.api_key else None
+    if provider_type == 'mock':
+        from llm_provider import MockProvider
+        return MockProvider(verdict={'verdict': 'unknown', 'fields': {}})
+    # 默认：智谱 GLM（ZHIPU_API_KEY 已在 .env 中配置）
+    p = ZhipuProvider()
     return p if p.api_key else None

@@ -58,6 +58,8 @@ jobs:
           VLM_MODEL: glm-4v-flash
           AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
           AGNES_MODEL: agnes-2.5-flash
+          JUDGE_PROVIDER: zhipu
+          JUDGE_MODEL: glm-4.7-flash
         run: python scraper/scraper.py
 
       - name: 同步静态数据源并生成前端切片
