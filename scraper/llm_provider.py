@@ -32,7 +32,9 @@ import requests
 # extraction-only 系统提示词（硬约束：只解析、不生成）
 # ---------------------------------------------------------------------------
 EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格遵守以下规则：
-1. 只做信息抽取，禁止编造、推理、补全、翻译或生成原文不存在的内容。
+1. 只做信息抽取，禁止编造、推理、补全、翻译或生成原文不存在的内容。abstract 与 speakerBio
+   必须原样照抄网页中对应的「摘要」「主讲人简介」段落，跟网页里面的内容一致，不得自行概括、
+   总结、改写或续写，更不得无中生有；若网页无独立摘要/简介段落，对应字段返回 null，不要从其他段落拼凑。
 2. 仅从给定正文中提取字段；原文没有的字段一律返回 null（不得省略键）。
 3. 每个字段附 snippet：直接抄录该字段在原文中的原句片段（含前后少量上下文），用于溯源核验。
 4. 输出严格 JSON（不要 markdown 代码块、不要解释），结构如下：
@@ -40,8 +42,8 @@ EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格�
   "title": {"value": "讲座系列名或整篇标题", "snippet": "..."},
   "topic": {"value": "单场讲座题目，无则 null", "snippet": "..."},
   "speaker": {"value": "主讲人姓名（仅姓名，不含职称/单位）", "snippet": "..."},
-  "speakerTitle": {"value": "职称如 教授/研究员/博士，无则 null", "snippet": "..."},
-  "speakerAffiliation": {"value": "单位/院系，无则 null", "snippet": "..."},
+  "speakerTitle": {"value": "主讲人当前职称，如 教授/副教授/研究员/讲师，无则 null；可从 speakerBio/abstract 中明确提到的职称提取", "snippet": "..."},
+  "speakerAffiliation": {"value": "主讲人当前单位/院系，无则 null；若 speakerBio/abstract 中明确出现『XX大学XX学院』、『现任/现为 XX大学』等当前所属机构，必须提取出来", "snippet": "..."},
   "lectureStart": {"value": "ISO8601 如 2026-08-21 15:00，未知 null", "snippet": "..."},
   "lectureEnd": {"value": "ISO8601，未知 null", "snippet": "..."},
   "location": {"value": "地点（精确到楼栋房号，不含校名）", "snippet": "..."},
@@ -50,6 +52,12 @@ EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格�
 }
 5. 时间必须基于正文明确写出的日期与时间，不要猜测年份；年份无法确定时 lectureStart 用 null。
 6. speaker 必须基于正文明确写出的主讲人姓名；正文无明确人名返回 null，严禁根据标题猜测。
+7. abstract 与 speakerBio 只提取各自段落的正文，必须到此为止：遇到「主讲人简介/报告人简介/专家简介/
+   个人简介/报告题目/报告时间/报告地点/报名方式/联系方式/面向对象」等后续字段标题，或「一、二、
+   三、」等章节序号时立即截断，严禁把后续段落（简介、题目、时间、地点、报名方式等）并入本字段。
+8. 输出必须是纯 JSON（以 { 开头、} 结尾）。严禁输出 markdown 列表（如 "- **题目**：..."）、
+   加粗、代码块围栏或任何解释文字；若某字段无法从原文解析，返回该字段为 null 的 JSON，
+   而不是用文字说明「无法提取」。
 """
 
 
@@ -175,6 +183,35 @@ def _get_env(name):
 
 
 # ---------------------------------------------------------------------------
+# 主动限速
+# ---------------------------------------------------------------------------
+_RATE_LOCK = threading.Lock()
+_NEXT_SLOT = [0.0]
+
+
+def _throttle():
+    """按 LLM_RPM（默认 20 次/分钟）占用一个时间槽，在真实 HTTP 调用前生效。
+
+    仅靠 429 被动退避不足以保护批量任务：全库并发时会在短时间打出大量请求，
+    先撞限流再重试反而更慢。这里全局串行分配时间槽，把速率压在阈值以内。
+    """
+    try:
+        rpm = int(_get_env('LLM_RPM') or 20)
+    except (TypeError, ValueError):
+        rpm = 20
+    if rpm <= 0:
+        return
+    slot = 60.0 / rpm
+    with _RATE_LOCK:
+        now = time.time()
+        start = max(now, _NEXT_SLOT[0])
+        _NEXT_SLOT[0] = start + slot
+        wait = start - now
+    if wait > 0:
+        time.sleep(wait)
+
+
+# ---------------------------------------------------------------------------
 # Provider 抽象
 # ---------------------------------------------------------------------------
 class ModelProvider(abc.ABC):
@@ -244,8 +281,15 @@ class AgnesProvider(ModelProvider):
             {"role": "system", "content": EXTRACTION_ONLY_SYSTEM},
             {"role": "user", "content": "讲座正文：\n" + txt},
         ]
-        raw = self._post(messages, temperature)
-        fields = _parse_model_json(raw) if raw else None
+        # 模型 A 偶发不稳定：可能返回 markdown、或全字段 null 的 JSON。解析失败/全空时
+        # 重试（最多 3 次），拿到含有效字段的 JSON 才采用（回落规则由调用方负责）。
+        fields = None
+        for _attempt in range(3):
+            raw = self._post(messages, temperature)
+            fields = _parse_model_json(raw) if raw else None
+            if fields and _fields_useful(fields):
+                break
+            time.sleep(2)
         if fields and _fields_useful(fields):
             _cache_set(key, fields)
         return fields

@@ -471,10 +471,71 @@ def strip_admin_shell(raw):
     return t
 
 
+# 线上会议识别（系统级规则，不依赖大模型）：从地点原文识别会议平台与会议号，
+# 返回 "腾讯会议 123-456-789" / "Zoom 123456789" / "线上会议" 之类；无线上会议特征返回 ''。
+# 用途：_clean_location 在定位物理地点的同时把线上会议信息一并保留
+# （如「理1栋302（腾讯会议 123-456-789）」），满足「线上会议须显示平台+会议号」。
+def _extract_meeting_info(raw):
+    if not raw:
+        return ''
+    s = str(raw)
+    plat = ''
+    if re.search(r'腾讯会议|企业微信|腾讯会议（企业版）|腾讯会议\(企业版\)', s):
+        plat = '腾讯会议'
+    elif re.search(r'zoom', s, re.I):
+        plat = 'Zoom'
+    elif re.search(r'钉钉', s):
+        plat = '钉钉'
+    elif re.search(r'飞书', s):
+        plat = '飞书'
+    elif re.search(r'腾讯课堂', s):
+        plat = '腾讯课堂'
+    elif re.search(r'webex', s, re.I):
+        plat = 'Webex'
+    elif re.search(r'瞩目', s):
+        plat = '瞩目'
+    elif re.search(r'线上|网络会议|线上会议|线上直播|直播|会议号|会议ID|会议号码|Meeting\s*ID|入会码', s, re.I):
+        plat = '线上会议'
+    if not plat:
+        return ''
+    num = ''
+    # 显式标签后的会议号（含/不含连字符、含内部空格）
+    m = re.search(
+        r'(?:会议号|会议ID|会议号码|腾讯会议号|Meeting\s*ID|会议入会码|入会码)[：:\s]*([0-9][0-9\s-]{5,})',
+        s, re.I)
+    if m:
+        num = re.sub(r'\s+', '', m.group(1))
+    else:
+        m = re.search(r'zoom(?:\.us)?/(?:j/|meet/)?(\d{9,11})', s, re.I)
+        if m:
+            num = m.group(1)
+        elif plat == '腾讯会议':
+            m = re.search(r'腾讯会议[^\d]{0,8}?(\d{9,11})', s)
+            if m:
+                num = m.group(1)
+            else:
+                m = re.search(r'(?<!\d)(\d{3}-\d{3}-\d{3})(?!\d)', s)
+                if m:
+                    num = m.group(1)
+        # 平台上下文下的裸会议号（7-11 位，或 3-3-3 连字符）：Zoom/钉钉/Webex 等常无显式标签
+        if not num:
+            m = re.search(r'(?<!\d)(\d{3}-\d{3}-\d{3})(?!\d)', s)
+            if m:
+                num = m.group(1)
+            else:
+                m = re.search(r'(?<!\d)(\d{7,11})(?!\d)', s)
+                if m:
+                    num = m.group(1)
+    if num:
+        return f'{plat} {num}'
+    return plat
+
+
 def _clean_location(loc, title=None):
     if not loc:
         return ''
     orig = loc
+    meeting = _extract_meeting_info(orig)  # 线上会议平台+会议号（如"腾讯会议 123-456-789"），无则空串
     loc = loc.strip()
     if not loc:
         return ''
@@ -576,7 +637,9 @@ def _clean_location(loc, title=None):
                     loc = loc[:pos].strip()
                     break
     if not loc:
-        # 整段仅为线上会议号等、无实体地点：标注为线上
+        # 整段仅为线上会议号等、无实体地点：有会议号则返回"平台 会议号"，否则标注为线上
+        if meeting:
+            return meeting
         if re.search(r'(腾讯会议|线上|会议号|会议 ?ID|网络会议|直播|Tencent ?Meeting)', orig):
             return '线上'
         return ''
@@ -596,9 +659,14 @@ def _clean_location(loc, title=None):
             break
         loc = new
     if not loc:
+        if meeting:
+            return meeting
         if re.search(r'(腾讯会议|线上|会议号|会议 ?ID|网络会议|直播|Tencent ?Meeting)', orig):
             return '线上'
         return ''
+    if meeting:
+        # 物理地点 + 线上会议信息并存（混合讲座）：物理地点在前，会议信息括注在后
+        return loc + '（' + meeting + '）'
     return loc
 
 
@@ -1192,9 +1260,14 @@ def _vlm_rate_limit(min_interval=6.0):
         _VLM_RLAST[0] = _time.time()
 
 
-# 文本 LLM 增强总开关（2026-09-01 起默认关闭：经数据对比证实 LLM 对结构化字段不可信、
-# 且自由文本摘要/简介非必需，彻底放弃文本 LLM 增强。SCNU_LLM_TEXT=1 可手动重新开启）。
+# 文本 LLM 增强总开关（SCNU_LLM_TEXT=1 可手动开启：让 A 参与全部字段的 only-fill 增强，
+# 并启用结构字段分歧 B 裁决）。默认 '0' 关闭——结构字段由规则主导，避免 LLM 干扰已确认的值。
 _USE_LLM_TEXT = (_os.environ.get('SCNU_LLM_TEXT') or '0') not in ('0', 'false', 'False', '')
+
+# 摘要/简介（丰富信息）独立子开关：默认开启。让 abstract/speakerBio（以及规则空时的
+# 职称/单位）默认由大模型 A 主导填充，规则仅作兜底。符合「摘要/简介 A 主导、规则兜底」路线。
+# SCNU_LLM_RICH=0 可手动关闭本子开关。
+_USE_LLM_RICH = (_os.environ.get('SCNU_LLM_RICH') or '1') not in ('0', 'false', 'False', '')
 
 
 def _vlm_extract_fields(img_urls, cfgs):
@@ -4268,15 +4341,19 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 仅当总开关 _USE_LLM_TEXT 开启、正文足够长、且文本模型可用时触发。规则结果在
     # parse_detail 内已先行算出，本块异常或模型失效都只回落规则，绝不空库/阻塞。
     # 海报页不走此路径（VLM 路线独立，见 _vlm_extract_fields）。
-    if _USE_LLM_TEXT and len(body_text) >= 80:
+    # 触发条件：总开关（全字段）或 rich 子开关（仅摘要/简介）开启，且正文足够长、文本模型可用。
+    if (_USE_LLM_TEXT or _USE_LLM_RICH) and len(body_text) >= 80:
         try:
             from llm_provider import get_text_provider, get_judge_provider
             from hybrid import apply_llm_text_hybrid
             _provider = get_text_provider()
             _judge = get_judge_provider()
             if _provider is not None:
+                # rich_only=True 时 A 只填充 abstract/speakerBio（及规则空的职称/单位），
+                # 不干预结构字段（speaker/time/location/topic），由规则主导。
                 apply_llm_text_hybrid(result, body_text, url, _provider, _judge,
-                                      default_year, publish_time, title_year, url_year)
+                                      default_year, publish_time, title_year, url_year,
+                                      rich_only=not _USE_LLM_TEXT)
         except Exception as _e:
             print(f'[HYBRID_ERR] {url}: {_e}', file=sys.stderr)
 

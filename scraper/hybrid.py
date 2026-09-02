@@ -2,7 +2,15 @@
 """规则 + 大模型 A 双轨解析与分歧裁决（仅文本页）。
 
 对应 2026-09-02 方案：规则与 Agnes（A）并行识别，比较主要结构（地点/主讲人/时间/题目），
-一致则采用 A 的丰富结果；不一致则调用第二个大模型（B）读原文裁决，且保守偏向规则。
+一致则放行；不一致则调用第二个大模型（B）读原文裁决，且保守偏向规则。
+
+2026-09-02 下午修订（字段分层，实测 maths 8781 后确立）：
+- 融合一律「仅填空」：规则已有值的字段 A 绝不覆盖（含职称/单位/摘要/简介）。
+  职称与单位属填空型字段——规则没抓到时由 A 补上，规则已有则保留规则值。
+- 每个从 A 采纳的值都必须通过 snippet 溯源闸门（值能在原文中找到出处），
+  否则判为幻觉并记入 llmRejected。这是可规模化的信任机制，替代人工全量抽查。
+- 发布时间不接入本模块：实测其位于 div.meta 图标区、不在 body_text 内，A 看不到；
+  且发布时间是删除依据，须保持确定性规则。
 
 铁律保障（用户硬性要求"大模型可能失效，规则必须独立可用"）：
 - 规则结果 result 在 parse_detail 内已先行算出，本模块永不阻塞、永不空库；
@@ -132,17 +140,176 @@ def compare_struct(rule, llm):
 _NOISE = ('null', 'None', '无', '暂无', 'N/A', 'na', '-', '—')
 
 
-def _merge_a_into_result(result, a, default_year=None, publish_time=None,
-                         title_year=None, url_year=None):
-    def _prefer(field):
-        cur = (result.get(field) or '').strip()
-        lv = (a.get(field) or '').strip()
-        if lv and lv not in _NOISE:
-            result[field] = lv
+def _norm_for_match(s):
+    """归一化用于溯源匹配：去空白 + 全角转半角（body_text 已过 N1 归一，两侧须同口径）"""
+    if not s:
+        return ''
+    s = re.sub(r'\s+', '', str(s))
+    return ''.join(chr(ord(c) - 0xFEE0) if 0xFF01 <= ord(c) <= 0xFF5E else c for c in s)
 
-    for fld in ('topic', 'speaker', 'speakerTitle', 'speakerAffiliation',
-                'location', 'abstract', 'speakerBio'):
-        _prefer(fld)
+
+def _snippet_ok(snippet, body_text):
+    """溯源闸门：A 给的值必须能在原文中找到出处，否则判为幻觉、拒绝采用。
+
+    没附 snippet、或原文里匹配不上 -> 一律拒绝（而不是照单全收）。
+    """
+    sn = _norm_for_match(snippet)
+    if len(sn) < 4:
+        return False
+    bt = _norm_for_match(body_text)
+    if sn in bt:
+        return True
+    # 容忍 A 对 snippet 的轻微省略：首尾各取一片都命中，才算溯源成功
+    return len(sn) >= 12 and sn[:6] in bt and sn[-6:] in bt
+
+
+# 单位字段常被后续元数据标记污染（源页常见「XX大学)日期:3月3日」粘连），填入前截断
+_AFFIL_CUT = re.compile(r'(日期|时间|地点|主持人|主讲人|报告人|讲座|摘要|腾讯|会议|线上)\s*[:：]')
+
+
+def _clean_affiliation(v):
+    if not v:
+        return ''
+    m = _AFFIL_CUT.search(str(v))
+    return (str(v)[:m.start()] if m else str(v)).strip(' )）:：-—、,，')
+
+
+# ---------------------------------------------------------------------------
+# 纯规则兜底：模型 A 偶发抽不到 affiliation/title 时，从已有 speakerBio 开头片段
+# 正则提取。华师讲座简介通用格式为「姓名,单位职称,...」，此兜底确定性、不依赖模型可用性，
+# 仅在 A 仍未提供时触发，绝不覆盖已有值。搜索范围限定 bio 前 40 字（姓名+单位职称通常在此），
+# 避免误抓后文的「博士毕业于 XX 大学」等历史单位。
+# ---------------------------------------------------------------------------
+_AFFIL_RE = re.compile(
+    r'([\u4e00-\u9fa5]{2,6}大学[\u4e00-\u9fa5]{1,8}?(?:学院|研究院|学部|系|中心))'
+    r'|([\u4e00-\u9fa5]{2,10}?(?:大学|研究院|研究所))'
+)
+_TITLE_RE = re.compile(
+    r'(教授|副教授|研究员|副研究员|助理研究员|讲师|助理教授|博士后|博士|主任医师|副主任医师)'
+)
+
+
+def _infer_affiliation(bio):
+    if not bio:
+        return ''
+    head = bio[:40]
+    m = _AFFIL_RE.search(head)
+    return (m.group(1) or m.group(2) or '').strip() if m else ''
+
+
+def _infer_title(bio):
+    if not bio:
+        return ''
+    head = bio[:40]
+    for m in _TITLE_RE.finditer(head):
+        t = m.group(1)
+        # 排除「博士毕业于 / 博士学位 / 博士后」这类非当前职称的误匹配
+        if t == '博士' and any(k in head[m.end():m.end() + 3]
+                               for k in ('毕业', '学位', '后')):
+            continue
+        return t
+    return ''
+
+
+def _apply_bio_fallback(result):
+    """规则兜底：模型 A 未提供 affiliation/title 时，从已有 speakerBio 开头片段正则提取。
+
+    华师讲座简介通用格式为「姓名,单位职称,...」，此兜底确定性、不依赖模型可用性，
+    仅在字段仍为空时触发，绝不覆盖已有值。需在 A 成功融合后、以及 A 完全失败提前
+    return 前各调用一次（A 失败时 apply 不会进入 _merge，兜底必须独立存在）。
+    """
+    if not (result.get('speakerAffiliation') or '').strip() and (result.get('speakerBio') or '').strip():
+        _a = _infer_affiliation(result['speakerBio'])
+        if _a:
+            result['speakerAffiliation'] = _a
+    if not (result.get('speakerTitle') or '').strip() and (result.get('speakerBio') or '').strip():
+        _t = _infer_title(result['speakerBio'])
+        if _t:
+            result['speakerTitle'] = _t
+
+
+# rich_only 模式只处理丰富/补全型字段，绝不碰结构字段（speaker/topic/location），
+# 确保结构字段完全由规则主导。
+_RICH_FIELDS = ('abstract', 'speakerBio', 'speakerTitle', 'speakerAffiliation')
+_ALL_FIELDS = ('topic', 'speaker', 'speakerTitle', 'speakerAffiliation',
+              'location', 'abstract', 'speakerBio')
+
+# rich 字段边界截断：A 模型对 abstract/speakerBio 缺乏边界约束，会把后续「专家简介/
+# 报告题目/报告时间」等段落一并吞入。复用 parsers 既有锚点词表做后处理兜底——在 A 返回值
+# 填入 result 之前先截断到自然段落边界（遇到下个字段标题或章节序号即停）。正常干净提取
+# 不含这些标记，截断函数不会破坏它；仅当 A 溢出时才生效。
+_RICH_CUT = re.compile(
+    r'\s*(?:'
+    r'主讲人简介|报告人简介|主讲人简历|专家介绍|专家简介|个人简介|作者简介|'
+    r'主讲人介绍|报告人介绍|主讲介绍|简历|Bio|'
+    r'学术报告|报告题目|讲座题目|报告时间|讲座时间|报告地点|讲座地点|'
+    r'报告专家|报告人[：:]|讲座专家|'
+    r'报名时间|报名方式|联系方式|面向对象|参与方式|注意事项|交通指引|温馨提示|'
+    r'会议时间|会议地点|会议简介|论坛简介|沙龙简介|研讨会议程|'
+    r'主办单位|承办单位|协办单位|'
+    r'资讯及通知|相关新闻|最新动态|推荐阅读|相关文章|附件下载|相关链接|通知公告|'
+    r'[一二三四五六七八九十百零0-9]+[、.．](?!\d)|第.{1,6}期'
+    r')'
+)
+
+
+def _truncate_rich_text(v):
+    """把 abstract/speakerBio 截断到自然段落边界，去除 A 溢出吞入的后续段落。"""
+    if not v:
+        return v
+    m = _RICH_CUT.search(str(v))
+    if m:
+        return str(v)[:m.start()].strip()
+    return str(v).strip()
+
+
+def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=None,
+                         title_year=None, url_year=None, rich_only=False):
+    """仅填空融合：规则已有值的字段一律不动（铁律：不破坏已提取值）。
+
+    规则为空才考虑 A 的值，且必须通过 snippet 溯源闸门；被闸门拦下的字段名
+    记入 llmRejected，便于事后统计 A 的幻觉率。
+    rich_only=True 时只处理丰富/补全型字段（abstract/speakerBio/职称/单位），
+    不碰结构字段（speaker/topic/location），确保结构字段完全由规则主导。
+    """
+    rejected = []
+    _fields = _RICH_FIELDS if rich_only else _ALL_FIELDS
+    for fld in _fields:
+        cur = (result.get(fld) or '').strip()
+        lv = (a.get(fld) or '').strip()
+        if fld in ('abstract', 'speakerBio'):
+            # A 主导（用户路线「摘要/简介 A 主导」）：abstract/speakerBio 以 A 的干净值为准，
+            # 规则仅作兜底。A 值须先截断到段落边界（去溢出），再经 snippet 溯源闸门验证
+            # （证明确系网页原文、非幻觉）才采用；A 无值或溯源失败则保留规则值，不污染。
+            if not lv or lv in _NOISE:
+                continue  # A 无值 -> 保留规则
+            lv = _truncate_rich_text(lv)
+            if not lv or lv in _NOISE:
+                continue
+            if not _snippet_ok(a.get(fld + 'Snippet'), body_text):
+                rejected.append(fld)  # A 溯源失败 -> 保留规则
+                continue
+            result[fld] = lv
+            continue
+        # 其余字段（职称/单位/结构字段）：规则已有值不覆盖（仅填空补全）
+        if cur and cur not in _NOISE:
+            continue
+        if not lv or lv in _NOISE:
+            continue
+        if fld == 'speakerAffiliation':
+            lv = _clean_affiliation(lv)
+            if not lv:
+                continue
+        if not _snippet_ok(a.get(fld + 'Snippet'), body_text):
+            rejected.append(fld)
+            continue
+        result[fld] = lv
+    if rejected:
+        result['llmRejected'] = '|'.join(rejected)
+
+    # 纯规则兜底：模型 A 偶发抽不到 affiliation/title 时，从已有 speakerBio 开头片段
+    # 正则提取（确定性、不依赖模型可用性）。仅在 A 仍未提供时触发，绝不覆盖已有值。
+    _apply_bio_fallback(result)
 
     # 时间守卫：仅当规则时间是占位/缺失且年份与 A 一致时，才采用 A 的精确时刻。
     # 规则已有具体时间或年份不一致 -> 完全保留规则时间（防 LLM 年份/时刻幻觉）。
@@ -186,10 +353,12 @@ def _merge_a_into_result(result, a, default_year=None, publish_time=None,
 # ---------------------------------------------------------------------------
 def apply_llm_text_hybrid(result, body_text, url, provider, judge,
                           default_year=None, publish_time=None,
-                          title_year=None, url_year=None):
+                          title_year=None, url_year=None, rich_only=False):
     """双轨解析 + 分歧裁决。原地修改 result 并打溯源标记，返回 result。
 
     provider: 模型 A（ModelProvider）；judge: 裁决模型 B（ModelProvider 或 None）。
+    rich_only=True：仅把 A 的摘要/简介（及规则空的职称/单位）填空融合，
+        结构字段完全由规则主导，不比较、不调 B 裁决。
     """
     result['llmTextEnhanced'] = False
     result['llmVerdict'] = None
@@ -204,13 +373,27 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
     except Exception:
         a_raw = None
     if not a_raw:
-        return result  # A 失效 -> 规则保底
+        # A 失效（含全 null / 返回非 JSON 被拒）-> 规则保底，但先用 bio 兜底补单位/职称
+        _apply_bio_fallback(result)
+        return result
 
     a = flatten_fields(a_raw)
+
+    if rich_only:
+        # 丰富字段模式：直接 only-fill abstract/speakerBio/职称/单位，
+        # 不比较结构字段、不调 B，结构字段完全由规则主导。
+        _merge_a_into_result(result, a, body_text, default_year, publish_time,
+                             title_year, url_year, rich_only=True)
+        if result.get('abstract') or result.get('speakerBio'):
+            result['llmTextEnhanced'] = True
+            result['llmVerdict'] = 'rich-only'
+        return result
+
     diffs = compare_struct(result, a)
     if not diffs:
         # 一致：采用 A 丰富结果（abstract/bio 等规则没有的字段直接采用）
-        _merge_a_into_result(result, a, default_year, publish_time, title_year, url_year)
+        _merge_a_into_result(result, a, body_text, default_year, publish_time,
+                             title_year, url_year)
         result['llmTextEnhanced'] = True
         result['llmVerdict'] = 'consistent'
         if a.get('speaker'):
@@ -228,7 +411,8 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
 
     # 保守偏向规则：仅当 B 明确支持 llm 且给出采纳字段时才采用 A
     if verdict.get('verdict') == 'llm' and verdict.get('fields'):
-        _merge_a_into_result(result, a, default_year, publish_time, title_year, url_year)
+        _merge_a_into_result(result, a, body_text, default_year, publish_time,
+                             title_year, url_year)
         result['llmTextEnhanced'] = True
         if a.get('speaker'):
             result['speakerSource'] = 'llm'
