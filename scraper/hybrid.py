@@ -174,27 +174,163 @@ def _clean_affiliation(v):
     return (str(v)[:m.start()] if m else str(v)).strip(' )）:：-—、,，')
 
 
+# 单位字段质量校验：A 偶发把职称片段（如"助理"）误填进 affiliation，
+# 必须含机构后缀且不能是纯职称词，否则拒绝并回到规则兜底。
+_AFFIL_INVALID = re.compile(
+    r'^(教授|副教授|助理教授|助理|讲师|研究员|副研究员|助理研究员|博士|博士后|院士|主任|院长|所长|老师|先生|女士)$'
+)
+_AFFIL_VALID_SUFFIX = (
+    '大学', '学院', '研究院', '研究所', '学部', '系', '中心',
+    'University', 'College', 'Institute', 'School', 'Department',
+    'Centre', 'Center', 'Laboratory', 'Lab',
+)
+
+
+def _is_valid_affiliation(v):
+    if not v or len(v.strip()) < 3:
+        return False
+    v = v.strip()
+    if _AFFIL_INVALID.match(v):
+        return False
+    lowered = v.lower()
+    return any(s.lower() in lowered for s in _AFFIL_VALID_SUFFIX)
+
+
 # ---------------------------------------------------------------------------
 # 纯规则兜底：模型 A 偶发抽不到 affiliation/title 时，从已有 speakerBio 开头片段
 # 正则提取。华师讲座简介通用格式为「姓名,单位职称,...」，此兜底确定性、不依赖模型可用性，
 # 仅在 A 仍未提供时触发，绝不覆盖已有值。搜索范围限定 bio 前 40 字（姓名+单位职称通常在此），
 # 避免误抓后文的「博士毕业于 XX 大学」等历史单位。
+#
+# 2026-09-02 扩展：同时支持英文/中英混合单位（如 New York University Abu Dhabi）。
 # ---------------------------------------------------------------------------
 _AFFIL_RE = re.compile(
     r'([\u4e00-\u9fa5]{2,6}大学[\u4e00-\u9fa5]{1,8}?(?:学院|研究院|学部|系|中心))'
-    r'|([\u4e00-\u9fa5]{2,10}?(?:大学|研究院|研究所))'
+    r'|([\u4e00-\u9fa5]{2,10}?(?:大学|研究院|研究所)(?:[\u4e00-\u9fa5]{0,6}?(?:分校|校区|学部|学院|系|中心))?)'
+    r'|([A-Za-z][A-Za-z\s]*(?:University|College|Institute|School|Department|Centre|Center|Laboratory|Lab)(?:\s+(?:of|and|&|at|in|[A-Za-z]+)){0,8})'
 )
 _TITLE_RE = re.compile(
     r'(教授|副教授|研究员|副研究员|助理研究员|讲师|助理教授|博士后|博士|主任医师|副主任医师)'
 )
 
 
+# 规则兜底提取单位时，可能连带命中「毕业于/就读于/现为」等动词前缀或学历词，
+# 需要剥掉这些非单位前缀，保留从机构名开始的部分。
+_AFFIL_PREFIX_NOISE = re.compile(
+    r'^(?:'
+    r'博士|硕士|本科|研究生|'
+    r'毕业|毕业于|就读于|获|获得|年获|年分别获得|年于|年在|年本科|'
+    r'现为|现任|现任于|现任职|任职|就职于|任职于|工作于|就职|'
+    r'是|曾|曾任职|曾在|曾任|曾为|于|在|分别|先后'
+    r')\s*[于在,，]?\s*'
+)
+_AFFIL_VALID_KEYWORDS = (
+    '大学', '学院', '研究院', '研究所', '学部', '系', '中心',
+    'University', 'College', 'Institute', 'School', 'Department',
+    'Centre', 'Center', 'Laboratory', 'Lab',
+)
+
+
+_AFFIL_EN_STOP_WORDS = {
+    'of', 'at', 'in', 'and', '&', 'the', 'from', 'joined', 'worked', 'graduated',
+    'as', 'a', 'an', 'to', 'for', 'with', 'by', 'is', 'was', 'has', 'have', 'had',
+    'did', 'after', 'that', 'he', 'she', 'they', 'it', 'this', 'these', 'there',
+    'born', 'received', 'earned', 'obtained', 'got', 'gotten', 'before', 'when',
+    'where', 'who', 'which', 'while', 'during', 'until', 'since', 'between',
+}
+
+
+def _strip_affil_prefix(aff):
+    """保留从第一个机构后缀词开头的部分，剥去前带动词/学历前缀。"""
+    if not aff:
+        return aff
+    lowered = aff.lower()
+    best = -1
+    best_kw = ''
+    for kw in _AFFIL_VALID_KEYWORDS:
+        idx = lowered.find(kw.lower())
+        if idx >= 0 and (best < 0 or idx < best):
+            best = idx
+            best_kw = kw
+    if best < 0:
+        return aff
+    # 英文机构后缀：直接用 _AFFIL_RE 的英文分支重新提取，剥去连带动词/人名
+    if re.match(r'^[A-Za-z]', best_kw):
+        m = _AFFIL_RE.search(aff)
+        if m and m.group(3):
+            g3 = m.group(3).strip()
+            # 从末尾跳过 stop words（介词/年份后的 in/as 等），再向前保留连续大写修饰词
+            parts = g3.split()
+            end_idx = len(parts) - 1
+            while end_idx >= 0 and parts[end_idx].lower() in _AFFIL_EN_STOP_WORDS:
+                end_idx -= 1
+            if end_idx >= 0:
+                start_idx = end_idx
+                while start_idx > 0:
+                    w = parts[start_idx - 1]
+                    if w.lower() in _AFFIL_EN_STOP_WORDS:
+                        break
+                    if w and w[0].isupper():
+                        start_idx -= 1
+                        continue
+                    break
+                return ' '.join(parts[start_idx:end_idx + 1]).strip()
+        return aff[best:best + len(best_kw)].strip()
+    # 中文机构后缀：从机构名开始
+    prefix = aff[:best]
+    for sep in ('，', '、', ',', ' '):
+        pos = prefix.rfind(sep)
+        if pos >= 0:
+            return aff[pos + 1:].strip()
+    # 若机构词紧贴开头但前面只剩 1-2 个字的动词残片（如"获""在"），也剥掉
+    if len(prefix) <= 2 and prefix and not re.match(r'^[\u4e00-\u9fa5]{2,}$', prefix):
+        return aff[best:].strip()
+    return aff
+
+
 def _infer_affiliation(bio):
     if not bio:
         return ''
-    head = bio[:40]
+    # 优先匹配「现任/现为/任职于」等当前单位表达，避免把学历单位错当现单位。
+    current_re = re.compile(
+        r'(?:现为|现任|现任于|现任职|任职|就职于|任职于|工作于|就职)'
+        r'\s*[于在,，]?\s*'
+        r'(' + _AFFIL_RE.pattern + r')'
+    )
+    m = current_re.search(bio)
+    if m:
+        aff = (m.group(1) or m.group(2) or m.group(3) or m.group(4) or '').strip()
+        aff = _strip_affil_prefix(aff)
+        aff = re.sub(r'(助理教授|教授|副教授|讲师|研究员|副研究员|助理研究员|博士后|博士|院士|主任|院长|所长|老师|先生|女士)$', '', aff).strip(' ,，')
+        if _is_valid_affiliation(aff):
+            return aff
+    # 全英文 bio 且无现单位表达时：通常现单位在最后，取最后一个有效机构
+    if not re.search(r'[\u4e00-\u9fa5]', bio):
+        last = ''
+        for m in _AFFIL_RE.finditer(bio):
+            cand = (m.group(1) or m.group(2) or m.group(3) or '').strip()
+            cand = _strip_affil_prefix(cand)
+            cand = re.sub(r'(助理教授|教授|副教授|讲师|研究员|副研究员|助理研究员|博士后|博士|院士|主任|院长|所长|老师|先生|女士)$', '', cand).strip(' ,，')
+            if _is_valid_affiliation(cand):
+                last = cand
+        if last:
+            return last
+    # 回退：从 bio 开头提取单位
+    head = bio[:80]
     m = _AFFIL_RE.search(head)
-    return (m.group(1) or m.group(2) or '').strip() if m else ''
+    if not m:
+        return ''
+    aff = (m.group(1) or m.group(2) or m.group(3) or '').strip()
+    # 先剥开头常见动词/学历前缀（可循环 3 次）
+    for _ in range(3):
+        new_aff = _AFFIL_PREFIX_NOISE.sub('', aff)
+        if new_aff == aff:
+            break
+        aff = new_aff
+    aff = _strip_affil_prefix(aff)
+    # 清理尾部职称词
+    aff = re.sub(r'(助理教授|教授|副教授|讲师|研究员|副研究员|助理研究员|博士后|博士|院士|主任|院长|所长|老师|先生|女士)$', '', aff).strip(' ,，')
+    return aff
 
 
 def _infer_title(bio):
@@ -298,7 +434,9 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             continue
         if fld == 'speakerAffiliation':
             lv = _clean_affiliation(lv)
-            if not lv:
+            if not lv or not _is_valid_affiliation(lv):
+                if lv:
+                    rejected.append(fld)
                 continue
         if not _snippet_ok(a.get(fld + 'Snippet'), body_text):
             rejected.append(fld)
