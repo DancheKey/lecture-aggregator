@@ -130,6 +130,21 @@ CASES = [
     # 块末"嘉宾：下一场"指向下一场；核验前置 speaker 正确落位（刘玉鑫/吴小山/刘玉斌）
     {'url': 'https://physics.scnu.edu.cn/a/20191118/807.html', 'fixture': 'physics807.html',
      'count': 3, 'speakers': ['刘玉鑫', '吴小山', '刘玉斌'], 'topic_sub': []},
+    # 2026-09 主讲人提取修复回归：原规则把题目/单位当主讲人、并列多主讲漏识别。
+    # 对应 parsers.py 三处修复（报告人后跟题目则跳过取下一标签 / 并列多主讲兼容半角括号单位 /
+    # 单位提取前截掉粘连的日期时间地点元数据）。以下 6 例锁定修复后正确主讲人。
+    {'url': 'http://skc.scnu.edu.cn/a/20191202/512.html', 'fixture': 'skc512.html',
+     'count': 1, 'speakers': ['白凯']},
+    {'url': 'http://lswh.scnu.edu.cn/a/20181022/13.html', 'fixture': 'lswh13.html',
+     'count': 1, 'speakers': ['黄国信、温春来']},
+    {'url': 'https://physics.scnu.edu.cn/a/20250303/12933.html', 'fixture': 'physics12933.html',
+     'count': 1, 'speakers': ['温永立']},
+    {'url': 'https://physics.scnu.edu.cn/a/20221011/12119.html', 'fixture': 'physics12119.html',
+     'count': 1, 'speakers': ['罗洪刚']},
+    {'url': 'https://physics.scnu.edu.cn/a/20211117/11773.html', 'fixture': 'physics11773.html',
+     'count': 1, 'speakers': ['李海欧']},
+    {'url': 'https://physics.scnu.edu.cn/a/20221018/12127.html', 'fixture': 'physics12127.html',
+     'count': 1, 'speakers': ['陈理想']},
     # 直播已下线(404)且无本地副本：唯一保留 skip 语义的 case（文档化例外）。
     {'url': 'http://ctld.scnu.edu.cn/a/20250310/4409.html', 'fixture': 'ctld4409.html',
      'count': 2, 'speakers': ['卢晓中', '赵淦森'], 'topic_sub': [], 'may_404': True},

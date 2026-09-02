@@ -29,6 +29,13 @@ FIXTURES = [
     ('cs5708.html', 'http://cs.scnu.edu.cn/a/20240516/5708.html'),
     ('ggy5666.html', 'http://ggy.scnu.edu.cn/a/20211116/5666.html'),
     ('physics807.html', 'https://physics.scnu.edu.cn/a/20191118/807.html'),
+    # 2026-09 主讲人提取修复回归（与 test_parser_golden.py 末尾 6 例对应）
+    ('skc512.html', 'http://skc.scnu.edu.cn/a/20191202/512.html'),
+    ('lswh13.html', 'http://lswh.scnu.edu.cn/a/20181022/13.html'),
+    ('physics12933.html', 'https://physics.scnu.edu.cn/a/20250303/12933.html'),
+    ('physics12119.html', 'https://physics.scnu.edu.cn/a/20221011/12119.html'),
+    ('physics11773.html', 'https://physics.scnu.edu.cn/a/20211117/11773.html'),
+    ('physics12127.html', 'https://physics.scnu.edu.cn/a/20221018/12127.html'),
 ]
 
 
