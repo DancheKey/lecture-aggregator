@@ -4341,8 +4341,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     # 仅当总开关 _USE_LLM_TEXT 开启、正文足够长、且文本模型可用时触发。规则结果在
     # parse_detail 内已先行算出，本块异常或模型失效都只回落规则，绝不空库/阻塞。
     # 海报页不走此路径（VLM 路线独立，见 _vlm_extract_fields）。
-    # 触发条件：总开关（全字段）或 rich 子开关（仅摘要/简介）开启，且正文足够长、文本模型可用。
-    if (_USE_LLM_TEXT or _USE_LLM_RICH) and len(body_text) >= 80:
+    # 触发条件：总开关（全字段）或 rich 子开关（仅摘要/简介）开启，且非海报页、正文足够长、文本模型可用。
+    if (_USE_LLM_TEXT or _USE_LLM_RICH) and not poster_only and len(body_text) >= 80:
         try:
             from llm_provider import get_text_provider, get_judge_provider
             from hybrid import apply_llm_text_hybrid
