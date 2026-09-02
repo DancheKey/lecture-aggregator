@@ -190,6 +190,7 @@ _AFFIL_VALID_SUFFIX = (
     '实验室', '所', '医院', '中学', '小学', '学校', '教育',
     '公司', '集团', '企业', '协会', '学会', '研究会',
     '博物馆', '银行', '政府', '机关', '报社', '出版社',
+    '画院', '幼儿园', '文联', '科技', '网络',
     # 中文机构缩写（高校/科研院所常用简称）
     '交大', '科大', '工大', '师大', '理工', '医科', '农大', '财大',
     '财经', '政法', '中科院', '社科院', '科院',
@@ -212,8 +213,24 @@ def _is_valid_affiliation(v):
     # 以「院」结尾（学院/研究院/医院/书院/量子院/广医三院 等；职称片段多「员/士」结尾，安全）
     if v.endswith('院'):
         return True
+    # 全大写外文缩写（如 NIDA），多为机构 acronym；混合大小写的人名（ZhongshanLi）不匹配
+    if re.fullmatch(r'[A-Z]{2,10}', v):
+        return True
     lowered = v.lower()
     return any(s.lower() in lowered for s in _AFFIL_VALID_SUFFIX)
+
+
+# 主办校名（页面框架常出现，易被模型 A 误当主讲人单位）。蔡瑞初 cs/5826 实战：页面仅
+# 「报告人：蔡瑞初 教授」无单位，模型 A 把页眉/页脚的「华南师范大学」当单位填入；snippet
+# 溯源闸门无法识别（校名每页必现）。故增加 host 守卫：裸主办校名（无更具体院系后缀）视为
+# 页面框架，拒填。真实本校主讲人单位多为「华南师范大学XX学院」（含院系后缀），不受影响。
+_AFFIL_HOST_NAMES = ('华南师范大学', 'south china normal university', 'scnu')
+
+
+def _is_host_affiliation(v):
+    if not v:
+        return False
+    return v.strip().lower() in _AFFIL_HOST_NAMES
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +471,7 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             continue
         if fld == 'speakerAffiliation':
             lv = _clean_affiliation(lv)
-            if not lv or not _is_valid_affiliation(lv):
+            if not lv or not _is_valid_affiliation(lv) or _is_host_affiliation(lv):
                 if lv:
                     rejected.append(fld)
                 continue
