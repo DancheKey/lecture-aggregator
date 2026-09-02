@@ -2211,6 +2211,40 @@ def _is_meta_skeleton(text):
     return len(stripped) < 50 and len(text) - len(stripped) > 60
 
 
+def _is_column_intro(text):
+    """识别「栏目/机构介绍散文」型骨架页（与 _is_meta_skeleton 互补）。
+
+    _is_meta_skeleton 仅捕获「题目/主讲人/时间…字段标签组成的空壳」；
+    本函数捕获另一类：body_text 是一段书院/学院/部门的机构简介散文
+    （如「实施书院制…三全育人…一站式」），常被 CMS 模板重复输出、且
+    完全不含任何讲座结构化标签——真实讲座信息全在海报图片里。此类页
+    在行知书院等站点出现，若不识别会被误判为「图文页」走规则解析，从
+    模板噪声里错误提取主讲人（如把机构介绍当正文）。
+
+    前提守卫：文本不得含任何讲座标签（时间/地点/主讲人/摘要…），
+    否则一律视为真实讲座正文、不判骨架——避免误伤主题恰好提及
+    「通识教育」「立德树人」等词的讲座页。
+    """
+    if not text or len(text) < 60:
+        return False
+    # 前提：无任何讲座结构化标签（真实讲座正文必有其一）
+    if re.search(r'(?:时间|地点|主讲[人师]|报告人|演讲人|摘要|讲座简介|'
+                 r'报告简介|内容简介|主持人|邀请人)[：:]', text):
+        return False
+    # 栏目/机构介绍特征词
+    _INTRO_KW = ('书院制', '三全育人', '立德树人', '通识教育', '第二课堂',
+                 '一站式', '党团学建设', '书院概况', '学院概况', '部门概况',
+                 '本网站', '本站', '网站简介', '人才培养方案', '负责组织实施')
+    if any(kw in text for kw in _INTRO_KW):
+        return True
+    # 文本高度重复（CMS 模板把同一段介绍输出两遍）：去标点空白后前半 == 后半
+    _norm = re.sub(r'[\s\u3000\W]+', '', text)
+    n = len(_norm)
+    if n >= 80 and n % 2 == 0 and _norm[:n // 2] == _norm[n // 2:]:
+        return True
+    return False
+
+
 def _clean_title(t):
     t = t.strip()
     if ' - ' in t:
@@ -2880,7 +2914,8 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     _vlm_sessions = None
     poster_only = ((len(body_text) < 150
                     and not re.search(r'(?:时间|地点|主讲[人师]|报告人)[：:]', body_text))
-                   or (bool(imgs) and _is_meta_skeleton(body_text))
+                   or (bool(imgs) and (_is_meta_skeleton(body_text)
+                                        or _is_column_intro(body_text)))
                    or _pdf_poster_converted)
     if poster_only:
         # 优先用多模态 LLM 结构化提取海报；无 key / 失败则降级回 rapidocr。
