@@ -179,10 +179,27 @@ def _clean_affiliation(v):
 _AFFIL_INVALID = re.compile(
     r'^(教授|副教授|助理教授|助理|讲师|研究员|副研究员|助理研究员|博士|博士后|院士|主任|院长|所长|老师|先生|女士)$'
 )
+# 合法机构标识词（白名单）。覆盖：高校/科院/实验室/研究所/中小学/企业/协会/博物馆/政府/
+# 医院等中文机构类型，中文高校常用缩写（交大/科大/理工/中科院…），以及英文与多语种
+# （葡/德/法/西/荷/意等）高校与研究机构的常见写法。纯职称词由上方 _AFFIL_INVALID 黑名单拦截。
+# 额外规则：以「院」结尾即视为合法（学院/研究院/医院/书院/量子院/广医三院 等；职称片段多以
+# 「员/士」结尾，不会误放）。
 _AFFIL_VALID_SUFFIX = (
-    '大学', '学院', '研究院', '研究所', '学部', '系', '中心',
+    # 中文机构类型（完整词）
+    '大学', '学院', '研究院', '研究所', '研究室', '学部', '系', '中心',
+    '实验室', '所', '医院', '中学', '小学', '学校', '教育',
+    '公司', '集团', '企业', '协会', '学会', '研究会',
+    '博物馆', '银行', '政府', '机关', '报社', '出版社',
+    # 中文机构缩写（高校/科研院所常用简称）
+    '交大', '科大', '工大', '师大', '理工', '医科', '农大', '财大',
+    '财经', '政法', '中科院', '社科院', '科院',
+    # 外文机构类型（含非英文语种）
     'University', 'College', 'Institute', 'School', 'Department',
     'Centre', 'Center', 'Laboratory', 'Lab',
+    'Universidade', 'Universität', 'Université', 'Universidad',
+    'Universiteit', 'Università', 'Hochschule', 'Polytechnic',
+    'Politecnico', 'Academy', 'Akademie', 'Instituto', 'Institut',
+    'École', 'Ecole', 'Conservatory', 'Hospital',
 )
 
 
@@ -192,6 +209,9 @@ def _is_valid_affiliation(v):
     v = v.strip()
     if _AFFIL_INVALID.match(v):
         return False
+    # 以「院」结尾（学院/研究院/医院/书院/量子院/广医三院 等；职称片段多「员/士」结尾，安全）
+    if v.endswith('院'):
+        return True
     lowered = v.lower()
     return any(s.lower() in lowered for s in _AFFIL_VALID_SUFFIX)
 
