@@ -111,6 +111,14 @@ def _year_of(s):
     return int(m) if m.isdigit() else None
 
 
+def _month_of(s):
+    """从 ISO 时间串提取月份(1-12)，失败返回 None。"""
+    if not s:
+        return None
+    m = str(s)[5:7]
+    return int(m) if m.isdigit() else None
+
+
 # 回填目标字段：全部仅填空；身份/去重键（sourceUrl/college/title/lectureIndex）不碰。
 _FILL_FIELDS = ('topic', 'speaker', 'location', 'abstract', 'speakerBio',
                 'speakerAffiliation', 'speakerTitle', 'lectureStart', 'lectureEnd')
@@ -159,6 +167,8 @@ def _fix_speaker(rec, src):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--year', type=int, required=True)
+    ap.add_argument('--month-start', type=int, default=None, help='月份起点(含)，如 7')
+    ap.add_argument('--month-end', type=int, default=None, help='月份终点(含)，如 12')
     ap.add_argument('--limit', type=int, default=0, help='最多处理 N 个 URL（冒烟用）')
     ap.add_argument('--dry-run', action='store_true', help='不写盘，仅打印统计')
     ap.add_argument('--force', action='store_true',
@@ -172,6 +182,15 @@ def main():
     # 筛选该年记录
     year_recs = [r for r in recs if _year_of(r.get('lectureStart')) == args.year
                  or (_year_of(r.get('lectureStart')) is None and _year_of(r.get('publishTime')) == args.year)]
+
+    # 月份范围过滤（可选）：仅保留 lectureStart/publishTime 落在 [month_start, month_end] 的记录
+    if args.month_start or args.month_end:
+        ms, me = (args.month_start or 1), (args.month_end or 12)
+        def _in_month(r):
+            mo = _month_of(r.get('lectureStart')) or _month_of(r.get('publishTime'))
+            return mo is not None and ms <= mo <= me
+        year_recs = [r for r in year_recs if _in_month(r)]
+        print(f'[INFO] 月份范围 {ms}-{me} 过滤后：{len(year_recs)} 条记录')
     # 按 sourceUrl 聚合（多讲座拆分页一 URL 对多条记录）
     by_url = {}
     for r in year_recs:
@@ -246,7 +265,7 @@ def main():
                 filled.append('speaker*')
             if filled:
                 any_change = True
-                rec['llmTextEnhanced'] = bool(src.get('llmTextEnhanced'))
+                rec['llmTextEnhanced'] = rec.get('llmTextEnhanced') or bool(src.get('llmTextEnhanced'))
                 if src.get('llmVerdict'):
                     rec['llmVerdict'] = src['llmVerdict']
                 if src.get('llmTextEnhanced'):

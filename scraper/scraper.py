@@ -269,6 +269,72 @@ def _normalize_title(title):
     return s
 
 
+# 多轮通知识别（2026-09-03 新增）：同学院发布的同一会议，先发第一轮通知、后发
+# 第二轮补充通知（不同 URL）。用户约定「只保留最新一轮」。仅当新记录标题含明确轮次
+# 标记才触发替换，配合 同学院+同讲座日+去轮次后标题高度相似+不同URL+新更晚 多重闸门，
+# 避免误伤同日同单位的两场不同讲座（如 bd/66 vs bd/67）。
+_ROUND_MARKER_RE = re.compile(r'第[一二三四五六七八九十\d]+\s*轮|(?:补充|更新|修订)\s*通知')
+
+
+def _has_round_marker(title):
+    """标题是否含明确轮次标记（第X轮 / 补充·更新·修订通知）。"""
+    return bool(_ROUND_MARKER_RE.search(title or ''))
+
+
+def _strip_round_marker(title):
+    """去掉标题中的轮次标记，用于同一会议多轮通知比对。
+
+    例：'…学术研讨会 第二轮会议通知（2019•广州）' -> '…学术研讨会'
+        '第二届认知控制学术研讨会：第一轮会议通知' -> '第二届认知控制学术研讨会：'
+    """
+    t = title or ''
+    t = re.sub(r'第[一二三四五六七八九十\d]+\s*轮', '', t)
+    t = re.sub(r'(?:补充|更新|修订)\s*通知', '', t)
+    t = re.sub(r'会议通知', '', t)
+    t = re.sub(r'[（(]\s*第[一二三四五六七八九十\d]+\s*[轮次]?\s*[）)]', '', t)
+    t = re.sub(r'\(\s*第[一二三四五六七八九十\d]+\s*[轮次]?\s*[\))]', '', t)
+    return _normalize_title(t)
+
+
+def _multi_round_replace(records):
+    """全量模式多轮通知去旧轮：同学院发布的同一会议，先发第一轮、后发第二轮补充通知
+    （不同 URL）。仅当同组内存在带轮次标记（第X轮/补充·更新·修订通知）的记录时触发，
+    保留 publishTime 最晚的一条（最新一轮），删除较早轮次。
+
+    高置信防误伤：
+      - 必须存在轮次标记才触发，否则整组不处理（同日同单位两场不同讲座无标记不误删）；
+      - 仅当 (college, 讲座日, 去轮次标题) 三键相同时才视为同会议多轮。
+    """
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for idx, r in enumerate(records):
+        c = r.get('college', '')
+        ls = (r.get('lectureStart') or '')[:10]
+        nl = _strip_round_marker(r.get('title'))
+        if not nl:
+            continue
+        groups[(c, ls, nl)].append(idx)
+    if not groups:
+        return list(records)
+    drop = set()
+    for key, idxs in groups.items():
+        if len(idxs) < 2:
+            continue
+        # 触发条件：组内至少一条带轮次标记（否则可能是正常同日两场不同讲座）
+        if not any(_has_round_marker(records[i].get('title')) for i in idxs):
+            continue
+        # 保留 publishTime 最晚一条，删除其余
+        idxs_sorted = sorted(idxs, key=lambda i: records[i].get('publishTime') or '')
+        keep = idxs_sorted[-1]
+        for i in idxs_sorted[:-1]:
+            if i != keep:
+                drop.add(i)
+    if drop:
+        print(f'[MULTI-ROUND] 全量模式去旧轮 {len(drop)} 条（保留最新一轮）')
+        return [r for i, r in enumerate(records) if i not in drop]
+    return list(records)
+
+
 def _completeness(r):
     """记录字段完整度：非空关键字段越多越「完整」，去重/合并时优先保留。"""
     return sum(1 for v in [
@@ -738,6 +804,49 @@ def incremental_merge(existing, new_records):
     # 新增记录：先同源去重，再跨源去重（new 内部合并，避免互相重复）
     new_deduped = cross_source_dedup(dedup(new_records))
 
+    # === 多轮通知高置信替换（2026-09-03 新增）===
+    # 场景：同学院发布的同一会议，先发第一轮通知、后发第二轮补充通知（不同 URL）。
+    # 用户约定「只保留最新一轮」。增量模式下 basal 原样锁定、且 _cross_source_dedup
+    # 会把更晚的第二轮判为「与旧轮跨源重复」而跳过 → 旧轮残留、新轮被丢，违背约定。
+    # 高置信闸门：仅当「新记录标题含明确轮次标记（第X轮/补充·更新通知）」才触发替换，
+    # 且要求 同学院 + 同讲座日 + 去轮次后标题高度相似 + 不同 URL + 新记录发布时间更新，
+    # 避免误伤同日同单位的两场不同讲座（如 bd/66 vs bd/67）。
+    replaced_new_keys = set()
+    suppressed_new_keys = set()
+    for r in new_deduped:
+        if not _has_round_marker(r.get('title')):
+            continue
+        c = r.get('college', '')
+        nl_new = _strip_round_marker(r.get('title'))
+        ls = (r.get('lectureStart') or '')[:10]
+        new_pub = r.get('publishTime') or ''
+        new_url = _norm_url(r.get('sourceUrl'))
+        for old in existing:
+            if old.get('college', '') != c:
+                continue
+            if (old.get('lectureStart') or '')[:10] != ls:
+                continue
+            if _norm_url(old.get('sourceUrl')) == new_url:
+                continue  # 同 URL 由 seen 处理
+            nl_old = _strip_round_marker(old.get('title'))
+            if not (nl_new == nl_old or (nl_old and nl_old in nl_new) or (nl_new and nl_new in nl_old)):
+                continue
+            old_pub = old.get('publishTime') or ''
+            new_key = new_url + ('#' + str(r.get('lectureIndex')) if r.get('lectureIndex') is not None else '')
+            if new_pub >= old_pub:
+                old_key = _norm_url(old.get('sourceUrl')) + ('#' + str(old.get('lectureIndex')) if old.get('lectureIndex') is not None else '')
+                if old_key in base_map:
+                    del base_map[old_key]
+                    seen.discard(old_key)
+                    replaced_new_keys.add(new_key)
+                    print(f'[MULTI-ROUND] 多轮通知替换旧轮次: {old_key} -> {new_url}（保留最新一轮）')
+            else:
+                # 新记录更旧（属于同会议更早期的轮次通知）：抑制追加，避免与较新的旧轮并存，
+                # 符合「只保留最新一轮」约定。
+                old_key = _norm_url(old.get('sourceUrl')) + ('#' + str(old.get('lectureIndex')) if old.get('lectureIndex') is not None else '')
+                suppressed_new_keys.add(new_key)
+                print(f'[MULTI-ROUND] 多轮通知新记录更旧，抑制追加: {new_url}（保留 {old_key}）')
+
     # 基底跨源索引：用于判断 new 是否与已有讲座跨源重复
     existing_index = {}
     for r in existing:
@@ -755,11 +864,21 @@ def incremental_merge(existing, new_records):
         key = _norm_url(r.get('sourceUrl')) + ('#' + str(r.get('lectureIndex')) if r.get('lectureIndex') is not None else '')
         if key in seen:
             continue
+        # 多轮通知替换者：跳过跨源去重，直接追加最新一轮（否则会被旧轮判定为跨源重复而跳过）
+        if key in replaced_new_keys:
+            seen.add(key)
+            final_new.append(r)
+            continue
+        # 多轮通知更旧轮次：抑制追加（保留较新的旧轮，符合「只保留最新一轮」）
+        if key in suppressed_new_keys:
+            continue
         if _cross_source_dup_with_existing(r, existing_index):
             skip += 1
             continue
         seen.add(key)
         final_new.append(r)
+    if replaced_new_keys:
+        print(f'[MULTI-ROUND] 共替换 {len(replaced_new_keys)} 条旧轮次（保留最新一轮）')
     if skip:
         print(f'[INCREMENTAL] 跳过 {skip} 条与基底跨源重复的新增记录（不重复追加；基底保持原样）')
     return list(base_map.values()) + final_new
@@ -1016,6 +1135,10 @@ def main():
         out = incremental_merge(existing, all_fetched)
     else:
         out = dedup(raw)
+        # 多轮通知识别：同学院+同讲座日+去轮次标题 的多条记录只保留 publishTime 最晚的
+        # 一条（最新一轮），避免「第一轮/第二轮」并存。须在 cross_source_dedup 之前，
+        # 否则两轮同主讲会被合并/保留旧轮。
+        out = _multi_round_replace(out)
         # 跨源去重：不同学院发布的同一讲座合并为一条（同主讲+同日期+topic相似）。
         # --out 模式由各源独立写出、最后由驱动脚本统一合并，故此处跳过跨源去重避免重复。
         if not args.out:

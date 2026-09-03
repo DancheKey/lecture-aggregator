@@ -3,6 +3,7 @@ import re
 import io
 import sys
 import datetime
+import unicodedata
 import requests
 from urllib.parse import urljoin, unquote, urlparse
 from bs4 import BeautifulSoup
@@ -218,8 +219,11 @@ def _looks_like_real_name(s):
     # 含任何「绝不可能是人名」的子串（系列名/单位/职务/简介等）→ 非人名
     if any(bad in s for bad in _NAME_FORBIDDEN):
         return False
-    # 含字母/· 的外文名（允许 First Last / Last, First / 带前缀）
-    if re.fullmatch(r"[A-Za-z]+(?:[.'·]?\s?[A-Za-z]+)*", s):
+    # 含字母/· 的外文名（允许 First Last / Last, First / 带前缀）。
+    # 支持变音符号（á/ö/ü/ñ/é 等）：先 NFKD 分解再去组合记号再校验，
+    # 否则 'Tamás Dalmay' 因 á 不命中 [A-Za-z] 被拒，导致 poster 页主讲人被清洗守卫清空。
+    s_fold = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
+    if re.fullmatch(r"[A-Za-z]+(?:[.'·]?\s?[A-Za-z]+)*", s_fold):
         if s.lower().strip('.') in _EN_NON_NAME:
             return False
         return True
@@ -1033,6 +1037,11 @@ def _load_text_llm_configs():
     }]
 
 
+# 主动限速（统一到 llm_provider._throttle 令牌桶）：文本默认 20 RPM、VLM 默认 10 RPM，可经环境变量覆盖
+_LLM_RPM = int(_os.environ.get('LLM_RPM') or 20)
+_VLM_RPM = int(_os.environ.get('VLM_RPM') or 10)
+
+
 def _vlm_cache_path():
     return _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
                          'data', '.vlm_cache.json')
@@ -1271,12 +1280,20 @@ _USE_LLM_RICH = (_os.environ.get('SCNU_LLM_RICH') or '1') not in ('0', 'false', 
 
 
 def _vlm_extract_fields(img_urls, cfgs):
-    """按优先级遍历 provider 调用 VLM 提取海报结构化字段。返回 dict 或 None（无 key / 失败 / 限流耗尽）。"""
+    """按优先级遍历 provider 调用 VLM 提取海报结构化字段。返回 dict 或 None（无 key / 失败 / 限流耗尽）。
+
+    负缓存：全失败时写入负标记（模型返回空→硬负常驻；网络/限流失败→软负短 TTL），避免重复烧 VLM 额度。
+    """
+    from llm_provider import _is_neg, _neg_expired, _neg_marker
     if not cfgs or not img_urls:
         return None
     key = _hash.md5('|'.join(sorted(img_urls)).encode('utf-8')).hexdigest()
     cached = _vlm_cache_get(key)
-    if cached is not None and _vlm_fields_useful(cached):
+    if _is_neg(cached):
+        if not _neg_expired(cached):
+            return None  # 负缓存命中（未过期），跳过 VLM 调用
+        # 已过期：当作未命中，继续重试
+    elif cached is not None and _vlm_fields_useful(cached):
         return cached
     contents = []
     for u in img_urls[:2]:
@@ -1293,12 +1310,17 @@ def _vlm_extract_fields(img_urls, cfgs):
     _hp = _os.environ.get('HTTPS_PROXY') or _os.environ.get('https_proxy')
     if _hp:
         _proxies = {'https': _hp, 'http': _hp}
+    got_empty_any = False
     for cfg in cfgs:
-        fields = _vlm_try_one_provider(message, cfg, _proxies or None)
+        fields, got_empty = _vlm_try_one_provider(message, cfg, _proxies or None, rpm=_VLM_RPM)
+        if got_empty:
+            got_empty_any = True
         if fields:
             _vlm_cache_set(key, fields)
-            _vlm_rate_limit(6.0)  # 全局视觉限速（保守，应对 1K/20·2K/10·3K+/1 RPM）
             return fields
+    # 全失败：网络/限流失败→软负；模型返回空→硬负
+    _vlm_cache_set(key, _neg_marker(hard=got_empty_any,
+                                    reason='empty' if got_empty_any else 'error'))
     return None
 
 
@@ -1307,24 +1329,35 @@ def _llm_extract_text_fields(body_text, url):
 
     复用 _vlm_try_one_provider（通用发送函数，message 内容决定文本/视觉模式）。
     仅走 Agnes（_load_text_llm_configs），Agnes 不可用则回落规则解析（由调用方处理）。
+    负缓存：全失败时写入负标记（模型返回空→硬负常驻；网络/限流失败→软负短 TTL），避免重复烧 token。
     """
+    from llm_provider import _is_neg, _neg_expired, _neg_marker
     cfgs = _load_text_llm_configs()
     if not cfgs or not body_text or len(body_text) < 30:
         return None
     key = _hash.md5(body_text.encode('utf-8')).hexdigest()
     cached = _vlm_cache_get(key)
-    if cached is not None and _vlm_fields_useful(cached):
+    if _is_neg(cached):
+        if not _neg_expired(cached):
+            return None  # 负缓存命中（未过期），跳过模型调用
+        # 已过期：当作未命中，继续重试
+    elif cached is not None and _vlm_fields_useful(cached):
         return cached
     # 截断避免超长（多数讲座正文 < 2000 字，超长反而引入页脚噪声）
     _txt = body_text[:3500]
     # 国内域名直连（scnu 与 agnes-ai.cn 均不绕代理，与 scraper 一致）
     message = [{"role": "user", "content": LLM_TEXT_PROMPT.replace('{text}', _txt)}]
+    got_empty_any = False
     for cfg in cfgs:
-        fields = _vlm_try_one_provider(message, cfg, None)
+        fields, got_empty = _vlm_try_one_provider(message, cfg, None, rpm=_LLM_RPM)
+        if got_empty:
+            got_empty_any = True
         if fields:
             _vlm_cache_set(key, fields)
-            _llm_text_rate_limit(3.0)  # 文本 20 RPM，3 秒间隔留余量
             return fields
+    # 全失败：网络/限流失败→软负；模型返回空→硬负
+    _vlm_cache_set(key, _neg_marker(hard=got_empty_any,
+                                    reason='empty' if got_empty_any else 'error'))
     return None
 
 
@@ -1500,8 +1533,15 @@ def _apply_llm_text_to_result(result, f, default_year, publish_time, title_year,
     result['llmTextEnhanced'] = True
 
 
-def _vlm_try_one_provider(message, cfg, proxies):
-    """单个 provider 的带重试提取；遇 429/5xx/异常最多 2 次短退避后放弃。返回 dict 或 None。"""
+def _vlm_try_one_provider(message, cfg, proxies, rpm=None):
+    """单个 provider 的带重试提取；遇 429/5xx/异常最多 2 次短退避后放弃。
+
+    返回 (fields, got_empty)：fields 成功为 dict、失败为 None；got_empty 表示
+    HTTP 有响应但解析后无有用字段（模型明确「非讲座/无信息」），供硬负缓存判定。
+    调用前经 _throttle 统一限速（按服务名分桶，VLM 视觉通道传更保守的 rpm）。
+    """
+    from llm_provider import _throttle
+    _throttle(channel=cfg['name'], rpm=rpm)
     # message 两种形态：① 文本通道已封装好的 messages 列表 [{role,content}]
     #              ② 海报视觉通道的 content parts 列表 [{type,text}/{type,image_url}]
     # 前者直接作为 messages；后者包一层 {"role":"user","content": parts}。
@@ -1518,34 +1558,36 @@ def _vlm_try_one_provider(message, cfg, proxies):
         "Authorization": "Bearer " + cfg['api_key'],
         "Content-Type": "application/json",
     }
+    got_empty = False
     for attempt in range(3):
         try:
             r = requests.post(cfg['base_url'], headers=headers, json=payload, timeout=60, proxies=proxies)
             if r.status_code in (401, 403):
                 # 鉴权失败（key 失效/无权限）：重试无意义，立即放弃并回落下一 provider / OCR
-                return None
+                return None, False
             if r.status_code == 429:
                 # 免费层限流（"访问量过大"）：快速失败，避免指数退避空耗超时。
                 # 最多 2 次短退避（5s/10s）后放弃，回落下一个 provider / RapidOCR。
                 if attempt < 2:
                     _time.sleep(5 * (attempt + 1)); continue
-                return None
+                return None, False
             if r.status_code >= 500:
                 if attempt < 2:
                     _time.sleep(3 * (attempt + 1)); continue
-                return None
+                return None, False
             r.raise_for_status()
             resp = r.json()
             txt = resp['choices'][0]['message']['content']
             fields = _parse_vlm_json(txt)
             if fields and _vlm_fields_useful(fields):
-                return fields
-            return None
+                return fields, False
+            got_empty = True  # 有响应但无有用字段（模型明确「非讲座/无信息」）
+            return None, True
         except Exception:
             if attempt < 2:
                 _time.sleep(3 * (attempt + 1)); continue
-            return None
-    return None
+            return None, False
+    return None, False
 
 
 def _vlm_split_title(original_title, session_number, item_title):

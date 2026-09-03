@@ -63,11 +63,35 @@ EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格�
 6. speaker 必须基于正文明确写出的主讲人姓名；正文无明确人名返回 null，严禁根据标题猜测。
 7. abstract 与 speakerBio 只提取各自段落的正文，必须到此为止：遇到「主讲人简介/报告人简介/专家简介/
    个人简介/报告题目/报告时间/报告地点/报名方式/联系方式/面向对象」等后续字段标题，或「一、二、
-   三、」等章节序号时立即截断，严禁把后续段落（简介、题目、时间、地点、报名方式等）并入本字段。
+   三、」等章节序号时立即截断，严禁把后续段落（简介、题目、时间、地点、报名方式等）并入本字段。此外，正文末尾的「欢迎老师/同学参加」「诚邀」「敬请期待」等邀请语，以及页脚「编辑：/审核：/摄影：」署名，均不属于讲座内容，遇到即从该处截断，不并入 abstract。此外，正文末尾的「欢迎老师/同学参加」「诚邀」「敬请期待」等邀请语，以及页脚「编辑：/审核：/摄影：」署名，均不属于讲座内容，遇到即从该处截断，不并入 abstract。
 8. 输出必须是纯 JSON（以 { 开头、} 结尾）。严禁输出 markdown 列表（如 "- **题目**：..."）、
    加粗、代码块围栏或任何解释文字；若某字段无法从原文解析，返回该字段为 null 的 JSON，
    而不是用文字说明「无法提取」。
 """
+
+
+_ABSTRACT_BOUNDS = (
+    "附件", "附录", "课程名称", "授课对象", "报名方式", "报名链接", "参会方式",
+    "联系方式", "欢迎各位", "欢迎老师", "欢迎同学", "欢迎广大", "欢迎感兴趣",
+    "欢迎广大师生", "诚邀", "敬请期待", "编辑：", "审核：", "摄影：",
+    "扫描二维码", "长按识别", "点击查看", "阅读原文", "更多资讯",
+    "主办单位", "承办单位", "腾讯会议", "会议号", "Meeting ID", "Zoom",
+    "直播链接", "观看方式",
+)
+
+def _truncate_abstract(text):
+    """清理摘要正文后的邀请语/报名/附件/署名等模板尾巴（保留讲座内容本体）。"""
+    if not text or not isinstance(text, str):
+        return text
+    pos = None
+    for b in _ABSTRACT_BOUNDS:
+        i = text.find(b)
+        if i != -1 and (pos is None or i < pos):
+            pos = i
+    if pos is None:
+        return text
+    cut = text[:pos].rstrip()
+    return cut if len(cut) >= 40 else text  # 护栏：边界词在头部则放弃截断
 
 
 # ---------------------------------------------------------------------------
@@ -195,17 +219,24 @@ def _get_env(name):
 # 主动限速
 # ---------------------------------------------------------------------------
 _RATE_LOCK = threading.Lock()
-_NEXT_SLOT = [0.0]
+_NEXT_SLOT = {}  # channel -> 下一次可用 epoch（按通道分桶，文本与视觉互不拖累）
 
 
-def _throttle():
-    """按 LLM_RPM（默认 20 次/分钟）占用一个时间槽，在真实 HTTP 调用前生效。
+def _throttle(channel='agnes', rpm=None):
+    """按 RPM 占用一个时间槽，在真实 HTTP 调用前生效（全局串行、按通道分桶）。
 
     仅靠 429 被动退避不足以保护批量任务：全库并发时会在短时间打出大量请求，
-    先撞限流再重试反而更慢。这里全局串行分配时间槽，把速率压在阈值以内。
+    先撞限流再重试反而更慢。这里按通道（agnes / zhipu 等不同 API 服务）分配时间槽，
+    把速率压在阈值以内；文本与视觉调用计入各自服务的总 RPM，互不拖累。
+
+    rpm 缺省读 LLM_RPM（文本，默认 20/分钟）；VLM 视觉通道调用方应显式传 VLM_RPM
+    （默认 10/分钟，更保守，应对 glm-4v-flash 等视觉模型限流）。
     """
     try:
-        rpm = int(_get_env('LLM_RPM') or 20)
+        if rpm is None:
+            rpm = int(_get_env('LLM_RPM') or 20)
+        else:
+            rpm = int(rpm)
     except (TypeError, ValueError):
         rpm = 20
     if rpm <= 0:
@@ -213,11 +244,42 @@ def _throttle():
     slot = 60.0 / rpm
     with _RATE_LOCK:
         now = time.time()
-        start = max(now, _NEXT_SLOT[0])
-        _NEXT_SLOT[0] = start + slot
+        nxt = _NEXT_SLOT.get(channel, 0.0)
+        start = max(now, nxt)
+        _NEXT_SLOT[channel] = start + slot
         wait = start - now
-    if wait > 0:
-        time.sleep(wait)
+        if wait > 0:
+            time.sleep(wait)
+
+
+# ---------------------------------------------------------------------------
+# 负缓存（negative cache）：把「确认无价值」的解析结果也缓存，避免每轮批量对
+# 解析失败/无结果的正文重复烧 token。
+#   硬负：模型明确「非讲座/无信息」（HTTP 200 但字段全空）→ 常驻，不重试。
+#   软负：网络/限流/超时等偶发失败 → 短 TTL（默认 1 天），到期自动重试，
+#         防止「模型临时故障误标负」导致永久漏抓。
+# 标记结构：{"__neg__": True, "ts": epoch, "hard": bool, "reason": str}
+# ---------------------------------------------------------------------------
+NEG_SOFT_TTL = int(_get_env('NEG_SOFT_TTL') or 86400)    # 软负默认 1 天
+NEG_HARD_TTL = int(_get_env('NEG_HARD_TTL') or 2592000)  # 硬负默认 30 天（误标自愈，避免永久漏抓）
+
+
+def _neg_marker(hard, reason):
+    return {"__neg__": True, "ts": time.time(), "hard": bool(hard), "reason": reason}
+
+
+def _is_neg(v):
+    return isinstance(v, dict) and v.get('__neg__') is True
+
+
+def _neg_expired(v):
+    """负标记是否已过期需重试（软负过期返回 True；硬负/永久返回 False）。"""
+    if not _is_neg(v):
+        return False
+    ttl = NEG_HARD_TTL if v.get('hard') else NEG_SOFT_TTL
+    if ttl <= 0:
+        return False
+    return (time.time() - v.get('ts', 0)) > ttl
 
 
 # ---------------------------------------------------------------------------
@@ -253,6 +315,7 @@ class AgnesProvider(ModelProvider):
     def _post(self, messages, temperature):
         if not self.api_key:
             return None
+        _throttle(channel=self.name)
         payload = {"model": self.model, "messages": messages, "temperature": temperature}
         headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
         _hp = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
@@ -283,7 +346,11 @@ class AgnesProvider(ModelProvider):
             return None
         key = 'text:' + hashlib.md5(body_text.encode('utf-8')).hexdigest()
         cached = _cache_get(key)
-        if cached is not None and _fields_useful(cached):
+        if _is_neg(cached):
+            if not _neg_expired(cached):
+                return None  # 负缓存命中（未过期），跳过模型调用
+            # 已过期：当作未命中，继续重试
+        elif cached is not None and _fields_useful(cached):
             return cached
         txt = body_text[:3500]
         messages = [
@@ -293,14 +360,20 @@ class AgnesProvider(ModelProvider):
         # 模型 A 偶发不稳定：可能返回 markdown、或全字段 null 的 JSON。解析失败/全空时
         # 重试（最多 3 次），拿到含有效字段的 JSON 才采用（回落规则由调用方负责）。
         fields = None
+        got_empty = False
         for _attempt in range(3):
             raw = self._post(messages, temperature)
             fields = _parse_model_json(raw) if raw else None
             if fields and _fields_useful(fields):
                 break
+            got_empty = raw is not None  # 有响应但无效/全空 → 硬负
             time.sleep(2)
         if fields and _fields_useful(fields):
+            fields['abstract'] = _truncate_abstract(fields.get('abstract'))
             _cache_set(key, fields)
+        else:
+            _cache_set(key, _neg_marker(hard=got_empty,
+                                        reason='empty' if got_empty else 'error'))
         return fields
 
     def extract_verdict(self, body_text, rule_fields, llm_fields, *, temperature=0.0):
@@ -339,6 +412,7 @@ class ZhipuProvider(ModelProvider):
     def _post(self, messages, temperature):
         if not self.api_key:
             return None
+        _throttle(channel=self.name)
         payload = {"model": self.model, "messages": messages, "temperature": temperature}
         headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
         _hp = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
@@ -370,7 +444,11 @@ class ZhipuProvider(ModelProvider):
             return None
         key = 'text:zhipu:' + hashlib.md5(body_text.encode('utf-8')).hexdigest()
         cached = _cache_get(key)
-        if cached is not None and _fields_useful(cached):
+        if _is_neg(cached):
+            if not _neg_expired(cached):
+                return None  # 负缓存命中（未过期），跳过模型调用
+            # 已过期：当作未命中，继续重试
+        elif cached is not None and _fields_useful(cached):
             return cached
         txt = body_text[:3500]
         messages = [
@@ -379,8 +457,13 @@ class ZhipuProvider(ModelProvider):
         ]
         raw = self._post(messages, temperature)
         fields = _parse_model_json(raw) if raw else None
+        got_empty = raw is not None  # 有响应但解析无效/全空 → 硬负
         if fields and _fields_useful(fields):
+            fields['abstract'] = _truncate_abstract(fields.get('abstract'))
             _cache_set(key, fields)
+        else:
+            _cache_set(key, _neg_marker(hard=got_empty,
+                                        reason='empty' if got_empty else 'error'))
         return fields
 
     def extract_verdict(self, body_text, rule_fields, llm_fields, *, temperature=0.0):
