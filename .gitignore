@@ -52,6 +52,8 @@ docs/*audit*.html
 docs/[0-9][0-9]-*.md
 # 两轮代码体检报告
 docs/代码体检报告-*.md
+# 代码评审报告（过程文档，不公开，避免推到公网仓库）
+docs/code-review-*/
 # 早期评审稿
 docs/讲座拆分规则-综合修订版.html
 # 需求规格说明书（md 版，注意非 .html）
