@@ -49836,33 +49836,17 @@
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "listTitle": "[2021年12月17日]林树——Quantum kinetic theory for QED and shear-induced spin polarizat",
-      "sources": [],
-      "merged": false,
+      "sources": [
+        {
+          "sourceUrl": "https://physics.scnu.edu.cn/a/20211216/11812.html",
+          "college": "物理学院",
+          "campus": "大学城"
+        }
+      ],
+      "merged": true,
       "sourceCount": 1,
       "abstract": "We derive a quantum kinetic theory for QED including both elastic and inelastic collisions. By assuming parity invariance, we find the classical limit of the kinetic theory generalizes the well-known classical kinetic theory to massive case. The resulting classical kinetic theory simplifies when fermion bare mass is much greater than thermal mass. In this case only elastic collision is relevant and screening is only needed for Coulomb scattering. As an application, we obtain an additional contribution to the shear-induced spin polarization from the collision term. We also discuss phenomenological implications of the contribution.",
       "speakerBio": "2004-2010, PhD at Stony Brook University 2010-2012, Postdoc at Max-Planck-Institute for Physics, Munich 2012-2015, Postdoc at Brookhaven National Laboratory 2015-2016, Associate Professor at Sun Yat-Sen University 2016-present, Professor at Sun Yat-Sen University Research interest: kinetic theory and spin transport, application of gauge/gravity duality, non-equilibrium field theory. 报告人：林树教授（中山大学）报告时间：2021年12月17日上午10:00报告地点：理8栋一楼学术报告厅"
-    },
-    {
-      "sourceUrl": "https://physics.scnu.edu.cn/a/20211216/11812.html",
-      "college": "物理学院",
-      "campus": "大学城",
-      "title": "中山大学林树教授学术报告",
-      "topic": "",
-      "lectureStart": "2021-12-17 10:00:00",
-      "lectureEnd": null,
-      "location": "理8栋一楼学术报告厅",
-      "speaker": "林树",
-      "speakerAffiliation": "中山大学",
-      "organizer": "物理学院",
-      "publishTime": "2021-12-16 09:57:00",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "listTitle": "中山大学林树教授学术报告",
-      "sources": [],
-      "merged": false,
-      "sourceCount": 1,
-      "abstract": "We derive a quantum kinetic theory for QED including both elastic and inelastic collisions. By assuming parity invariance, we find the classical limit of the kinetic theory generalizes the well-known classical kinetic theory to massive case. The resulting classical kinetic theory simplifies when fermion bare mass is much greater than thermal mass. In this case only elastic collision is relevant and screening is only needed for Coulomb scattering. As an application, we obtain an additional contribution to the shear-induced spin polarization from the collision term. We also discuss phenomenological implications of the contribution.",
-      "speakerBio": "2004-2010, PhD at Stony Brook University 2010-2012, Postdoc at Max-Planck-Institute for Physics, Munich 2012-2015, Postdoc at Brookhaven National Laboratory 2015-2016, Associate Professor at Sun Yat-Sen University 2016-present, Professor at Sun Yat-Sen University Research interest:kinetic theory and spin transport, application of gauge/gravity duality, non-equilibrium field theory. 报告人：林树教授（中山大学）报告时间：2021年12月17日上午10:00报告地点：理8栋一楼学术报告厅"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211213/11811.html",
