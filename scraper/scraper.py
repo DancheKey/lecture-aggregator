@@ -349,9 +349,12 @@ def _topic_similarity(a, b):
 def cross_source_dedup(records):
     """跨源去重：不同学院发布的同一讲座合并为一条。
 
-    判定规则（两层）：
+    判定规则（三层）：
       必须条件：同一主讲人（归一化后） + 同一讲座日期（精确到天）
-      充分条件：标题或 topic 的关键词 Jaccard 重叠度 ≥ 0.25
+      充分条件（任一满足即合并）：
+        1. 标题或 topic 的关键词 Jaccard 重叠度 ≥ 0.25
+        2. 同地点（location 完全相同）——覆盖量子物质研究院/物理学院等
+           对同一场讲座使用中英文不同风格标题导致文本相似度极低的情况
 
     合并策略：
       - 保留字段更完整的记录作为主记录（primary）
@@ -474,6 +477,15 @@ def cross_source_dedup(records):
                     _topic_similarity(ri.get('title', ''), rj.get('topic', '')),  # A title vs B topic
                 )
                 if sim >= 0.25:
+                    union(i, j)
+                    continue
+                # 兜底层：同讲者(已在组内) + 同日期(已在组内) + 同地点 → 强信号合并。
+                # 覆盖量子物质研究院/物理学院对同一场讲座分别用英文具体题名和中文
+                # "学术报告"导致文本相似度 < 0.25 的漏合并场景（2026-09-03 实战：
+                # 林树/秦广友/庄鹏飞/Winney 四对均因此漏合并）。
+                loc_a = (ri.get('location') or '').strip()
+                loc_b = (rj.get('location') or '').strip()
+                if loc_a and loc_a == loc_b:
                     union(i, j)
 
         # 按 find 结果聚簇执行合并
