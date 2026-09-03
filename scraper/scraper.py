@@ -294,9 +294,13 @@ def _normalize_speaker(speaker):
 def _is_valid_speaker_name(name):
     """判断主讲人是否为真实姓名（排除「联系方式」「我校生命」等解析噪声）。
 
-    合法姓名特征：2~10 字符，不含明显非人名词汇。
+    合法姓名特征：2~30 字符，不含明显非人名词汇。
+    上限放宽到 30 是为了容纳 "Dr. Daniel Winney" 这类带头衔的英文全名——
+    它们此前被 15 字符上限判为噪声，从而完全不参与跨源合并分组，
+    导致同一场讲座在两个学院网站各存一条。误合并风险由下面的
+    invalid_keywords 黑名单与调用方的相似度阈值（≥0.25）双重兜底。
     """
-    if not name or len(name) < 2 or len(name) > 15:
+    if not name or len(name) < 2 or len(name) > 30:
         return False
     # 明确非法词（解析器常见噪声）
     invalid_keywords = [
