@@ -1,33 +1,41 @@
-"""按年份把历史讲座记录用 Agnes 文本 LLM 重新增强（定向补丁，不整体替换）。
+"""按年份把历史讲座记录定向回填（parse_detail 全流程 + 仅填空补丁，不整体替换）。
 
-只对该年记录的 sourceUrl 重新抓取正文，调用 parsers 里已验证的
-_llm_extract_text_fields + _apply_llm_text_to_result，把 LLM 提取的字段
-补丁式回填进现有记录（仅填 topic/speaker/location/abstract/speakerBio 与
-时间；不动 sourceUrl/college/title/lectureIndex 等身份与去重键，不覆盖已有
-非空好值）。符合「禁整体替换、只做定向补丁」铁律。
+对该年记录的 sourceUrl 重新抓取正文，调用 parsers.parse_detail 完整管线
+（规则解析 + rich 模式 LLM 增强，内置全套守卫：snippet 溯源、单位质量校验、
+host 校名拦截、bio 截断），把结果按「仅填空」原则回填进现有记录——
+绝不覆盖已有非空值。多讲座拆分页按 lectureIndex 一一匹配；news filter
+命中的页（返回 None）整页跳过；海报页跳过（VLM 独立路线，不烧额度）。
 
 用法：
-  python scripts/backfill_llm_by_year.py --year 2026
-  python scripts/backfill_llm_by_year.py --year 2026 --limit 5     # 冒烟
-  python scripts/backfill_llm_by_year.py --year 2026 --dry-run     # 不写盘
+  python scripts/backfill_llm_by_year.py --year 2024
+  python scripts/backfill_llm_by_year.py --year 2024 --limit 5     # 冒烟
+  python scripts/backfill_llm_by_year.py --year 2024 --dry-run     # 不写盘
 
 说明：
-- 每个 URL 只抓一次；LLM 调用走 parsers 内全局限速锁（文本 3s/次）。
+- 脚本强制 SCNU_LLM_TEXT=0（不启用全字段双轨与 B 裁决）；SCNU_LLM_RICH
+  尊重外部设置（默认 1=rich 增强，仅填摘要/简介/规则空的职称与单位；
+  设 0 可跑纯规则模式，零 LLM 成本）。
+- 抓取与 LLM 调用均直连（清除代理环境变量，国内域名约定）。
+- 每个 URL 只抓一次；LLM 调用走 llm_provider 内置缓存与限速。
 - 写盘前自动备份 data/lectures.json，再用临时文件 + os.replace 原子替换。
 - 抓不到的页（404/超时）保持原记录不变。
 """
 import os
+import re
 import sys
 import json
 import time
-import re
 import argparse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 
+# —— 环境设定必须在 import parsers 之前（开关在 parsers 模块顶层读取）——
+os.environ['SCNU_LLM_TEXT'] = '0'   # 强制关闭全字段双轨：backfill 只用 rich 增强
+for _k in ('HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy'):
+    os.environ.pop(_k, None)        # 国内域名直连约定
+
 import requests  # noqa: E402
-from bs4 import BeautifulSoup  # noqa: E402
 import charset_normalizer  # noqa: E402
 import parsers  # noqa: E402
 
@@ -66,34 +74,6 @@ def _speaker_suspicious(db_sp, rule_sp):
     return _lev(a, b) <= 2
 
 
-def _flatten_rule_result(rule):
-    """parse_detail 多讲座拆分页返回 list[dict]，单页返回 dict。"""
-    if isinstance(rule, list):
-        for r in rule:
-            if isinstance(r, dict) and (r.get('speaker') or '').strip():
-                return r
-        return {}
-    if isinstance(rule, dict):
-        return rule
-    return {}
-
-
-def _apply_rule_fallback(rec, rule_dict):
-    """NO_LLM 兜底：用规则结果校正 speaker。
-    仅当规则 speaker 是合法 CJK 姓名、与现有 speaker 编辑距离 ≤2 → 覆盖。
-    不改 speaker 以外的字段，避免误改时间、URL、来源、标题等。
-    """
-    db_sp = (rec.get('speaker') or '').strip()
-    rule_sp = (rule_dict.get('speaker') or '').strip() if rule_dict else ''
-    if not _speaker_suspicious(db_sp, rule_sp):
-        return False
-    rec['speaker'] = rule_sp
-    rule_title = (rule_dict.get('speakerTitle') or '').strip() if rule_dict else ''
-    if rule_title and not (rec.get('speakerTitle') or '').strip():
-        rec['speakerTitle'] = rule_title
-    return True
-
-
 def _decode_html(raw):
     """鲁棒解码 HTML：优先 <meta charset> 声明，其次 UTF-8 严格，再次 GB18030 兜底。"""
     try:
@@ -104,8 +84,6 @@ def _decode_html(raw):
             if enc in ('gb2312', 'gbk', 'gb18030', 'gbk2312'):
                 enc = 'gb18030'
             elif enc in ('big5', 'big5hkscs'):
-                enc = 'big5'
-            if enc not in ('utf-8', 'utf8', 'us-ascii', 'ascii', 'iso-8859-1'):
                 try:
                     return raw.decode(enc)
                 except UnicodeDecodeError:
@@ -126,14 +104,6 @@ def _decode_html(raw):
     return raw.decode('utf-8', errors='replace')
 
 
-# 复刻 parsers.parse_detail 对正文容器的选取（稳定小片段，避免耦合其内部实现）
-_CONTENT_DIV_CLASSES = (
-    'wp_articlecontent', 'wp_entry', 'article-content', 'container-left',
-    'article', 'content', 'news-details-all', 'news-details-middle',
-    'news-text', 'entry-content',
-)
-
-
 def _year_of(s):
     if not s:
         return None
@@ -141,36 +111,49 @@ def _year_of(s):
     return int(m) if m.isdigit() else None
 
 
-def extract_body_text(html, url):
-    """从 HTML 提取讲座正文文本（尽量与 parse_detail 一致）。"""
-    soup = BeautifulSoup(html, 'html.parser')
-    text = soup.get_text(' ')
-    meta_parts = []
-    for meta in (soup.find('meta', attrs={'name': 'description'}),
-                 soup.find('meta', property='og:description'),
-                 soup.find('meta', attrs={'name': 'og:description'})):
-        if meta and meta.get('content') and len(meta.get('content').strip()) > 3:
-            meta_parts.append(meta.get('content').strip())
-    if meta_parts:
-        text = text + ' ' + ' '.join(meta_parts)
-    text = parsers._n1_normalize(parsers._normalize_label_text(re.sub(r'\s+', ' ', text).strip()))
-    text = parsers._strip_footer(text)
-    content_div = None
-    for cls in _CONTENT_DIV_CLASSES:
-        content_div = soup.find('div', class_=cls)
-        if content_div:
-            break
-    if not content_div:
-        content_div = soup.find('article')
-    body = content_div.get_text(' ') if content_div else text
-    body = parsers._n1_normalize(parsers._normalize_label_text(re.sub(r'\s+', ' ', body).strip()))
-    body = parsers._strip_footer(body)
-    # JS 渲染站点（maths/physics 等）正文容器只含导航骨架，但 meta description 中保存了
-    # 完整讲座摘要。把 meta 追加进 body，保证 LLM 能读到主讲人/时间/地点。
-    if meta_parts:
-        body = body + ' ' + ' '.join(meta_parts)
-        body = parsers._n1_normalize(parsers._normalize_label_text(re.sub(r'\s+', ' ', body).strip()))
-    return body
+# 回填目标字段：全部仅填空；身份/去重键（sourceUrl/college/title/lectureIndex）不碰。
+_FILL_FIELDS = ('topic', 'speaker', 'location', 'abstract', 'speakerBio',
+                'speakerAffiliation', 'speakerTitle', 'lectureStart', 'lectureEnd')
+
+
+def _is_empty(v):
+    return v is None or (isinstance(v, str) and not v.strip())
+
+
+def _match_result(parse_res, rec):
+    """parse_detail 结果与库内记录匹配。
+
+    单页返回 dict → 所有 rec 共用；多讲座返回 list → 按 lectureIndex
+    （两侧均为 1-based）一一匹配，匹配不上返回 None（不回写，防串值）。
+    """
+    if isinstance(parse_res, dict):
+        return parse_res
+    if isinstance(parse_res, list):
+        li = rec.get('lectureIndex')
+        for r in parse_res:
+            if isinstance(r, dict) and r.get('lectureIndex') == li:
+                return r
+    return None
+
+
+def _fill_empty(rec, src):
+    """仅填空回写：rec 字段为空且 src 非空才写入。返回写入的字段名列表。"""
+    filled = []
+    for f in _FILL_FIELDS:
+        v = src.get(f)
+        if _is_empty(rec.get(f)) and not _is_empty(v):
+            rec[f] = v.strip() if isinstance(v, str) else v
+            filled.append(f)
+    return filled
+
+
+def _fix_speaker(rec, src):
+    """speaker 可疑（疑似串值/错配）时用 parse_detail 结果校正（8777/13327 同款）。"""
+    sp = (src.get('speaker') or '').strip()
+    if sp and _speaker_suspicious(rec.get('speaker'), sp):
+        rec['speaker'] = sp
+        return True
+    return False
 
 
 def main():
@@ -189,7 +172,7 @@ def main():
     # 筛选该年记录
     year_recs = [r for r in recs if _year_of(r.get('lectureStart')) == args.year
                  or (_year_of(r.get('lectureStart')) is None and _year_of(r.get('publishTime')) == args.year)]
-    # 按 sourceUrl 聚合（2026 实测 1:1，仍通用处理）
+    # 按 sourceUrl 聚合（多讲座拆分页一 URL 对多条记录）
     by_url = {}
     for r in year_recs:
         u = str(r.get('sourceUrl', '')).rstrip('/')
@@ -207,14 +190,14 @@ def main():
     print(f'[INFO] 年份 {args.year}：该年记录 {len(year_recs)} 条，唯一 URL {len(by_url)} 个，'
           f'本次处理 {len(urls)} 个' + ('（dry-run，不写盘）' if args.dry_run else ''))
 
-    stat = {'ok': 0, 'fail': 0, 'enhanced': 0, 'no_llm': 0, 'rule_fallback': 0}
+    stat = {'ok': 0, 'fail': 0, 'news_skipped': 0, 'poster_skip': 0,
+            'enhanced': 0, 'rule_only': 0, 'fixed_speaker': 0, 'no_match': 0}
     sess = requests.Session()
 
     for i, url in enumerate(urls, 1):
         try:
-            # 显式禁用代理：scnu.edu.cn / agnes-ai.cn 均为国内域名须直连。
-            # 注意 proxies={'http':None,'https':None}（空字典才阻止 requests 回退读环境变量），
-            # 单个 None 反而会让 requests 回退去读 HTTP(S)_PROXY 环境变量。
+            # 显式禁用代理：scnu.edu.cn 为国内域名须直连。
+            # 注意 proxies={'http':None,'https':None}（空字典才阻止 requests 回退读环境变量）。
             r = sess.get(url, headers=HEADERS, timeout=30,
                          proxies={'http': None, 'https': None})
             if r.status_code != 200:
@@ -226,68 +209,68 @@ def main():
             print(f'  [{i}/{len(urls)}] ERR {url} -> {e}')
             continue
 
-        # 用 bytes + 鲁棒解码（与 scraper.py fetch 一致），避免 requests.text 按 ISO-8859-1
-        # 错误解码华师 UTF-8 页面导致中文乱码、LLM 认错人名。
         html = _decode_html(r.content)
-        body = extract_body_text(html, url)
-        if len(body) < 30:
-            stat['no_llm'] += 1
-            print(f'  [{i}/{len(urls)}] NO_LLM body_too_short(len={len(body)}) {url}')
+
+        # 海报页跳过：文本增强不适用（正文是 OCR 碎片），VLM 是独立路线
+        if any(rr.get('hasPosterImage') or rr.get('imageParseMethod') for rr in by_url[url]):
+            stat['poster_skip'] += 1
+            print(f'  [{i}/{len(urls)}] POSTER-SKIP {url}')
             continue
-        lf = parsers._llm_extract_text_fields(body, url)
-        # 抓到的 HTML 直接供 RULE-FALLBACK 复用，避免重复请求
-        cached_html = html
 
-        url_year = parsers._year_from_url(url)
-        default_year = args.year
+        first = by_url[url][0]
+        try:
+            parse_res = parsers.parse_detail(
+                html, url, first.get('college') or '', first.get('campus') or '',
+                default_year=args.year,
+                list_title=(first.get('listTitle') or first.get('title') or ''))
+        except Exception as e:
+            stat['fail'] += 1
+            print(f'  [{i}/{len(urls)}] PARSE-ERR {url} -> {e}')
+            continue
+        if parse_res is None:
+            # news filter / 成立大会剔除等：整页跳过，不动记录
+            stat['news_skipped'] += 1
+            print(f'  [{i}/{len(urls)}] NEWS-SKIP {url}')
+            continue
 
-        rule_used = False
+        any_change = False
         for rec in by_url[url]:
-            try:
-                if lf:
-                    parsers._apply_llm_text_to_result(
-                        rec, lf, default_year,
-                        rec.get('publishTime'), None, url_year)
-                else:
-                    # NO_LLM 兜底：复用已抓到的 HTML 跑规则路径 parse_detail，
-                    # 对错配 speaker 做最小补丁回写。这是 backfill 的重要兜底——
-                    # 之前 LLM 返回 None 时静默 continue，导致旧错值被 llmTextEnhanced=True
-                    # 永久锁死（如 8777 苏伟旻、13327 窦皓哲），现已修复。
-                    try:
-                        from parsers import parse_detail as _parse
-                        rec_college = (rec.get('college') or '')
-                        rec_campus = (rec.get('campus') or '')
-                        rec_lt = (rec.get('listTitle') or rec.get('title') or '')
-                        rule_res = _parse(cached_html, url, rec_college, rec_campus,
-                                          default_year=default_year, list_title=rec_lt)
-                        flat = _flatten_rule_result(rule_res)
-                        if _apply_rule_fallback(rec, flat):
-                            rule_used = True
-                            stat['rule_fallback'] += 1
-                    except Exception as _ex:
-                        pass
-                if rec.get('llmTextEnhanced'):
+            src = _match_result(parse_res, rec)
+            if src is None:
+                stat['no_match'] += 1
+                print(f'  [{i}/{len(urls)}] NO-MATCH lectureIndex={rec.get("lectureIndex")} {url}')
+                continue
+            filled = _fill_empty(rec, src)
+            if _fix_speaker(rec, src):
+                stat['fixed_speaker'] += 1
+                filled.append('speaker*')
+            if filled:
+                any_change = True
+                rec['llmTextEnhanced'] = bool(src.get('llmTextEnhanced'))
+                if src.get('llmVerdict'):
+                    rec['llmVerdict'] = src['llmVerdict']
+                if src.get('llmTextEnhanced'):
                     stat['enhanced'] += 1
-            except Exception as e:
-                print(f'  [{i}/{len(urls)}] MERGE-ERR {url} -> {e}')
-        if not lf:
-            stat['no_llm'] += 1
-        stat['ok'] += 1
-        tag = '(LLM)' if lf else ('(RULE-FALLBACK)' if rule_used else '(no-op)')
-        print(f'  [{i}/{len(urls)}] OK {tag} {url}  speaker={by_url[url][0].get("speaker")}  '
-              f'abstract={"有" if by_url[url][0].get("abstract") else "无"}')
+                else:
+                    stat['rule_only'] += 1
+            tag = ('FILL[' + ','.join(filled) + ']') if filled else 'no-op'
+            print(f'  [{i}/{len(urls)}] {tag} {url}')
+        if any_change:
+            stat['ok'] += 1
 
-    print(f'\n[SUMMARY] 抓取成功 {stat["ok"]} / 失败 {stat["fail"]} / '
-          f'无LLM结果 {stat["no_llm"]} / LLM增强 {stat["enhanced"]} 条 / '
-          f'规则兜底 {stat["rule_fallback"]} 条')
+    print(f'\n[SUMMARY] 有回写 {stat["ok"]} / 抓取或解析失败 {stat["fail"]} / '
+          f'新闻稿跳过 {stat["news_skipped"]} / 海报页跳过 {stat["poster_skip"]} / '
+          f'index未匹配 {stat["no_match"]}\n'
+          f'          LLM增强 {stat["enhanced"]} 条 / 纯规则填充 {stat["rule_only"]} 条 / '
+          f'speaker校正 {stat["fixed_speaker"]} 条')
 
     if args.dry_run:
         print('[DRY-RUN] 未写盘。')
         return
 
     # 原子写盘（先备份）—— 任一路径修改都需持久化
-    if stat['enhanced'] == 0 and stat['rule_fallback'] == 0:
-        print('[INFO] 无记录被增强或兜底，跳过写盘。')
+    if stat['enhanced'] == 0 and stat['rule_only'] == 0 and stat['fixed_speaker'] == 0:
+        print('[INFO] 无记录被回填，跳过写盘。')
         return
     bak = data_path + '.bak-' + time.strftime('%Y%m%d%H%M%S')
     import shutil
