@@ -10,9 +10,13 @@
   1) sourceUrl 与 lectureIndex 复合键唯一（无重复记录键）。
   2) 凡含 listTitle 的记录，title 必须等于 clean_title(listTitle)
      —— 直接防止「把 topic 拼进 title」「title 被覆盖成题目」这类回归。
-  3) 社科处(skc)记录：若 topic 非空，则 title != topic（防止二者被合并）。
+  3) 社科处(skc)记录：listTitle 含「第N讲」等系列结构时，title 必须保留完整
+     clean_title(listTitle)（防止 title 塌缩、丢失系列名）。
   4) images 字段不含本地文件系统路径（C:\、D:\、/tmp/ 等）。
   5) 增量合并函数 incremental_merge 单元测试：基底锁定、只追加、不重复。
+
+说明：title 与 topic 内容相同**不再**视为违规（2026-09-04 决策）——两者是卡片上的
+独立元素，均需保留；topic 承载讲座题目，即使与 title 重复也不应被清空。
 
 说明：clean_title / _strip_nav_noise 为 scraper/parsers.py 的**镜像副本**，
 仅用于校验「已提交数据」是否与生成逻辑一致。若 parsers.py 改动标题清洗逻辑，
@@ -141,8 +145,9 @@ _SERIES_RE = re.compile(r"第[一二三四五六七八九十百零\d]+[场期讲
 def check_skc_title_integrity(recs, errors):
     """社科处铁律（2026-07-30 修复后约定）：
     listTitle 含「第N讲」等独特系列结构时，title 必须保留完整 listTitle
-    （clean_title 后），且不得塌缩成 == topic（topic 是提炼出的讲座题目）。
-    这是针对「title 被 topic 覆盖、丢失系列名」回归的精确护栏。"""
+    （clean_title 后）。这是针对「title 被 topic 覆盖、丢失系列名」回归的精确护栏。
+    注：2026-09-04 起不再检查 title==topic——topic 是卡片上的独立元素，
+    与 title 内容相同属正常形态，不应判违规（原检查随 CTLD 同款检查一并移除）。"""
     for r in recs:
         url = r.get("sourceUrl", "")
         if "skc.scnu.edu.cn" not in url:
@@ -157,25 +162,6 @@ def check_skc_title_integrity(recs, errors):
                 f"[skc title!=clean(listTitle)] {url} "
                 f"expected={expected!r} actual={actual!r}"
             )
-        tp = (r.get("topic") or "").strip()
-        if tp and actual == tp:
-            errors.append(f"[skc title==topic] {url} title={actual!r}")
-
-
-def check_ctld_topic_not_equal_title(recs, errors):
-    """ctld 铁律补充护栏（2026-07-30）：教师发展中心(ctld)的 listTitle 是
-    「关于举办"XXX"通知」行政壳，title 应抽为讲座名、topic 应清空（不冗余）。
-    若 topic 非空且 == title，即 title 被 topic 覆盖/冗余，判为违规。
-    仅针对 ctld 源——life/行知/地理/美术 等大量源的 title==topic 是良性历史形态
-    （title 已承载讲座名，topic 重复为历史简化、前端已适配），不在本次回归修复范围，
-    故不检查，避免误伤。"""
-    for r in recs:
-        if r.get("college") != "教师发展中心":
-            continue
-        t = (r.get("title") or "").strip()
-        tp = (r.get("topic") or "").strip()
-        if tp and t == tp:
-            errors.append(f"[ctld title==topic] {r.get('sourceUrl')} title={t!r}")
 
 
 def test_incremental_merge_unit(errors):
@@ -209,7 +195,6 @@ def main():
     errors = []
     check_composite_key_unique(recs, errors)
     check_skc_title_integrity(recs, errors)
-    check_ctld_topic_not_equal_title(recs, errors)
     check_images_no_local_path(recs, errors)
     test_incremental_merge_unit(errors)
 
