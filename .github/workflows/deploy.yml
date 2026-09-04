@@ -1,0 +1,66 @@
+name: 部署到 GitHub Pages
+
+# 触发：每次推送到 main（含每日自动更新数据）都会重新部署
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# 发布 Pages 所需的最小权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个部署；新触发排队，不取消正在跑的
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      # 铁律护栏（最后防线）：部署前再校验一次数据不变量，
+      # 防止任何漏网的坏数据（如手动 push 未本地验证）上线公网。
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # test_invariants.py 会 import scraper 模块，其顶层依赖 requests/yaml/bs4 等。
+      # 若未安装，"校验数据不变量"步骤会因 ImportError 直接失败（此前 13:38/14:25 邮件根因）。
+      - name: 安装 Python 依赖
+        run: pip install -r scraper/requirements.txt
+
+      # 切片新鲜度守卫（2026-08-05 体检修复 中等-19）：部署前由 data/lectures.json
+      # 重新生成前端切片，杜绝「手工改了 data/ 却忘跑切片脚本」导致公网切片陈旧。
+      - name: 重新生成前端切片
+        run: python scripts/generate_frontend_data.py
+
+      - name: 校验数据不变量（铁律护栏）
+        run: python scripts/test_invariants.py
+
+      # 一致性守卫：server.py 下发路径与切片生成路径必须逐条一致（防双实现漂移）
+      - name: 一致性守卫测试
+        run: python tests/test_frontend_consistency.py
+
+      # 把 site/ 目录作为静态站点产物上传
+      - name: 上传站点产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

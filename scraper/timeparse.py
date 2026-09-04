@@ -1,0 +1,608 @@
+"""中文讲座时间结构化：将「2025年7月2日（星期一）下午3:00」等解析为 datetime。
+
+时间抽取规则（R1–R6，2026-07-18 定稿）：
+  R1 权威标签优先：按 Tier 顺序扫描带日期的"时间"标签，完整日期直接采用、仅月日转 R4 补年。
+  R2 通用解析只扫正文：仅作用于 content_div（剔除 nav/aside/footer/meta），缺失回退整页并降置信。
+  R3 发布时间精确定位（在 parsers.py 的 _locate_publish_time 实现）：发布日排除只用于定位发布时间，
+      绝不用字符串替换删除正文里所有同天日期（修 Bug A）。
+  R4 年份优先级固定：URL年 > 标题年 > 正文年 > 发布年 > 当前年；仅月日沿链补年，不二次抬年。
+  R5 讲座日 = 发布日属正常：不因此置空或降级。
+  R6 跨年修正（双向）：仅月日补年结果、补年源∈{URL年,发布年}、publish 已定位时触发；
+      lecture<publish 或 lecture>publish 双向判定 +1/-1/不动，附置信度与 note。
+
+本模块只做"纯解析"：parse_cn_time 是底层原语（在给定文本里找第一个日期，按优先级补年，
+但**不删除**任何文本）；resolve_lecture_time 是编排层，实现 R1/R2/R4/R6。
+"""
+import re
+from datetime import datetime, date
+
+PERIOD_OFFSET = {'上午': 0, '早上': 0, '中午': '中午', '下午': 12, '晚上': 12, '傍晚': 12}
+
+FULL_PATTERNS = [
+    r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]',
+    r'(\d{4})-(\d{2})-(\d{2})',
+    r'(\d{4})\.(\d{2})\.(\d{2})',
+]
+MONTHDAY = r'(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?'
+SLASH_MONTHDAY = r'(\d{1,2})/(\d{1,2})'
+COLON = r'[:：]'
+
+
+def _apply_period(hh, period):
+    if period == '中午':
+        # 2026-08-05 体检修正：「中午」此前按 +12 一刀切，中午11点被错解为 23:00。
+        # 中午只覆盖 11–13 点语义：11点/12点保持原值，1–5 点视为午后（13–17 点）。
+        if hh in (11, 12):
+            return hh
+        if 1 <= hh <= 5:
+            return hh + 12
+        return hh % 24
+    if period is not None:
+        if hh < 12:
+            hh += period
+        elif period == 12 and hh == 12:
+            hh = 12
+    else:
+        # 讲座不会在凌晨 1–5 点举办；无上午/下午标记的小时间按下午(+12)处理，
+        # 避免把「2：30-4：00」误解析为 02:30-04:00（实为 14:30-16:00，ibc/2779）。
+        # 6 点及以后、0 点占位保持原值，避免误伤上午场与 00:00 占位。
+        if 1 <= hh <= 5:
+            hh += 12
+    return hh % 24
+
+
+def _apply_ampm(hh, suffix):
+    """中英混排 am/pm 后缀：pm 在 <12 时 +12；am 在 12 时归 0；否则保持。"""
+    if suffix == 'pm':
+        if hh < 12:
+            hh += 12
+    elif suffix == 'am':
+        if hh == 12:
+            hh = 0
+    return hh
+
+
+def _build(m, seg, y, mo, d):
+    # 防御：月份/日期/年份越界（如 URL 路径 2025/0507 被 SLASH_MONTHDAY 误匹配成
+    # "月=25/日=05"）直接返回 None，避免构造 datetime 抛异常导致整条解析失败；
+    # 调用方会回退到其他日期模式或留空，而非丢弃整条讲座。
+    try:
+        y_i, mo_i, d_i = int(y), int(mo), int(d)
+    except (ValueError, TypeError):
+        return None
+    if not (1 <= mo_i <= 12) or not (1 <= d_i <= 31) or y_i <= 0:
+        return None
+    # 修复（2026-08-05 体检 严重-2）：上面的范围校验只查「日≤31」，
+    # 「2026年2月31日」「4月31日」等 OCR 常见噪声能通过校验，随后构造
+    # datetime 抛 ValueError 一路上抛、整条讲座被静默丢弃——与本模块
+    # 「绝不直接构造 datetime 抛异常」的承诺相悖。此处做真实日历校验，
+    # 非法日期返回 None，调用方回退其他日期模式或留空。
+    try:
+        datetime(y_i, mo_i, d_i)
+    except ValueError:
+        return None
+    seg = seg[m.start():]
+    period = 0
+    pm = re.search(r'(上午|早上|中午|下午|晚上|傍晚)', seg)
+    if pm:
+        period = PERIOD_OFFSET[pm.group(1)]
+    # 时钟时间抽取（支持 冒号 / 中文点 / 中英混排 am·pm 前缀或后缀，大小写）：
+    # 2026-08-09 修复——seri 海报「上午10am」「15:00pm」、swc 海报「Am 9：00」
+    # （全角冒号已由 COLON 覆盖）此前未被识别，导致真实时刻被写成 08:00 占位。
+    raw_times = []
+    for tm in re.finditer(r'(\d{1,2})\s*' + COLON + r'\s*(\d{2})\s*(am|pm|AM|PM)?', seg, re.I):
+        raw_times.append((int(tm.group(1)), int(tm.group(2)), (tm.group(3) or '').lower()))
+    if not raw_times:
+        for tm in re.finditer(r'(am|pm|AM|PM)\s*(\d{1,2})\s*' + COLON + r'\s*(\d{2})', seg, re.I):
+            raw_times.append((int(tm.group(2)), int(tm.group(3)), tm.group(1).lower()))
+    if not raw_times:
+        for tm in re.finditer(r'(?<![\d:])\s*(\d{1,2})\s*(am|pm|AM|PM)\b', seg, re.I):
+            raw_times.append((int(tm.group(1)), 0, tm.group(2).lower()))
+    if not raw_times:
+        # 中文「X点 / X点X分 / X点半」式时间（如「下午3点」「上午10点30分」），
+        # 冒号时间缺失时兜底（常见于海报 OCR 文本）。
+        # 2026-08-05 体检修正：「半」改为仅匹配紧随「点」后的半（第 3 捕获组）。
+        # 此前对整个 seg 泛搜「半」字，「半决赛」「一半」等词也会让分钟误置 30。
+        dot = re.findall(r'(\d{1,2})\s*点\s*(?:(\d{1,2})\s*分?|(半))?', seg)
+        if dot:
+            hh = int(dot[0][0])
+            mm = int(dot[0][1]) if dot[0][1] else (30 if dot[0][2] else 0)
+            raw_times.append((hh, mm, ''))
+    if not raw_times:
+        return {'start': datetime(y_i, mo_i, d_i, 0, 0),
+                'end': None, 'has_time': False}
+    # 每个时间：优先用自身 am/pm 后缀/前缀，否则用中文 period（上午/下午…）
+    def _final_hh(hh, suffix):
+        if suffix in ('am', 'pm'):
+            return _apply_ampm(hh, suffix)
+        return _apply_period(hh, period)
+    def _valid(hh, mm):
+        return 0 <= hh <= 23 and 0 <= mm <= 59
+    h0_raw, m0_raw, s0 = raw_times[0]
+    if not _valid(h0_raw, m0_raw):
+        return {'start': datetime(y_i, mo_i, d_i, 0, 0),
+                'end': None, 'has_time': False}
+    h0 = _final_hh(h0_raw, s0)
+    start = datetime(y_i, mo_i, d_i, h0, m0_raw)
+    end = None
+    if len(raw_times) > 1:
+        h1_raw, m1_raw, s1 = raw_times[1]
+        if _valid(h1_raw, m1_raw):
+            h1 = _final_hh(h1_raw, s1)
+            end = datetime(y_i, mo_i, d_i, h1, m1_raw)
+    return {'start': start, 'end': end, 'has_time': True}
+
+
+def _parse_compact_run(m, seg, yy, run):
+    """抗 OCR 噪声的紧凑数字日期：年份后接 3-6 位乱序数字（如 2024111128 / 20241715 / 2024715）。
+
+    汕尾校区教学工作坊海报经 OCR 后，日期常被粘连成无分隔符的数字串，且可能多/少一位。
+    对 run 做多种切分试探，按优先级取首个「月∈[1,12] 且 日∈[1,31]」的合法组合。
+    """
+    n = len(run)
+    if n == 4 and run[:2] in ('19', '20'):
+        return None
+    cands = []
+    if n == 3:
+        cands.append((int(run[0]), int(run[1:])))
+    elif n == 4:
+        cands.append((int(run[:2]), int(run[2:])))
+        cands.append((int(run[0]), int(run[1:])))
+    elif n == 5:
+        cands.append((int(run[1:3]), int(run[3:])))
+        cands.append((int(run[:2]), int(run[2:4])))
+    elif n == 6:
+        if run[0:2] == run[2:4]:
+            cands.append((int(run[2:4]), int(run[4:6])))
+        else:
+            cands.append((int(run[:2]), int(run[2:4])))
+            cands.append((int(run[2:4]), int(run[4:6])))
+    for mo, d in cands:
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            return _build(m, seg, str(yy), str(mo), str(d))
+    if '1' in run:
+        parts = [p for p in re.split(r'1', run) if p and p.isdigit()]
+        if len(parts) == 2:
+            mo, d = int(parts[0]), int(parts[1])
+            if 1 <= mo <= 12 and 1 <= d <= 31:
+                return _build(m, seg, str(yy), str(mo), str(d))
+    return None
+
+
+def _parse_segment(seg, default_year, publish_time):
+    """在单段文本里找第一个日期。完整日期用其显式年；仅月日用 default_year 补年。
+
+    返回 {'start','end','has_time','from_full'} 或 None。from_full 表示该日期含显式 4 位年。
+    注意：绝不对 seg 做字符串删除（修 Bug A）；仅对"完整日期"循环做发布日精确跳过，
+    避免把发布时间戳当讲座日。
+    """
+    seg = re.sub(r'\s+', '', seg)
+    pub = publish_time[:10] if publish_time else None
+    y = default_year
+
+    # 1) 完整中文日期（含中文年）：最可靠，优先使用显式年份。
+    m = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]', seg)
+    if m:
+        r = _build(m, seg, m.group(1), m.group(2), m.group(3))
+        if not r:
+            return None
+        r['from_full'] = True
+        return r
+
+    # 2) 完整日期 YYYY-MM-DD / YYYY.MM.DD / YYYY/M/D / YYYY/MMDD：
+    #    跳过等于发布日期的（避免把发布日期当讲座日期）。
+    for p in [r'(\d{4})-(\d{2})-(\d{2})',
+              r'(\d{4})\.(\d{2})\.(\d{2})',
+              r'(\d{4})/(\d{1,2})/(\d{1,2})',
+              r'(\d{4})/(\d{2})(\d{2})']:
+        for m in re.finditer(p, seg):
+            if pub and f"{m.group(1)}-{m.group(2).zfill(2)}-{m.group(3).zfill(2)}" == pub:
+                continue
+            r = _build(m, seg, m.group(1), m.group(2), m.group(3))
+            if not r:
+                continue
+            r['from_full'] = True
+            return r
+
+    # 3) 抗 OCR 噪声的紧凑数字日期：年份后接 3-6 位紧邻数字。
+    m = re.search(r'20(\d{2})([ \t]{0,2})(\d{3,6})', seg)
+    if m:
+        cand = _parse_compact_run(m, seg, 2000 + int(m.group(1)), m.group(3))
+        if cand:
+            cand['from_full'] = True
+            return cand
+
+    # 4) 仅有 M月D日：使用外部传入的默认年份（title_year / url_year / publish_time / current）
+    md = re.search(MONTHDAY, seg)
+    if md:
+        r = _build(md, seg, y, md.group(1), md.group(2))
+        if not r:
+            return None
+        r['from_full'] = False
+        return r
+
+    # 5) 图片 OCR 常见美式月日：06/10，默认取 default_year
+    sm = re.search(SLASH_MONTHDAY, seg)
+    if sm:
+        if not re.search(r'20\d{2}/' + sm.group(0), seg):
+            r = _build(sm, seg, y, sm.group(1), sm.group(2))
+            if not r:
+                return None
+            r['from_full'] = False
+            return r
+    return None
+
+
+def _year_from_text(text):
+    """从文本中提取显式年份，兼容 2024-12-02 / 20251204 等常见格式。"""
+    if not text:
+        return None
+    m = re.search(r'(20\d{2})[-/.年]\s*\d{1,2}[-/.月]\s*\d{1,2}', text)
+    if m:
+        return int(m.group(1))
+    m = re.search(r'(20\d{2})(\d{2})(\d{2})', text)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def _date_from_title(title):
+    """R4：从详情页标题提取完整讲座日期，作为讲座日的低优先级兜底来源。
+
+    兼容三种标题日期写法：
+      ① 中文完整日期：2026年6月23日 / 2026年6月23
+      ② 紧凑 YYYYMMDD：讲座通知20260623  → 2026-06-23（要求独立 8 位数字，
+         避免从更长编号如 202606231 中截断前 8 位）
+      ③ 分隔符日期：2026-06-23 / 2026.06.23
+    仅返回日期（无时间，has_time=False）。命中即比「无日期」更可靠，但置信度低。
+    """
+    if not title:
+        return None
+    # ① 中文完整日期
+    m = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?', title)
+    if m:
+        r = _build(m, title, m.group(1), m.group(2), m.group(3))
+        if r:
+            r['from_full'] = True
+            return r
+    # ② 紧凑 YYYYMMDD（独立 8 位）
+    m = re.search(r'(?<!\d)(20\d{2})(\d{2})(\d{2})(?!\d)', title)
+    if m:
+        r = _build(m, title, m.group(1), m.group(2), m.group(3))
+        if r:
+            r['from_full'] = True
+            return r
+    # ③ 分隔符日期
+    for p in (r'(\d{4})-(\d{2})-(\d{2})', r'(\d{4})\.(\d{2})\.(\d{2})'):
+        m = re.search(p, title)
+        if m:
+            r = _build(m, title, m.group(1), m.group(2), m.group(3))
+            if r:
+                r['from_full'] = True
+                return r
+    return None
+
+
+# ============================================================================
+# R1 权威标签分级扫描
+# ============================================================================
+# 注：Tier 分级逻辑已内联到 _LABEL_RE 的 if/elif 分支中（见 331-345 行），
+# 排除（非讲座时间）：标签关键词「时间」前若含这些词，视为 CMS 文章元数据而非讲座时间。
+# 注意：_LABEL_RE 匹配「发布时间」时命中的关键词是裸「时间」（发布时间不在正则备选里），
+# pre 窗口只含其前的「发布」等短词，故此处必须用短形式（发布/更新…），写「发布时间」等长形式反而匹配不到。
+_EXCLUDE_PREFIX = ['报名', '报名截止', '截止', '直播', '提交', '签到', '用餐', '返程',
+                   '发布', '更新', '修改', '审核', '创建']
+# R1 标签扫描正则（捕获标签关键词 + 其后值）
+# 支持混合中英文标签（N1e）：标签候选已同时含中文与英文（Time/Seminar Time），
+# 海报中 "时间/Time:" 这类组合标签会被正则分别命中其中任一段。
+_LABEL_RE = re.compile(
+    r'(讲座时间|报告时间|学术报告时间|开讲时间|开课时间|会议时间|研讨会\s*日期|研讨\s*日期'
+    r'|讲座\s*日期|报告\s*日期|举办\s*日期|举办\s*时间|seminar\s*时间'
+    r'|Seminar\s*Time\s*:?|Time\s*:?|时\s*间|时\s*闻)\s*[：:]?\s*(.{0,50})',
+    re.IGNORECASE)
+_RETRO_WORDS = ['成功', '已举办', '已举行', '圆满', '回顾', '报道', '纪实', '日前']
+_PREVIEW_WORDS = ['将', '拟', '定于', '将于', '预告', '即将', '本周', '下周']
+
+
+def _label_scan(body_text):
+    """R1：在正文内扫描带日期的"时间"标签，返回命中列表。
+
+    每条 hit: {tier, kw, full:(y,mo,d)|None, md:(mo,d)|None, seg:解析结果, pos}
+    已应用：Tier 分级、排除前缀（报名/截止/直播…）、Time: 负向排除(deadline/submission/regist)、
+    会议时间 后接含截止/deadline/提交 则排除。
+    """
+    hits = []
+    if not body_text:
+        return hits
+    for m in _LABEL_RE.finditer(body_text):
+        kw = m.group(1)
+        val = m.group(2).strip()
+        if not val:
+            continue
+        pre = body_text[max(0, m.start(1) - 6):m.start(1)]
+        # 排除前缀
+        if any(p in pre for p in _EXCLUDE_PREFIX):
+            continue
+        kw_norm = re.sub(r'\s*', '', kw).lower()
+        # Time: 负向排除
+        if kw_norm.startswith('time'):
+            if re.search(r'(deadline|submission|regist)', pre, re.IGNORECASE):
+                continue
+            tier = 1
+        elif kw_norm in ('讲座时间', '报告时间', '学术报告时间', 'seminartime', 'seminartime:'):
+            tier = 1
+        elif kw_norm in ('研讨会日期', '研讨日期', '讲座日期', '报告日期', '举办日期', '举办时间'):
+            # 研讨会/讲座/报告/举办的「日期/时间」是讲座事件日的最高权威标签（高于弱「时间」）
+            tier = 1
+        elif kw_norm in ('开讲时间', '开课时间', '会议时间'):
+            tier = 2
+            if re.search(r'截止|deadline|提交', val, re.IGNORECASE):
+                continue
+        else:  # 时间 / 时闻
+            tier = 2
+        # 解析值：完整日期 or 仅月日
+        seg_res = _parse_segment(val, 2000, None)
+        if not seg_res:
+            continue
+        if seg_res.get('from_full'):
+            full = (seg_res['start'].year, seg_res['start'].month, seg_res['start'].day)
+            md = None
+        else:
+            full = None
+            md = (seg_res['start'].month, seg_res['start'].day)
+        hits.append({'tier': tier, 'kw': kw, 'full': full, 'md': md,
+                     'seg': seg_res, 'val': val, 'pos': m.start()})
+    return hits
+
+
+def _resolve_year(url_year, title_year, publish_year, default_year):
+    """R4：年份优先级链，返回 (year, src)。src ∈ {url,title,publish,current}。"""
+    if url_year:
+        return url_year, 'url'
+    if title_year:
+        return title_year, 'title'
+    if publish_year:
+        return publish_year, 'publish'
+    return default_year, 'current'
+
+
+def _wrap_year(res, new_year):
+    """把解析结果整体平移年份（R6 跨年修正用）。
+
+    2026-08-05 体检修正：闰年 2/29 平移到平年时 replace(year=...) 抛 ValueError
+    （未捕获会一路上抛丢记录），回退为 2/28。
+    """
+    new = dict(res)
+    try:
+        new['start'] = res['start'].replace(year=new_year)
+    except ValueError:
+        new['start'] = res['start'].replace(year=new_year, day=28)
+    if res.get('end'):
+        try:
+            new['end'] = res['end'].replace(year=new_year)
+        except ValueError:
+            new['end'] = res['end'].replace(year=new_year, day=28)
+    return new
+
+
+def _cross_year(res, publish_time, title, body_text, year, url_year, publish_year):
+    """R6：双向跨年修正。仅当 year ∈ {url_year, publish_year}（补年源为 URL/发布年）时触发。
+
+    返回 (res, confidence, note)。confidence ∈ {high, mid, low}。
+    """
+    ls = res['start']
+    try:
+        pub = datetime.strptime(publish_time[:10], '%Y-%m-%d')
+    except (ValueError, TypeError):
+        return res, 'low', 'publish-unparseable'
+    can_cross = year in (url_year, publish_year)
+    hay = (title or '') + ' ' + (body_text or '')
+    retro = any(w in hay for w in _RETRO_WORDS)
+    preview = any(w in hay for w in _PREVIEW_WORDS)
+
+    if ls.date() == pub.date():
+        return res, 'high', 'same-day-normal'
+
+    # 同年（未跨年边界）：年份来自 URL/标题等可靠源，无需跨年修正，直接定 high。
+    # 跨年修正只在"讲座与发布分属不同日历年"时才有意义。
+    if ls.year == pub.year:
+        return res, 'high', 'same-year'
+
+    if not can_cross:
+        # 2026-08-05 体检修正：can_cross 此前算出后从未使用，R6 触发面比文档宽。
+        # 按模块头 R6 规格收紧：补年源不属于 {URL年, 发布年}（如标题年/低 Tier 标签年）
+        # 时年份本身可靠，即使讲座与发布分属不同日历年也不做 ±1 年平移。
+        return res, 'mid', 'year-source-reliable'
+
+    if ls.date() < pub.date():
+        # 讲座落在发布前
+        if retro:
+            return res, 'high', 'retrospective-report'
+        if preview:
+            return _wrap_year(res, ls.year + 1), 'high', 'preview-nextyear'
+        if pub.month in (11, 12) and ls.month in (1, 2):
+            return _wrap_year(res, ls.year + 1), 'high', 'crossyear-window'
+        return res, 'low', 'crossyear-uncertain'
+
+    # 讲座落在发布后
+    if preview:
+        return res, 'high', 'preview-normal'
+    if retro:
+        return _wrap_year(res, ls.year - 1), 'high', 'retro-prevyear'
+    if pub.month in (1, 2) and ls.month in (11, 12):
+        return _wrap_year(res, ls.year - 1), 'low', 'crossyear-window-prev'
+    return res, 'low', 'crossyear-uncertain'
+
+
+def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
+                         publish_level, default_year, list_title=None, page_text=None):
+    """R1–R6 编排层。返回 {'start':iso,'end':iso|None,'confidence','note'} 或 None。
+
+    Args:
+        body_text: 正文区域文本（content_div 去噪后），R1/R2 仅扫此。
+        title: 详情页标题（用于 R6 回顾/预告词检索）。
+        url_year / title_year: 从 URL/标题提取的年份。
+        publish_time: 已定位的发布时间字符串（R3 产物）。
+        publish_level: 发布时间来源级别（1=标签,2=伴生/class,3=位置），用于 R3 本质条款。
+        default_year: 当前年（补年最后兜底）。
+        list_title: 列表标题（补充年份来源）。
+    """
+    # 2026-08-05 体检修正：default_year=None 兜底，与 parse_cn_time 对齐。
+    # 此前 None 传入 _resolve_year 会在 R4 链末端返回 (None,'current')，
+    # None 再传 _parse_segment/_build 被 try 吞掉、仅月日的日期被静默丢弃。
+    if default_year is None:
+        default_year = date.today().year
+    if list_title:
+        ly = _year_from_text(list_title)
+        if ly:
+            title_year = title_year or ly
+    publish_year = None
+    if publish_time:
+        try:
+            publish_year = int(str(publish_time)[:4])
+        except (ValueError, TypeError):
+            publish_year = None
+
+    # A-修复：正文中「发布时间：YYYY-MM-DD HH:MM:SS」会被 R2 通用解析当成讲座时间的另一个端点，
+    # 污染 start/end（如生科院页面讲座时间行与发布时间行同处正文）。发布时间已由 _locate_publish_time
+    # 单独定位，此处从扫描文本中移除其 ISO 串（讲座信息用中文日期格式，ISO 串唯一对应发布时间）。
+    if publish_time and publish_time in body_text:
+        body_text = body_text.replace(publish_time, '')
+
+    # ---- R1：权威标签扫描 ----
+    hits = _label_scan(body_text)
+
+    def _year_consistent(y):
+        return y in (url_year, title_year)
+
+    primary = None
+    for tier in (1, 2):
+        cand = [h for h in hits if h['tier'] == tier]
+        if not cand:
+            continue
+        cons = [h for h in cand if h['full'] and _year_consistent(h['full'][0])]
+        primary = cons[0] if cons else cand[0]
+        break
+
+    if primary:
+        if primary['full']:
+            # 完整日期直接采用，结束年份处理（R1 + R4 前三级不二次抬年）
+            dt = primary['seg']
+            return {'start': dt['start'].isoformat(sep=' '),
+                    'end': dt['end'].isoformat(sep=' ') if dt.get('end') else None,
+                    'confidence': 'high', 'note': 'authoritative-label'}
+        # 仅月日：取高 Tier 月日，年份补年（优先借低 Tier 完整年 url/title 一致者）
+        mo, dd = primary['md']
+        year, src = _resolve_year(url_year, title_year, publish_year, default_year)
+        lower = [h for h in hits if h['tier'] > primary['tier']
+                 and h['full'] and _year_consistent(h['full'][0])]
+        if lower:
+            year = lower[0]['full'][0]
+            src = 'label'
+        dt = _parse_segment(primary['val'], year, publish_time)
+        if not dt:
+            dt = primary['seg']
+        # R6 跨年修正（仅月日补年结果）
+        if publish_time:
+            dt, conf, note = _cross_year(dt, publish_time, title, body_text, year,
+                                         url_year, publish_year)
+            return {'start': dt['start'].isoformat(sep=' '),
+                    'end': dt['end'].isoformat(sep=' ') if dt.get('end') else None,
+                    'confidence': conf, 'note': note}
+        return {'start': dt['start'].isoformat(sep=' '),
+                'end': dt['end'].isoformat(sep=' ') if dt.get('end') else None,
+                'confidence': 'high', 'note': 'monthday-nopublish'}
+
+    # ---- R2：通用解析只扫正文 ----
+    # 年份优先级与 R4/_resolve_year 统一：url_year > title_year > publish_year
+    eff = default_year
+    if url_year:
+        eff = url_year
+    elif title_year:
+        eff = title_year
+    elif publish_year:
+        eff = publish_year
+    g = _parse_segment(body_text, eff, publish_time)
+    if g:
+        if g.get('from_full'):
+            # 完整日期直接采用，不触发 R6
+            return {'start': g['start'].isoformat(sep=' '),
+                    'end': g['end'].isoformat(sep=' ') if g.get('end') else None,
+                    'confidence': 'high', 'note': 'general-body-full'}
+        # 仅月日：补年 + R6
+        year = g['start'].year
+        if publish_time:
+            g, conf, note = _cross_year(g, publish_time, title, body_text, year,
+                                         url_year, publish_year)
+            return {'start': g['start'].isoformat(sep=' '),
+                    'end': g['end'].isoformat(sep=' ') if g.get('end') else None,
+                    'confidence': conf, 'note': note}
+        return {'start': g['start'].isoformat(sep=' '),
+                'end': g['end'].isoformat(sep=' ') if g.get('end') else None,
+                'confidence': 'high', 'note': 'general-body-monthday-nopublish'}
+
+    # ---- Fix B：整页文本兜底重试 ----
+    # 当 content_div 命中的正文区域（body_text）未解析出日期时，用整页纯净文本
+    # （page_text，与 body_text 不同即说明 body_text 来自某 content_div 而非整页兜底）
+    # 再跑一次 R2。整页含导航噪声，但 _parse_segment 只认合规日期串，导航词不会凑成
+    # 「YYYY年M月D日」等格式，讲座日期（常含显式年）通常可正确提取。仅当 page_text 与
+    # body_text 不同（避免与 Fix A 的整页回退重复）且 body_text 确实未命中时触发。
+    if page_text and page_text.strip() and page_text != body_text:
+        pg = page_text
+        if publish_time and publish_time in pg:
+            pg = pg.replace(publish_time, '')
+        gb = _parse_segment(pg, eff, publish_time)
+        if gb:
+            if gb.get('from_full'):
+                return {'start': gb['start'].isoformat(sep=' '),
+                        'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                        'confidence': 'mid', 'note': 'general-page-full'}
+            year = gb['start'].year
+            if publish_time:
+                gb, conf, note = _cross_year(gb, publish_time, title, pg, year,
+                                             url_year, publish_year)
+                return {'start': gb['start'].isoformat(sep=' '),
+                        'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                        'confidence': conf, 'note': note}
+            return {'start': gb['start'].isoformat(sep=' '),
+                    'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                    'confidence': 'mid', 'note': 'general-page-monthday-nopublish'}
+
+    # R2 回退：正文为空（纯海报且尚未 OCR）时返回 None，交由调用方走 OCR/URL 兜底
+    return None
+
+
+def parse_cn_time(text, default_year=None, publish_time=None, title_year=None, url_year=None):
+    """底层原语：在给定文本里找第一个日期。
+
+    年份补年优先级：url_year > title_year > publish_time年份 > current_year。
+    （2026-08-05 体检修正：与 R4/_resolve_year 统一为 url > title > publish；
+    此前本函数为 title > url，同一仅月日文本走不同路径会补出不同年份。）
+    **不做任何字符串删除**（修 Bug A）；仅在完整日期循环中精确跳过发布日。
+    用于 OCR 路径与列表标题兜底。
+    """
+    if default_year is None:
+        default_year = date.today().year
+    effective_default = default_year
+    if url_year is not None:
+        effective_default = url_year
+    elif title_year is not None:
+        effective_default = title_year
+    elif publish_time:
+        try:
+            effective_default = int(publish_time[:4])
+        except (ValueError, IndexError):
+            pass
+    if not text:
+        return None
+    lm = re.search(
+        r'(时\s*间|时\s*闻|讲座时间|讲座时闻|报告时间|学术报告时间|开讲时间|开课时间|会议时间)\s*[：:]?\s*(.{0,80})',
+        text)
+    if lm:
+        res = _parse_segment(lm.group(2), effective_default, publish_time)
+        if res:
+            return res
+    res = _parse_segment(text, effective_default, publish_time)
+    if res:
+        return res
+    return None

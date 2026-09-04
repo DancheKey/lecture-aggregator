@@ -1,0 +1,161 @@
+name: 每日自动拉取讲座数据
+
+# 触发条件：
+#   1) 定时：每天两班（UTC = 北京时间 - 8h）
+#      - 早班：01:00 UTC = 北京时间 09:00（上午讲座发布后可当日补抓）
+#      - 夜班：16:00 UTC = 北京时间 24:00（常规日更）
+#      GitHub scheduled workflows 会排队，实际启动通常延迟 0.5~4h；
+#      两班制可显著降低“当天发布当天讲座”被漏掉的概率。
+#   2) 手动：在 Actions 页面点 "Run workflow"，或网站「抓取新数据」按钮经代理触发
+on:
+  schedule:
+    - cron: '0 1 * * *'
+    - cron: '0 16 * * *'
+  workflow_dispatch: {}
+
+# 本工作流需要写回仓库（提交更新后的数据），并发布 Pages
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个抓取任务；新触发排队（不取消正在跑的），避免并发写冲突
+concurrency:
+  group: daily-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # 需要完整历史以便增量基线
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scraper/requirements.txt
+
+      # OCR 引擎已换为 RapidOCR（onnxruntime 后端）：
+      #   - 识别模型随 rapidocr-onnxruntime 包分发，无需单独下载/缓存（不再需要 ~/.EasyOCR 缓存）。
+      #   - 图像处理用 opencv-python-headless，无需 libgl1 等系统图形库（headless 版已剥离 GL 依赖）。
+      - name: 安装 Python 依赖
+        run: pip install -r scraper/requirements.txt
+
+      # 增量抓取：若仓库内 data/last_scrape.json 存在，则只补该时间之后的新讲座；
+      # 否则（首次或缺失）自动全量，并以已有 data/lectures.json 作去重基底。
+      # VLM 主通道：智谱 GLM（国内直连、免费稳定），API Key 走 GitHub Secrets（加密，绝不写明文）；
+      # 模型名非敏感，明文注入即可。GLM 不可用（429/5xx/鉴权失败/异常）时自动落第二顺位
+      # Agnes-ai，仍失败则回落本地 RapidOCR。
+      - name: 运行爬虫（增量）
+        env:
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+          VLM_MODEL: glm-4v-flash
+          AGNES_API_KEY: ${{ secrets.AGNES_API_KEY }}
+          AGNES_MODEL: agnes-2.5-flash
+          JUDGE_PROVIDER: zhipu
+          JUDGE_MODEL: glm-4.7-flash
+        run: python scraper/scraper.py
+
+      - name: 同步静态数据源并生成前端切片
+        run: python scripts/generate_frontend_data.py
+
+      # 铁律护栏：抓取生成的数据必须通过不变量测试，否则阻断提交/部署
+      # （防止 CI 整体重跑退化、title 被 topic 覆盖、复合键重复等回归）。
+      - name: 校验数据不变量（铁律护栏）
+        run: python scripts/test_invariants.py
+
+      - name: 提交并推送（仅在有变化时）
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 2026-08-05 体检修复（中等-20）：generate_frontend_data.py 的缓存破坏
+          # 会改写 site/index.html / site/stats.html（追加 ?v=hash），必须一并提交，
+          # 否则 CI 侧的 JS 版本号更新被静默丢弃。
+          # 2026-08-08 修复：补充分片产物，确保手机端分片加载可用。
+          git add \
+            data/lectures.json \
+            data/last_scrape.json \
+            site/lectures.json \
+            site/lectures/latest.json \
+            site/lectures/stats.json \
+            site/lectures/chunk_*.json \
+            site/lectures/chunks.json \
+            site/index.html \
+            site/stats.html
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            echo "存在变更，准备提交..."
+            git status --short
+            git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')"
+            echo "提交成功，同步远端..."
+            # 运行期间若仓库被其他提交推进（如人工推送），先 rebase 再 push，避免 non-fast-forward 失败
+            # rebase 失败时 abort 退出，交给下一班 cron 重跑（已有 concurrency 排队，重跑成本低）
+            git pull --rebase origin main || { echo "::error::git pull --rebase 失败，中止 rebase 等待下次 cron 重试"; git rebase --abort; exit 1; }
+            echo "推送到 origin/main..."
+            # 最多重试 3 次 push，应对短时并发冲突
+            for i in 1 2 3; do
+              if git push origin main; then
+                echo "推送成功 (try $i)"
+                break
+              else
+                if [ $i -eq 3 ]; then
+                  echo "::error::git push 第 3 次仍失败（请检查仓库 Settings -> Actions -> General -> Workflow permissions 是否为 Read and write permissions）"
+                  exit 1
+                fi
+                echo "::warning::git push 失败 (try $i)，拉取远程最新再试..."
+                sleep 5
+                git pull --rebase origin main || true
+              fi
+            done
+            echo "推送成功"
+          fi
+
+      # 下面步骤将 site/ 发布为 GitHub Pages。
+      # 注意：本工作流用 GITHUB_TOKEN 推送的数据提交不会触发 deploy.yml，
+      # 因此由本工作流直接完成部署，保证每日新数据即时上线。
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传站点产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      # 失败源告警（2026-08-05 体检修复 严重-3）：爬虫在有源失败时不推进增量水位，
+      # 并把 failed_sources 写入 data/last_scrape.json（下次运行同区间自动补回）。
+      # 此步放在提交/部署之后：成功抓到的数据照常上线，但工作流以红色结束，
+      # 通过 GitHub 通知提醒维护者关注持续失败的源。
+      # 已知设计权衡（2026-08-05 复查确认）：
+      #   - 前序步骤因其它原因失败时，本步读到的旧 last_scrape 可能无 failed_sources
+      #     而不额外告警——但此时工作流本就因前序失败而红，GitHub 通知仍会送达；
+      #   - 存在失败源时页面其实已部署成功，Pages 状态却显示"失败"，
+      #     这是「宁可误报不漏报」的有意取舍。
+      - name: 检查失败信息源（告警）
+        if: always()
+        run: |
+          python - <<'EOF'
+          import json, os, sys
+          p = 'data/last_scrape.json'
+          if not os.path.exists(p):
+              sys.exit(0)
+          with open(p, encoding='utf-8') as f:
+              d = json.load(f)
+          failed = d.get('failed_sources') or []
+          if failed:
+              print('::error::本次抓取有 %d 个信息源失败（增量水位未推进，下次自动重试）：%s'
+                    % (len(failed), '；'.join(failed)))
+              sys.exit(1)
+          print('所有信息源抓取成功。')
+          EOF

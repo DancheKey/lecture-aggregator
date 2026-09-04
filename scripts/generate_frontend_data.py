@@ -1,0 +1,304 @@
+"""为前端生成优化后的数据切片。
+
+从 data/lectures.json 生成：
+  - site/lectures.json：全量原始数据，供本地 /api/lectures 与 GitHub Pages 后台加载使用。
+  - site/lectures/latest.json：仅保留最新 50 条（首页第一页），与 lectures.json 同字段集
+    （含 abstract、speakerBio），用于"先渲染第一页，后台再加载完整数据"的渐进体验。
+  - site/lectures/stats.json：统计页专用，包含预计算的学院-年份矩阵、年份合计、
+    以及用于动态访问/点赞数的最小讲座索引，避免统计页加载 2MB+ 全量数据。
+
+所有文件均先写入 .tmp 临时文件，再原子重命名，确保首页与统计页在任何时刻
+不会看到"半新半旧"的数据版本。
+
+运行：python scripts/generate_frontend_data.py
+"""
+import hashlib
+import json
+import os
+import re
+import sys
+
+# 确保 scripts/ 下的共享模块（如 excluded_urls）可被 import
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
+SITE_LECTURES_PATH = os.path.join(ROOT, 'site', 'lectures.json')
+SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
+LATEST_SIZE = 50
+CHUNK_SIZE = 500        # 公网分片加载：每片 500 条，失败可单独重试，数字渐进滚动
+UNKNOWN_YEAR = '其他'
+# 首页首屏（latest.json）只需要列表卡片展示字段，长文本按首页 truncate 长度截断，
+# 让首屏秒开；详情字段在 site/lectures.json 中仍完整保留，确保展开/查看时信息齐全。
+LATEST_PREVIEW_LEN = 220
+
+
+def atomic_write_text(path, content):
+    """文本文件的原子写入（用于改写 HTML 等）。"""
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(content)
+    os.replace(tmp, path)
+
+
+def atomic_write_json(path, data):
+    """JSON 文件的原子写入（用于改写切片等）。"""
+    atomic_write_text(path, json.dumps(data, ensure_ascii=False, separators=(',', ':')))
+
+
+def _short_hash(path, length=10):
+    """返回文件内容的短 hash，用作静态资源缓存破坏版本号。"""
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        h.update(f.read())
+    return h.hexdigest()[:length]
+
+
+def stamp_script_version(html_name, js_name):
+    """给 html 中引用 js_name 的 <script> 标签打上「基于文件内容 hash」的版本号：
+    <script defer src="stats.js"></script> -> <script defer src="stats.js?v=abc123"></script>
+
+    作用：GitHub Pages 对未哈希的静态资源会长期缓存。若只改 JS 逻辑而不改文件名，
+    回访用户的浏览器会继续跑旧 JS（例如统计页仍加载 5.7MB 全量数据而非 291KB 切片），
+    表现为「改动已推送但体验没变 / 仍很慢」。按内容 hash 打版本号后，JS 一改版本号即变，
+    浏览器必然重新拉取；JS 未变时版本号不变，不产生无谓改动。幂等（重复运行不会叠加 ?v）。
+    """
+    html_path = os.path.join(ROOT, 'site', html_name)
+    js_path = os.path.join(ROOT, 'site', js_name)
+    if not (os.path.exists(html_path) and os.path.exists(js_path)):
+        return
+    ver = _short_hash(js_path)
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html = f.read()
+    # 匹配 src="js_name" 或 src="js_name?v=xxxx"（无论单/双引号），统一替换为带新版本号
+    pat = re.compile(r'src=(["\'])' + re.escape(js_name) + r'(?:\?v=[0-9a-fA-F]+)?\1')
+    new_html = pat.sub(r'src="%s?v=%s"' % (js_name, ver), html)
+    if new_html != html:
+        atomic_write_text(html_path, new_html)
+        print(f'[done] {html_name}: {js_name} 缓存版本号 = {ver}')
+
+
+def latest_preview(item):
+    """生成首屏 latest.json 的轻量条目：保留列表必要字段，长文本截断。
+    与 site/lectures.json 字段完全一致，只是 abstract/speakerBio 被截断，不损失功能只损失未展开长度。"""
+    preview = dict(item)
+    for key in ('abstract', 'speakerBio'):
+        val = preview.get(key)
+        if val and len(val) > LATEST_PREVIEW_LEN:
+            preview[key] = val[:LATEST_PREVIEW_LEN]
+    return preview
+
+
+def year_of(item):
+    """与 stats.js 保持一致的年份提取逻辑。"""
+    if item.get('lectureStart'):
+        return str(item['lectureStart'])[:4]
+    m = (item.get('publishTime') or '').strip()[:4] or None
+    if m and m.isdigit():
+        return m
+    t = (item.get('title') or '')
+    m2 = re.search(r'(\d{4})', t)
+    if m2:
+        return m2.group(1)
+    return UNKNOWN_YEAR
+
+
+def load_lectures():
+    with open(DATA_PATH, 'r', encoding='utf-8') as f:
+        raw = json.load(f)
+    if isinstance(raw, dict) and 'data' in raw:
+        return raw.get('data', []) or [], raw.get('updatedAt', '')
+    return raw if isinstance(raw, list) else [], ''
+
+
+# load_excluded 已迁移至 scripts/excluded_urls.py（scraper / generate / server 三点共用）
+from excluded_urls import load_excluded  # noqa: E402,F811
+
+
+def sort_for_latest(data):
+    """按 lectureStart 降序，缺失时间排最后。"""
+    def key(item):
+        start = item.get('lectureStart') or ''
+        return ('1' if start else '0', start)
+    return sorted(data, key=key, reverse=True)
+
+
+def build_stats(data, updated_at):
+    """生成统计页专用 JSON：预计算矩阵 + 最小讲座索引。"""
+    years_set = set()
+    source_notice_count = 0
+    # 学院 -> 年份 -> 来源通知数
+    matrix = {}
+    # 年份 -> 来源通知数
+    year_totals = {}
+    # 最小讲座索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
+    lectures = []
+    # 学院 -> 校区（供统计页校区筛选）
+    campus_map = {}
+
+    for item in data:
+        y = year_of(item)
+        if y:
+            years_set.add(y)
+        primary_url = item.get('sourceUrl') or ''
+        sources = item.get('sources') or [item]
+        # 累加来源通知总数。注意：显式 sourceCount=0（多讲座拆分出的非首条）应被尊重，
+        # 故不能写 `item.get('sourceCount') or ...`（0 会被 or 吞掉）。
+        sc = item.get('sourceCount')
+        s_count = sc if sc is not None else (len(sources) or 1)
+        source_notice_count += s_count
+        # 预计算矩阵：按「该讲座归属的全部单位」计数。
+        # 跨源合并的讲座（同一讲座被多个单位发布）应在每个相关单位各计一次，
+        # 与首页筛选逻辑 Set([主学院, ...来源单位]) 完全一致，修复统计页漏算合并讲座的问题。
+        # 注意：这是「讲座-单位归属计数」，联合发布的讲座会在各单位重复计入，故
+        # 各单位计数之和会大于唯一讲座总数 lectureCount（属正常，统计页有说明文字）。
+        primary_college = item.get('college') or '未分类'
+        units = []
+        seen_unit = set()
+        for c in [primary_college] + [s.get('college') for s in sources if s.get('college')]:
+            if c and c not in seen_unit:
+                seen_unit.add(c)
+                units.append(c)
+        cell_year = y or UNKNOWN_YEAR
+        for c in units:
+            matrix.setdefault(c, {})
+            matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
+            year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
+        # 学院 -> 校区映射：主学院优先；来源单位补全（保证合并讲座的来源单位也能按校区筛选）
+        for c in units:
+            if c in campus_map:
+                continue
+            if c == primary_college:
+                campus_map[c] = item.get('campus') or ''
+            else:
+                src = next((s for s in sources if s.get('college') == c), None)
+                campus_map[c] = (src or {}).get('campus') or ''
+        # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞。
+        # cs = 该讲座归属的全部单位（含主学院与来源单位），供访问/点赞按单位展开归属；
+        # c = 主学院（保留，供来源通知数等按主讲座口径统计）。
+        lectures.append({
+            'u': primary_url,
+            'y': y or UNKNOWN_YEAR,
+            'c': primary_college,
+            'cs': units,
+            's': s_count,
+        })
+
+    # 年份排序：数字年份降序，"其他"放最后
+    def year_key(y):
+        return (0, y) if y.isdigit() else (1, y)
+
+    years = sorted([y for y in years_set if y.isdigit()], key=lambda y: -int(y))
+    if UNKNOWN_YEAR in years_set:
+        years.append(UNKNOWN_YEAR)
+
+    return {
+        'updatedAt': updated_at,
+        'lectureCount': len(data),
+        'sourceNoticeCount': source_notice_count,
+        'years': years,
+        'matrix': matrix,
+        'yearTotals': year_totals,
+        'lectures': lectures,
+        'campusMap': campus_map,
+    }
+
+
+def with_unit(item, url_dates):
+    """为单页多讲座拆分记录标注 unitType，供前端区分「场」与「期」：
+
+    - 同一 sourceUrl 组内所有记录的讲座日期完全相同（同一天多场次）
+      -> 'session'（第x场，同一活动的某一场）
+    - 同一 sourceUrl 组内记录跨了不同日期（系列讲座分期）
+      -> 'issue'（第x期，不同日期的若干期）
+
+    仅对含 lectureIndex 的记录附加该字段；其它记录原样透传，不污染主数据。
+    """
+    it = dict(item)
+    if item.get('lectureIndex') is not None:
+        dates = url_dates.get(item.get('sourceUrl') or '', set())
+        it['unitType'] = 'session' if len(dates) == 1 else 'issue'
+    return it
+
+
+def write_chunks(data, updated_at):
+    """将全量数据切片为 chunk_NNNN.json，并写入 chunks.json 清单。
+
+    公网（GitHub Pages）下前端改为逐片加载：每片 ~1MB（500 条），比整文件 6MB 更抗弱网；
+    任一片失败仅重试该片，不影响其它片；每片到达数字滚动到已加载真实条数，
+    彻底解决「手机端一次性拉 6MB 失败 -> 数字定格在 50」的问题。
+    """
+    # 清理旧分片：数据量减少时不残留（如 100 片缩到 50 片后旧的 chunk_0051+ 仍会被 git add 提交）
+    import glob
+    for old in glob.glob(os.path.join(SITE_DIR, 'chunk_*.json')):
+        os.remove(old)
+    chunks = []
+    n = len(data)
+    for i in range(0, n, CHUNK_SIZE):
+        part = data[i:i + CHUNK_SIZE]
+        idx = i // CHUNK_SIZE + 1
+        fname = 'chunk_%04d.json' % idx
+        atomic_write_json(os.path.join(SITE_DIR, fname), {'updatedAt': updated_at, 'data': part})
+        chunks.append('lectures/' + fname)
+    manifest = {
+        'updatedAt': updated_at,
+        'total': n,
+        'chunkSize': CHUNK_SIZE,
+        'chunks': chunks,
+    }
+    atomic_write_json(os.path.join(SITE_DIR, 'chunks.json'), manifest)
+    print(f'[done] chunks.json + {len(chunks)} 片 (每片 {CHUNK_SIZE} 条, 共 {n} 条)')
+
+
+def main():
+    os.makedirs(SITE_DIR, exist_ok=True)
+    data, updated_at = load_lectures()
+    if not data:
+        print('[warn] 没有讲座数据，跳过生成')
+        return
+
+    # 全局排除名单：凡是列入的 URL 不应出现在聚合页面（与爬虫端跳过抓取保持一致）。
+    # 这是根治「排除过的非讲座又回来」的关键——之前 excluded 只被爬虫用，展示端从不过滤。
+    excluded = load_excluded()
+    if excluded:
+        before = len(data)
+        data = [r for r in data if (r.get('sourceUrl') or '').rstrip('/') not in excluded]
+        print(f'[filter] 排除名单过滤: {before} -> {len(data)} (移除 {before - len(data)} 条)')
+
+    # 构建 sourceUrl -> 讲座日期集合，用于区分「同一活动的多场」（同天=场）
+    # 与「系列讲座分期」（跨天=期）。
+    url_dates = {}
+    for item in data:
+        u = item.get('sourceUrl') or ''
+        d = (item.get('lectureStart') or '')[:10]
+        url_dates.setdefault(u, set())
+        if d:
+            url_dates[u].add(d)
+
+    sorted_data = sort_for_latest(data)
+    latest = [latest_preview(with_unit(item, url_dates)) for item in sorted_data[:LATEST_SIZE]]
+    stats = build_stats(data, updated_at)
+    full_data = [with_unit(item, url_dates) for item in data]
+
+    # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
+    atomic_write_json(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': full_data})
+    atomic_write_json(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
+    atomic_write_json(os.path.join(SITE_DIR, 'stats.json'), stats)
+    write_chunks(full_data, updated_at)
+
+    latest_bytes = os.path.getsize(os.path.join(SITE_DIR, 'latest.json'))
+    stats_bytes = os.path.getsize(os.path.join(SITE_DIR, 'stats.json'))
+    stats_lectures_count = len(stats['lectures'])
+    print(f'[done] site/lectures.json: {len(data)} 条')
+    print(f'[done] latest.json: {len(latest)} 条 ({latest_bytes / 1024:.1f} KB)')
+    print(f'[done] stats.json: {stats_lectures_count} 条索引 ({stats_bytes / 1024:.1f} KB)')
+
+    # 给前端脚本打内容 hash 版本号，避免浏览器长期缓存旧 JS（见 stamp_script_version 注释）。
+    stamp_script_version('stats.html', 'stats.js')
+    stamp_script_version('index.html', 'app.js')
+    stamp_script_version('index.html', 'footer-counter.js')
+    stamp_script_version('stats.html', 'footer-counter.js')
+
+
+if __name__ == '__main__':
+    main()

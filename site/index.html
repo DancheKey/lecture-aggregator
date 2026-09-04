@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- CSP 说明：
+       - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
+         站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
+       - 访问量使用 busuanzi.aspark.cc（国内可用的免费计数服务，兼容原版不蒜子写法），
+         script-src / connect-src 需放行 busuanzi.aspark.cc；sessionStorage 防同会话重复计数。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <!-- footer-counter.js 动态加载 busuanzi，同会话只计 1 次 -->
+  <meta name="referrer" content="no-referrer" />
+  <title>木铎金声</title>
+  <link rel="stylesheet" href="vendor/tailwind.css" />
+  <script defer src="vendor/vue.global.prod.js"></script>
+  <style>
+    [v-cloak] { display: none !important; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .line-clamp-3 {
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .date-sticky { top: 57px; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+    /* 搜索框：隐藏浏览器原生的 ×，改用自定义清除按钮，文字与按钮之间留出空间 */
+    input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+    input[type="search"]::-ms-clear { display: none; width: 0; height: 0; }
+    /* 清除按钮：所有屏幕尺寸通用 */
+    .search-clear { position: absolute; right: .5rem; top: 50%; transform: translateY(-50%); width: 1.25rem; height: 1.25rem; display: flex; align-items: center; justify-content: center; border-radius: 9999px; color: #64748b; font-size: .875rem; line-height: 1; cursor: pointer; background: transparent; border: none; }
+    .search-clear:hover { color: #1e293b; background-color: #e2e8f0; }
+    /* 搜索框：为右侧清除按钮留出空间（所有尺寸） */
+    .search-pad { padding-left: .75rem; padding-right: 2.25rem; }
+    /* 讲座卡片：边框 + 悬停抬升，参考 RSS 阅读器信息流视觉 */
+    .lecture-card {
+      transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+    .lecture-card:hover {
+      box-shadow: 0 6px 20px -6px rgba(15, 23, 42, 0.12);
+      border-color: #cbd5e1;
+      transform: translateY(-2px);
+    }
+    /* 回到顶部按钮悬停动画 */
+    .back-top-btn { transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.2s ease; }
+    .back-top-btn:hover { transform: translateY(-2px) scale(1.08); color: #2563eb; box-shadow: 0 10px 24px -6px rgba(15,23,42,0.22); }
+    /* 两侧校训图：默认隐藏；仅视口宽度 ≥1700px（侧边能完整放下图片而不侵入内容区）时显示，避免窄窗/高缩放下遮挡讲座卡片 */
+    .motto-side { display: none; }
+    @media (min-width: 1700px) {
+      .motto-side { display: block; }
+    }
+  </style>
+</head>
+<body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <div id="app" v-cloak class="min-h-screen flex flex-col">
+
+    <!-- 顶部栏 -->
+    <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
+      <div class="max-w-4xl mx-auto px-4">
+        <div class="flex items-center gap-3 h-14">
+          <div class="flex items-center gap-2 shrink-0">
+            <img src="scnu-emblem.png" alt="华南师范大学" class="w-9 h-9 rounded-lg bg-white shadow-sm" />
+            <img src="site-title.png" alt="木铎金声" class="h-8 w-auto object-contain" />
+          </div>
+
+          <!-- 校区导航（桌面） -->
+          <nav class="hidden sm:flex items-center gap-1 ml-3">
+            <button v-for="c in campusList" :key="c"
+              @click="setCampus(c)"
+              :class="['px-3 py-1.5 rounded-full text-[12pt] transition', campus===c ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
+              {{ c || '全部' }}
+            </button>
+            <button @click="toggleLikedFilter()"
+              :class="['px-3 py-1.5 rounded-full text-[12pt] transition flex items-center gap-1', showLikedOnly ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
+              </svg>
+              点赞
+            </button>
+          </nav>
+
+          <div ref="menuContainer" class="relative ml-auto">
+            <button @click.stop="showMenu = !showMenu"
+              class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition"
+              aria-label="更多操作">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+              </svg>
+            </button>
+            <div v-show="showMenu" class="absolute right-0 top-full pt-2 w-44 z-30">
+              <div class="bg-white rounded-lg shadow-lg border border-slate-200 py-1">
+                <button @click="scrape(); showMenu = false" :disabled="scraping"
+                  class="block w-full text-left px-4 py-2 text-[12pt] text-slate-600 hover:bg-slate-50 hover:text-blue-600 disabled:opacity-60">
+                  {{ scraping ? '抓取中…' : '抓取新数据' }}
+                </button>
+                <a href="stats.html" @click="showMenu = false"
+                  class="block px-4 py-2 text-[12pt] text-slate-600 hover:bg-slate-50 hover:text-blue-600">讲座统计</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 校区导航（移动端） -->
+        <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1">
+          <button v-for="c in campusList" :key="c"
+            @click="setCampus(c)"
+            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap', campus===c ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
+            {{ c || '全部' }}
+          </button>
+          <button @click="toggleLikedFilter()"
+            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap flex items-center gap-1', showLikedOnly ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
+            </svg>
+            点赞
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 左右两侧校训：fixed 悬浮于视口两侧，上下滚动时始终不动；仅在视口宽度 ≥1700px 时显示，避免窄窗/高缩放时遮挡讲座卡片 -->
+    <img src="motto.webp" alt="华南师范大学校训" loading="lazy" decoding="async" class="motto-side fixed top-1/2 -translate-y-1/2 w-60 h-auto object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 90vh; left: 8rem;" />
+    <img src="motto.webp" alt="华南师范大学校训" loading="lazy" decoding="async" class="motto-side fixed top-1/2 -translate-y-1/2 w-60 h-auto object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 90vh; right: 8rem;" />
+
+    <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
+          <!-- 统计 + 筛选工具栏：同一行，筛选时左侧文字切换为"当前筛选"，避免控件跳行 -->
+          <div v-if="!loading" class="mb-5">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <!-- 左侧统计文字：桌面端单行左侧 -->
+              <div class="text-[12pt] text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
+                <template v-if="dataStage === 'partial'">
+                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
+                  <span class="text-slate-300">·</span>
+                  <span class="text-slate-400">完整数据加载中…</span>
+                </template>
+                <template v-else-if="dataStage === 'partial-error'">
+                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
+                  <span class="text-slate-300">·</span>
+                  <button type="button" @click="retryLoadFull" class="px-2 py-0.5 text-[11pt] font-medium text-white bg-blue-500 hover:bg-blue-600 rounded transition">点击加载全部讲座</button>
+                </template>
+                <template v-else>
+                  共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
+                </template>
+
+                <template v-if="!hasActiveFilter && dataStage === 'full'">
+                  <span class="text-slate-300">·</span>
+                  覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知
+                </template>
+                <template v-if="filtered.length !== totalCount">
+                  <span class="text-slate-300">·</span>
+                  当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
+                </template>
+                <template v-else-if="updatedAt && !hasActiveFilter && dataStage === 'full'">
+                  <span class="text-slate-300">·</span>
+                  更新于 {{ updatedAt.slice(0, 10) }}
+                </template>
+              </div>
+              <!-- 右侧筛选控件：桌面端单行右侧，移动端也保持单行（搜索+筛选同行） -->
+              <div class="flex items-center gap-2 w-full sm:w-auto">
+                <!-- 搜索框：移动端弹性占满剩余空间，桌面端固定宽度 -->
+                <div class="relative flex-1 sm:flex-none sm:w-44">
+                  <input v-model="query" type="search" :placeholder="searchPlaceholder"
+                    class="w-full px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
+                  <button v-if="query" type="button" @click="query = ''"
+                    class="search-clear"
+                    aria-label="清空搜索" title="清空搜索">×</button>
+                </div>
+                <select v-model="searchField" class="flex-none w-auto text-[12pt] rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                  <option value="">全部</option>
+                  <option value="college">单位</option>
+                  <option value="location">地点</option>
+                  <option value="topic">题目</option>
+                  <option value="abstract">摘要</option>
+                </select>
+                <select v-model="year" class="flex-none w-auto text-[12pt] rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                  <option value="">年份</option>
+                  <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                </select>
+                <button v-if="hasActiveFilter" @click="clearFilters()"
+                  class="flex-none px-2 py-1.5 text-[12pt] rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
+                  title="清除所有筛选条件">✕ 清除</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 时间线 -->
+          <div v-if="loading" class="text-center text-slate-400 py-16 text-[12pt]">数据加载中…</div>
+          <div v-else-if="filtered.length">
+            <div v-for="g in pagedGroups" :key="g.key" class="mb-2">
+              <div class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">
+                <span class="w-1 h-5 rounded-full bg-blue-500"></span>
+                {{ g.key }}
+              </div>
+              <article v-for="l in g.items" :key="l.sourceUrl + (l.lectureIndex ? '#' + l.lectureIndex : '')"
+                class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
+                <!-- 元信息 -->
+                <div class="flex items-center gap-2 text-[11pt] text-slate-400 mb-1.5 flex-nowrap">
+                  <span class="font-medium text-slate-500 truncate min-w-0 max-w-[45%]">{{ l.college }}</span>
+                  <span class="text-slate-300 shrink-0">·</span>
+                  <span class="whitespace-nowrap">{{ fmtDateTime(l) }}</span>
+                  <span :class="['ml-auto px-2 py-0.5 rounded text-[11pt] font-semibold shrink-0 whitespace-nowrap', statusInfo(l.lectureStart).hot ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400']">{{ statusInfo(l.lectureStart).label }}</span>
+                </div>
+                <!-- 标题 -->
+                <h2 class="text-[15pt] font-semibold leading-snug mb-2">
+                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}<span v-if="l.isMultiLecture && l.lectureIndex != null && !topicHasSession(l.topic, l.lectureIndex)">（第{{ l.lectureIndex }}{{ l.unitType === 'session' ? '场' : '期' }}）</span></a>
+                </h2>
+                <!-- 结构化详情：题目/地点/主讲/简介/内容摘要 -->
+                <div v-if="l.topic || l.location || l.speaker || l.speakerBio || abstractOf(l)"
+                  class="text-[12pt] text-slate-600 space-y-1 mb-2">
+                  <div v-if="l.topic"><span class="text-slate-400">题目</span> <span class="text-slate-600">{{ truncate(l.topic, 120) }}</span></div>
+                  <div v-if="l.location"><span class="text-slate-400">地点</span> <span class="text-slate-600">{{ l.location }}</span></div>
+                  <div v-if="l.speaker"><span class="text-slate-400">主讲</span> <span class="text-slate-600">{{ l.speaker }}<span v-if="l.speakerAffiliation" class="text-slate-400">（{{ l.speakerAffiliation }}）</span></span></div>
+                  <div v-if="l.host"><span class="text-slate-400">主持</span> <span class="text-slate-600">{{ l.host }}</span></div>
+                  <div v-if="l.meetingId"><span class="text-slate-400">会议号</span> <span class="text-slate-600">{{ l.meetingPlatform ? l.meetingPlatform + ' ' : '' }}{{ l.meetingId }}</span></div>
+                  <div v-if="l.participants"><span class="text-slate-400">参与</span> <span class="text-slate-600">{{ l.participants }}</span></div>
+                  <div v-if="notesText(l)" class="text-amber-600 text-[11pt]">⚠ {{ notesText(l) }}</div>
+                  <div v-if="l.speakerBio" class="text-slate-500 leading-relaxed">
+                    <span class="text-slate-400">简介</span> {{ truncate(cleanFooter(l.speakerBio), 220) }}
+                  </div>
+                  <div v-if="abstractOf(l)" class="text-slate-500 leading-relaxed line-clamp-3">
+                    <span class="text-slate-400">摘要</span> {{ abstractOf(l) }}
+                  </div>
+                </div>
+                <!-- 可点击 Tag + 想听 + 点赞 -->
+                <div class="flex flex-wrap gap-2 items-center">
+                  <!-- 多来源讲座：列出所有来源单位标签 -->
+                  <template v-if="l.merged">
+                    <button v-for="c in sourceColleges(l)" :key="c"
+                      @click="onTagClick('college', c)"
+                      class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
+                    <button @click="toggleSources(l.sourceUrl)"
+                      class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-[12pt] border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.sourceUrl] ? '▲' : '▼' }}</button>
+                  </template>
+                  <template v-else>
+                    <button @click="onTagClick('college', l.college)"
+                      class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
+                  </template>
+                  <button v-for="c in sourceCampuses(l)" :key="c" @click="onTagClick('campus', c)"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
+                  <!-- 想听按钮：ml-auto 推到右侧，点赞数字 min-w 防挤压 -->
+                  <button @click="toggleWant(l.sourceUrl)"
+                    :class="['ml-auto px-2.5 py-1 rounded-full flex items-center gap-1 text-[12pt] transition border whitespace-nowrap', hasWanted(l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
+                    title="想听就点^_^">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" :fill="hasWanted(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                    </svg>
+                    <span class="min-w-[1.25rem] text-center">{{ capDisplay(wantCount(l.sourceUrl)) }}</span>
+                  </button>
+                  <button @click="toggleLike(l.sourceUrl)"
+                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-[12pt] transition border whitespace-nowrap', hasLiked(l.sourceUrl) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
+                    title="喜欢就赞^_^">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linejoin="round" d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
+                    </svg>
+                    <span class="min-w-[1.25rem] text-center">{{ capDisplay(likeCount(l.sourceUrl)) }}</span>
+                  </button>
+                </div>
+                <!-- 多来源：展开各官方原文链接 -->
+                <div v-if="l.merged && expanded[l.sourceUrl]" class="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
+                  <a v-for="s in l.sources" :key="s.sourceUrl" :href="safeUrl(s.sourceUrl)" target="_blank" rel="noopener noreferrer"
+                    @click="recordVisit(l.sourceUrl)"
+                    class="flex items-center gap-2 text-[12pt] text-blue-600 hover:text-blue-800 hover:underline">
+                    <span class="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[11pt]">{{ s.college }}</span>
+                    <span class="truncate">{{ s.title || s.sourceUrl }}</span>
+                  </a>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div v-else class="text-center text-slate-400 py-16 text-[12pt]">没有匹配的讲座。</div>
+
+          <!-- 分页导航 -->
+          <nav v-if="filtered.length > pageSize" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-[12pt]">
+            <button @click="prevPage" :disabled="currentPage === 1"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+            <template v-for="p in pageNumbers" :key="p">
+              <button v-if="p !== '...'" @click="gotoPage(p)"
+                :class="['min-w-[36px] px-2 py-1.5 rounded-lg border transition', p === currentPage ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50']">{{ p }}</button>
+              <span v-else class="px-1.5 text-slate-400 select-none">…</span>
+            </template>
+            <button @click="nextPage" :disabled="currentPage === totalPages"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+            <span class="ml-3 inline-flex items-center gap-1 whitespace-nowrap">
+              <span class="text-slate-400">跳至</span>
+              <input type="number" min="1" :max="totalPages" v-model.number="gotoInput" @keydown.enter="jumpToPage"
+                class="w-16 px-2 py-1.5 text-center rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <span class="text-slate-400">页</span>
+              <button @click="jumpToPage"
+                class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">跳转</button>
+            </span>
+          </nav>
+    </main>
+
+    <footer class="border-t border-slate-200 text-center text-[12pt] text-slate-400 py-6 bg-white">
+      数据来源于华南师范大学各学院/部处公开站点，仅供师生参考，请以官方原文为准。
+      <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
+        · 本站总访问量 <span id="busuanzi_site_pv">—</span> 次
+      </span>
+    </footer>
+
+    <!-- Toast 提示 -->
+    <transition name="fade">
+      <div v-if="toast.show"
+        class="fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-slate-800 text-white text-[12pt] shadow-lg z-50">
+        {{ toast.message }}
+      </div>
+    </transition>
+
+    <!-- 回到顶部：下滑后出现，纯灰箭头圆形白底，悬停放大+阴影 -->
+    <transition name="fade">
+      <button v-if="showBackTop" @click="scrollToTop"
+        class="back-top-btn fixed bottom-6 right-6 z-40 flex items-center justify-center w-11 h-11 rounded-full bg-white text-slate-500 shadow-lg border border-slate-200"
+        aria-label="回到顶部">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 15V5M5 10l5-5 5 5" />
+        </svg>
+      </button>
+    </transition>
+  </div>
+
+  <script defer src="app.js?v=5eb7e17335"></script>
+  <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
+       必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
+       会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
+  <script defer src="footer-counter.js?v=34709fe347"></script>
+</body>
+</html>

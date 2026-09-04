@@ -1,0 +1,107 @@
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ===== 运行时日志（不入库） =====
+*.log
+server.log
+
+# ===== 手动备份（不入库） =====
+data/*.backup.json
+data/*.bak
+data/*.bak.*
+data/*.bak*
+*.bak.json
+data/.backups/
+data/powershell.txt
+# 一次性修复脚本（fix_5708.py 等），不入库
+fix_*.py
+
+# ===== 本地调试/开发工具（仅本地使用，不推送公网） =====
+# tools/ 下均为一次性诊断/回填/OCR 基准脚本，网站运行（爬虫+前端切片）不依赖它们；
+# daily.yml 只用 scraper/ 与 scripts/。保留在本地，绝不入库。
+tools/
+# 本地预览启动/停止脚本，公网不需要
+start_local.bat
+stop_local.bat
+
+# ===== 截图 =====
+site/screenshots/
+
+# ===== 内部资料（不公开，避免推到公网仓库） =====
+信息源网址清单.md
+EVALUATION.md
+需求规格说明书.md
+# 本地安全审查报告：不公开（D+E）
+docs/SECURITY.md
+代码审查报告*.html
+
+# ===== docs/ 个人学习/测试/评审产物（不公开，避免推到公网仓库） =====
+# 注意：deploy.md 与 PARSING_RULES.md 是项目核心文档，刻意保留在仓库，不在此列
+docs/从零搭建讲座聚合网站.md
+docs/OCR_RULES_CURRENT.md
+docs/lecture_split_rules_review.html
+docs/rules_docx*_review.html
+docs/*需求规格*.html
+docs/*audit*.html
+# 以下为游离未跟踪的内部文档，补覆盖以杜绝误 git add 入库：
+# 00~10 规则文档系列（内部梳理，不公开）
+docs/[0-9][0-9]-*.md
+# 两轮代码体检报告
+docs/代码体检报告-*.md
+# 代码评审报告（过程文档，不公开，避免推到公网仓库）
+docs/code-review-*/
+# 早期评审稿
+docs/讲座拆分规则-综合修订版.html
+# 需求规格说明书（md 版，注意非 .html）
+docs/需求规格说明书-*.md
+
+# ===== 运行时 / 增量状态 =====
+# 注意：data/last_scrape.json 必须入库！GitHub Actions 每日定时抓取依赖它在
+# 仓库中持久化，才能「接着上一次」做增量更新，而非每次全量重扫。
+# （data/lectures.json 为公开讲座数据，本就入库。）
+#
+# 以下为本机 server.py 运行时生成的访问量/点赞统计状态，属本地运行时数据，
+# 不应提交到仓库（公网为静态托管也不读取）。
+data/visits.json
+data/lecture_stats.json
+# VLM（智谱等）海报结构化提取结果缓存：按图片 URL 哈希存，重跑幂等、省额度，不入库
+data/.vlm_cache.json
+
+# 访问量「每年每月」报告：由 scripts/gen_visits_report.py 生成的产物，
+# 随时可重跑得到，不入库（数据来源 data/visits.json 本身已 gitignore）。
+reports/
+
+# ===== 本地开发记忆与内部资料（不公开，避免推到公网仓库） =====
+.workbuddy/
+wechat_accounts.md
+
+# ===== 本地专用后台页面：不部署到公网 =====
+# 信息源管理依赖本地后端，公网不提供该功能。保留在本地开发用，
+# 但绝不推送到仓库/Pages，避免暴露信息源结构与新增入口。
+site/sources.html
+
+# ===== 可能含凭据的本地环境文件（务必不要提交） =====
+.env
+.env.*
+*.local
+secrets.*
+*token*.txt
+
+# ===== 临时调试/测试/备份文件（务必不要提交，避免泄露内部数据） =====
+_*.py
+_*.txt
+_*.md
+data/_*
+data/*.backup.json
+data/*.bak.*
+*.tmp
+# golden 测试的直播 HTML 缓存目录（密封化后测试改用 tests/fixtures/，
+# 此目录若被旧流程生成，不得入库——内含外部站点抓取的网页）
+tmp_diag/
+verify_sandbox/
+# 本地调试/测试临时目录（dom.html、filter_test、mobile_test 等），不入库
+tmp/

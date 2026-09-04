@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- CSP 说明：
+       - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
+         站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
+       - 访问量使用 busuanzi.aspark.cc（国内可用的免费计数服务，兼容原版不蒜子写法），
+         script-src / connect-src 需放行 busuanzi.aspark.cc；sessionStorage 防同会话重复计数。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <!-- footer-counter.js 动态加载 busuanzi，同会话只计 1 次 -->
+  <meta name="referrer" content="no-referrer" />
+  <title>各学院讲座统计 - 木铎金声</title>
+  <link rel="stylesheet" href="vendor/tailwind.css" />
+  <script defer src="vendor/vue.global.prod.js"></script>
+    <style>
+      [v-cloak] { display: none !important; }
+      /* iOS Safari 兜底：-webkit-sticky 前缀 + 优先级压制（tailwind 的 sticky 只输出 position:sticky） */
+      th.sticky, td.sticky { position: -webkit-sticky; position: sticky; }
+    </style>
+  </head>
+  <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+    <div id="app" v-cloak class="flex flex-col min-h-screen">
+
+    <!-- 顶部栏（不再固定，随页面自然滚动，移动端才看得到数据） -->
+    <header class="bg-white/95 border-b border-slate-200">
+      <div class="max-w-6xl mx-auto px-4">
+        <div class="flex items-center gap-3 h-14">
+          <a href="./" class="flex items-center gap-2 shrink-0">
+            <img src="scnu-emblem.png" alt="华南师范大学" class="w-9 h-9 rounded-lg bg-white shadow-sm" />
+            <img src="site-title.png" alt="木铎金声" class="h-8 w-auto object-contain" />
+          </a>
+
+          <!-- 校区导航（桌面）：与首页一致，放在木铎金声 logo 之后 -->
+          <nav class="hidden sm:flex items-center gap-1 ml-3">
+            <button v-for="cp in campuses" :key="cp" @click="campusFilter = cp"
+              :class="['px-3 py-1.5 rounded-full text-[12pt] transition', campusFilter === cp ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
+              {{ cp === '' ? '全部' : cp }}
+            </button>
+          </nav>
+
+          <div class="ml-auto flex items-center gap-2">
+            <a href="./" class="text-[12pt] text-slate-600 hover:text-slate-800 whitespace-nowrap">返回首页</a>
+          </div>
+        </div>
+
+        <!-- 校区导航（移动端） -->
+        <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1">
+          <button v-for="cp in campuses" :key="cp" @click="campusFilter = cp"
+            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap', campusFilter === cp ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
+            {{ cp === '' ? '全部' : cp }}
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6 w-full">
+      <div class="mb-4">
+        <h1 class="text-[18pt] font-bold text-slate-800">各学院 / 部处讲座统计</h1>
+        <p class="text-[12pt] text-slate-500 mt-1">
+          去重后 <span class="font-semibold text-slate-800">{{ displayLecture }}</span> 场讲座（全站），覆盖 <span class="font-semibold text-slate-800">{{ filteredCollegeCount }}</span> 个单位<span v-if="campusFilter || collegeFilter">（当前筛选）</span>，<span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知（全站），跨 <span class="font-semibold text-slate-800">{{ years.length }}</span> 个年份。
+        </p>
+      </div>
+
+      <!-- 排序 + 筛选学院：同一行（筛选学院在左，排序在右） -->
+      <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+          <label class="text-[12pt] text-slate-500 whitespace-nowrap">筛选学院：</label>
+          <input v-model="collegeFilter" type="text" placeholder="输入学院/部处名称..."
+            class="w-full sm:w-64 px-3 py-1.5 rounded-lg border border-slate-200 text-[12pt] focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 bg-white" />
+        </div>
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <span class="text-[12pt] text-slate-500 whitespace-nowrap">排序：</span>
+          <button @click="toggleSort('total')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'total' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按总数</button>
+          <button @click="toggleSort('college')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'college' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按学院名</button>
+          <button @click="toggleSort('visits')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'visits' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按访问数</button>
+          <button @click="toggleSort('likes')"
+            :class="['px-3 py-1.5 rounded-lg text-[12pt] border transition', sortBy.key === 'likes' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按点赞数</button>
+        </div>
+      </div>
+
+      <!-- 统计区。桌面端：table 冻结表头/首列 + 内部滚动框；移动端：div 行式表格（见下方，兼容安卓 WebView 的 sticky） -->
+      <div v-if="summary && summary.lectureCount">
+        <!-- 桌面端（≥640px）：表格，冻结表头/首列，内部滚动 -->
+        <div class="hidden sm:block sm:bg-white sm:rounded-xl sm:border sm:border-slate-200 sm:shadow-sm sm:overflow-hidden">
+          <div class="sm:overflow-auto sm:max-h-[calc(100vh_-_13rem)]">
+          <!-- border-separate + spacing-0：iOS Safari 下 border-collapse 会使单元格上的 position:sticky 失效（经典 WebKit bug），必须用 separate 模式才能让表头/首列钉住视口 -->
+          <table class="min-w-full text-[12pt] border-separate border-spacing-0">
+            <thead class="bg-slate-50 text-slate-600">
+              <tr>
+                <th class="text-center px-2 py-3 font-semibold border-b border-slate-200 sticky top-0 left-0 z-30 bg-slate-50 min-w-[48px] whitespace-nowrap hidden sm:table-cell">序号</th>
+                <th @click="toggleSort('college')" class="cursor-pointer select-none text-left px-4 py-3 font-semibold border-b border-slate-200 sticky top-0 left-0 z-30 bg-slate-50 max-w-[140px] break-words sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">
+                  <span class="inline-flex items-center gap-1 hover:text-slate-800">学院 / 部处 <span class="text-slate-400 text-[10pt]">{{ sortIcon('college') }}</span></span>
+                </th>
+                <th v-if="displayMode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[80px] whitespace-nowrap">
+                  <span class="inline-flex items-center gap-1 justify-end">总计 <span class="text-slate-400 text-[10pt]">{{ sortIcon('total') }}</span></span>
+                </th>
+                <th v-else-if="displayMode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[80px] whitespace-nowrap">
+                  <span class="inline-flex items-center gap-1 justify-end">访问数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('visits') }}</span></span>
+                </th>
+                <th v-else-if="displayMode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[80px] whitespace-nowrap">
+                  <span class="inline-flex items-center gap-1 justify-end">点赞数 <span class="text-slate-400 text-[10pt]">{{ sortIcon('likes') }}</span></span>
+                </th>
+                <th v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 sticky top-0 z-20 bg-slate-50 min-w-[80px] whitespace-nowrap">
+                  <span class="inline-flex items-center gap-1 hover:text-slate-800 justify-end">{{ y }} 年 <span class="text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span></span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, idx) in rows" :key="row.college" class="hover:bg-slate-50">
+                <td class="px-2 py-3 text-center text-slate-400 sm:sticky sm:left-0 z-10 bg-white min-w-[48px] whitespace-nowrap hidden sm:table-cell border-b border-slate-100">{{ idx + 1 }}</td>
+                <td class="px-4 py-3 font-medium text-slate-700 sticky left-0 z-10 bg-white max-w-[140px] break-words sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none border-b border-slate-100">{{ row.college || '未分类' }}</td>
+                <td v-if="displayMode === 'count'" class="px-4 py-3 text-right font-bold text-slate-800 min-w-[80px] whitespace-nowrap border-b border-slate-100">{{ row.total }}</td>
+                <td v-else-if="displayMode === 'visits'" class="px-4 py-3 text-right font-semibold text-slate-700 min-w-[80px] whitespace-nowrap border-b border-slate-100">{{ row.visitsTotal }}</td>
+                <td v-else-if="displayMode === 'likes'" class="px-4 py-3 text-right font-semibold text-slate-700 min-w-[80px] whitespace-nowrap border-b border-slate-100">{{ row.likesTotal }}</td>
+                <td v-for="(n, idx) in row.cells" :key="years[idx]" :class="['px-4 py-3 text-right min-w-[80px] whitespace-nowrap border-b border-slate-100', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
+                  {{ cellDisplay(n) }}
+                </td>
+              </tr>
+              <tr class="bg-slate-50 font-semibold text-slate-700 sm:sticky sm:bottom-0 z-20">
+                <td class="px-2 py-3 text-center sm:sticky sm:left-0 sm:bottom-0 z-30 bg-slate-50 min-w-[48px] whitespace-nowrap hidden sm:table-cell"></td>
+                <td class="px-4 py-3 sticky left-0 z-30 bg-slate-50 max-w-[140px] break-words sm:bottom-0 sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">合计</td>
+                <td v-if="displayMode === 'count'" class="px-4 py-3 text-right font-bold text-slate-800 sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[80px] whitespace-nowrap">{{ grandTotal }}</td>
+                <td v-else-if="displayMode === 'visits'" class="px-4 py-3 text-right font-bold text-slate-800 sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[80px] whitespace-nowrap">{{ grandVisits }}</td>
+                <td v-else-if="displayMode === 'likes'" class="px-4 py-3 text-right font-bold text-slate-800 sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[80px] whitespace-nowrap">{{ grandLikes }}</td>
+                <td v-for="n in yearTotals" :key="n.year" class="px-4 py-3 text-right sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[80px] whitespace-nowrap">{{ displayMode === 'count' ? n.count : (displayMode === 'visits' ? n.visits : n.likes) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-if="summary && summary.lectureCount" class="mt-3 px-4 text-[11pt] text-slate-400 leading-relaxed">
+            说明：同一讲座若由多个单位联合发布（跨源合并），会在每个相关单位各计 1 次，因此「各单位计数之和」会大于顶部「去重后讲座总数」。各单位的讲座明细与首页按单位筛选的结果完全一致。
+          </p>
+          </div>
+        </div>
+
+        <!-- 移动端（<640px）：div 行式表格 + 双横滑容器（表头与数据各自独立 overflow-x:auto，JS 双向同步 scrollLeft）。
+             首列固定改用浏览器原生 CSS sticky left-0（首列是每行第一个子元素，自然位置即容器左缘，
+             横滑时由合成层原生钉住，零 JS 帧延迟、无抖动（之前 JS translate3d 推回会因 1 帧时差抖动）。
+             表头容器本身 sticky top-0 钉视口顶；外层卡片 overflow-hidden 裁切圆角与表格溢出。 -->
+        <div class="sm:hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <!-- 表头独立横滑容器：sticky top-0 钉视口顶，自身 overflow-x-auto 不撑大外层 -->
+          <div id="m-thead-scroll" class="sticky top-0 z-30 overflow-x-auto bg-slate-50 border-b border-slate-200 shadow-sm" style="position:sticky;top:0;z-index:30">
+            <div class="flex" style="width: max-content">
+              <div @click="toggleSort('college')" class="mobile-sticky-left sticky left-0 z-40 bg-slate-50 w-[96px] shrink-0 px-2 py-3 font-semibold text-left border-r border-slate-200 break-words cursor-pointer select-none">
+                学院 / 部处 <span class="text-slate-400 text-[10pt]">{{ sortIcon('college') }}</span>
+              </div>
+              <div class="flex">
+                <div v-if="displayMode === 'count'" @click="toggleSort('total')" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
+                  <span class="whitespace-nowrap">总计 <span class="ml-1 text-slate-400 text-[10pt]">{{ sortIcon('total') }}</span></span>
+                </div>
+                <div v-else-if="displayMode === 'visits'" @click="toggleSort('visits')" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
+                  <span class="whitespace-nowrap">访问数 <span class="ml-1 text-slate-400 text-[10pt]">{{ sortIcon('visits') }}</span></span>
+                </div>
+                <div v-else-if="displayMode === 'likes'" @click="toggleSort('likes')" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
+                  <span class="whitespace-nowrap">点赞数 <span class="ml-1 text-slate-400 text-[10pt]">{{ sortIcon('likes') }}</span></span>
+                </div>
+                <div v-for="y in years" :key="y" @click="toggleSort(String(y))" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
+                  <span class="whitespace-nowrap">{{ y }}<span class="ml-1 text-slate-400 text-[10pt]">{{ sortIcon(String(y)) }}</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 数据独立横滑容器 -->
+          <div id="m-scrollx" class="overflow-x-auto">
+            <div v-for="(row, idx) in rows" :key="row.college" class="flex border-b border-slate-100" style="width: max-content">
+              <div class="mobile-sticky-left sticky left-0 z-20 bg-white w-[96px] shrink-0 px-2 py-3 font-medium text-slate-700 border-r border-slate-100 break-words">{{ row.college || '未分类' }}</div>
+              <div v-if="displayMode === 'count'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ row.total }}</div>
+              <div v-else-if="displayMode === 'visits'" class="w-[72px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.visitsTotal }}</div>
+              <div v-else-if="displayMode === 'likes'" class="w-[72px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.likesTotal }}</div>
+              <div v-for="(n, ci) in row.cells" :key="years[ci]" :class="['w-[72px] shrink-0 px-2 py-3 text-right border-r border-slate-100', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
+                {{ cellDisplay(n) }}
+              </div>
+            </div>
+
+            <!-- 合计行 -->
+            <div class="flex bg-slate-50" style="width: max-content">
+              <div class="mobile-sticky-left sticky left-0 z-20 bg-slate-50 w-[96px] shrink-0 px-2 py-3 font-semibold text-slate-700 border-r border-slate-100">合计</div>
+              <div v-if="displayMode === 'count'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandTotal }}</div>
+              <div v-else-if="displayMode === 'visits'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandVisits }}</div>
+              <div v-else-if="displayMode === 'likes'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandLikes }}</div>
+              <div v-for="t in yearTotals" :key="t.year" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ displayMode === 'count' ? t.count : (displayMode === 'visits' ? t.visits : t.likes) }}</div>
+            </div>
+          </div>
+
+          <p class="mt-3 px-4 pb-4 text-[11pt] text-slate-400 leading-relaxed">
+            说明：同一讲座若由多个单位联合发布（跨源合并），会在每个相关单位各计 1 次，因此「各单位计数之和」会大于顶部「去重后讲座总数」。左右滑动查看各年份数据。
+          </p>
+        </div>
+      </div>
+
+      <div v-else-if="loading" class="text-center text-slate-400 py-16 text-[12pt]">数据加载中…</div>
+      <div v-else-if="loadError" class="text-center text-red-500 py-16 text-[12pt]">{{ loadError }}</div>
+      <div v-else class="text-center text-slate-400 py-16 text-[12pt]">暂无数据</div>
+    </main>
+
+    <footer class="border-t border-slate-200 text-center text-[12pt] text-slate-400 py-6 bg-white">
+      数据来源于华南师范大学各学院/部处公开站点，仅供师生参考，请以官方原文为准。
+      <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
+        · 本站总访问量 <span id="busuanzi_site_pv">—</span> 次
+      </span>
+    </footer>
+
+  </div>
+
+  <script defer src="stats.js?v=b5e670fadb"></script>
+  <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
+       必须置于 stats.js（mount('#app')）之后执行，否则其写入的缓存值
+       会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
+  <script defer src="footer-counter.js?v=34709fe347"></script>
+</body>
+</html>
