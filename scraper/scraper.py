@@ -345,10 +345,19 @@ def _completeness(r):
 
 
 def _normalize_speaker(speaker):
-    """主讲人归一化：去掉职称后缀，用于跨源匹配。"""
+    """主讲人归一化：去掉职称后缀与英文头衔前缀，用于跨源匹配。
+
+    英文头衔前缀（Dr./Prof. 等）不剥会导致同一人跨源合并失败：
+    Winney 实测——物理学院主记录 speaker='Dr. Daniel Winney'、
+    iqm 新记录 speaker='Daniel Winney'，键不同 → 重复插入。
+    """
     if not speaker:
         return ''
     s = speaker.strip()
+    # 去英文头衔前缀（大小写不敏感，可带点、后接空格或直接连姓名）
+    s = re.sub(r'^(?:associate\s+|assistant\s+|full\s+)?'
+               r'(?:professor|prof|dr|mr|mrs|ms|ph\.?d)\.?\s*',
+               '', s, flags=re.I) or s
     # 去掉常见职称
     for suffix in ['教授', '副教授', '讲师', '研究员', '副研究员',
                    '院士', '博士', '博士后', '博士生导师', '硕士生导师']:

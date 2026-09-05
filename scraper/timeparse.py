@@ -522,7 +522,24 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
         eff = title_year
     elif publish_year:
         eff = publish_year
+
+    # R2 前置清洗：屏蔽"截止/截稿"语境的日期。
+    # CFP/研讨会通知常含多个日期（报名截止/提要截稿/评审通知/会议日期），通用解析
+    # 抓第一个日期，会把报名截止日当讲座时间（wxy3238：研讨会 12-17 被抓成 11-15）。
+    # 屏蔽版仍能解析出日期才采信（说明正文确有非截止日期）；否则保留原结果，
+    # 避免"页面只有截止日期"的场景反而落空。
+    def _mask_deadline_dates(t):
+        return re.sub(
+            r'[^，。；;,.\n]{0,12}(?:截止|截稿)[^，。；;,.\n]{0,8}[：:]?\s*'
+            r'(?:\d{4}\s*[年\-/.]\s*)?\d{1,2}\s*[月\-/.]\s*\d{1,2}\s*[日号]?',
+            ' ', t)
+
     g = _parse_segment(body_text, eff, publish_time)
+    _bt_masked = _mask_deadline_dates(body_text)
+    if _bt_masked != body_text:
+        _g2 = _parse_segment(_bt_masked, eff, publish_time)
+        if _g2 and (not g or _g2.get('start') != (g or {}).get('start')):
+            g = _g2
     if g:
         if g.get('from_full'):
             # 完整日期直接采用，不触发 R6

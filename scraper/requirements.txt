@@ -10,3 +10,7 @@ numpy==2.3.4
 # OCR 引擎：RapidOCR（ONNXRuntime 后端，替代原 easyocr；中文海报更准确、更轻量）
 rapidocr-onnxruntime==1.4.4
 opencv-python-headless==4.13.0.92
+
+# 中文人名→拼音转换：双主讲人「讲座人：高兴森教授，张飞」与英文分场题目
+# 「…By Ms Fei Zhang / …By Xingsen Gao」的场-人配对（physics791 类页面）
+pypinyin==0.55.0
