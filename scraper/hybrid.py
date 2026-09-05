@@ -436,17 +436,70 @@ def _truncate_rich_text(v):
     return str(v).strip()
 
 
+def _is_plausible_speaker(value, trace_text):
+    """speaker 终检：值必须①像人名 ②字面可溯源到正文或标题。
+
+    两道闸门缺一不可：
+    - ①挡机构名/讲座题目（如 'Nanyang Technological University'、'Collider Frontier'）；
+    - ②挡 LLM 形近字错误（如把「魏文娅」认成「魏文雯」，错字在原文中不存在）。
+    多人（顿号/逗号分隔）逐段校验，任一段不通过则整体拒绝。
+    """
+    if not value or str(value).strip() in _NOISE:
+        return False
+    try:
+        from parsers import _looks_like_real_name
+    except Exception:
+        _looks_like_real_name = None
+
+    _trace = _norm_for_match(trace_text or '')
+    if not _trace:
+        return False
+    for seg in re.split(r'[、,，/]', str(value)):
+        seg = seg.strip()
+        if not seg:
+            continue
+        if _looks_like_real_name is not None and not _looks_like_real_name(seg):
+            return False
+        # 值级溯源：姓名必须字面出现在正文或标题中
+        if _norm_for_match(seg) not in _trace:
+            return False
+    return True
+
+
+def _try_fill_speaker(result, a, trace_text):
+    """仅填空融合 speaker。供「分歧未获 B 支持」分支单独调用。
+
+    只补 speaker 是因为 abstract/speakerBio 在 _merge_a_into_result 中属
+    「A 主导覆盖型」字段，未获 B 支持时不得覆盖规则值；而 speaker 采用前
+    须通过 _is_plausible_speaker（值级溯源 + 人名终检），风险可控。
+    """
+    if (result.get('speaker') or '').strip():
+        return False
+    lv = (a.get('speaker') or '').strip()
+    if not lv or lv in _NOISE:
+        return False
+    if not _is_plausible_speaker(lv, trace_text):
+        return False
+    result['speaker'] = lv
+    return True
+
+
 def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=None,
-                         title_year=None, url_year=None, rich_only=False):
+                         title_year=None, url_year=None, rich_only=False,
+                         extra_source=''):
     """仅填空融合：规则已有值的字段一律不动（铁律：不破坏已提取值）。
 
     规则为空才考虑 A 的值，且必须通过 snippet 溯源闸门；被闸门拦下的字段名
     记入 llmRejected，便于事后统计 A 的幻觉率。
     rich_only=True 时只处理丰富/补全型字段（abstract/speakerBio/职称/单位），
     不碰结构字段（speaker/topic/location），确保结构字段完全由规则主导。
+    extra_source：额外合法出处文本（页面标题）。speaker 溯源时与正文一并参与匹配，
+    因大量讲座页主讲人只出现在标题里。
     """
     rejected = []
     _fields = _RICH_FIELDS if rich_only else _ALL_FIELDS
+    # speaker 溯源范围 = 正文 + 标题（见 apply_llm_text_hybrid 的 title_text 说明）
+    _trace_text = (body_text or '') + ' ' + (extra_source or '')
     for fld in _fields:
         cur = (result.get(fld) or '').strip()
         lv = (a.get(fld) or '').strip()
@@ -475,7 +528,16 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                 if lv:
                     rejected.append(fld)
                 continue
-        if not _snippet_ok(a.get(fld + 'Snippet'), body_text):
+        if fld == 'speaker':
+            # speaker 采用「值级溯源」而非 snippet 级：A 常从标题读到姓名却编造一段
+            # 正文风格的 snippet（如「主讲人：曹艺轩（华南师范大学心理学院）」），
+            # 该 snippet 在正文与标题中都匹配不上，按 snippet 闸门会被误判为幻觉。
+            # 改为直接校验「姓名值本身」是否字面出现在正文+标题中——既能救回
+            # 标题型姓名，也能天然挡住 LLM 的形近字错误（错字在原文里不存在）。
+            if not _is_plausible_speaker(lv, _trace_text):
+                rejected.append('speaker')
+                continue
+        elif not _snippet_ok(a.get(fld + 'Snippet'), body_text):
             rejected.append(fld)
             continue
         result[fld] = lv
@@ -528,12 +590,17 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
 # ---------------------------------------------------------------------------
 def apply_llm_text_hybrid(result, body_text, url, provider, judge,
                           default_year=None, publish_time=None,
-                          title_year=None, url_year=None, rich_only=False):
+                          title_year=None, url_year=None, rich_only=False,
+                          title_text=''):
     """双轨解析 + 分歧裁决。原地修改 result 并打溯源标记，返回 result。
 
     provider: 模型 A（ModelProvider）；judge: 裁决模型 B（ModelProvider 或 None）。
     rich_only=True：仅把 A 的摘要/简介（及规则空的职称/单位）填空融合，
         结构字段完全由规则主导，不比较、不调 B 裁决。
+    title_text: 页面标题/列表标题。纳入 speaker 溯源范围——大量讲座页（如
+        物理学院「学术报告（第N期）XX大学李永强教授」）主讲人只写在标题里，
+        正文根本没有姓名，A 从标题读到的是真实信息，其 snippet 在 body_text 中
+        匹配不上会被误判为幻觉。标题是页面自有文本，属合法出处。
     """
     result['llmTextEnhanced'] = False
     result['llmVerdict'] = None
@@ -558,7 +625,8 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
         # 丰富字段模式：直接 only-fill abstract/speakerBio/职称/单位，
         # 不比较结构字段、不调 B，结构字段完全由规则主导。
         _merge_a_into_result(result, a, body_text, default_year, publish_time,
-                             title_year, url_year, rich_only=True)
+                             title_year, url_year, rich_only=True,
+                             extra_source=title_text)
         if result.get('abstract') or result.get('speakerBio'):
             result['llmTextEnhanced'] = True
             result['llmVerdict'] = 'rich-only'
@@ -568,7 +636,7 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
     if not diffs:
         # 一致：采用 A 丰富结果（abstract/bio 等规则没有的字段直接采用）
         _merge_a_into_result(result, a, body_text, default_year, publish_time,
-                             title_year, url_year)
+                             title_year, url_year, extra_source=title_text)
         result['llmTextEnhanced'] = True
         result['llmVerdict'] = 'consistent'
         if a.get('speaker'):
@@ -583,15 +651,26 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
         except Exception:
             verdict = {'verdict': 'unknown', 'fields': {}}
     result['llmVerdict'] = verdict.get('verdict', 'unknown')
+    # B 的独立提取留痕（方案A）：仅分歧裁决时存在，供人工抽检 B 自提取质量
+    if isinstance(verdict.get('self_extract'), dict) and verdict['self_extract']:
+        result['llmSelfExtract'] = verdict['self_extract']
 
     # 保守偏向规则：仅当 B 明确支持 llm 且给出采纳字段时才采用 A
     if verdict.get('verdict') == 'llm' and verdict.get('fields'):
         _merge_a_into_result(result, a, body_text, default_year, publish_time,
-                             title_year, url_year)
+                             title_year, url_year, extra_source=title_text)
         result['llmTextEnhanced'] = True
         if a.get('speaker'):
             result['speakerSource'] = 'llm'
     else:
-        # 保留规则；标记需人工抽检（仅当确有差异）
+        # 分歧未获 B 支持 -> 规则已有值一律保留，标记需人工抽检。
+        # 但「规则 speaker 为空、A 有值」的补全仍单独执行：speaker 为空在
+        # compare_struct 中不算分歧，若不单独补，只要时间/地点任一字段有分歧，
+        # A 从标题里正确读到的主讲人就会被连带丢弃（如物理学院「学术报告（第N期）
+        # 国防科技大学李永强教授」——姓名只写在标题里）。
+        _trace = (body_text or '') + ' ' + (title_text or '')
+        if _try_fill_speaker(result, a, _trace):
+            result['llmFilled'] = 'speaker'
+            result['speakerSource'] = 'llm'
         result['needsHumanReview'] = '|'.join(diffs)
     return result

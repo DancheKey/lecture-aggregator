@@ -154,7 +154,27 @@ _NON_NAME_TOKENS = [
     '优秀教师', '青年', '教师', '学生', '嘉宾', '领导', '专家',
 ]
 _EN_NON_NAME = {'professor', 'dr', 'mr', 'ms', 'presenter', 'lecturer', 'speaker',
-                'university', 'college', 'institute', 'research', 'science', 'chair'}
+                'university', 'college', 'institute', 'research', 'science', 'chair',
+                # 英文职位/头衔词——全大小写后若整串命中即判非人名（防 e.g. "Postdoctoral Associate"）
+                'postdoctoral', 'associate', 'fellow', 'director', 'dean', 'investigator',
+                'scholar', 'consultant', 'coordinator', 'administrator', 'officer', 'agent',
+                'technician', 'engineer', 'analyst', 'specialist', 'contributor',
+                'adjunct', 'emeritus', 'senior', 'junior', 'visiting',
+}
+
+# 英文 speaker 的词级噪声词（机构/学术活动）。命中任一词即判为非人名。
+# 背景：英文分支原只在「整串等于噪声词」时拦截，对多词短语无判别力，导致
+# 机构名（Nanyang Technological University）与讲座题目（Collider Frontier）
+# 被当作人名填进 speaker。全库审计：154 条英文 speaker 中仅 3 条命中，且全为
+# 姓名+机构粘连的脏值，无误杀真实人名。
+_EN_NAME_STOPWORD = {
+    'university', 'college', 'institute', 'institutes', 'school', 'department',
+    'dept', 'laboratory', 'lab', 'centre', 'center', 'academy', 'faculty',
+    'technology', 'technological', 'polytechnic',
+    'science', 'research', 'frontier', 'frontiers',
+    'seminar', 'lecture', 'lectures', 'symposium', 'workshop', 'colloquium',
+    'conference', 'forum', 'webinar',
+}
 
 # 绝不可能出现在真实人名中的子串（系列名/职务/单位/简介等）。命中即非人名。
 _NAME_FORBIDDEN = (
@@ -223,8 +243,26 @@ def _looks_like_real_name(s):
     # 支持变音符号（á/ö/ü/ñ/é 等）：先 NFKD 分解再去组合记号再校验，
     # 否则 'Tamás Dalmay' 因 á 不命中 [A-Za-z] 被拒，导致 poster 页主讲人被清洗守卫清空。
     s_fold = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
-    if re.fullmatch(r"[A-Za-z]+(?:[.'·]?\s?[A-Za-z]+)*", s_fold):
+    # ⛔ ReDoS 修复（2026-09-05）：原写法
+    #   re.fullmatch(r"[A-Za-z]+(?:[.'·]?\s?[A-Za-z]+)*", s_fold)
+    # 在「长英文串 + 尾部含非字母字符」（如 B 类脏值
+    # 'Juergen Stuhler Vice President Quantum Technologies (Germany)'）时 fullmatch
+    # 必然失败，引发灾难性回溯：实测单次调用卡死数分钟~永不返回、CPU 90%+，
+    # 是批量重解析"假卡死"的真凶（faulthandler 栈实锤 parsers.py:_looks_like_real_name）。
+    # 修复：量词改占有型（++ / *+，Python 3.11+，本地与 CI 均 3.12）——贪婪匹配后
+    # 绝不交还字符，失败即失败、线性时间，匹配语义与原正则完全一致（全库 171 条
+    # 英文 speaker 值逐一比对零分歧），仅消除回溯。
+    if re.fullmatch(r"[A-Za-z]++(?:[.'·]?\s?[A-Za-z]++)*+", s_fold):
         if s.lower().strip('.') in _EN_NON_NAME:
+            return False
+        # 词级拦截：机构名/题目整串混入 speaker（见 _EN_NAME_STOPWORD 说明）
+        if {w.lower().strip('.') for w in re.split(r"[\s.'·]+", s_fold) if w} \
+                & _EN_NAME_STOPWORD:
+            return False
+        # ⛔ 新增（2026-09-05）：英文职位/头衔词拦截——防 "Postdoctoral Associate"
+        # 等复合职位被当作人名。用词级集合拦截，命中任一词即判非人名。
+        if {w.lower().strip('.:,;') for w in re.split(r"[\s.'·]+", s_fold) if w} \
+                & _EN_NON_NAME:
             return False
         return True
     # 中文名：2–5 个汉字，首字须为常见姓氏，且去除非人名 token 后仍有残留
@@ -4395,7 +4433,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                 # 不干预结构字段（speaker/time/location/topic），由规则主导。
                 apply_llm_text_hybrid(result, body_text, url, _provider, _judge,
                                       default_year, publish_time, title_year, url_year,
-                                      rich_only=not _USE_LLM_TEXT)
+                                      rich_only=not _USE_LLM_TEXT,
+                                      title_text=' '.join(
+                                          x for x in (list_title or '', title or '')
+                                          if x))
         except Exception as _e:
             print(f'[HYBRID_ERR] {url}: {_e}', file=sys.stderr)
 

@@ -61,6 +61,7 @@ EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格�
 }
 5. 时间必须基于正文明确写出的日期与时间，不要猜测年份；年份无法确定时 lectureStart 用 null。
 6. speaker 必须基于正文明确写出的主讲人姓名；正文无明确人名返回 null，严禁根据标题猜测。
+6b. **英文 speaker 禁区**：英文语境下，speaker 只提取真实人名（如 "John Smith"、"刘潇屿"），**严禁把职位/头衔/机构名当作 speaker**，包括但不限于：Professor / Associate Professor / Postdoctoral Associate / Research Fellow / Director / Dean / Chair 等；若原文只出现 "Name + Title"，speaker 取 Name，Title 归 speakerTitle 字段。
 7. abstract 与 speakerBio 只提取各自段落的正文，必须到此为止：遇到「主讲人简介/报告人简介/专家简介/
    个人简介/报告题目/报告时间/报告地点/报名方式/联系方式/面向对象」等后续字段标题，或「一、二、
    三、」等章节序号时立即截断，严禁把后续段落（简介、题目、时间、地点、报名方式等）并入本字段。此外，正文末尾的「欢迎老师/同学参加」「诚邀」「敬请期待」等邀请语，以及页脚「编辑：/审核：/摄影：」署名，均不属于讲座内容，遇到即从该处截断，不并入 abstract。此外，正文末尾的「欢迎老师/同学参加」「诚邀」「敬请期待」等邀请语，以及页脚「编辑：/审核：/摄影：」署名，均不属于讲座内容，遇到即从该处截断，不并入 abstract。
@@ -97,6 +98,29 @@ def _truncate_abstract(text):
 # ---------------------------------------------------------------------------
 # JSON 解析（处理模型可能夹带的代码块围栏）
 # ---------------------------------------------------------------------------
+# 裁决员字段语义说明（拼接到 extract_verdict 的 system prompt）。
+# 实测教训（bench_judge_model.py v1）：不说明字段语义时，裁决模型会认为
+# "规则值信息更完整就更好"，把 LLM 提取的纯人名 speaker 错判为 rule 方。
+# 补上语义后（bench v2）：glm-4-flash / glm-4.5-air / agnes-2.5-flash 全部判对。
+_VERDICT_FIELD_SEMANTICS = (
+    "\n\n【字段语义（重要，判定前必读）】\n"
+    "- speaker = 主讲人**姓名本身**，是纯粹的人名。\n"
+    "- speaker **不得包含**职称/职务/头衔（如 教授、副教授、研究员、院长、"
+    "Vice President、Director、Professor、Dr. 等），也不得包含单位/机构名。\n"
+    "- 职称与单位应归入 speakerTitle / affiliation 字段，不属于 speaker。\n"
+    "- 判据：若一方的值只是另一方的『人名部分』（即另一方在其后拼接了职称/职务/单位），"
+    "则**只含人名的那一方更准确**，即使它看起来「信息更少」。\n"
+    "- lectureStart/lectureEnd = 讲座实际开始/结束时间。注意：时刻为 08:00 或 00:00 "
+    "属**占位符，表示时刻未知**，只用于按日期比较——一方给出占位时刻不代表它认为讲座"
+    "在那个时刻开始。对比时以**日期部分**为准，时刻格式不必强求一致。\n"
+    "- topic = 讲座真正的题目；title = 通知页面的外包装标题（如「学术报告（第N期）」）。"
+    "两者可以不同，都合法，都不算错。\n"
+    "- location = 讲座地点（楼栋+房间号），不含学校名。\n"
+    "- self_extract 是你自己的独立提取结果，仅作对比依据与留痕，不直接被采纳；"
+    "最终采纳以 verdict / fields 为准。"
+)
+
+
 def _parse_model_json(text):
     if not text:
         return None
@@ -113,6 +137,40 @@ def _parse_model_json(text):
         return json.loads(t)
     except Exception:
         return None
+
+
+def _parse_verdict_json(text):
+    """裁决输出专用解析（方案A三步法配套，2026-09-05）。
+
+    glm-4-flash 等模型按三步作答时会输出**多个** JSON 代码块：
+    第一步 self_extract 一个、第三步裁决（含 verdict/fields）又一个。
+    旧 _parse_model_json 非贪婪只取第一个块 -> 拿到无 verdict 的中间产物 ->
+    解析"失败"保守回落 unknown，B 的正确裁决被丢弃（实测 12246 页踩中）。
+    故此处从后往前找**含 verdict 键**的 JSON 块；无围栏时用 raw_decode
+    从 '{"self_extract"/"verdict"' 起点做括号配对解析（可处理嵌套 fields）。
+    """
+    if not text:
+        return None
+    # 1) 有 ```json 围栏：从后往前找含 verdict 的块
+    for b in reversed(re.findall(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)):
+        try:
+            obj = json.loads(b)
+            if isinstance(obj, dict) and 'verdict' in obj:
+                return obj
+        except Exception:
+            continue
+    # 2) 无围栏：从 {"self_extract" / {"verdict" 起点做括号配对解析（支持嵌套）
+    dec = json.JSONDecoder()
+    for m in reversed(list(re.finditer(r'\{"(?:self_extract|verdict)"', text))):
+        try:
+            obj, _ = dec.raw_decode(text[m.start():])
+            if isinstance(obj, dict) and 'verdict' in obj:
+                return obj
+        except Exception:
+            continue
+    # 3) 兜底：旧行为（首个可解析 JSON）
+    obj = _parse_model_json(text)
+    return obj if isinstance(obj, dict) and 'verdict' in obj else None
 
 
 def _unwrap(obj):
@@ -318,8 +376,11 @@ class AgnesProvider(ModelProvider):
         _throttle(channel=self.name)
         payload = {"model": self.model, "messages": messages, "temperature": temperature}
         headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
-        _hp = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
-        proxies = {'https': _hp, 'http': _hp} if _hp else None
+        # 不显式构造 proxies 字典：交给 requests 按标准环境变量解析，
+        # HTTP_PROXY/HTTPS_PROXY/NO_PROXY 均生效。本地若代理访问国内 LLM 异常，
+        # 可设 NO_PROXY=open.bigmodel.cn,api.agnes-ai.cn 让其直连绕过坏节点。
+        # （GitHub CI 不设任何代理变量，天然直连，不受影响。）
+        proxies = None
         for attempt in range(3):
             try:
                 r = requests.post(self.base_url, headers=headers, json=payload,
@@ -382,18 +443,33 @@ class AgnesProvider(ModelProvider):
         txt = (body_text or '')[:3500]
         rule_s = json.dumps(rule_fields or {}, ensure_ascii=False)
         llm_s = json.dumps(llm_fields or {}, ensure_ascii=False)
-        system = ("你是严格的讲座信息裁决员。只依据给定原文判断『规则解析结果』与『大模型解析结果』"
-                  "哪一方更准确，或是否都无法确定。禁止编造。输出严格 JSON："
-                  '{"verdict":"rule"|"llm"|"unknown","reason":"简述依据","fields":{采纳方的字段}}')
+        # 方案A三步裁决（2026-09-05）：①独立提取结构字段 -> ②与双方对比 -> ③裁决。
+        # self_extract 仅作裁决依据与日志留痕，采纳逻辑不变（verdict=llm 才采用 A 的 fields）。
+        system = ("你是严格的讲座信息裁决员。工作分三步，全部只依据给定原文，禁止编造。\n"
+                  "第一步【独立提取】：从原文独立提取讲座结构化信息，字段："
+                  "speaker(主讲人姓名)、speakerTitle(职称)、affiliation(单位)、"
+                  "lectureStart(讲座开始日期时间)、lectureEnd(讲座结束时间)、"
+                  "location(地点)、topic(讲座题目)、title(通知标题)。"
+                  "原文没有的字段填 null。\n"
+                  "第二步【对比】：把你的独立提取结果与『规则解析结果』『大模型解析结果』"
+                  "逐字段对比，判断哪一方更准确，或是否都无法确定。\n"
+                  "第三步【裁决】：输出严格 JSON：\n"
+                  '{"self_extract":{第一步提取的字段},"verdict":"rule"|"llm"|"unknown",'
+                  '"reason":"简述依据","fields":{采纳方的字段}}'
+                  + _VERDICT_FIELD_SEMANTICS)
         user = ("原文：\n" + txt +
                 "\n\n规则解析结果：\n" + rule_s +
                 "\n\n大模型解析结果：\n" + llm_s +
-                "\n\n请裁决：哪一方更准确？若大模型明显更准确且原文支持，verdict=llm 并把采纳字段放入 fields；"
+                "\n\n请按三步裁决：先独立提取（self_extract），再与双方逐字段对比，最后裁决。"
+                "若大模型明显更准确且原文支持，verdict=llm 并把采纳字段放入 fields；"
                 "若规则更准确或无法判断，verdict=rule 或 unknown（fields 留空）。")
         raw = self._post([{"role": "system", "content": system},
                           {"role": "user", "content": user}], temperature)
-        parsed = _parse_model_json(raw) if raw else None
+        parsed = _parse_verdict_json(raw) if raw else None
         if isinstance(parsed, dict) and parsed.get('verdict') in ('rule', 'llm', 'unknown'):
+            # self_extract 容错：非 dict 直接剥离，不影响 verdict/fields 主流程
+            if not isinstance(parsed.get('self_extract'), dict):
+                parsed.pop('self_extract', None)
             return parsed
         return {'verdict': 'unknown', 'fields': {}}
 
@@ -407,7 +483,9 @@ class ZhipuProvider(ModelProvider):
         self.api_key = api_key or _get_env('ZHIPU_API_KEY')
         self.base_url = (base_url or _get_env('ZHIPU_BASE_URL')
                          or 'https://open.bigmodel.cn/api/paas/v4/chat/completions')
-        self.model = (model or _get_env('JUDGE_MODEL') or 'glm-4.7-flash')
+        # glm-4-flash（免费普惠、非推理）：实测裁决 2.6~4.1s 且判对；
+        # 旧默认 glm-4.7-flash 为推理模型，实测单次 32~90s 甚至超时，是批量解析慢的主因。
+        self.model = (model or _get_env('JUDGE_MODEL') or 'glm-4-flash')
 
     def _post(self, messages, temperature):
         if not self.api_key:
@@ -415,8 +493,11 @@ class ZhipuProvider(ModelProvider):
         _throttle(channel=self.name)
         payload = {"model": self.model, "messages": messages, "temperature": temperature}
         headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
-        _hp = os.environ.get('HTTPS_PROXY') or os.environ.get('https_proxy')
-        proxies = {'https': _hp, 'http': _hp} if _hp else None
+        # 不显式构造 proxies 字典：交给 requests 按标准环境变量解析，
+        # HTTP_PROXY/HTTPS_PROXY/NO_PROXY 均生效。本地若代理访问国内 LLM 异常，
+        # 可设 NO_PROXY=open.bigmodel.cn,api.agnes-ai.cn 让其直连绕过坏节点。
+        # （GitHub CI 不设任何代理变量，天然直连，不受影响。）
+        proxies = None
         for attempt in range(3):
             try:
                 r = requests.post(self.base_url, headers=headers, json=payload,
@@ -473,18 +554,33 @@ class ZhipuProvider(ModelProvider):
         txt = (body_text or '')[:3500]
         rule_s = json.dumps(rule_fields or {}, ensure_ascii=False)
         llm_s = json.dumps(llm_fields or {}, ensure_ascii=False)
-        system = ("你是严格的讲座信息裁决员。只依据给定原文判断『规则解析结果』与『大模型解析结果』"
-                  "哪一方更准确，或是否都无法确定。禁止编造。输出严格 JSON："
-                  '{"verdict":"rule"|"llm"|"unknown","reason":"简述依据","fields":{采纳方的字段}}')
+        # 方案A三步裁决（2026-09-05）：①独立提取结构字段 -> ②与双方对比 -> ③裁决。
+        # self_extract 仅作裁决依据与日志留痕，采纳逻辑不变（verdict=llm 才采用 A 的 fields）。
+        system = ("你是严格的讲座信息裁决员。工作分三步，全部只依据给定原文，禁止编造。\n"
+                  "第一步【独立提取】：从原文独立提取讲座结构化信息，字段："
+                  "speaker(主讲人姓名)、speakerTitle(职称)、affiliation(单位)、"
+                  "lectureStart(讲座开始日期时间)、lectureEnd(讲座结束时间)、"
+                  "location(地点)、topic(讲座题目)、title(通知标题)。"
+                  "原文没有的字段填 null。\n"
+                  "第二步【对比】：把你的独立提取结果与『规则解析结果』『大模型解析结果』"
+                  "逐字段对比，判断哪一方更准确，或是否都无法确定。\n"
+                  "第三步【裁决】：输出严格 JSON：\n"
+                  '{"self_extract":{第一步提取的字段},"verdict":"rule"|"llm"|"unknown",'
+                  '"reason":"简述依据","fields":{采纳方的字段}}'
+                  + _VERDICT_FIELD_SEMANTICS)
         user = ("原文：\n" + txt +
                 "\n\n规则解析结果：\n" + rule_s +
                 "\n\n大模型解析结果：\n" + llm_s +
-                "\n\n请裁决：哪一方更准确？若大模型明显更准确且原文支持，verdict=llm 并把采纳字段放入 fields；"
+                "\n\n请按三步裁决：先独立提取（self_extract），再与双方逐字段对比，最后裁决。"
+                "若大模型明显更准确且原文支持，verdict=llm 并把采纳字段放入 fields；"
                 "若规则更准确或无法判断，verdict=rule 或 unknown（fields 留空）。")
         raw = self._post([{"role": "system", "content": system},
                           {"role": "user", "content": user}], temperature)
-        parsed = _parse_model_json(raw) if raw else None
+        parsed = _parse_verdict_json(raw) if raw else None
         if isinstance(parsed, dict) and parsed.get('verdict') in ('rule', 'llm', 'unknown'):
+            # self_extract 容错：非 dict 直接剥离，不影响 verdict/fields 主流程
+            if not isinstance(parsed.get('self_extract'), dict):
+                parsed.pop('self_extract', None)
             return parsed
         return {'verdict': 'unknown', 'fields': {}}
 
