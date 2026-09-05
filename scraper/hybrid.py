@@ -4,13 +4,19 @@
 对应 2026-09-02 方案：规则与 Agnes（A）并行识别，比较主要结构（地点/主讲人/时间/题目），
 一致则放行；不一致则调用第二个大模型（B）读原文裁决，且保守偏向规则。
 
-2026-09-02 下午修订（字段分层，实测 maths 8781 后确立）：
-- 融合一律「仅填空」：规则已有值的字段 A 绝不覆盖（含职称/单位/摘要/简介）。
-  职称与单位属填空型字段——规则没抓到时由 A 补上，规则已有则保留规则值。
+2026-09-05 修订（全局诊断后定死，回退此前的「摘要/简介 A 主导」实验）：
+- 融合一律「仅填空」：规则已有值的字段 A 绝不覆盖——含摘要/简介。此前对
+  abstract/speakerBio 的 A 主导覆盖曾在 maths 8806 等页把元信息块/邀请语
+  覆盖进规则的干净值（snippet 溯源闸门只能证"值在原文存在"，证不了
+  "边界正确"，污染文本本就来自原文）。A 仅在规则为空时补全。
 - 每个从 A 采纳的值都必须通过 snippet 溯源闸门（值能在原文中找到出处），
   否则判为幻觉并记入 llmRejected。这是可规模化的信任机制，替代人工全量抽查。
+- A 采纳值先过统一词表（field_vocab）的边界截断与标签折叠，再走闸门；
+  词表与规则、出口闸门三方共享同一标准（见 field_vocab.py 模块注释）。
 - 发布时间不接入本模块：实测其位于 div.meta 图标区、不在 body_text 内，A 看不到；
   且发布时间是删除依据，须保持确定性规则。
+- llmTextEnhanced 语义收紧：仅当 A 真正贡献了 ≥1 个字段才置 True
+  （旧逻辑只看结果里有没有 abstract/bio，规则自己填的也会误标）。
 
 铁律保障（用户硬性要求"大模型可能失效，规则必须独立可用"）：
 - 规则结果 result 在 parse_detail 内已先行算出，本模块永不阻塞、永不空库；
@@ -24,6 +30,7 @@ VLM 路线（VLM 主 + 第二 VLM 备份 + RapidOCR 兜底）。
 import datetime
 import re
 
+import field_vocab as _fv
 from llm_provider import _unwrap
 
 
@@ -36,6 +43,8 @@ def flatten_fields(fields):
     if not isinstance(fields, dict):
         return out
     for k, v in fields.items():
+        if k.startswith('_'):
+            continue  # 元数据键（如 _vocabVersion），非提取字段
         val, snip = _unwrap(v)
         if val is None:
             continue
@@ -407,33 +416,16 @@ _RICH_FIELDS = ('abstract', 'speakerBio', 'speakerTitle', 'speakerAffiliation')
 _ALL_FIELDS = ('topic', 'speaker', 'speakerTitle', 'speakerAffiliation',
               'location', 'abstract', 'speakerBio')
 
-# rich 字段边界截断：A 模型对 abstract/speakerBio 缺乏边界约束，会把后续「专家简介/
-# 报告题目/报告时间」等段落一并吞入。复用 parsers 既有锚点词表做后处理兜底——在 A 返回值
-# 填入 result 之前先截断到自然段落边界（遇到下个字段标题或章节序号即停）。正常干净提取
-# 不含这些标记，截断函数不会破坏它；仅当 A 溢出时才生效。
-_RICH_CUT = re.compile(
-    r'\s*(?:'
-    r'主讲人简介|报告人简介|主讲人简历|专家介绍|专家简介|个人简介|作者简介|'
-    r'主讲人介绍|报告人介绍|主讲介绍|简历|Bio|'
-    r'学术报告|报告题目|讲座题目|报告时间|讲座时间|报告地点|讲座地点|'
-    r'报告专家|报告人[：:]|讲座专家|'
-    r'报名时间|报名方式|联系方式|面向对象|参与方式|注意事项|交通指引|温馨提示|'
-    r'会议时间|会议地点|会议简介|论坛简介|沙龙简介|研讨会议程|'
-    r'主办单位|承办单位|协办单位|'
-    r'资讯及通知|相关新闻|最新动态|推荐阅读|相关文章|附件下载|相关链接|通知公告|'
-    r'[一二三四五六七八九十百零0-9]+[、.．](?!\d)|第.{1,6}期'
-    r')'
-)
-
-
+# rich 字段边界截断（2026-09-05 起）：锚点词表收敛到 field_vocab 单一事实源。
+# A 模型对 abstract/speakerBio 缺乏边界约束，会把后续「专家简介/报告题目/报告时间」
+# 等段落一并吞入。截断采用 aggressive 口径（比出口闸门多截章节序号/第N期），
+# 且截断前先做标签折叠（「报 告 人：」→「报告人：」），空格变体不再漏网
+# （maths 8806 病根：A 值里"题 目：""报 告 人："从未命中旧 _RICH_CUT 锚点）。
 def _truncate_rich_text(v):
     """把 abstract/speakerBio 截断到自然段落边界，去除 A 溢出吞入的后续段落。"""
     if not v:
         return v
-    m = _RICH_CUT.search(str(v))
-    if m:
-        return str(v)[:m.start()].strip()
-    return str(v).strip()
+    return _fv.truncate_rich_text(v, aggressive=True)
 
 
 def _is_plausible_speaker(value, trace_text):
@@ -490,25 +482,31 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
     """仅填空融合：规则已有值的字段一律不动（铁律：不破坏已提取值）。
 
     规则为空才考虑 A 的值，且必须通过 snippet 溯源闸门；被闸门拦下的字段名
-    记入 llmRejected，便于事后统计 A 的幻觉率。
+    记入 llmRejected，便于事后统计 A 的幻觉率。含 abstract/speakerBio——
+    2026-09-05 起回退 A 主导实验（maths 8806 脏值覆盖事故），全部字段一律仅填空。
     rich_only=True 时只处理丰富/补全型字段（abstract/speakerBio/职称/单位），
     不碰结构字段（speaker/topic/location），确保结构字段完全由规则主导。
     extra_source：额外合法出处文本（页面标题）。speaker 溯源时与正文一并参与匹配，
     因大量讲座页主讲人只出现在标题里。
+
+    返回实际采纳的字段名列表（供 llmTextEnhanced 语义使用）。
     """
     rejected = []
+    adopted = []
     _fields = _RICH_FIELDS if rich_only else _ALL_FIELDS
     # speaker 溯源范围 = 正文 + 标题（见 apply_llm_text_hybrid 的 title_text 说明）
     _trace_text = (body_text or '') + ' ' + (extra_source or '')
     for fld in _fields:
         cur = (result.get(fld) or '').strip()
         lv = (a.get(fld) or '').strip()
+        # 仅填空：规则已有值的字段一律保留（含摘要/简介，2026-09-05 修订）
+        if cur and cur not in _NOISE:
+            continue
         if fld in ('abstract', 'speakerBio'):
-            # A 主导（用户路线「摘要/简介 A 主导」）：abstract/speakerBio 以 A 的干净值为准，
-            # 规则仅作兜底。A 值须先截断到段落边界（去溢出），再经 snippet 溯源闸门验证
-            # （证明确系网页原文、非幻觉）才采用；A 无值或溯源失败则保留规则值，不污染。
+            # A 仅在规则为空时补全；值须先截断到段落边界（去溢出），再经 snippet
+            # 溯源闸门验证（证明确系网页原文、非幻觉）才采用。
             if not lv or lv in _NOISE:
-                continue  # A 无值 -> 保留规则
+                continue  # A 无值 -> 保留规则（含空）
             lv = _truncate_rich_text(lv)
             if not lv or lv in _NOISE:
                 continue
@@ -516,10 +514,9 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                 rejected.append(fld)  # A 溯源失败 -> 保留规则
                 continue
             result[fld] = lv
+            adopted.append(fld)
             continue
         # 其余字段（职称/单位/结构字段）：规则已有值不覆盖（仅填空补全）
-        if cur and cur not in _NOISE:
-            continue
         if not lv or lv in _NOISE:
             continue
         if fld == 'speakerAffiliation':
@@ -541,8 +538,11 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             rejected.append(fld)
             continue
         result[fld] = lv
+        adopted.append(fld)
     if rejected:
         result['llmRejected'] = '|'.join(rejected)
+    if adopted:
+        result['llmAdopted'] = '|'.join(adopted)
 
     # 纯规则兜底：模型 A 偶发抽不到 affiliation/title 时，从已有 speakerBio 开头片段
     # 正则提取（确定性、不依赖模型可用性）。仅在 A 仍未提供时触发，绝不覆盖已有值。
@@ -583,6 +583,7 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                             pass
         except Exception:
             pass  # A 时间解析失败 -> 保留规则值
+    return adopted
 
 
 # ---------------------------------------------------------------------------
@@ -631,23 +632,24 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
     if rich_only:
         # 丰富字段模式：直接 only-fill abstract/speakerBio/职称/单位，
         # 不比较结构字段、不调 B，结构字段完全由规则主导。
-        _merge_a_into_result(result, a, body_text, default_year, publish_time,
-                             title_year, url_year, rich_only=True,
-                             extra_source=title_text)
-        if result.get('abstract') or result.get('speakerBio'):
+        adopted = _merge_a_into_result(result, a, body_text, default_year, publish_time,
+                                       title_year, url_year, rich_only=True,
+                                       extra_source=title_text)
+        if adopted:
             result['llmTextEnhanced'] = True
             result['llmVerdict'] = 'rich-only'
         return result
 
     diffs = compare_struct(result, a)
     if not diffs:
-        # 一致：采用 A 丰富结果（abstract/bio 等规则没有的字段直接采用）
-        _merge_a_into_result(result, a, body_text, default_year, publish_time,
-                             title_year, url_year, extra_source=title_text)
-        result['llmTextEnhanced'] = True
+        # 一致：仅填空融合（规则已有值不覆盖）
+        adopted = _merge_a_into_result(result, a, body_text, default_year, publish_time,
+                                       title_year, url_year, extra_source=title_text)
         result['llmVerdict'] = 'consistent'
-        if a.get('speaker'):
-            result['speakerSource'] = 'llm'
+        if adopted:
+            result['llmTextEnhanced'] = True
+            if 'speaker' in adopted:
+                result['speakerSource'] = 'llm'
         return result
 
     # 分歧：调用 B 裁决（读原文 + 双方结果）——用拆行后的文本
@@ -664,11 +666,12 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
 
     # 保守偏向规则：仅当 B 明确支持 llm 且给出采纳字段时才采用 A
     if verdict.get('verdict') == 'llm' and verdict.get('fields'):
-        _merge_a_into_result(result, a, body_text, default_year, publish_time,
-                             title_year, url_year, extra_source=title_text)
-        result['llmTextEnhanced'] = True
-        if a.get('speaker'):
-            result['speakerSource'] = 'llm'
+        adopted = _merge_a_into_result(result, a, body_text, default_year, publish_time,
+                                       title_year, url_year, extra_source=title_text)
+        if adopted:
+            result['llmTextEnhanced'] = True
+            if 'speaker' in adopted:
+                result['speakerSource'] = 'llm'
     else:
         # 分歧未获 B 支持 -> 规则已有值一律保留，标记需人工抽检。
         # 但「规则 speaker 为空、A 有值」的补全仍单独执行：speaker 为空在

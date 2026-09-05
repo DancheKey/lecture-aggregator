@@ -27,6 +27,8 @@ import time
 
 import requests
 
+import field_vocab as _fv
+
 
 # ---------------------------------------------------------------------------
 # extraction-only 系统提示词（硬约束：只解析、不生成）
@@ -65,22 +67,19 @@ EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格�
 6a. **语言保持一致**：原文中的中文姓名必须保留为中文，严禁翻译为拼音或英文（如原文"高兴森"→speaker必须是"高兴森"，不能是"Xingsen Gao"）。
 6b. **英文 speaker 禁区**：英文语境下，speaker 只提取真实人名（如 "John Smith"、"刘潇屿"），**严禁把职位/头衔/机构名当作 speaker**，包括但不限于：Professor / Associate Professor / Postdoctoral Associate / Research Fellow / Director / Dean / Chair 等；若原文只出现 "Name + Title"，speaker 取 Name，Title 归 speakerTitle 字段。
 7. abstract 与 speakerBio 只提取各自段落的正文，必须到此为止：遇到「主讲人简介/报告人简介/专家简介/
-   个人简介/报告题目/报告时间/报告地点/报名方式/联系方式/面向对象」等后续字段标题，或「一、二、
-   三、」等章节序号时立即截断，严禁把后续段落（简介、题目、时间、地点、报名方式等）并入本字段。此外，正文末尾的「欢迎老师/同学参加」「诚邀」「敬请期待」等邀请语，以及页脚「编辑：/审核：/摄影：」署名，均不属于讲座内容，遇到即从该处截断，不并入 abstract。此外，正文末尾的「欢迎老师/同学参加」「诚邀」「敬请期待」等邀请语，以及页脚「编辑：/审核：/摄影：」署名，均不属于讲座内容，遇到即从该处截断，不并入 abstract。
+   个人简介/报告题目/报告时间/报告地点/组织单位/主办单位/承办单位/报名方式/联系方式/面向对象」
+   等后续字段标题，或「一、二、三、」等章节序号时立即截断，严禁把后续段落（简介、题目、时间、地点、
+   报名方式等）并入本字段。正文末尾的「欢迎老师/同学参加」「诚邀」「敬请期待」等邀请语，以及页脚
+   「编辑：/审核：/摄影：」署名，均不属于讲座内容，遇到即从该处截断，不并入 abstract。
 8. 输出必须是纯 JSON（以 { 开头、} 结尾）。严禁输出 markdown 列表（如 "- **题目**：..."）、
    加粗、代码块围栏或任何解释文字；若某字段无法从原文解析，返回该字段为 null 的 JSON，
    而不是用文字说明「无法提取」。
 """
 
 
-_ABSTRACT_BOUNDS = (
-    "附件", "附录", "课程名称", "授课对象", "报名方式", "报名链接", "参会方式",
-    "联系方式", "欢迎各位", "欢迎老师", "欢迎同学", "欢迎广大", "欢迎感兴趣",
-    "欢迎广大师生", "诚邀", "敬请期待", "编辑：", "审核：", "摄影：",
-    "扫描二维码", "长按识别", "点击查看", "阅读原文", "更多资讯",
-    "主办单位", "承办单位", "腾讯会议", "会议号", "Meeting ID", "Zoom",
-    "直播链接", "观看方式",
-)
+# 摘要边界词表（find 式 earliest-substring 语义）收敛到 field_vocab 单一事实源，
+# 与规则截断（parsers）、A 输出截断（hybrid）、出口闸门共享同一标准。
+_ABSTRACT_BOUNDS = _fv.ABSTRACT_BOUNDS
 
 def _truncate_abstract(text):
     """清理摘要正文后的邀请语/报名/附件/署名等模板尾巴（保留讲座内容本体）。"""
@@ -413,8 +412,11 @@ class AgnesProvider(ModelProvider):
             if not _neg_expired(cached):
                 return None  # 负缓存命中（未过期），跳过模型调用
             # 已过期：当作未命中，继续重试
-        elif cached is not None and _fields_useful(cached):
+        elif (cached is not None
+              and cached.get('_vocabVersion') == _fv.VOCAB_VERSION
+              and _fields_useful(cached)):
             return cached
+        # 词表版本不匹配的旧缓存视为未命中——词表修复后自动重提，脏值不再固化
         txt = body_text[:3500]
         messages = [
             {"role": "system", "content": EXTRACTION_ONLY_SYSTEM},
@@ -433,6 +435,7 @@ class AgnesProvider(ModelProvider):
             time.sleep(2)
         if fields and _fields_useful(fields):
             fields['abstract'] = _truncate_abstract(fields.get('abstract'))
+            fields['_vocabVersion'] = _fv.VOCAB_VERSION
             _cache_set(key, fields)
         else:
             _cache_set(key, _neg_marker(hard=got_empty,
@@ -531,7 +534,9 @@ class ZhipuProvider(ModelProvider):
             if not _neg_expired(cached):
                 return None  # 负缓存命中（未过期），跳过模型调用
             # 已过期：当作未命中，继续重试
-        elif cached is not None and _fields_useful(cached):
+        elif (cached is not None
+              and cached.get('_vocabVersion') == _fv.VOCAB_VERSION
+              and _fields_useful(cached)):
             return cached
         txt = body_text[:3500]
         messages = [
@@ -543,6 +548,7 @@ class ZhipuProvider(ModelProvider):
         got_empty = raw is not None  # 有响应但解析无效/全空 → 硬负
         if fields and _fields_useful(fields):
             fields['abstract'] = _truncate_abstract(fields.get('abstract'))
+            fields['_vocabVersion'] = _fv.VOCAB_VERSION
             _cache_set(key, fields)
         else:
             _cache_set(key, _neg_marker(hard=got_empty,
