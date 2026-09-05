@@ -61,6 +61,8 @@ EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格�
 }
 5. 时间必须基于正文明确写出的日期与时间，不要猜测年份；年份无法确定时 lectureStart 用 null。
 6. speaker 必须基于正文明确写出的主讲人姓名；正文无明确人名返回 null，严禁根据标题猜测。
+6a. **语言保持一致**：原文中的中文姓名必须保留为中文，严禁翻译为拼音或英文（如原文"高兴森"→speaker必须是"高兴森"，不能是"Xingsen Gao"）。
+6a. **语言保持一致**：原文中的中文姓名必须保留为中文，严禁翻译为拼音或英文（如原文"高兴森"→speaker必须是"高兴森"，不能是"Xingsen Gao"）。
 6b. **英文 speaker 禁区**：英文语境下，speaker 只提取真实人名（如 "John Smith"、"刘潇屿"），**严禁把职位/头衔/机构名当作 speaker**，包括但不限于：Professor / Associate Professor / Postdoctoral Associate / Research Fellow / Director / Dean / Chair 等；若原文只出现 "Name + Title"，speaker 取 Name，Title 归 speakerTitle 字段。
 7. abstract 与 speakerBio 只提取各自段落的正文，必须到此为止：遇到「主讲人简介/报告人简介/专家简介/
    个人简介/报告题目/报告时间/报告地点/报名方式/联系方式/面向对象」等后续字段标题，或「一、二、
