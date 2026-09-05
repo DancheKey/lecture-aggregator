@@ -2859,12 +2859,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
                    or soup.find('div', class_='wp_entry')
                    or soup.find('div', class_='article-content')
                    or soup.find('div', class_='container-left')     # 图书馆等站点：左侧正文区（含 iframe PDF 海报）
-                   or soup.find('div', class_='article')            # 地理科学学院等 CMS 的真实正文区
-                   or soup.find('div', class_='content')
+                   or soup.find('div', class_='posts_content')      # 物理学院老页面：真实正文区（须在 .content 之前）
+                   or soup.find('article')                          # 地理科学学院等 CMS 的真实正文区
+                   or soup.find('div', class_='content')            # 面包屑导航区（须在 article 之后，作为兜底）
                    or soup.find('div', class_='news-details-all')
                    or soup.find('div', class_='news-details-middle')
-                   or soup.find('div', class_='news-text')        # 文学院等 CMS 正文区（须先于通用 <article> 标签，避免误匹配导航骨架）
-                   or soup.find('article')
+                   or soup.find('div', class_='news-text')        # 文学院等 CMS 正文区
                    or soup.find('div', class_='entry-content'))
     body_text = content_div.get_text(' ') if content_div else text
     body_text = re.sub(r'\s+', ' ', body_text).strip()
