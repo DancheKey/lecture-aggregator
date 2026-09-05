@@ -609,9 +609,16 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
     if provider is None:
         return result  # 无模型可用 -> 纯规则保底
 
+    # ⚠ 老页面单行折叠问题（如 physics/20110112/791.html）：
+    # body_text 被折叠成单行后，「讲座人:高兴森教授,张飞时 间:...」会被 LLM 误当
+    # 两个人名（高兴森+张飞），导致 speaker='张飞' 或 'Xingsen Gao'。
+    # 修复：在「时间/地点/题目/摘要/主讲/报告」等字段关键词前插入换行，
+    # 让 LLM 按行读取，正则截断到换行符即可正确终止。
+    _body_text_fixed = re.sub(r'(?<=.)(\s*)(时\s*间|地\s*点|题\s*目|摘\s*要|主讲|报告|演讲|嘉宾|邀请)[：:\s]', r'\n\2:', body_text or '')
+
     a_raw = None
     try:
-        a_raw = provider.extract_text(body_text)
+        a_raw = provider.extract_text(_body_text_fixed)
     except Exception:
         a_raw = None
     if not a_raw:
@@ -643,11 +650,11 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
             result['speakerSource'] = 'llm'
         return result
 
-    # 分歧：调用 B 裁决（读原文 + 双方结果）
+    # 分歧：调用 B 裁决（读原文 + 双方结果）——用拆行后的文本
     verdict = {'verdict': 'unknown', 'fields': {}}
     if judge is not None:
         try:
-            verdict = judge.extract_verdict(body_text, result, a) or verdict
+            verdict = judge.extract_verdict(_body_text_fixed, result, a) or verdict
         except Exception:
             verdict = {'verdict': 'unknown', 'fields': {}}
     result['llmVerdict'] = verdict.get('verdict', 'unknown')
@@ -668,7 +675,7 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
         # compare_struct 中不算分歧，若不单独补，只要时间/地点任一字段有分歧，
         # A 从标题里正确读到的主讲人就会被连带丢弃（如物理学院「学术报告（第N期）
         # 国防科技大学李永强教授」——姓名只写在标题里）。
-        _trace = (body_text or '') + ' ' + (title_text or '')
+        _trace = (_body_text_fixed or '') + ' ' + (title_text or '')
         if _try_fill_speaker(result, a, _trace):
             result['llmFilled'] = 'speaker'
             result['speakerSource'] = 'llm'
