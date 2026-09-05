@@ -242,8 +242,8 @@ def _is_host_affiliation(v):
 # 2026-09-02 扩展：同时支持英文/中英混合单位（如 New York University Abu Dhabi）。
 # ---------------------------------------------------------------------------
 _AFFIL_RE = re.compile(
-    r'([\u4e00-\u9fa5]{2,6}大学[\u4e00-\u9fa5]{1,8}?(?:学院|研究院|学部|系|中心))'
-    r'|([\u4e00-\u9fa5]{2,10}?(?:大学|研究院|研究所)(?:[\u4e00-\u9fa5]{0,6}?(?:分校|校区|学部|学院|系|中心))?)'
+    r'([\u4e00-\u9fff]{2,6}大学[\u4e00-\u9fff]{1,8}?(?:学院|研究院|学部|系|中心))'
+    r'|([\u4e00-\u9fff]{2,10}?(?:大学|研究院|研究所)(?:[\u4e00-\u9fff]{0,6}?(?:分校|校区|学部|学院|系|中心))?)'
     r'|([A-Za-z][A-Za-z\s]*(?:University|College|Institute|School|Department|Centre|Center|Laboratory|Lab)(?:\s+(?:of|and|&|at|in|[A-Za-z]+)){0,8})'
 )
 _TITLE_RE = re.compile(
@@ -320,7 +320,7 @@ def _strip_affil_prefix(aff):
         if pos >= 0:
             return aff[pos + 1:].strip()
     # 若机构词紧贴开头但前面只剩 1-2 个字的动词残片（如"获""在"），也剥掉
-    if len(prefix) <= 2 and prefix and not re.match(r'^[\u4e00-\u9fa5]{2,}$', prefix):
+    if len(prefix) <= 2 and prefix and not re.match(r'^[\u4e00-\u9fff]{2,}$', prefix):
         return aff[best:].strip()
     return aff
 
@@ -342,7 +342,7 @@ def _infer_affiliation(bio):
         if _is_valid_affiliation(aff):
             return aff
     # 全英文 bio 且无现单位表达时：通常现单位在最后，取最后一个有效机构
-    if not re.search(r'[\u4e00-\u9fa5]', bio):
+    if not re.search(r'[\u4e00-\u9fff]', bio):
         last = ''
         for m in _AFFIL_RE.finditer(bio):
             cand = (m.group(1) or m.group(2) or m.group(3) or '').strip()
