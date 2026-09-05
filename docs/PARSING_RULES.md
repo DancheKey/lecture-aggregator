@@ -196,6 +196,34 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
   （2026-08-05 体检修正：旧文档称 latest.json「保留全部字段」未提截断，易误导。）
 - ⚠️ 历史上曾为减小体积剥离这两字段，导致**公网卡片比本地少「简介/内容摘要」两行**——这是切片裁剪不是数据缺失。任何「优化体积」而裁剪字段的冲动，先确认该字段在首页卡片被渲染。
 
+### 1.8 字段边界单一事实源 + 出口闸门（2026-09-05 全局修复）
+
+**背景**：摘要/简介"在哪里结束"这一标准曾散落四处（parsers 摘要正则、hybrid `_RICH_CUT`、
+llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类污染：
+- **规则脏**（physics 787）：裸「单位」锚点命中「组织单位：」内部 → 摘要残留「…。 组织」；
+- **模型A脏**（maths 8806）：A 主导覆盖策略下，A 吞入的元信息块/邀请语覆盖了规则干净值，
+  而「报 告 人：」「题 目：」空格变体不在任何截断锚点里；snippet 溯源闸门只能证
+  "值在原文存在"，证不了"边界正确"——污染文本本就来自原文，天然拦不住。
+
+**四条固化约定（改代码前必读）**：
+1. **词表单一事实源**：字段标签/元信息块锚点/邀请语/页脚标记全部定义在
+   `scraper/field_vocab.py`。规则截断、hybrid 对 A 值的截断、llm_provider 摘要边界、
+   出口闸门、prompt 示例——一律引用它，**严禁再在任何模块内私拷一份词表**。
+   词表变更必须递增 `VOCAB_VERSION`（llm_provider 文本缓存按它失效，修复自动重放）。
+2. **融合一律仅填空**：`hybrid._merge_a_into_result` 对所有字段（含 abstract/speakerBio）
+   只在规则为空时采纳 A 值，规则已有值绝不被覆盖。A 主导覆盖实验（2026-09-02）
+   已回退，勿再打开。
+3. **出口统一闸门**：`parsers.parse_detail` 包装层在返回前对每条记录的
+   abstract/speakerBio/inviter 跑 `apply_exit_gate`——元信息块/邀请语/页脚/悬挂残段
+   （「…。 组织」）命中即截断，截后 <12 字且原值 ≥30 字则整段置空。规则与模型共用
+   同一标准；**"规则兜底"的真正含义是规则标准在出口最后一道把关，而非规则先算一遍**。
+   改动经 `rec['qaGate']` 留痕可审计。
+4. **存量修复走重放通道**：`scripts/repair_backfill.py`（与 backfill_llm_by_year 的
+   "仅填空"互补——它能**替换**过不了闸门的存量脏值）。用法：默认只处理闸门判定带污染的
+   记录，纯规则零成本；`--dry-run` 预览、`--host/--urls/--year/--all` 选范围、
+   `--force` 连干净值也重放。修复留痕 `rec['qaRepaired']`。**词表修复后必须重放存量**，
+   禁止逐案手补（增量抓取会跳过已入库 URL，代码修复对存量不自动生效）。
+
 ---
 
 ## 2. 踩坑记录（每条都是真实踩过的雷，改动相关代码前先读）
@@ -323,7 +351,9 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
 | 爬虫 CLI | `scraper/scraper.py`（`--source` / `--full` / `--since`） |
 | 源配置 | `scraper/sources.yaml` |
 | 详情解析 | `scraper/parsers.py` |
+| 字段边界词表（单一事实源） | `scraper/field_vocab.py`（§1.8） |
 | 时间解析 | `scraper/timeparse.py` |
+| 存量修复重放 | `scripts/repair_backfill.py`（§1.8） |
 | 切片生成 | `scripts/generate_frontend_data.py` |
 | 本地服务/计数 | `server.py`（含 `/api/visits` 按日累计 `by_day`，数据写 `data/visits.json`） |
 | 访问量报告 | `scripts/gen_visits_report.py` → `reports/visits-by-month.html`（按年/月，自包含单文件） |
