@@ -69612,8 +69612,8 @@
    "lectureStart": "2017-10-16 14:00:00",
    "lectureEnd": "2017-10-16 17:00:00",
    "location": "华南师范大学教师发展中心204室",
-   "speaker": "",
-   "speakerTitle": "",
+   "speaker": "李芳",
+   "speakerTitle": "副研究员",
    "speakerAffiliation": "",
    "inviter": "",
    "organizer": "教师发展中心",
@@ -69628,7 +69628,11 @@
    "hasPosterImage": true,
    "ocrExtracted": false,
    "abstract": "随着教育技术与教学实践活动的不断融合,很多院校都相继进行基于环境的教学场景变革,例如可活动可组合桌椅,双屏乃至多屏高清液晶显示,多终端甩屏交互,多场景远程互动等新技术不断出现…… 新一轮的教学改革,对于教学空间的改变,将有哪些趋势？未来大学的教师空间变革,会呈现出什么样的面貌？重构学习必须从重构教室开始,本期讲座,来自对外经贸大学的李芳研究员将会为大家",
-   "speakerBio": "随着教育技术与教学实践活动的不断融合,很多院校都相继进行基于环境的教学场景变革,例如可活动可组合桌椅,双屏乃至多屏高清液晶显示,多终端甩屏交互,多场景远程互动等新技术不断出现…… 新一轮的教学改革,对于教学空间的改变,将有哪些趋势？未来大学的教师空间变革,会呈现出什么样的面貌？重构学习必须从重构教室开始,本期讲座,来自对外经贸大学的李芳研究员将会为大家"
+   "speakerBio": "随着教育技术与教学实践活动的不断融合,很多院校都相继进行基于环境的教学场景变革,例如可活动可组合桌椅,双屏乃至多屏高清液晶显示,多终端甩屏交互,多场景远程互动等新技术不断出现…… 新一轮的教学改革,对于教学空间的改变,将有哪些趋势？未来大学的教师空间变革,会呈现出什么样的面貌？重构学习必须从重构教室开始,本期讲座,来自对外经贸大学的李芳研究员将会为大家",
+   "speakerSource": "llm",
+   "affiliation": "",
+   "llmTextEnhanced": true,
+   "llmVerdict": "consistent"
   },
   {
    "sourceUrl": "http://ctld.scnu.edu.cn/a/20170930/446.html",
@@ -77500,7 +77504,7 @@
    "lectureStart": "2011-01-13 10:00:00",
    "lectureEnd": null,
    "location": "物电学院理六栋405会议室",
-   "speaker": "",
+   "speaker": "高兴森",
    "speakerTitle": "教授",
    "speakerAffiliation": "",
    "inviter": "",
@@ -77510,7 +77514,10 @@
    "timeConfidence": "high",
    "timeNote": "same-year",
    "listTitle": "清洁能源团队讲座通知",
-   "llmTextEnhanced": false
+   "llmTextEnhanced": true,
+   "speakerSource": "llm",
+   "affiliation": "",
+   "llmVerdict": "consistent"
   },
   {
    "sourceUrl": "https://physics.scnu.edu.cn/a/20101229/790.html",
@@ -77521,7 +77528,7 @@
    "lectureStart": "2010-12-30 10:00:00",
    "lectureEnd": null,
    "location": "物电学院理六栋405会议室",
-   "speaker": "",
+   "speaker": "王洋",
    "speakerAffiliation": "",
    "organizer": "物理学院",
    "publishTime": "2010-12-29 00:00:00",
@@ -77534,7 +77541,9 @@
    "abstract": "Various aspects of the properties of transparent conducting oxides (TCOs) are reviewed in terms of how they impact the device performances of thin film solar cells. Of particular interest is light trapping effects due to different surface textures. Future directions are identified which may lead to further improvement in the TCO properties, as well as new concepts using plasmonics/metamaterial light trapping schemes as superior alternatives. 讲座人：王洋教授时 间：12月30号（星期四）上午10：00地 点：物电学院理六栋405",
    "speakerTitle": "教授",
    "llmTextEnhanced": true,
-   "llmVerdict": "rich-only"
+   "llmVerdict": "consistent",
+   "speakerSource": "llm",
+   "affiliation": ""
   },
   {
    "sourceUrl": "https://physics.scnu.edu.cn/a/20101201/789.html",
@@ -77592,7 +77601,7 @@
    "lectureStart": "2010-11-18 14:00:00",
    "lectureEnd": null,
    "location": "理六栋405会议室",
-   "speaker": "",
+   "speaker": "吴素娟",
    "speakerAffiliation": "",
    "organizer": "物理学院",
    "publishTime": "2010-11-18 00:00:00",
@@ -77603,7 +77612,12 @@
    "timeConfidence": "high",
    "timeNote": "authoritative-label",
    "timeUnknown": false,
-   "abstract": "介绍聚合物电池、共混电池的研究现状,有待解决的问题,及她做的相关工作。 组织"
+   "abstract": "介绍聚合物电池、共混电池的研究现状,有待解决的问题,及她做的相关工作。 组织",
+   "speakerSource": "llm",
+   "speakerTitle": "",
+   "affiliation": "",
+   "llmTextEnhanced": true,
+   "llmVerdict": "consistent"
   },
   {
    "sourceUrl": "https://physics.scnu.edu.cn/a/20090331/785.html",
