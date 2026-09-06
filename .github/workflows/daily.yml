@@ -60,6 +60,10 @@ jobs:
           AGNES_MODEL: agnes-2.5-flash
           JUDGE_PROVIDER: zhipu
           JUDGE_MODEL: glm-4.7-flash
+          # 全字段双轨（2026-09-05）：规则 + 模型A 并行识别，分歧调模型B 裁决。
+          # 此前缺省为 rich-only，模型B 从未进入生产链路（全库 llmVerdict=None 占 93%）。
+          # 每日新增页面仅数条，A/B 调用成本可控（glm-4.7-flash）。
+          SCNU_LLM_TEXT: '1'
         run: python scraper/scraper.py
 
       - name: 同步静态数据源并生成前端切片
