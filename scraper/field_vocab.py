@@ -20,7 +20,11 @@ import re
 # 2026-09-05.2：5 页验收修补——①移除裸「感兴趣」锚点（iqm552 正文被拦腰截断）；
 # ②FIELD 锚点补「讲座人」（physics791 旧页标签）；③出口闸门新增"纯短中文残段"
 # 识别（psy229 摘要='学术讲座'式标题垃圾）。
-VOCAB_VERSION = '2026-09-05.2'
+# 2026-09-05.3：残留清单 194 条专项——①站点系列名模板串锚点（"物理学院学术报告
+# （第N期）/新世纪论坛学术报告"，拖挂 159 条 speakerBio）；②尾部残段修剪
+# trim_dangling_labels（" 报告"×18、"…实验室主办"×5）；③摘要 lookahead 复合
+# 标签（报告时间/报告地点）防"报告"两字残留。
+VOCAB_VERSION = '2026-09-05.3'
 
 # ---------------------------------------------------------------------------
 # 字段标签规范名（用于折叠 CMS 把标签拆成单字加空格的形态，如「报 告 人」→「报告人」）
@@ -88,6 +92,49 @@ _FOOTER_PHRASES = (
     '扫描二维码', '长按识别', '会议密码',
 )
 
+# 站点系列名模板串（2026-09-05 残留清单 194 条专项）：JS 渲染站的 div.content 在
+# 简介/摘要之后拼接页头系列名（physics 站"物理学院学术报告（第N期）"、
+# "新世纪论坛学术报告"、physics 老页"物理与电信工程学院学术报告"），曾拖挂在
+# 159 条 speakerBio 尾部。锚点带"（第N期）"特征或"新世纪论坛"前缀——散文正文中
+# 的"学术报告"一词不会误截。
+_SERIES_TEMPLATE_RE = re.compile(
+    r'[\u4e00-\u9fff]{0,12}学术报告\s*[（(]\s*第.{1,6}期\s*[）)]'
+    r'|新世纪论坛学术报告'
+    r'|[\u4e00-\u9fff]{0,14}学术报告$'
+)
+
+# 尾部标签残段修剪（出口闸门调用）：值尾为"空白+标签前缀/署名"形态即修剪。
+# 均要求空白前缀——自然散文句尾不会以空格+单字标签收尾；修剪后 <12 字则放弃
+# （保底不把短值剪残）。
+_DANGLING_TAIL_RE = re.compile(
+    r'\s+(?:'
+    r'[\u4e00-\u9fff]{0,14}学术报告(?:\s*[（(]\s*第.{1,6}期\s*[）)])?'
+    r'|报告'
+    r'|讲座'
+    r'|[\u4e00-\u9fff&\u3000\s""'']{1,45}主办'
+    r')$'
+)
+
+
+def trim_dangling_labels(value):
+    """修剪 rich 文本尾部的模板串/标签残段（physics 模板串、iqm『 报告』、psy『主办』署名）。
+
+    与 trim_dangling_unit_prefix 同族：只动"空白+已知名词"的尾部形态，且修剪后
+    仍 ≥12 字才采用；否则返回原值（不把短值剪残）。
+    """
+    if not value:
+        return value
+    v = str(value).strip()
+    prev = None
+    while prev != v and len(v) >= 12:
+        prev = v
+        v2 = _DANGLING_TAIL_RE.sub('', v).strip()
+        v3 = _SERIES_TEMPLATE_RE.sub('', v2).strip() if _SERIES_TEMPLATE_RE.search(v2) else v2
+        if len(v3) < 12:
+            break
+        v = v3
+    return v
+
 # 元信息块标签（含「组织单位：」等复合标签）。这些标签出现在 rich 文本尾部
 # 说明后续是字段元数据而非正文；锚定时须匹配到冒号，防止散文误伤。
 UNIT_LABEL_ALTS = ('组织单位', '主办单位', '承办单位', '协办单位', '支持单位', '指导单位')
@@ -114,6 +161,8 @@ def rich_boundary_re(aggressive=False):
         _alts(_SECTION_LABELS),                                   # 节标题（无需冒号）
         _alts(_FIELD_LABELS) + r'\s*[：:]',                       # 字段标签（须冒号）
         _alts(UNIT_LABEL_ALTS) + r'\s*[：:]?',                    # 单位类复合标签
+        r'[\u4e00-\u9fff]{0,12}学术报告\s*[（(]\s*第.{1,6}期\s*[）)]',  # 站点系列名模板串
+        r'新世纪论坛学术报告',
         _alts(_INVITE_PHRASES, spaced=False),
         _alts(_FOOTER_PHRASES, spaced=False),
     ]
