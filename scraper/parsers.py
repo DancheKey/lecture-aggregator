@@ -1310,14 +1310,22 @@ def _vlm_rate_limit(min_interval=6.0):
         _VLM_RLAST[0] = _time.time()
 
 
-# 文本 LLM 增强总开关（SCNU_LLM_TEXT=1 可手动开启：让 A 参与全部字段的 only-fill 增强，
-# 并启用结构字段分歧 B 裁决）。默认 '0' 关闭——结构字段由规则主导，避免 LLM 干扰已确认的值。
-_USE_LLM_TEXT = (_os.environ.get('SCNU_LLM_TEXT') or '0') not in ('0', 'false', 'False', '')
+# 文本 LLM 增强总开关（SCNU_LLM_TEXT=1：全字段双轨——规则 + 模型A 并行识别，
+# 分歧调模型B 裁决）。默认 '0' 关闭——结构字段由规则主导，避免 LLM 干扰已确认的值。
+# 优先级：真实环境变量 > 项目根 .env > 默认（2026-09-05：开关此前只读进程环境变量，
+# .env 里的 SCNU_LLM_TEXT=1 不生效，导致本地/CI 默认 rich-only、模型B 从未进入生产链路）。
+def _text_llm_flag(name, default):
+    v = _os.environ.get(name)
+    if v is None:
+        v = _load_dotenv().get(name)
+    return (v or default) not in ('0', 'false', 'False', '')
 
-# 摘要/简介（丰富信息）独立子开关：默认开启。让 abstract/speakerBio（以及规则空时的
-# 职称/单位）默认由大模型 A 主导填充，规则仅作兜底。符合「摘要/简介 A 主导、规则兜底」路线。
-# SCNU_LLM_RICH=0 可手动关闭本子开关。
-_USE_LLM_RICH = (_os.environ.get('SCNU_LLM_RICH') or '1') not in ('0', 'false', 'False', '')
+_USE_LLM_TEXT = _text_llm_flag('SCNU_LLM_TEXT', '0')
+
+# 摘要/简介（丰富信息）独立子开关：默认开启。全字段模式（SCNU_LLM_TEXT=1）下本开关
+# 隐含开启；rich-only 模式让 abstract/speakerBio（以及规则空时的职称/单位）由模型A
+# 仅填空补全。SCNU_LLM_RICH=0 可手动关闭本子开关（纯规则零成本）。
+_USE_LLM_RICH = _text_llm_flag('SCNU_LLM_RICH', '1')
 
 
 def _vlm_extract_fields(img_urls, cfgs):
@@ -2811,6 +2819,14 @@ def _replace_schedule_tables_with_text(soup):
 def _gate_record(r, url=''):
     """对单条记录的富文本字段做出口清洗。改动写入 r['qaGate'] 便于审计。"""
     changed = []
+    # topic 专项：只做边界截断（MS 拆分场次的 topic 常拖"报告专家:…北京师范大学"
+    # 尾巴），不置空、不做摘要专属守卫——题目短是正常的。
+    tp = (r.get('topic') or '').strip()
+    if tp:
+        ntp = _fv.trim_dangling_labels(_fv.trim_dangling_unit_prefix(_fv.truncate_rich_text(tp)))
+        if ntp and ntp != tp:
+            r['topic'] = ntp
+            changed.append('topic')
     for fld in ('abstract', 'speakerBio'):
         v = (r.get(fld) or '').strip()
         if not v:
@@ -2818,6 +2834,9 @@ def _gate_record(r, url=''):
         nv = _fv.truncate_rich_text(v)
         # 句末悬挂单位词残段（「…工作。 组织」——锚点截断错位的典型残迹）
         nv = _fv.trim_dangling_unit_prefix(nv)
+        # 尾部模板串/标签残段（「…。 物理学院学术报告（第48期）」「…。 报告」
+        # 「…实验室主办」——physics/iqm/psy 站残留清单 194 条专项）
+        nv = _fv.trim_dangling_labels(nv)
         # 纯短中文残段（如「学术讲座」）：标题/栏目名混入，不可能是真实摘要/简介
         if nv and re.fullmatch(r'[\u4e00-\u9fff]{2,8}', nv):
             nv = ''
@@ -2964,9 +2983,15 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # JS 渲染站点（如 maths/physics）的正文容器可能只含导航骨架，但 meta description
     # 中保存了完整讲座摘要。即便 content_div 已命中，也要把 meta 摘要补进 body_text，
     # 保证 LLM/OCR 能读到主讲人/时间/地点等关键字段。
+    # ⚠ 去重守卫（2026-09-05.3）：仅当正文**不含** meta 内容时才追加——physics 新版页
+    # 正文与 meta 双份并存，曾使 MS 候选1/3、连写多主讲人、VLM 多场全部在两份文本上
+    # 各切一刀，拆出"双场同主讲人"的幻影场次（physics12723/13346 实测）。判定：meta
+    # 去空白后的开头 30 字已在正文中出现 → 正文已含该信息，不追加。
     if meta_parts:
-        body_text = body_text + ' ' + ' '.join(meta_parts)
-        body_text = re.sub(r'\s+', ' ', body_text).strip()
+        _meta_head = re.sub(r'\s+', '', ' '.join(meta_parts))[:30]
+        if not _meta_head or _meta_head not in re.sub(r'\s+', '', body_text):
+            body_text = body_text + ' ' + ' '.join(meta_parts)
+            body_text = re.sub(r'\s+', ' ', body_text).strip()
     ocr_text = ''
     # 提前从 URL 解析年份/完整日期（供 OCR 图片年份门控、CV1 校验、最终兜底共用）
     url_year = _year_from_url(url)
@@ -3239,6 +3264,15 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     if vlm_fields and _vlm_fields_useful(vlm_fields):
         applied = _apply_vlm_to_result(result, vlm_fields, default_year, publish_time,
                                        title_year, url_year, poster_only=poster_only)
+        if isinstance(vlm_fields, list) and isinstance(applied, list):
+            # 多场守卫（2026-09-05.3）：拆出各场主讲人须互异且非空——同一人重复是
+            # 双份文本/VLM 幻觉误拆信号（physics12723 实测：meta+正文双份导致
+            # VLM 识别成 2 场同主讲人，其中一场 topic 还是导航垃圾）。不通过时
+            # 视为 VLM 失败（applied=None），放行文本/OCR/多讲座拆分兜底。
+            _sp_names = [str(p.get('speaker') or '').strip() for p, _ in applied]
+            if len(applied) > 1 and not (all(_sp_names)
+                                         and len(set(_sp_names)) == len(_sp_names)):
+                applied = None
         if isinstance(vlm_fields, list) and isinstance(applied, list):
             # 多讲座拆分：按讲座开始时间排序，时间早的期数靠前（避免海报视觉排版顺序≠时间顺序）
             if len(applied) > 1:
@@ -4095,7 +4129,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         rf'{abs_pat}'
         r'([\s\S]+?)'
         rf'(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|'
-        r'主讲人|报告人|讲座人|主讲|主持人|时间|地点|题目[：:]|主题[：:]|邀请人|'
+        r'主讲人|报告人|讲座人|主讲|主持人|邀请人|'
+        r'报告时间|报告地点|报告题目|报告内容|'
+        r'时间|地点|题目[：:]|主题[：:]|'
         r'(?:组织单位|主办单位|承办单位|协办单位|支持单位|指导单位|单位)[：:]|'
         r'主讲人介绍|报告人简介|主讲人简历|专家介绍|$))',
         body_text)
@@ -5160,13 +5196,20 @@ def _pair_speakers_to_segments(speakers, segs):
 def _split_by_speakers(base, speakers):
     """把单条 base 记录按多位主讲人拆成多条（连写多主讲人场景）。
 
+    守卫（防 meta+正文双份误拆，physics12723 实测）：拆出的主讲人须互异且非空——
+    同一人出现两次是"主讲人值含双份文本"（meta description + 正文各一份）的误拆
+    信号，此时退回单条（返回 None，调用方继续单场流程）。
+
     基底字段（时间/地点/摘要/简介）共享，逐条覆盖主讲人信息；标记 isMultiLecture，
     sourceCount 仅首条计 1，统计页不膨胀。
     题目分场配对：题目含 n 个编号段（1)…2)…）且每段带 "By <拉丁名>" 时，按拼音把
     段配给对应主讲人、各条采用自己的段（剥序号与 By 尾部）；配对不成立则共享题目。
     """
+    n = len(speakers) if speakers else 0
+    _names = [str(s.get('name') or '').strip() for s in (speakers or [])]
+    if n < 2 or any(not x for x in _names) or len(set(_names)) < n:
+        return None
     out = []
-    n = len(speakers)
     segs = _split_topic_segments((base.get('topic') or '').strip(), n) if n >= 2 else None
     seg_assign = _pair_speakers_to_segments(speakers, segs) if segs else None
     for i, spk in enumerate(speakers):
@@ -5297,9 +5340,75 @@ def _detect_inline_topic_sessions(text, default_year=None, publish_time=None,
     return sessions if len(sessions) >= 2 else []
 
 
+def _ms_dedup_guard(sessions):
+    """多场次统一去重守卫（所有候选共用，2026-09-05.3）：
+
+    拦截"同一讲座被当成多场"的误拆——JS 渲染站（physics 新版）的正文容器内含
+    重复的页头块 + meta description 第三份，候选1/3 会在两份文本上各切一刀
+    （physics12723/13346 实测：两场 speaker 相同或一场是导航垃圾）。
+    - 垃圾场过滤：topic 命中导航栏目连串（学术活动/科研平台/研究方向…连续出现）
+      的是页头/导航切块，剔除；剔除后不足 2 场 → 单讲座；
+    - 全部场次 topic 互为重复或共享 ≥15 字长前缀 → 双份文本，非多场；
+    - 全部场次 speaker（非空）相同且时间相同 → 同理。
+    真实多场页各场 topic 主体互不相同（同题多时段本就不拆，MS3-2）。
+    """
+    if not sessions or len(sessions) < 2:
+        return sessions
+    # 垃圾场过滤：页头/导航切块的特征是栏目导航词连串；『…的通知』是同页行政通知
+    # 标题（gxb125 工作坊页实测：通知行+介绍段被各当一场）。
+    _NAV_CHAIN = re.compile(
+        r'(?:学术活动|科研项目|科研成果|科研平台|研究方向|重大项目|学科方向|'
+        r'人才招聘|本科生教育|研究生教育|党建工作|学院概况|学院简介|合作交流){2,}')
+    _NOTICE_TOPIC = re.compile(r'的通知$|^关于')
+    sessions = [s for s in sessions
+                if not _NAV_CHAIN.search(str(s.get('topic') or ''))
+                and not _NOTICE_TOPIC.search(str(s.get('topic') or '').strip())]
+    if len(sessions) < 2:
+        return []
+
+    def _topic_key(t):
+        """topic 比较键：去空白 + 全角转半角 + 去标点——『量子动力学：从皮秒到阿秒』
+        与『量子动力学:从皮秒到阿秒』（meta/正文的全半角冒号差异）、『微 纳』与
+        『微/纳』（空格与斜杠）是同一题目的两种排版形态，不归一则误拆
+        （physics12861/12678/12656 实测）。"""
+        t = re.sub(r'\s+', '', str(t or ''))
+        t = ''.join(chr(ord(c) - 0xFEE0) if 0xFF01 <= ord(c) <= 0xFF5E else c for c in t)
+        return re.sub(r'[：:/／\-—－_、,，。.·（）()【】\[\]]', '', t)
+
+    topics = [_topic_key(s.get('topic')) for s in sessions]
+    if len(set(topics)) < len(topics):
+        return []
+    # 长公共前缀（≥15 字）同样判为同一题目的双份文本——meta 与正文的形态差异
+    # 只是尾部拖挂不同。真实多场页的各场题目主体互不相同。
+    _pre = topics[0]
+    for _t in topics[1:]:
+        _n = min(len(_pre), len(_t))
+        while _n > 0 and _pre[:_n] != _t[:_n]:
+            _n -= 1
+        _pre = _pre[:_n]
+    if len(_pre) >= 15:
+        return []
+    spk = [re.sub(r'\s+', '', str(s.get('speaker') or '')) for s in sessions]
+    st = [str(s.get('start') or '') for s in sessions]
+    if all(spk) and len(set(spk)) < len(spk) and len(set(st)) <= 1:
+        return []
+    return sessions
+
+
 def detect_multi_session(text, title='', default_year=None, publish_time=None,
                          title_year=None, url_year=None, soup=None, url=None,
                          base_start=None):
+    """detect_multi_session 对外入口：各候选结果统一过 _ms_dedup_guard。"""
+    sessions = _detect_multi_session_impl(
+        text, title=title, default_year=default_year, publish_time=publish_time,
+        title_year=title_year, url_year=url_year, soup=soup, url=url,
+        base_start=base_start)
+    return _ms_dedup_guard(sessions)
+
+
+def _detect_multi_session_impl(text, title='', default_year=None, publish_time=None,
+                               title_year=None, url_year=None, soup=None, url=None,
+                               base_start=None):
     """检测系列讲座公告（MS1-MS3）。
 
     返回 [] 表示单讲座；否则返回 session 列表（含块文本供拆分时逐块提取）：
