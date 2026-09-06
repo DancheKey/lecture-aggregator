@@ -124,9 +124,23 @@ def _gate_changes(rec):
     return diffs
 
 
+def _time_inconsistent(rec):
+    """lectureEnd 早于 lectureStart → 时间字段矛盾（physics 存量 60 条）。"""
+    ls, le = rec.get('lectureStart'), rec.get('lectureEnd')
+    if not (ls and le):
+        return False
+    try:
+        import datetime as _dt
+        return _dt.datetime.fromisoformat(str(le)) < _dt.datetime.fromisoformat(str(ls))
+    except Exception:
+        return False
+
+
 def _is_dirty(rec):
-    """库内记录是否带闸门可判定的污染（富文本 + 摘要=简介复制）。"""
+    """库内记录是否带闸门可判定的污染（富文本 + 摘要=简介复制 + 时间矛盾）。"""
     if _gate_changes(rec):
+        return True
+    if _time_inconsistent(rec):
         return True
     return _abstract_is_bio_copy(rec.get('abstract'), rec.get('speakerBio'))
 
@@ -137,7 +151,12 @@ def _year_of(s):
 
 
 def _match_result(parse_res, rec):
-    """parse_detail 结果与库内记录按 lectureIndex 匹配（多讲座拆分页）。"""
+    """parse_detail 结果与库内记录按 lectureIndex 匹配（多讲座拆分页）。
+
+    匹配失败时退化兜底：若 parse_res 各条目的 (topic, time, speaker) 签名完全
+    一致（= MS 双份误拆被守卫拦成单条语义，physics12723 类），取首条作为修复源，
+    避免这些页的字段残留永远修不上。
+    """
     if isinstance(parse_res, dict):
         return parse_res
     if isinstance(parse_res, list):
@@ -145,6 +164,12 @@ def _match_result(parse_res, rec):
         for r in parse_res:
             if isinstance(r, dict) and r.get('lectureIndex') == li:
                 return r
+        sigs = {(re.sub(r'\s+', '', str(r.get('topic') or '')),
+                 str(r.get('lectureStart') or ''),
+                 re.sub(r'\s+', '', str(r.get('speaker') or '')))
+                for r in parse_res if isinstance(r, dict)}
+        if len(sigs) == 1 and parse_res:
+            return next(r for r in parse_res if isinstance(r, dict))
     return None
 
 
@@ -263,16 +288,16 @@ def main():
 
         # ---- 一拆多：存量单条、新解析拆出多条（physics791 双讲拆分）----
         # 条件：新解析为 ≥2 条、库内该 URL 仅 1 条且无 lectureIndex（非既有拆分页）。
-        # 守卫：拆出的主讲人须互异且非空（同一人出现两次 = MS 双份误拆信号，
-        # physics13346 实测）。处理：移除存量、插入全部新记录；绝不反向合并。
+        # 守卫：拆出各场 topic 须互异（同一人讲两场合法——13312 涂展春两场；
+        # topic 重复才是双份文本误拆，且 MS 守卫已在 parse 端拦截）。
+        # 处理：移除存量、插入全部新记录；绝不反向合并。
         _split_ok = False
         if (isinstance(parse_res, list) and len(parse_res) >= 2
                 and len(by_url[url]) == 1 and not by_url[url][0].get('lectureIndex')):
-            _sp_names = [str(r.get('speaker') or '').strip() for r in parse_res
-                         if isinstance(r, dict)]
-            _split_ok = (len(_sp_names) == len(parse_res)
-                         and all(_sp_names)
-                         and len(set(_sp_names)) == len(_sp_names))
+            _tp_names = [re.sub(r'\s+', '', str(r.get('topic') or ''))[:20]
+                         for r in parse_res if isinstance(r, dict)]
+            _split_ok = (len(_tp_names) == len(parse_res) and all(_tp_names)
+                         and len(set(_tp_names)) == len(_tp_names))
         if _split_ok:
             old_rec = by_url[url][0]
             _idx = recs.index(old_rec)
@@ -358,11 +383,17 @@ def main():
                 if (new_t and new_t != old_t
                         and (src.get('timeConfidence') or '').startswith('high')):
                     rec['lectureStart'] = new_t
-                    if src.get('lectureEnd') is not None:
-                        rec['lectureEnd'] = src.get('lectureEnd')
+                    rec['lectureEnd'] = src.get('lectureEnd')
                     rec['timeConfidence'] = src.get('timeConfidence')
                     rec['timeNote'] = src.get('timeNote')
                     touched.append('lectureStart')
+                elif (new_t and new_t == old_t and _time_inconsistent(rec)
+                      and (src.get('timeConfidence') or '').startswith('high')):
+                    # start 相同但存量 end 与 start 矛盾 → 用新解析的 end 消除矛盾
+                    rec['lectureEnd'] = src.get('lectureEnd')
+                    rec['timeConfidence'] = src.get('timeConfidence')
+                    rec['timeNote'] = src.get('timeNote')
+                    touched.append('lectureEnd')
             # location：新值非空且不同才替换（旧值为空/尾部残段均可修复）
             if 'location' in _field_set:
                 old_l = (rec.get('location') or '').strip()
