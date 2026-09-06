@@ -74,6 +74,19 @@ jobs:
       - name: 校验数据不变量（铁律护栏）
         run: python scripts/test_invariants.py
 
+      # 数据质量体检（2026-09-06）：每天抓取+修复后自动检查全库字段
+      # （时间/地点/主讲人/单位的错误与缺失），报告存为运行附件保留 30 天，
+      # 出现异常当天可见，不用等用户在网页上发现问题来反馈。
+      - name: 数据质量体检（自动）
+        run: python scripts/audit_fields.py --html reports/audit_fields_report.html
+
+      - name: 上传体检报告（保留 30 天）
+        uses: actions/upload-artifact@v4
+        with:
+          name: 字段体检报告
+          path: reports/audit_fields_report.html
+          retention-days: 30
+
       - name: 提交并推送（仅在有变化时）
         run: |
           set -e
