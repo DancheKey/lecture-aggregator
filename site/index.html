@@ -22,6 +22,45 @@
       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    .line-clamp-2 {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    /* 字号 utility：vendor/tailwind.css 是预编译产物，未包含 text-12pt 等任意值类，
+       这些类此前从未生效（全部落到浏览器默认 16px），是「字体不统一」观感的根源；
+       在此显式定义三级字号，类名与模板中原任意值写法一一对应 */
+    .text-11pt { font-size: 11pt; }
+    .text-12pt { font-size: 12pt; }
+    .text-15pt { font-size: 15pt; }
+    /* 原任意值宽度类的等效定义（同样未包含在预编译产物中）：
+       min-w-badge=点赞/想听数字防挤压，min-w-page=分页页码按钮，max-w-college=元信息行学院名截断 */
+    .min-w-badge { min-width: 1.25rem; }
+    .min-w-page { min-width: 36px; }
+    .max-w-college { max-width: 45%; }
+    /* 详情字段行图标：1.05em 与正文字号联动，-0.18em 修正基线使其视觉居中 */
+    .d-ico { width: 1.05em; height: 1.05em; vertical-align: -0.18em; flex-shrink: 0; }
+    /* 「进行中」状态徽章的呼吸圆点 */
+    @keyframes live-dot-kf { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+    .live-dot { animation: live-dot-kf 1.5s ease-in-out infinite; }
+    /* 点赞/想听点击反馈：图标缩放回弹（计数同步轻微跳动） */
+    @keyframes pop-bounce-kf {
+      0% { transform: scale(1); }
+      35% { transform: scale(0.85); }
+      70% { transform: scale(1.22); }
+      100% { transform: scale(1); }
+    }
+    .pop-bounce { animation: pop-bounce-kf 0.32s ease; }
+    /* Toast：淡入淡出 + 上浮位移。不用 Vue <transition>（其 enter 起始类依赖
+       rAF 移除，页面非前台被节流时过渡会卡死在 opacity:0）；改为常驻元素 +
+       toast-on/toff 类切换，纯 CSS transition 在任何环境都安全。 */
+    .toast-fixed {
+      position: fixed; bottom: 2rem; left: 0; right: 0;
+      margin: 0 auto; width: max-content; max-width: calc(100vw - 2rem); z-index: 50;
+      transition: opacity .25s ease, transform .25s ease;
+      pointer-events: none;
+    }
+    .toast-off { opacity: 0; transform: translateY(8px); }
+    .toast-on { opacity: 1; transform: translateY(0); }
     .date-sticky { top: 57px; }
     .fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
     .fade-enter-from, .fade-leave-to { opacity: 0; }
@@ -68,11 +107,11 @@
           <nav class="hidden sm:flex items-center gap-1 ml-3">
             <button v-for="c in campusList" :key="c"
               @click="setCampus(c)"
-              :class="['px-3 py-1.5 rounded-full text-[12pt] transition', campus===c ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
+              :class="['px-3 py-1.5 rounded-full text-12pt transition', campus===c ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
               {{ c || '全部' }}
             </button>
             <button @click="toggleLikedFilter()"
-              :class="['px-3 py-1.5 rounded-full text-[12pt] transition flex items-center gap-1', showLikedOnly ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
+              :class="['px-3 py-1.5 rounded-full text-12pt transition flex items-center gap-1', showLikedOnly ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
               </svg>
@@ -91,11 +130,11 @@
             <div v-show="showMenu" class="absolute right-0 top-full pt-2 w-44 z-30">
               <div class="bg-white rounded-lg shadow-lg border border-slate-200 py-1">
                 <button @click="scrape(); showMenu = false" :disabled="scraping"
-                  class="block w-full text-left px-4 py-2 text-[12pt] text-slate-600 hover:bg-slate-50 hover:text-blue-600 disabled:opacity-60">
+                  class="block w-full text-left px-4 py-2 text-12pt text-slate-600 hover:bg-slate-50 hover:text-blue-600 disabled:opacity-60">
                   {{ scraping ? '抓取中…' : '抓取新数据' }}
                 </button>
                 <a href="stats.html" @click="showMenu = false"
-                  class="block px-4 py-2 text-[12pt] text-slate-600 hover:bg-slate-50 hover:text-blue-600">讲座统计</a>
+                  class="block px-4 py-2 text-12pt text-slate-600 hover:bg-slate-50 hover:text-blue-600">讲座统计</a>
               </div>
             </div>
           </div>
@@ -105,11 +144,11 @@
         <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1">
           <button v-for="c in campusList" :key="c"
             @click="setCampus(c)"
-            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap', campus===c ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
+            :class="['px-3 py-1 rounded-full text-12pt whitespace-nowrap', campus===c ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
             {{ c || '全部' }}
           </button>
           <button @click="toggleLikedFilter()"
-            :class="['px-3 py-1 rounded-full text-[12pt] whitespace-nowrap flex items-center gap-1', showLikedOnly ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
+            :class="['px-3 py-1 rounded-full text-12pt whitespace-nowrap flex items-center gap-1', showLikedOnly ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
             </svg>
@@ -128,7 +167,7 @@
           <div v-if="!loading" class="mb-5">
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <!-- 左侧统计文字：桌面端单行左侧 -->
-              <div class="text-[12pt] text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
+              <div class="text-12pt text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
                 <template v-if="dataStage === 'partial'">
                   已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
                   <span class="text-slate-300">·</span>
@@ -137,7 +176,7 @@
                 <template v-else-if="dataStage === 'partial-error'">
                   已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
                   <span class="text-slate-300">·</span>
-                  <button type="button" @click="retryLoadFull" class="px-2 py-0.5 text-[11pt] font-medium text-white bg-blue-500 hover:bg-blue-600 rounded transition">点击加载全部讲座</button>
+                  <button type="button" @click="retryLoadFull" class="px-2 py-0.5 text-11pt font-medium text-white bg-blue-500 hover:bg-blue-600 rounded transition">点击加载全部讲座</button>
                 </template>
                 <template v-else>
                   共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
@@ -161,31 +200,31 @@
                 <!-- 搜索框：移动端弹性占满剩余空间，桌面端固定宽度 -->
                 <div class="relative flex-1 sm:flex-none sm:w-44">
                   <input v-model="query" type="search" :placeholder="searchPlaceholder"
-                    class="w-full px-3 py-1.5 text-[12pt] rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
+                    class="w-full px-3 py-1.5 text-12pt rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
                   <button v-if="query" type="button" @click="query = ''"
                     class="search-clear"
                     aria-label="清空搜索" title="清空搜索">×</button>
                 </div>
-                <select v-model="searchField" class="flex-none w-auto text-[12pt] rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                <select v-model="searchField" class="flex-none w-auto text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
                   <option value="">全部</option>
                   <option value="college">单位</option>
                   <option value="location">地点</option>
                   <option value="topic">题目</option>
                   <option value="abstract">摘要</option>
                 </select>
-                <select v-model="year" class="flex-none w-auto text-[12pt] rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                <select v-model="year" class="flex-none w-auto text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
                   <option value="">年份</option>
                   <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
                 </select>
                 <button v-if="hasActiveFilter" @click="clearFilters()"
-                  class="flex-none px-2 py-1.5 text-[12pt] rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
+                  class="flex-none px-2 py-1.5 text-12pt rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
                   title="清除所有筛选条件">✕ 清除</button>
               </div>
             </div>
           </div>
 
           <!-- 时间线 -->
-          <div v-if="loading" class="text-center text-slate-400 py-16 text-[12pt]">数据加载中…</div>
+          <div v-if="loading" class="text-center text-slate-400 py-16 text-12pt">数据加载中…</div>
           <div v-else-if="filtered.length">
             <div v-for="g in pagedGroups" :key="g.key" class="mb-2">
               <div class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">
@@ -194,32 +233,101 @@
               </div>
               <article v-for="l in g.items" :key="l.sourceUrl + (l.lectureIndex ? '#' + l.lectureIndex : '')"
                 class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
-                <!-- 元信息 -->
-                <div class="flex items-center gap-2 text-[11pt] text-slate-400 mb-1.5 flex-nowrap">
-                  <span class="font-medium text-slate-500 truncate min-w-0 max-w-[45%]">{{ l.college }}</span>
+                <!-- 元信息行：单位 · 时间（🕒 图标化）+ 右侧状态徽章（四态：进行中/即将开始/未开始/已结束） -->
+                <div class="flex items-center gap-2 text-11pt mb-1.5 flex-nowrap">
+                  <span class="font-medium text-slate-600 truncate min-w-0 max-w-college">{{ l.college }}</span>
                   <span class="text-slate-300 shrink-0">·</span>
-                  <span class="whitespace-nowrap">{{ fmtDateTime(l) }}</span>
-                  <span :class="['ml-auto px-2 py-0.5 rounded text-[11pt] font-semibold shrink-0 whitespace-nowrap', statusInfo(l.lectureStart).hot ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400']">{{ statusInfo(l.lectureStart).label }}</span>
+                  <span class="whitespace-nowrap inline-flex items-center gap-1 text-slate-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="font-medium">{{ fmtDateTime(l) }}</span>
+                  </span>
+                  <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1', statusInfo(l).cls]">
+                    <span v-if="statusInfo(l).dot" class="live-dot rounded-full shrink-0" style="width:6px;height:6px;background:currentColor"></span>
+                    {{ statusInfo(l).label }}
+                  </span>
                 </div>
                 <!-- 标题 -->
-                <h2 class="text-[15pt] font-semibold leading-snug mb-2">
+                <h2 class="text-15pt font-semibold leading-snug mb-2">
                   <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}<span v-if="l.isMultiLecture && l.lectureIndex != null && !topicHasSession(l.topic, l.lectureIndex)">（第{{ l.lectureIndex }}{{ l.unitType === 'session' ? '场' : '期' }}）</span></a>
                 </h2>
-                <!-- 结构化详情：题目/地点/主讲/简介/内容摘要 -->
-                <div v-if="l.topic || l.location || l.speaker || l.speakerBio || abstractOf(l)"
-                  class="text-[12pt] text-slate-600 space-y-1 mb-2">
-                  <div v-if="l.topic"><span class="text-slate-400">题目</span> <span class="text-slate-600">{{ truncate(l.topic, 120) }}</span></div>
-                  <div v-if="l.location"><span class="text-slate-400">地点</span> <span class="text-slate-600">{{ l.location }}</span></div>
-                  <div v-if="l.speaker"><span class="text-slate-400">主讲</span> <span class="text-slate-600">{{ l.speaker }}<span v-if="l.speakerAffiliation" class="text-slate-400">（{{ l.speakerAffiliation }}）</span></span></div>
-                  <div v-if="l.host"><span class="text-slate-400">主持</span> <span class="text-slate-600">{{ l.host }}</span></div>
-                  <div v-if="l.meetingId"><span class="text-slate-400">会议号</span> <span class="text-slate-600">{{ l.meetingPlatform ? l.meetingPlatform + ' ' : '' }}{{ l.meetingId }}</span></div>
-                  <div v-if="l.participants"><span class="text-slate-400">参与</span> <span class="text-slate-600">{{ l.participants }}</span></div>
-                  <div v-if="notesText(l)" class="text-amber-600 text-[11pt]">⚠ {{ notesText(l) }}</div>
-                  <div v-if="l.speakerBio" class="text-slate-500 leading-relaxed">
-                    <span class="text-slate-400">简介</span> {{ truncate(cleanFooter(l.speakerBio), 220) }}
+                <!-- 结构化详情：图标 + 字段名 + 值 三段式（回应反馈#9「字段太灰、界限不分明」）；
+                     顺序：题目 → 地点 → 主讲 → 简介（超两行折叠）→ 摘要（默认三行，可展开），
+                     简介与摘要均可展开/收起（回应反馈#2「摘要多一点、简介少一点」与 #5「折叠收起」） -->
+                <div v-if="l.topic || l.location || l.speaker || l.host || l.meetingId || l.participants || notesText(l) || l.speakerBio || abstractOf(l)"
+                  class="text-12pt text-slate-600 space-y-1 mb-2">
+                  <div v-if="l.topic" class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold">题目</span>
+                    <span class="text-slate-700 min-w-0">{{ truncate(l.topic, 120) }}</span>
                   </div>
-                  <div v-if="abstractOf(l)" class="text-slate-500 leading-relaxed line-clamp-3">
-                    <span class="text-slate-400">摘要</span> {{ abstractOf(l) }}
+                  <div v-if="l.location" class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold">地点</span>
+                    <span class="text-slate-700 min-w-0">{{ l.location }}</span>
+                  </div>
+                  <div v-if="l.speaker" class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold">主讲</span>
+                    <span class="text-slate-700 min-w-0">{{ l.speaker }}<span v-if="l.speakerAffiliation" class="text-slate-500">（{{ l.speakerAffiliation }}）</span></span>
+                  </div>
+                  <div v-if="l.host" class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.688z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold">主持</span>
+                    <span class="text-slate-700 min-w-0">{{ l.host }}</span>
+                  </div>
+                  <div v-if="l.meetingId" class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M2.25 13.5h3.86a7.68 7.68 0 01-1.194 2.764M15.75 10.5a5.25 5.25 0 01-5.25 5.25H6.75a5.25 5.25 0 01-5.25-5.25v-2.25A5.25 5.25 0 016.75 3h3.75a5.25 5.25 0 015.25 5.25v2.25z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold">会议号</span>
+                    <span class="text-slate-700 min-w-0">{{ l.meetingPlatform ? l.meetingPlatform + ' ' : '' }}{{ l.meetingId }}</span>
+                  </div>
+                  <div v-if="l.participants" class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold">参与</span>
+                    <span class="text-slate-700 min-w-0">{{ l.participants }}</span>
+                  </div>
+                  <div v-if="notesText(l)" class="text-amber-600 text-11pt">⚠ {{ notesText(l) }}</div>
+                  <!-- 主讲简介：跟在主讲之后，默认最多两行，超长展开/收起 -->
+                  <div v-if="l.speakerBio" class="flex items-start gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" style="margin-top:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold leading-relaxed">简介</span>
+                    <div class="min-w-0 flex-1">
+                      <p :class="['text-slate-500 leading-relaxed', expandedBio[l.sourceUrl] ? '' : 'line-clamp-2']">{{ bioText(l) }}</p>
+                      <button v-if="bioLong(l)" @click="toggleBio(l.sourceUrl)"
+                        class="block text-11pt text-blue-600 hover:text-blue-800 hover:underline mt-1">
+                        {{ expandedBio[l.sourceUrl] ? '收起简介 ▲' : '展开简介 ▼' }}
+                      </button>
+                    </div>
+                  </div>
+                  <!-- 摘要：默认三行，超长展开/收起 -->
+                  <div v-if="abstractOf(l)" class="flex items-start gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" style="margin-top:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold leading-relaxed">摘要</span>
+                    <div class="min-w-0 flex-1">
+                      <p :class="['text-slate-600 leading-relaxed', expandedAbstract[l.sourceUrl] ? '' : 'line-clamp-3']">{{ abstractOf(l) }}</p>
+                      <button v-if="abstractLong(l)" @click="toggleAbstract(l.sourceUrl)"
+                        class="block text-11pt text-blue-600 hover:text-blue-800 hover:underline mt-1">
+                        {{ expandedAbstract[l.sourceUrl] ? '收起摘要 ▲' : '展开摘要 ▼' }}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <!-- 可点击 Tag + 想听 + 点赞 -->
@@ -228,40 +336,40 @@
                   <template v-if="l.merged">
                     <button v-for="c in sourceColleges(l)" :key="c"
                       @click="onTagClick('college', c)"
-                      class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
+                      class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
                     <button @click="toggleSources(l.sourceUrl)"
-                      class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-[12pt] border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.sourceUrl] ? '▲' : '▼' }}</button>
+                      class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-12pt border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.sourceUrl] ? '▲' : '▼' }}</button>
                   </template>
                   <template v-else>
                     <button @click="onTagClick('college', l.college)"
-                      class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
+                      class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
                   </template>
                   <button v-for="c in sourceCampuses(l)" :key="c" @click="onTagClick('campus', c)"
-                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-[12pt] hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
                   <!-- 想听按钮：ml-auto 推到右侧，点赞数字 min-w 防挤压 -->
-                  <button @click="toggleWant(l.sourceUrl)"
-                    :class="['ml-auto px-2.5 py-1 rounded-full flex items-center gap-1 text-[12pt] transition border whitespace-nowrap', hasWanted(l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
+                  <button @click="toggleWant(l.sourceUrl, $event)"
+                    :class="['ml-auto px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
                     title="想听就点^_^">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" :fill="hasWanted(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                     </svg>
-                    <span class="min-w-[1.25rem] text-center">{{ capDisplay(wantCount(l.sourceUrl)) }}</span>
+                    <span class="min-w-badge text-center">{{ capDisplay(wantCount(l.sourceUrl)) }}</span>
                   </button>
-                  <button @click="toggleLike(l.sourceUrl)"
-                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-[12pt] transition border whitespace-nowrap', hasLiked(l.sourceUrl) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
+                  <button @click="toggleLike(l.sourceUrl, $event)"
+                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(l.sourceUrl) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
                     title="喜欢就赞^_^">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linejoin="round" d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
                     </svg>
-                    <span class="min-w-[1.25rem] text-center">{{ capDisplay(likeCount(l.sourceUrl)) }}</span>
+                    <span class="min-w-badge text-center">{{ capDisplay(likeCount(l.sourceUrl)) }}</span>
                   </button>
                 </div>
                 <!-- 多来源：展开各官方原文链接 -->
                 <div v-if="l.merged && expanded[l.sourceUrl]" class="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
                   <a v-for="s in l.sources" :key="s.sourceUrl" :href="safeUrl(s.sourceUrl)" target="_blank" rel="noopener noreferrer"
                     @click="recordVisit(l.sourceUrl)"
-                    class="flex items-center gap-2 text-[12pt] text-blue-600 hover:text-blue-800 hover:underline">
-                    <span class="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[11pt]">{{ s.college }}</span>
+                    class="flex items-center gap-2 text-12pt text-blue-600 hover:text-blue-800 hover:underline">
+                    <span class="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-11pt">{{ s.college }}</span>
                     <span class="truncate">{{ s.title || s.sourceUrl }}</span>
                   </a>
                 </div>
@@ -269,15 +377,15 @@
             </div>
           </div>
 
-          <div v-else class="text-center text-slate-400 py-16 text-[12pt]">没有匹配的讲座。</div>
+          <div v-else class="text-center text-slate-400 py-16 text-12pt">没有匹配的讲座。</div>
 
           <!-- 分页导航 -->
-          <nav v-if="filtered.length > pageSize" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-[12pt]">
+          <nav v-if="filtered.length > pageSize" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-12pt">
             <button @click="prevPage" :disabled="currentPage === 1"
               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
             <template v-for="p in pageNumbers" :key="p">
               <button v-if="p !== '...'" @click="gotoPage(p)"
-                :class="['min-w-[36px] px-2 py-1.5 rounded-lg border transition', p === currentPage ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50']">{{ p }}</button>
+                :class="['min-w-page px-2 py-1.5 rounded-lg border transition', p === currentPage ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50']">{{ p }}</button>
               <span v-else class="px-1.5 text-slate-400 select-none">…</span>
             </template>
             <button @click="nextPage" :disabled="currentPage === totalPages"
@@ -293,20 +401,18 @@
           </nav>
     </main>
 
-    <footer class="border-t border-slate-200 text-center text-[12pt] text-slate-400 py-6 bg-white">
+    <footer class="border-t border-slate-200 text-center text-12pt text-slate-400 py-6 bg-white">
       数据来源于华南师范大学各学院/部处公开站点，仅供师生参考，请以官方原文为准。
       <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
         · 本站总访问量 <span id="busuanzi_site_pv">—</span> 次
       </span>
     </footer>
 
-    <!-- Toast 提示 -->
-    <transition name="fade">
-      <div v-if="toast.show"
-        class="fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-slate-800 text-white text-[12pt] shadow-lg z-50">
-        {{ toast.message }}
-      </div>
-    </transition>
+    <!-- Toast 提示：淡入 + 上浮（常驻元素类切换，见样式注释） -->
+    <div :class="['toast-fixed px-4 py-2 rounded-lg bg-slate-800 text-white text-12pt shadow-lg', toast.show ? 'toast-on' : 'toast-off']"
+      aria-live="polite">
+      {{ toast.message }}
+    </div>
 
     <!-- 回到顶部：下滑后出现，纯灰箭头圆形白底，悬停放大+阴影 -->
     <transition name="fade">
@@ -320,10 +426,10 @@
     </transition>
   </div>
 
-  <script defer src="app.js?v=cb1da35fa7"></script>
+  <script defer src="app.js?v=20260906g"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
-  <script defer src="footer-counter.js?v=7dcf7c64e7"></script>
+  <script defer src="footer-counter.js?v=34709fe347"></script>
 </body>
 </html>
