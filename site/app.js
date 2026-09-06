@@ -45,6 +45,8 @@ const app = createApp({
       gotoInput: '',        // 跳页输入框的临时值
       showBackTop: false,  // 滚动超过阈值后显示「回到顶部」按钮
       expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
+      expandedAbstract: {}, // 卡片摘要的展开状态：sourceUrl -> bool（默认 3 行截断）
+      expandedBio: {},      // 主讲简介的展开状态：sourceUrl -> bool（长文默认折叠）
       // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
       displayTotal: 1,
       displaySource: 1,
@@ -275,14 +277,34 @@ const app = createApp({
       const wk = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 周${wk}`;
     },
-    statusInfo(iso) {
-      if (!iso || typeof iso !== 'string') return { label: '时间待定', hot: false };
-      const d = new Date(iso.replace(' ', 'T'));
-      if (isNaN(d)) return { label: '时间待定', hot: false };
-      const now = new Date();
-      if (d < now) return { label: '已结束', hot: false };
-      const days = (d - now) / 86400000;
-      return days <= 7 ? { label: '即将开始', hot: true } : { label: '即将开始', hot: false };
+    // 状态判定（徽章展示与后续状态筛选共用）：
+    //   tbd      时间待定 / 无有效开始时间
+    //   upcoming 未开始（now < lectureStart）
+    //   ongoing  进行中（lectureStart ≤ now ≤ lectureEnd；end 缺失或早于 start 时按开始+2小时兜底，
+    //            数据中 lectureEnd 覆盖率约六成，兜底保证「进行中」始终可判定）
+    //   ended    已结束（now > lectureEnd）
+    statusOf(l) {
+      if (this.isTimeTBD(l)) return 'tbd';
+      const s = new Date(String(l.lectureStart || '').replace(' ', 'T')).getTime();
+      if (!s || isNaN(s)) return 'tbd';
+      const endRaw = l.lectureEnd ? new Date(String(l.lectureEnd).replace(' ', 'T')).getTime() : 0;
+      const e = (endRaw && endRaw > s) ? endRaw : s + 2 * 3600 * 1000;
+      const now = Date.now();
+      if (now < s) return 'upcoming';
+      return now <= e ? 'ongoing' : 'ended';
+    },
+    // 状态徽章：label + 样式类（vendor 预编译 CSS 无绿色系，进行中用蓝 + 呼吸点）
+    statusInfo(l) {
+      const st = this.statusOf(l);
+      if (st === 'tbd') return { label: '时间待定', cls: 'bg-slate-100 text-slate-400', dot: false };
+      if (st === 'ongoing') return { label: '进行中', cls: 'bg-blue-100 text-blue-700', dot: true };
+      if (st === 'ended') return { label: '已结束', cls: 'bg-slate-100 text-slate-400', dot: false };
+      // upcoming：7 天内开讲标「即将开始」（橙），更远的未来标「未开始」（中性）
+      const s = new Date(String(l.lectureStart || '').replace(' ', 'T')).getTime();
+      const days = (s - Date.now()) / 86400000;
+      return days <= 7
+        ? { label: '即将开始', cls: 'bg-orange-100 text-orange-600', dot: false }
+        : { label: '未开始', cls: 'bg-slate-100 text-slate-600', dot: false };
     },
     truncate(s, maxLen) {
       if (!s) return '';
@@ -320,7 +342,29 @@ const app = createApp({
       // （如"关于征集国家社科基金...关于申报教育部..."），不是讲座摘要。
       // 特征：含"资讯及通知"栏目标题，或 ≥2 条"关于…通知/公告/申报/征集"短语。
       if (/资讯及通知|(?:关于.{2,40}(?:通知|公告|申报|征集|转发|招标|遴选).*){2,}/.test(ab)) return '';
-      return this.truncate(ab, 300);
+      // 上限 500 字防超长脏数据；展示层默认 3 行截断 + 展开按钮（见 abstractLong / expandedAbstract）
+      return this.truncate(ab, 500);
+    },
+    // 摘要是否超长（超过约 3 行时提供展开按钮；130 字 ≈ 12pt 字号下 3 行的阅读量）
+    abstractLong(l) {
+      return this.abstractOf(l).length > 130;
+    },
+    // 主讲简介全文（原 220 字截断放宽到 400，避免头衔/单位在截断处丢失）
+    bioText(l) {
+      return this.truncate(this.cleanFooter(l.speakerBio), 400);
+    },
+    // 简介是否需要折叠：超过约两行（80 字）时默认截为两行并提供展开按钮；
+    // 不超两行则直接完整显示（不出现按钮）
+    bioLong(l) {
+      return this.bioText(l).length > 80;
+    },
+    toggleAbstract(url) {
+      if (!url) return;
+      this.expandedAbstract = { ...this.expandedAbstract, [url]: !this.expandedAbstract[url] };
+    },
+    toggleBio(url) {
+      if (!url) return;
+      this.expandedBio = { ...this.expandedBio, [url]: !this.expandedBio[url] };
     },
     // 安全链接：仅放行 http/https，阻断 javascript:/data: 等可执行协议，防止 XSS
     safeUrl(u) {
@@ -388,8 +432,21 @@ const app = createApp({
     hasLiked(url) {
       return this.likedUrls.has(url);
     },
-    toggleLike(url) {
+    // 点赞/想听点击弹跳反馈：图标缩放回弹、计数轻微跳动（0.32s，纯视觉）
+    _pulse(evt) {
+      const btn = evt && evt.currentTarget;
+      if (!btn || !btn.querySelector) return;
+      const els = [btn.querySelector('svg'), btn.querySelector('span')].filter(Boolean);
+      els.forEach(el => {
+        el.classList.remove('pop-bounce');
+        void el.offsetWidth;   // 连续点击时重置动画
+        el.classList.add('pop-bounce');
+      });
+      setTimeout(() => els.forEach(el => el.classList.remove('pop-bounce')), 420);
+    },
+    toggleLike(url, evt) {
       if (!url) return;
+      this._pulse(evt);
       const willLike = !this.hasLiked(url);
       // 本地 UI 立即切换（乐观更新），保证点击即时反馈
       if (willLike) { this.likedUrls.add(url); } else { this.likedUrls.delete(url); }
@@ -455,8 +512,9 @@ const app = createApp({
     hasWanted(url) {
       return this.wantedUrls.has(url);
     },
-    toggleWant(url) {
+    toggleWant(url, evt) {
       if (!url) return;
+      this._pulse(evt);
       const willWant = !this.hasWanted(url);
       if (willWant) { this.wantedUrls.add(url); } else { this.wantedUrls.delete(url); }
       const delta = willWant ? 1 : -1;
