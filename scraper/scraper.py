@@ -74,6 +74,52 @@ def _decode_html(raw):
     return raw.decode('utf-8', errors='replace')
 
 
+import os
+import re
+import sys
+import json
+import time
+import yaml
+import datetime
+import random
+import threading
+import requests
+import charset_normalizer
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urljoin, urlparse
+from bs4 import BeautifulSoup
+
+# ---- 抓取礼貌性（2026-09-06）----
+# ① robots.txt：站点声明 Disallow 的路径不抓（按域名缓存一次解析结果）；
+#    robots.txt 不可达/404 时按惯例默认允许。
+# ② 抖动：每次成功抓取后随机延迟 0.2~0.6s，避免对源站的规律性高频请求。
+_ROBOTS_CACHE = {}
+_ROBOTS_LOCK = threading.Lock()
+
+
+def _can_fetch(url):
+    """robots.txt 合规检查。返回 False 表示站点明确 Disallow 该路径。"""
+    host = urlparse(url).netloc
+    scheme = urlparse(url).scheme or 'https'
+    with _ROBOTS_LOCK:
+        rp = _ROBOTS_CACHE.get(host)
+    if rp is None:
+        rp = False  # False = 「robots 不可达，默认允许」的哨兵
+        try:
+            r = requests.get(f'{scheme}://{host}/robots.txt', headers=HEADERS,
+                             timeout=10, proxies={'http': None, 'https': None})
+            if r.status_code == 200 and r.text.strip():
+                rp = urllib.robotparser.RobotFileParser()
+                rp.parse(r.text.splitlines())
+        except Exception:
+            rp = False
+        with _ROBOTS_LOCK:
+            _ROBOTS_CACHE[host] = rp
+    if rp is False or rp is None:
+        return True
+    return rp.can_fetch('*', url)
+
+
 def fetch(url, _retries=3, allowed_domains=None):
     """下载页面并鲁棒解码。
 
@@ -118,6 +164,8 @@ def fetch(url, _retries=3, allowed_domains=None):
                     print(f'[WARN] fetch: 响应超过 20MB 上限 {url}', file=sys.stderr)
                     return None
             r.close()
+            # 抓取礼貌性：成功后随机抖动，避免对源站的规律性高频请求
+            time.sleep(random.uniform(0.2, 0.6))
             return _decode_html(bytes(content))
         except requests.exceptions.RequestException as e:
             last_err = e
