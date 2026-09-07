@@ -228,6 +228,16 @@ def main():
     else:
         targets = dirty
 
+    # 单位补全：--fields 含 affiliation 时，『有主讲人但单位/职称均空』的记录纳入
+    # 处理范围（rich 模式下由模型A 补全；--llm 未开时新解析通常同样为空，不影响）
+    if 'affiliation' in _field_set:
+        _have = {str(r.get('sourceUrl', '')).rstrip('/') + str(r.get('lectureIndex'))
+                 for r in targets}
+        for r in scope:
+            _k = str(r.get('sourceUrl', '')).rstrip('/') + str(r.get('lectureIndex'))
+            if _k not in _have and (r.get('speaker') or '').strip()                     and not (r.get('speakerAffiliation') or '').strip():
+                targets.append(r)
+
     by_url = {}
     for r in targets:
         by_url.setdefault(str(r.get('sourceUrl', '')).rstrip('/'), []).append(r)
@@ -401,6 +411,17 @@ def main():
                 if new_l and new_l != old_l:
                     rec['location'] = new_l
                     touched.append('location')
+            # 单位补全：主讲人已有但单位缺失 → 新解析值非空才补（rich 模式下 A 提供）
+            if 'affiliation' in _field_set:
+                if ((rec.get('speaker') or '').strip()
+                        and not (rec.get('speakerAffiliation') or '').strip()):
+                    new_aff = (src.get('speakerAffiliation') or '').strip()
+                    if new_aff:
+                        rec['speakerAffiliation'] = new_aff
+                        new_title = (src.get('speakerTitle') or '').strip()
+                        if new_title and not (rec.get('speakerTitle') or '').strip():
+                            rec['speakerTitle'] = new_title
+                        touched.append('affiliation')
             if touched:
                 rec['qaRepaired'] = _fv.VOCAB_VERSION
                 # 富文本来源已刷新，同步溯源标记为新解析的产出

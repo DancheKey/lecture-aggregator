@@ -27,6 +27,7 @@ const app = createApp({
       campus: '',
       college: '',
       year: '',
+      speaker: '',        // 讲者筛选（归一化键；点卡片主讲人名字进入该讲者视图）
       query: '',
       searchField: '',  // 搜索维度：''=全部 | college=单位 | location=地点 | topic=题目 | abstract=摘要
       showLikedOnly: false,  // 仅显示已点赞讲座
@@ -115,11 +116,16 @@ const app = createApp({
           if (!colleges.has(this.college)) return false;
         }
         if (this.year && this.yearOf(l) !== this.year) return false;
+        if (this.speaker) {
+          // 讲者聚合：按归一化键匹配（多人讲座任一键命中即保留）
+          const keys = l.speakerKeys || [];
+          if (!keys.includes(this.speaker)) return false;
+        }
         if (q) {
           let hay;
           if (this.searchField === 'location') {
-            // 地点：仅按讲座地点匹配（多来源取各自地点）
-            hay = [l.location, ...(l.sources || []).map(s => s.location)]
+            // 地点：仅按讲座地点匹配（多来源取各自地点）；空地点记为「待公布」，可筛
+            hay = [l.location || '待公布', ...(l.sources || []).map(s => s.location)]
               .filter(Boolean).join(' ').toLowerCase();
           } else if (this.searchField === 'topic') {
             // 题目：标题 + 题目字段 + 主讲人（与占位提示「搜索题目 / 主讲…」对齐）
@@ -232,6 +238,19 @@ const app = createApp({
   },
 
   methods: {
+    /* ---------- 讲者视图 ---------- */
+    pickSpeaker(l) {
+      // 进入讲者视图：按该记录的归一化键筛选，滚回顶部
+      const keys = l.speakerKeys || [];
+      if (!keys.length) return;
+      this.speaker = keys[0];
+      this.currentPage = 1;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    clearSpeaker() {
+      this.speaker = '';
+      this.currentPage = 1;
+    },
     /* ---------- 工具 ---------- */
     yearOf(l) {
       if (!l) return '';
