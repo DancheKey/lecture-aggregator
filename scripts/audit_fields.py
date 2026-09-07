@@ -214,6 +214,9 @@ def _write_html(path, recs, issues):
         '<th>字段</th><th>问题描述</th><th>字段现值</th></tr>' +
         '\n'.join(rows) + '</table></body></html>'
     )
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
         f.write(html)
 
