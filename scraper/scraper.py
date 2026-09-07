@@ -134,9 +134,16 @@ def fetch(url, _retries=3, allowed_domains=None):
       - 可选域名白名单 allowed_domains（如 ['scnu.edu.cn']），限制只允许抓取
         本源或授权域名，防止页面内注入的恶意 URL 触发 SSRF；
         None 表示跳过校验（兼容无白名单的调用场景）。
+      - robots.txt 合规（2026-09-07 接线）：尊重站点 Disallow 声明，
+        按域名缓存一次解析结果；不可达/404 按惯例默认允许。
     """
     import random
     from urllib.parse import urlparse
+    # robots.txt 合规（2026-09-07）：站点明确 Disallow 的路径直接跳过，不消耗
+    # 请求预算，也避免被源站拉黑；缓存于 _ROBOTS_CACHE 避免每个 URL 都重新解析。
+    if not _can_fetch(url):
+        print(f'[WARN] fetch: robots.txt 禁止 {url}', file=sys.stderr)
+        return None
     last_err = None
     for _i in range(_retries):
         try:

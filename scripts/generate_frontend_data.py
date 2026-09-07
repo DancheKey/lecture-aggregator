@@ -204,6 +204,31 @@ def build_stats(data, updated_at):
     }
 
 
+def speaker_keys(name):
+    """讲者归一化键（2026-09-06）：去空白/职称后缀、全角转半角；英文 lower。
+    多主讲人（'A、B'）逐人拆分，返回键数组——同名同人判定为完全一致，
+    跨语言（张三/Zhang San）暂不合键（避免同音误并），留作后续。"""
+    if not name:
+        return []
+    t = str(name)
+    t = ''.join(chr(ord(c) - 0xFEE0) if 0xFF01 <= ord(c) <= 0xFF5E else c for c in t)
+    for suf in ('博士生导师', '硕士生导师', '特聘教授', '特任教授', '长聘教授',
+                '副教授', '助理教授', '副研究员', '助理研究员', '研究员',
+                '教授', '讲师', '博士后', '博士', '院士', '老师', '导师'):
+        if t.endswith(suf) and len(t) > len(suf):
+            t = t[:-len(suf)]
+            break
+    keys = []
+    for part in re.split(r'[、,，/]', t):
+        part = part.strip()
+        if not part:
+            continue
+        if re.search(r'[A-Za-z]', part):
+            part = part.lower()
+        keys.append(part)
+    return keys
+
+
 def with_unit(item, url_dates):
     """为单页多讲座拆分记录标注 unitType，供前端区分「场」与「期」：
 
@@ -218,6 +243,8 @@ def with_unit(item, url_dates):
     if item.get('lectureIndex') is not None:
         dates = url_dates.get(item.get('sourceUrl') or '', set())
         it['unitType'] = 'session' if len(dates) == 1 else 'issue'
+    # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
+    it['speakerKeys'] = speaker_keys(item.get('speaker'))
     return it
 
 
