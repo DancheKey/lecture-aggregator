@@ -48,6 +48,33 @@ LIKE_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同
 WANT_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同想听动作只接受一次（允许 want↔unwant 交替）
 
 
+def _speaker_keys(name):
+    """讲者归一化键（2026-09-06）：去空白/职称后缀、全角转半角；英文 lower。
+    多主讲人（'A、B'）逐人拆分，返回键数组——同名同人判定为完全一致，
+    跨语言（张三/Zhang San）暂不合键（避免同音误并），留作后续。
+    逻辑须与 scripts/generate_frontend_data.py 的 speaker_keys() 严格一致，
+    否则前端一致性守卫测试会拦截部署。"""
+    if not name:
+        return []
+    t = str(name)
+    t = ''.join(chr(ord(c) - 0xFEE0) if 0xFF01 <= ord(c) <= 0xFF5E else c for c in t)
+    for suf in ('博士生导师', '硕士生导师', '特聘教授', '特任教授', '长聘教授',
+                '副教授', '助理教授', '副研究员', '助理研究员', '研究员',
+                '教授', '讲师', '博士后', '博士', '院士', '老师', '导师'):
+        if t.endswith(suf) and len(t) > len(suf):
+            t = t[:-len(suf)]
+            break
+    keys = []
+    for part in re.split(r'[、,，/]', t):
+        part = part.strip()
+        if not part:
+            continue
+        if re.search(r'[A-Za-z]', part):
+            part = part.lower()
+        keys.append(part)
+    return keys
+
+
 def _attach_unit_types(data):
     """为单页多讲座拆分记录标注 unitType（场/期），逻辑须与 scripts/generate_frontend_data.py
     的 with_unit() 严格一致，确保本地开发服务器下发的 /api/lectures 与公网静态切片行为相同：
@@ -55,7 +82,8 @@ def _attach_unit_types(data):
     - 同一 sourceUrl 组内所有讲座日期相同（同一天多场次）-> 'session'（第x场）
     - 跨了不同日期（系列讲座分期）-> 'issue'（第x期）
 
-    仅对含 lectureIndex 的记录附加该字段，其余原样透传，不污染主数据。
+    仅对含 lectureIndex 的记录附加 unitType 字段；其余原样透传（但统一复制并补 speakerKeys），
+    不污染主数据。speakerKeys 由 _speaker_keys() 生成，须与 generate 端一致。
     """
     url_dates = {}
     for item in data:
@@ -66,13 +94,13 @@ def _attach_unit_types(data):
             url_dates[u].add(d)
     out = []
     for item in data:
+        it = dict(item)
         if item.get('lectureIndex') is not None:
             dates = url_dates.get(item.get('sourceUrl') or '', set())
-            it = dict(item)
             it['unitType'] = 'session' if len(dates) == 1 else 'issue'
-            out.append(it)
-        else:
-            out.append(item)
+        # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
+        it['speakerKeys'] = _speaker_keys(item.get('speaker'))
+        out.append(it)
     return out
 
 
