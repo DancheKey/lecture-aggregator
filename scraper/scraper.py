@@ -469,6 +469,35 @@ def _topic_similarity(a, b):
     return len(ta & tb) / len(ta | tb)
 
 
+def _norm_org(rec):
+    """取记录的「主讲人单位」并归一化。无单位时返回 ''。"""
+    v = (rec.get('speakerAffiliation') or rec.get('affiliation') or '').strip()
+    if not v:
+        return ''
+    v = re.sub(r'[（(].*?[)）]', '', v)                      # 去括号补充说明
+    v = re.sub(r'(教授|研究员|副教授|助理教授|讲师|博士|院士|博士生导师|硕士生导师)', '', v)
+    return re.sub(r'[\s,，、;；·]+', '', v)
+
+
+def _same_org(a, b):
+    """两条记录的主讲人单位是否一致（用于「同名不同人」防误合并）。
+
+    任一方缺单位时返回 False：宁可留下一条重复，也不能把同名不同单位的
+    两个人误并成一场讲座（误合并=丢数据，代价远大于留重复）。
+    """
+    oa, ob = _norm_org(a), _norm_org(b)
+    return bool(oa) and bool(ob) and oa == ob
+
+
+def _is_placeholder_time(t):
+    """时刻是否为占位值（00:00 / 08:00 = 时刻未知）。
+
+    占位时刻不能作为「开始时间精确到分」的强信号：两条同为占位的记录
+    只说明「同一天」，可能是同一天的两场不同讲座。
+    """
+    return (not t) or (str(t)[11:16] in ('00:00', '08:00'))
+
+
 def cross_source_dedup(records):
     """跨源去重：不同学院发布的同一讲座合并为一条。
 
@@ -609,6 +638,22 @@ def cross_source_dedup(records):
                 loc_a = (ri.get('location') or '').strip()
                 loc_b = (rj.get('location') or '').strip()
                 if loc_a and loc_a == loc_b:
+                    union(i, j)
+                    continue
+                # 兜底层2（2026-09-08）：同讲者(组内) + 同日期(组内) + 同「开始时刻精确到分」
+                # + 同单位 → 强信号合并。
+                # 覆盖 physics/iqm 等对同一场讲座分别用中英文标题（文本相似度≈0），
+                # 且地点写法不同（"理八栋210会议室报告" vs "理8-210报告"）导致前两层
+                # 全部漏判的场景（姚德良 2019-11-29 即此类）。
+                # 双保险防误并：
+                #   ① 单位必须相同（防同名不同人）；任一方缺单位则不启用 ——
+                #      宁可留一条重复，也不能把两个人误并成一场（误合并=丢数据）。
+                #   ② 排除占位时刻 00:00/08:00 —— 那只代表「同一天」，可能是两场。
+                t16_a = (ri.get('lectureStart') or '')[:16]
+                t16_b = (rj.get('lectureStart') or '')[:16]
+                if (t16_a and t16_a == t16_b
+                        and not _is_placeholder_time(ri.get('lectureStart'))
+                        and _same_org(ri, rj)):
                     union(i, j)
 
         # 按 find 结果聚簇执行合并
@@ -811,6 +856,16 @@ def _cross_source_dup_with_existing(rec, existing_index):
             _topic_similarity(rec.get('title', ''), r2.get('topic', '')),
         )
         if sim >= 0.25:
+            return True
+        # 兜底层（与 cross_source_dedup 的「兜底层2」保持一致）：
+        # 同讲者(已在组内) + 同日期(已在组内) + 同开始时刻(精确到分) + 同单位 → 重复。
+        # 覆盖两院对同一场讲座用中英文不同标题（相似度≈0）且地点写法不同的场景。
+        # 同样排除占位时刻、要求双方都有单位（防同名不同人）。
+        t16_a = (rec.get('lectureStart') or '')[:16]
+        t16_b = (r2.get('lectureStart') or '')[:16]
+        if (t16_a and t16_a == t16_b
+                and not _is_placeholder_time(rec.get('lectureStart'))
+                and _same_org(rec, r2)):
             return True
     return False
 
@@ -1076,6 +1131,13 @@ def main():
             existing_urls.add((u, r.get('lectureIndex')))
         else:
             existing_urls.add((u, None))
+        # 跨源合并后被并入 sources 的 URL 同样算「已抓」：否则增量抓取会把已合并的
+        # 来源页面重新抓成一条新记录，使合并白做（旧讲座目前只靠时间门侥幸挡住，
+        # 未来讲座就会重复复活）。
+        for s in (r.get('sources') or []):
+            su = str(s.get('sourceUrl', '')).rstrip('/')
+            if su:
+                existing_urls.add((su, None))
 
     lectures = {}
     if is_incremental:
