@@ -99,6 +99,212 @@ def clean_time_field(rec, desc):
     return None
 
 
+# ============================================================================
+# 内容型二次扫描（独立于 audit 报告的问题类型）
+# 适用：抓取时把多空格/单词边界压缩掉，导致字段值"单词被黏合"或"姓名+单位合一"
+# ============================================================================
+
+# 英文机构名白名单（精确替换：抓取结果→规范全称）
+EN_ORG_WHITELIST = {
+    'MassachusettsInstituteofTechnology': 'Massachusetts Institute of Technology',
+    'UniversityofHawaii': 'University of Hawaii',
+    'TheUniversityofNewSouthWales': 'The University of New South Wales',
+    'GhentUniversity': 'Ghent University',
+    'SeoulNationalUniversity': 'Seoul National University',
+    'ItalianInstituteofNuclearPhysics': 'Italian Institute of Nuclear Physics',
+    'UniversityofSantiagodeCompostela': 'University of Santiago de Compostela',
+    'Aix-MarseilleUniversity': 'Aix-Marseille University',
+    'Regensburguniversity': 'Regensburg University',
+    'UniversityofConnecticut': 'University of Connecticut',
+    'StonyBrookUniversity': 'Stony Brook University',
+    'LawrenceBerkeleyNationalLaboratory': 'Lawrence Berkeley National Laboratory',
+    'UniversityofAlabamaatBirmingham': 'University of Alabama at Birmingham',
+    'UniversityofAmsterdam': 'University of Amsterdam',
+    'NanyangTechnologicalUniversity': 'Nanyang Technological University',
+    'UniversityofScienceandTechnologyofChina': 'University of Science and Technology of China',
+    'KeyLabofQuantumInformation': 'Key Lab of Quantum Information',
+}
+
+# 英文机构识别词（白名单未命中时按驼峰切分）
+EN_ORG_WORDS_RE = re.compile(
+    r'(University|Universit[éä]t|Universiteit|College|School|'
+    r'Department|Center|Centre|Laboratory|Academy|Foundation|Hospital|'
+    r'Institute|Key\s*Lab|Polytechnic)',
+    re.I)
+# 通用地理/学科/前置介词短词（驼峰 fallback）
+EN_SHORT_WORDS_RE = re.compile(
+    r'(Massachusetts|Hawaii|Alabama|Connecticut|Ghent|Santiago|Compostela|'
+    r'Aix|Marseille|Regensburg|Seoul|Italian|'
+    r'New|South|North|East|West|States|Hong|Kong|Tokyo|'
+    r'Engineering|Technology|Sciences|Science|Information|Physics|'
+    r'Mathematics|Computer|Materials|Chemistry|Biology|Medicine|'
+    r'Business|Arts|Studies|Letters|Applied|Life|Earth|National|'
+    r'International|Technical|Federal|California|Texas|Florida|York|'
+    r'Jersey|Mexico|China|Chinese|Taiwan|Japan|Korean|'
+    r'Paris|London|Berlin|Munich|Leiden|Birmingham|Amsterdam|'
+    r'Quantum|USA|UK|PRC|and|of|at|in|de|the)',
+    re.I)
+
+# 姓名字段的中英混合禁用词（避免"出版人/编辑"等被误当中文姓名）
+SPEAKER_BLOCK_RE = re.compile(
+    r'^(出版人|编辑|记者|教授|副教授|研究员|助理研究员|讲师|博士|硕士|'
+    r'院士|主编|总编|副主编|特约记者|通讯员|'
+    r'院长|副院长|主任|副主任|所长|副所长|局长|副校长|校长|'
+    r'部长|副部长|秘书|助理|高级|中级|初级|'
+    r'客座|访问|名誉|退休)$')
+
+
+def en_org_split_words(s):
+    """英文单词被黏合时切分；可处理中英混合字段（只切其中的英文片段）"""
+    if not s:
+        return None
+    # 找出所有 8+ 字符的英文片段，逐段切分
+    en_segs = re.findall(r'[A-Za-z]{8,}', s)
+    if not en_segs:
+        return None
+    new = s
+    changed = False
+    for seg in en_segs:
+        if seg in EN_ORG_WHITELIST:
+            new = new.replace(seg, EN_ORG_WHITELIST[seg], 1)
+            changed = True
+            continue
+        if not EN_ORG_WORDS_RE.search(seg):
+            continue  # 片段不含机构词，可能是人名，不切
+        # 识别词 + 短词表 + 驼峰边界 三路补空格
+        out = EN_ORG_WORDS_RE.sub(r' \1', seg)
+        out = EN_SHORT_WORDS_RE.sub(r' \1', out)
+        out = re.sub(r'([a-z])([A-Z])', r'\1 \2', out)
+        out = re.sub(r'\s+', ' ', out).strip()
+        if ' ' in out and out != seg:
+            new = new.replace(seg, out, 1)
+            changed = True
+    if not changed:
+        return None
+    return new
+
+
+def speaker_zh_only(s):
+    """speaker 同时含中文+英文时只取中文段（过滤职务/职称词，多人联讲转人工）"""
+    if not s:
+        return None
+    if not (re.search(r'[\u4e00-\u9fff]', s) and re.search(r'[A-Za-z]', s)):
+        return None
+    # 多人联讲闸门：≥ 2 段（按逗号/分号/顿号切）且中文段只有 1 段 → 拒绝（避免丢讲者）
+    parts = [p.strip() for p in re.split(r'[,，、;；]', s) if p.strip()]
+    if len(parts) >= 2:
+        zh_count = sum(1 for p in parts if re.search(r'[\u4e00-\u9fff]', p))
+        en_count = sum(1 for p in parts if re.search(r'[A-Za-z]', p))
+        if zh_count == 1 and en_count >= 1:
+            return None
+    # 中文段允许内含空格与间隔号（「布鲁斯 · 胡德」这类音译名）
+    chunks = [c.strip(' ·') for c in re.findall(r'[\u4e00-\u9fff·\s]+', s)]
+    candidates = [c for c in chunks if c and not SPEAKER_BLOCK_RE.match(c)]
+    if not candidates:
+        return None
+    # 取最长；长度相同时取最右（「出版人,庄秋莞」中「庄秋莞」在后）
+    best = max(candidates, key=lambda c: (len(c), s.rfind(c)))
+    if len(best) < 2 or len(best) > 12:
+        return None
+    return best
+
+
+# 英文姓名+单位拆分：少数英文姓名与单位在同一段没有清晰分隔词的样本，
+# 用白名单兜底（避免"全切到 University 之前"导致姓名带单位修饰词）
+EN_SPLIT_WHITELIST = {
+    'Mingjie Xin Nanyang Technological University': ('Mingjie Xin', 'Nanyang Technological University'),
+    'Fei Xue University of Alabama at Birmingham': ('Fei Xue', 'University of Alabama at Birmingham'),
+    'Junyu He University of Amsterdam': ('Junyu He', 'University of Amsterdam'),
+}
+# 前置机构词（比 University 更具体，能精确切分姓名+单位的边界）
+EN_PRE_WORDS_RE = re.compile(
+    r'(Department|Center|Centre|Laboratory|Academy|Foundation|'
+    r'School|College|Faculty|Key\s*Lab|Key\s*Laboratory|'
+    r'Office|Group|Division|Program|Unit|Institute|'
+    r'Universit[éä]t|Universiteit)',
+    re.I)
+
+
+def split_speaker_at_org(s):
+    """speaker 含英文机构词时切分为姓名+单位
+    策略：①优先前置机构词（Department/Center/Laboratory/Key Lab 等） ②白名单兜底
+    返回 (新 speaker, 新单位) 或 None
+    """
+    if not s or not re.search(r'[A-Za-z]', s):
+        return None
+    if re.search(r'[\u4e00-\u9fff]', s):
+        return None
+    # 1) 白名单（精确已知）
+    if s in EN_SPLIT_WHITELIST:
+        return EN_SPLIT_WHITELIST[s]
+    # 2) 前置机构词启发式
+    m = EN_PRE_WORDS_RE.search(s)
+    if m:
+        new_sp = s[:m.start()].strip(' ,，、·')
+        new_aff = s[m.start():].strip(' ,，、·')
+        if len(new_sp) >= 2 and len(new_aff) >= 4:
+            return new_sp, new_aff
+    return None
+
+
+def apply_extra_fixes(recs):
+    """独立于 issues 列表的内容型清洗（直接基于字段内容判定）"""
+    changes = []
+    for i, r in enumerate(recs):
+        spk = r.get('speaker') or ''
+        aff = r.get('speakerAffiliation') or ''
+
+        # 1) 物理学院英文姓名+单位拆分（C 类：先于 B 类，避免 B 提取中文时把它当英文名）
+        if spk:
+            res = split_speaker_at_org(spk)
+            if res:
+                new_sp, new_aff = res
+                if new_sp != spk:
+                    changes.append({'idx': i, 'field': 'speaker', 'before': spk, 'after': new_sp,
+                                    'desc': '英文姓名+单位混在同一字段（拆分为姓名+单位）',
+                                    'url': r.get('sourceUrl'), 'college': r.get('college'),
+                                    'speaker': spk, 'start': r.get('lectureStart')})
+                if new_aff != aff:
+                    changes.append({'idx': i, 'field': 'speakerAffiliation',
+                                    'before': aff, 'after': new_aff,
+                                    'desc': '英文姓名+单位混在同一字段（拆分为姓名+单位）',
+                                    'url': r.get('sourceUrl'), 'college': r.get('college'),
+                                    'speaker': spk, 'start': r.get('lectureStart')})
+                # 安全闸门：当前 aff 已合理（长且含机构词）则不覆盖
+                if not (aff and len(aff) >= 20 and EN_ORG_WORDS_RE.search(aff)):
+                    r['speaker'] = new_sp
+                    r['speakerAffiliation'] = new_aff
+                    if r.get('affiliation') == aff:
+                        r['affiliation'] = new_aff
+                    spk = new_sp
+                    aff = new_aff
+
+        # 2) 姓名中英混合只取中文（全库；含心理学院 6 条 + 其他双语对照 7 条）
+        if spk:
+            new_sp = speaker_zh_only(spk)
+            if new_sp and new_sp != spk:
+                changes.append({'idx': i, 'field': 'speaker', 'before': spk, 'after': new_sp,
+                                'desc': '姓名中英混合只保留中文',
+                                'url': r.get('sourceUrl'), 'college': r.get('college'),
+                                'speaker': spk, 'start': r.get('lectureStart')})
+                r['speaker'] = new_sp
+                spk = new_sp
+
+        # 3) 英文单位单词补空格（白名单 + 识别词切分）
+        if aff:
+            new_aff = en_org_split_words(aff)
+            if new_aff:
+                changes.append({'idx': i, 'field': 'speakerAffiliation',
+                                'before': aff, 'after': new_aff,
+                                'desc': '英文单位单词被合并需补空格',
+                                'url': r.get('sourceUrl'), 'college': r.get('college'),
+                                'speaker': r.get('speaker'), 'start': r.get('lectureStart')})
+                r['speakerAffiliation'] = new_aff
+                if r.get('affiliation') == aff:
+                    r['affiliation'] = new_aff
+    return changes
+
+
 def gate(field, old, new):
     """安全闸门：返回 (是否允许, 拒绝原因)"""
     if new is None:
@@ -338,6 +544,12 @@ def main():
                 # 单位双写字段同步（前端读 speakerAffiliation，历史字段 affiliation 保持一致）
                 if f2 == 'speakerAffiliation' and r.get('affiliation') == old:
                     r['affiliation'] = new
+
+    # 内容型二次扫描：英文单位补空格 / 姓名取中文 / 英文姓名+单位拆分
+    # 独立于 audit 报告，直接基于字段内容判定
+    extra = apply_extra_fixes(recs)
+    changes.extend(extra)
+    print('内容型二次扫描: %d 项' % len(extra))
 
     print('可自动修项: %d' % len(auto))
     print('拟修改: %d   真拒绝: %d   已覆盖无需重复: %d'
