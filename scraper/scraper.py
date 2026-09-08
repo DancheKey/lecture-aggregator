@@ -6,10 +6,13 @@ import json
 import time
 import yaml
 import datetime
+import random
+import threading
 import requests
 import charset_normalizer
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin, urlparse
+import urllib.robotparser  # _can_fetch() 依赖：缺失会被 except 静默吞掉，导致 robots 合规失效
 from bs4 import BeautifulSoup
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -74,20 +77,6 @@ def _decode_html(raw):
     return raw.decode('utf-8', errors='replace')
 
 
-import os
-import re
-import sys
-import json
-import time
-import yaml
-import datetime
-import random
-import threading
-import requests
-import charset_normalizer
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urljoin, urlparse
-from bs4 import BeautifulSoup
 
 # ---- 抓取礼貌性（2026-09-06）----
 # ① robots.txt：站点声明 Disallow 的路径不抓（按域名缓存一次解析结果）；
@@ -111,7 +100,11 @@ def _can_fetch(url):
             if r.status_code == 200 and r.text.strip():
                 rp = urllib.robotparser.RobotFileParser()
                 rp.parse(r.text.splitlines())
-        except Exception:
+        except Exception as e:
+            # 不静默：曾因漏写 import urllib.robotparser，AttributeError 被此 except 吞掉，
+            # 导致 robots 合规长期静默失效而无人察觉。失败必须留下痕迹。
+            print(f'[WARN] robots.txt 解析失败，按「默认允许」处理 {host}: '
+                  f'{type(e).__name__}: {e}', file=sys.stderr)
             rp = False
         with _ROBOTS_LOCK:
             _ROBOTS_CACHE[host] = rp

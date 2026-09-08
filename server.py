@@ -30,6 +30,15 @@ sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 from excluded_urls import load_excluded
 
 
+def _warn(msg):
+    """关键路径失败告警：统一打到 stderr（带时间戳），避免 except 静默吞掉问题。
+
+    只用于「数据加载/持久化/校验」等失败会造成数据丢失或静默降级的路径；
+    探测类（找解释器、构造命令参数等）保持静默，避免日志噪音。
+    """
+    print(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] [WARN] {msg}', file=sys.stderr)
+
+
 VISITS_PATH = os.path.join(DATA_DIR, 'visits.json')          # 站点访问量：{"total": N}
 LECTURE_STATS_PATH = os.path.join(DATA_DIR, 'lecture_stats.json')  # 每条讲座的访问/点赞/想听：{url:{visits,likes,wants}}
 
@@ -110,7 +119,8 @@ def _load_stat_files():
     try:
         if os.path.exists(VISITS_PATH):
             _site_visits = json.load(open(VISITS_PATH, encoding='utf-8')) or {'total': 0}
-    except Exception:
+    except Exception as e:
+        _warn(f'站点访问量加载失败，本次从 0 开始（{VISITS_PATH}）：{type(e).__name__}: {e}')
         _site_visits = {'total': 0}
     # 兼容旧格式（仅有 total，无 by_day 按日明细）；旧值仍保留为「历史遗留总数」
     if not isinstance(_site_visits.get('by_day'), dict):
@@ -118,7 +128,9 @@ def _load_stat_files():
     try:
         if os.path.exists(LECTURE_STATS_PATH):
             _lecture_stats = json.load(open(LECTURE_STATS_PATH, encoding='utf-8')) or {}
-    except Exception:
+    except Exception as e:
+        _warn(f'讲座统计加载失败，点赞/想听计数将全部归零（{LECTURE_STATS_PATH}）：'
+              f'{type(e).__name__}: {e}')
         _lecture_stats = {}
 
 
@@ -133,15 +145,15 @@ def _atomic_write_json(path, obj):
 def _save_visits():
     try:
         _atomic_write_json(VISITS_PATH, _site_visits)
-    except Exception:
-        pass
+    except Exception as e:
+        _warn(f'站点访问量写盘失败（{VISITS_PATH}）：{type(e).__name__}: {e}')
 
 
 def _save_lecture_stats():
     try:
         _atomic_write_json(LECTURE_STATS_PATH, _lecture_stats)
-    except Exception:
-        pass
+    except Exception as e:
+        _warn(f'讲座统计写盘失败（{LECTURE_STATS_PATH}）：{type(e).__name__}: {e}')
 
 
 # 讲座 sourceUrl 白名单（按 lectures.json mtime 缓存）：写统计接口仅接受已知讲座，
@@ -165,8 +177,8 @@ def _known_lecture_urls():
                 u = r.get('sourceUrl')
                 if u:
                     urls.add(str(u).rstrip('/'))
-        except Exception:
-            pass
+        except Exception as e:
+            _warn(f'讲座 URL 集合解析失败，「未知讲座」校验会降级：{type(e).__name__}: {e}')
         _lecture_urls_cache['mtime'] = mt
         _lecture_urls_cache['urls'] = frozenset(urls)
     return _lecture_urls_cache['urls']
@@ -420,11 +432,11 @@ class Handler(SimpleHTTPRequestHandler):
             key = (ip, url)
             last = _recent_lecture.get(key, 0)
             if now - last >= VISIT_THROTTLE:
-                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 st['visits'] = st.get('visits', 0) + 1
                 _recent_lecture[key] = now
                 _save_lecture_stats()
-            cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
+            cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
             payload = {'ok': True, 'visits': cur.get('visits', 0)}
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
@@ -447,10 +459,10 @@ class Handler(SimpleHTTPRequestHandler):
             last = _recent_like_action.get(key)
             if last and last[1] == 'like' and now - last[0] < LIKE_THROTTLE:
                 # 短时间内重复点赞：视为刷量，直接返回当前值，不累加
-                cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
+                cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 payload = {'ok': True, 'likes': cur.get('likes', 0), 'throttled': True}
             else:
-                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 st['likes'] = st.get('likes', 0) + 1
                 _recent_like_action[key] = (now, 'like')
                 _save_lecture_stats()
@@ -474,10 +486,10 @@ class Handler(SimpleHTTPRequestHandler):
             key = (ip, url)
             last = _recent_like_action.get(key)
             if last and last[1] == 'unlike' and now - last[0] < LIKE_THROTTLE:
-                cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0})
+                cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 payload = {'ok': True, 'likes': cur.get('likes', 0), 'throttled': True}
             else:
-                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0})
+                st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 st['likes'] = max(0, st.get('likes', 0) - 1)
                 _recent_like_action[key] = (now, 'unlike')
                 _save_lecture_stats()
