@@ -105,3 +105,14 @@ tmp_diag/
 verify_sandbox/
 # 本地调试/测试临时目录（dom.html、filter_test、mobile_test 等），不入库
 tmp/
+
+# ===== 手工备份与抓取缓存目录（体积大，绝不入库） =====
+# 形如 _bak_20260908/（存放清洗前的数据快照，本地可回溯即可）、
+# _scraped/（增量抓取的页面快照）。均为本机产物，公网无需。
+_bak_*/
+_scraped/
+
+# ===== 内部评审/清理过程文档（不公开） =====
+docs/code-review-2026-*.html
+docs/_data_cleanup_review.html
+docs/feedback-analysis-plan.html
