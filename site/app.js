@@ -48,6 +48,7 @@ const app = createApp({
       expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
       expandedAbstract: {}, // 卡片摘要的展开状态：sourceUrl -> bool（默认 3 行截断）
       expandedBio: {},      // 主讲简介的展开状态：sourceUrl -> bool（长文默认折叠）
+      tick: Date.now(),     // 秒级心跳（响应式依赖）：statusInfo 内的「即将开始」倒计时读它触发每秒重渲染
       // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
       displayTotal: 1,
       displaySource: 1,
@@ -318,11 +319,32 @@ const app = createApp({
       if (st === 'tbd') return { label: '时间待定', cls: 'bg-slate-100 text-slate-400', dot: false };
       if (st === 'ongoing') return { label: '进行中', cls: 'bg-blue-100 text-blue-700', dot: true };
       if (st === 'ended') return { label: '已结束', cls: 'bg-slate-100 text-slate-400', dot: false };
-      // upcoming：7 天内开讲标「即将开始」（橙），更远的未来标「未开始」（中性）
+      // upcoming：依赖 this.tick 触发响应式（mounted 里 setInterval 每秒更新）
+      // 混合判定：剩余不足 24 小时 → 秒级滚动（时分秒，实时跳变）；
+      // 满 24 小时 → 按「日历日差」显示整天天数（符合「本周六/星期二间隔几天」语义）
       const s = new Date(String(l.lectureStart || '').replace(' ', 'T')).getTime();
-      const days = (s - Date.now()) / 86400000;
-      return days <= 7
-        ? { label: '即将开始', cls: 'bg-orange-100 text-orange-600', dot: false }
+      const diffMs = s - this.tick;
+      const DAY = 86400000;
+      let countdown;
+      if (diffMs < DAY) {
+        // 不足 24 小时：时分秒实时滚动（不足 1 小时省略「时」）
+        const h = Math.floor(diffMs / 3600000);
+        const m = Math.floor((diffMs % 3600000) / 60000);
+        const sec = Math.floor((diffMs % 60000) / 1000);
+        countdown = h > 0
+          ? `还有 ${h} 时 ${m} 分 ${sec} 秒`
+          : `还有 ${m} 分 ${sec} 秒`;
+      } else {
+        // 满 24 小时：按日历日差（自然日边界，非剩余时长取整）
+        const sd = new Date(s), td = new Date(this.tick);
+        const dayGap = Math.round(
+          (Date.UTC(sd.getFullYear(), sd.getMonth(), sd.getDate()) -
+           Date.UTC(td.getFullYear(), td.getMonth(), td.getDate())) / DAY
+        );
+        countdown = `还有 ${dayGap} 天`;
+      }
+      return diffMs <= 7 * DAY
+        ? { label: '即将开始 · ' + countdown, cls: 'bg-orange-100 text-orange-600', dot: false }
         : { label: '未开始', cls: 'bg-slate-100 text-slate-600', dot: false };
     },
     truncate(s, maxLen) {
@@ -921,6 +943,8 @@ const app = createApp({
     this.loadLikes();
     this.loadWants();
     this.loadLectureStats();
+    // 启动秒级心跳：驱动「即将开始」徽章的倒计时（statusInfo 内读取 this.tick 触发响应式）
+    this._tickTimer = setInterval(() => { this.tick = Date.now(); }, 1000);
     // 公网静态托管不要先等 /api/lectures 超时；先秒开 latest.json，后台再补全量。
     // 本地后端（127.0.0.1/localhost）仍优先 /api/lectures，保证数据最新。
     // IPv6 回环时浏览器返回的 hostname 是「[::1]」（带方括号），一并覆盖
