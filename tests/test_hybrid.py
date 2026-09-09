@@ -94,7 +94,8 @@ class TestHybridScenarios(unittest.TestCase):
         self.assertEqual(rule_result['speaker'], '温永立')  # 保守保留规则
 
     def test_scenario_3_judge_llm(self):
-        """分歧 -> B 裁决支持 llm：仍只填空，规则已有值不被覆盖。"""
+        """分歧 -> B 裁决支持 llm：B 列名字段进入 force（可覆盖），但 speaker='李四'
+        无法通过值级溯源（不在原文）-> 闸门拦截，规则已有值保留（2026-09-09 新语义）。"""
         rule_result = self._make_result()
         provider = MockProvider(text_result={
             'speaker': {'value': '李四', 'snippet': '主讲人：温永立 教授'},
@@ -110,6 +111,39 @@ class TestHybridScenarios(unittest.TestCase):
         self.assertEqual(rule_result['llmVerdict'], 'llm')
         self.assertEqual(rule_result['speaker'], '温永立')  # 已有值不覆盖
         self.assertEqual(rule_result['abstract'], '本报告介绍深度学习的最新进展与应用。')
+
+
+class TestForceOverride(unittest.TestCase):
+    """B 裁决支持 llm 的字段走 force_fields「有闸门覆盖」（2026-09-09 新语义）。"""
+
+    def test_force_override_when_traceable(self):
+        """B 支持且 A 值可溯源 -> 覆盖规则脏值。"""
+        rule = {'speaker': '温永立清华', 'speakerAffiliation': '某某机构'}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '温永立', 'snippet': '主讲人：温永立'},
+            'speakerAffiliation': {'value': '清华大学计算机系',
+                                   'snippet': '（清华大学计算机系）'},
+        })
+        judge = MockProvider(verdict={
+            'verdict': 'llm',
+            'fields': {'speaker': '温永立', 'speakerAffiliation': '清华大学计算机系'},
+        })
+        apply_llm_text_hybrid(rule, BODY, None, provider, judge)
+        self.assertEqual(rule['speaker'], '温永立')
+        self.assertEqual(rule['speakerAffiliation'], '清华大学计算机系')
+
+    def test_force_blocked_by_trace_gate(self):
+        """B 支持但 A 值无法溯源 -> 闸门拦截，保留规则值并记 llmRejected。"""
+        rule = {'speaker': '温永立', 'speakerAffiliation': ''}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '李四', 'snippet': 'nowhere'},
+        })
+        judge = MockProvider(verdict={
+            'verdict': 'llm', 'fields': {'speaker': '李四'},
+        })
+        apply_llm_text_hybrid(rule, BODY, None, provider, judge)
+        self.assertEqual(rule['speaker'], '温永立')
+        self.assertIn('speaker', (rule.get('llmRejected') or ''))
 
 
 class TestFillEmptyOnly(unittest.TestCase):

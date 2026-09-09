@@ -73,6 +73,20 @@ MULTI_SEP_RE = re.compile(r'[、,，/&]| and | AND ')
 EN_TITLE_RE = re.compile(r'^\s*(Prof|Doctor|Dr|Professor|Mr|Ms|Mrs|Sir|Madam)\.?\s+', re.I)
 
 
+# 英文机构词（英文机构全称天然长，长度阈值单独放宽）
+EN_ORG_RE = re.compile(
+    r'University|Institute|Laboratory|Department|School|College|'
+    r'Academy|Hospital|Centre|Center|Publishing')
+# 单位首段含机构词 → 后面的职称词属头衔描述（如「北京大学博雅荣休教授、博士生导师」），
+# 2026-09-09 经用户逐条确认为合规形态，不再标脏（真脏形态如「教授，华南师大」仍会命中）
+AFF_HEAD_OK_RE = re.compile(
+    r'^[^，,、;；]*?(大学|学院|研究院|研究所|实验室|中心|系|公司|'
+    r'University|Institute|College|School|Laboratory|Center|Centre|Academy)',
+    re.I)
+# 地点建筑词：含完整楼栋/厅室的地址属正常长形态
+LOC_BLD_RE = re.compile(r'栋|楼|室|厅|馆|校区|校园|会议室|报告厅|大厦')
+
+
 def is_journal_name(a):
     """判断是否期刊/出版社误当单位。
     先剔除含 Science 的合法机构/学科名搭配，避免误伤
@@ -114,7 +128,7 @@ FIX_RULES = [
     (r'^单位中含主讲人姓名', 'auto', '去掉姓名前缀，保留机构名'),
     (r'^单位含换行', 'auto', '换行替换为空格'),
     (r'^单位含职称', 'manual', '回源页确认真实单位'),
-    (r'^疑似期刊', 'manual', '需回源页查真实所属单位，无法凭空推断'),
+    (r'^疑似期刊', 'nfix', '讲者确属期刊/出版社（如 Nature 编辑）时为合法值；需精确单位可回源页'),
     (r'^单位过长', 'manual', '人工判断是否为真实长机构名（如带重点实验室后缀）'),
     (r'^英文单词粘连', 'manual', '人工恢复空格（自动加空格易切错单词边界）'),
     (r'^时间格式非法', 'manual', '回源页重新解析时间'),
@@ -181,7 +195,9 @@ def scan(recs):
                 issues.append(('主讲人', 'speaker', '高', '括号未闭合（抓取截断）', spk, r))
             if EN_TITLE_RE.match(spk):
                 issues.append(('主讲人', 'speaker', '中', '英文名带头衔前缀', spk, r))
-            if len(spk) > 6 and re.search(r'[\u4e00-\u9fa5]', spk) and not is_multi_speaker(spk):
+            # 外文音译名含「·」为正常形态（如「克里斯蒂安·盖勒兰」），不按过长误报
+            if len(spk) > 6 and re.search(r'[\u4e00-\u9fa5]', spk) \
+                    and '·' not in spk and not is_multi_speaker(spk):
                 issues.append(('主讲人', 'speaker', '中', f'姓名过长({len(spk)}字)，疑似混入其他内容', spk, r))
             if '\n' in spk or '\t' in spk:
                 issues.append(('主讲人', 'speaker', '高', '姓名含换行/制表符', spk, r))
@@ -190,7 +206,8 @@ def scan(recs):
         if not aff:
             issues.append(('缺失', 'speakerAffiliation', '低', '单位为空', '(空)', r))
         else:
-            if TITLE_RE.search(aff):
+            # 首段含机构词时，职称词属头衔描述（「北京大学博雅荣休教授」），不标
+            if TITLE_RE.search(aff) and not AFF_HEAD_OK_RE.search(aff):
                 issues.append(('单位', 'speakerAffiliation', '高', '单位含职称/学位', aff, r))
             if is_journal_name(aff):
                 issues.append(('单位', 'speakerAffiliation', '高', '疑似期刊/出版社误当单位', aff, r))
@@ -198,7 +215,9 @@ def scan(recs):
                 issues.append(('单位', 'speakerAffiliation', '高', '单位中含主讲人姓名', aff, r))
             if has_unclosed_paren(aff):
                 issues.append(('单位', 'speakerAffiliation', '中', '括号未闭合（抓取截断）', aff, r))
-            if len(aff) > 30:
+            # 英文机构全称天然长（阈值 80）；中文多机构并列/重点实验室后缀也常见（45）
+            aff_len_limit = 80 if EN_ORG_RE.search(aff) else 45
+            if len(aff) > aff_len_limit:
                 issues.append(('单位', 'speakerAffiliation', '中', f'单位过长({len(aff)}字)', aff, r))
             # 英文单词粘连：连续 >18 个字母且无空格
             if re.search(r'[A-Za-z]{18,}', aff) and ' ' not in aff.strip():
@@ -243,9 +262,11 @@ def scan(recs):
         if not loc:
             issues.append(('缺失', 'location', '低', '地点缺失', '(空)', r))
         else:
-            if len(loc) > 40:
+            # 含建筑词且 ≤60 字 = 完整地址正常形态，豁免长度检查（正文标签仍单独检）
+            bld_ok = bool(LOC_BLD_RE.search(loc)) and len(loc) <= 60
+            if len(loc) > 40 and not bld_ok:
                 issues.append(('地点', 'location', '高', f'地点过长({len(loc)}字)，疑似正文段落混入', loc, r))
-            elif len(loc) > 30:
+            elif len(loc) > 30 and not bld_ok:
                 issues.append(('地点', 'location', '中', f'地点偏长({len(loc)}字)', loc, r))
             if LOC_LABEL_RE.search(loc):
                 issues.append(('地点', 'location', '高', '地点含正文标签/正文句子', loc, r))

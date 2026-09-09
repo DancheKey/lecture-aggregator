@@ -40,15 +40,22 @@ def _n1a_normalize(text, keep_word_boundaries=True):
     return re.sub(r'([\u4e00-\u9fff])(\s{1,2})([\u4e00-\u9fff])', _cjk_space, text)
 
 
-def _n1_normalize(text, keep_word_boundaries=True):
-    """N1 通用预处理：全角标点统一为半角（冒号/逗号/括号/斜杠/分号/引号）。"""
+def _n1_normalize(text, keep_word_boundaries=True, collapse_cjk_spaces=True):
+    """N1 通用预处理：全角标点统一为半角（冒号/逗号/括号/斜杠/分号/引号）。
+
+    collapse_cjk_spaces=False 时跳过 N1a（保留 CJK 间原始空格）。
+    用途：body_text_llm 旁路——LLM（模型 A/B）需要看到未折叠的原文证据
+    （如「彭斌 中学数学高级教师」的姓名/职称边界空格），否则 B 的
+    「原文支持」判定天然缺证据（idx772 实测教训，2026-09-09）。
+    """
     if not text:
         return text
     repl = {'：': ':', '，': ',', '（': '(', '）': ')', '／': '/', '【': '[', '】': ']',
             '；': ';', '“': '"', '”': '"', '‘': "'", '’': "'", '　': ' '}
     for k, v in repl.items():
         text = text.replace(k, v)
-    text = _n1a_normalize(text, keep_word_boundaries)  # N1a：去 CJK 内部空格
+    if collapse_cjk_spaces:
+        text = _n1a_normalize(text, keep_word_boundaries)  # N1a：去 CJK 内部空格
     return text
 
 
@@ -137,6 +144,8 @@ def _clean_ocr_text(ocr_text):
 # 或非有效人名（长度<2、纯数字标点、纯英文职称/单位），则视为无效，返回 False。
 _NON_NAME_TOKENS = [
     '作为', '首席', '主讲', '报告', '学院', '大学', '邀请', '专家', '嘉宾', '简介', '简历',
+    # 中小学也非人名词根（idx772「彭斌中学」曾因缺此二词被人名守卫放行，2026-09-09）
+    '中学', '小学', '初中', '高中',
     '主持', '致辞', '出席', '参加', '单位', '教授', '研究员', '博士', '老师', '先生', '女士',
     '学术', '讲座', '报告会', '工作坊', '论坛', '沙龙', '研讨会', '讲坛', '座谈会', '时间',
     '地点', '主题', '题目', '摘要', '内容', '来源', '发布', '承办', '协办', '主办', '科学',
@@ -317,6 +326,18 @@ def _is_plausible_han_name(s):
 # 纳入会导致把简介里被介绍的人误当主讲人。
 _SPEAKER_TITLE = (r'(?:特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|助理研究员|研究员|'
                   r'教授|讲师|博士后|博士|院士|老师|导师|先生|女士)')
+
+# 完整职称交替式（单一事实源，2026-09-09）：供 ①尾部职称剥离（3720/3846 两处）
+# ②姓名后残文的头部职称剥离 复用。含「学段+学科+高级职称」复合形态——
+# 「中学数学高级教师」类复合职称若只剥「高级教师」会把「中学数学」残留在姓名里
+# （idx772 speaker='彭斌中学' 实测教训）。
+_TITLE_ALT_FULL = (
+    r'(?:高级实验师|高级讲师|高级教师|高级工程师|高级会计师|高级经济师|特级教师'
+    r'|实验师|工程师|会计师|经济师'
+    r'|(?:(?:中学|小学|初中|高中)(?:数学|语文|英语|物理|化学|生物|政治|历史|地理|科学|美术|音乐|体育|信息技术)?'
+    r'|数学|语文|英语|物理|化学|生物|政治|历史|地理|科学|美术|音乐|体育)?高级(?:教师|讲师|实验师|工程师|会计师|经济师)'
+    r'|特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)'
+)
 
 # O6d-2.5 边界字符类：候选姓名词两侧须为「空白或标点」。同时覆盖 ASCII 与全角
 # （之前版本漏了 ASCII 逗号 ','，导致「张世海,」这类紧邻半角逗号的名字整组漏匹配）。
@@ -2977,9 +2998,16 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         content_div = _first if _first_len >= 80 else _best
     body_text = content_div.get_text(' ') if content_div else text
     body_text = re.sub(r'\s+', ' ', body_text).strip()
+    # LLM 证据旁路：保留 CJK 间原始空格的版本，专供模型 A/B 与溯源闸门使用。
+    # 折叠版 body_text 仍服务纯规则正则（「张三 教授」→「张三教授」剥离依赖），
+    # 但把折叠版喂给 A/B 会灭失姓名/职称边界证据，使 B 的「原文支持」判定失效
+    # （idx772「彭斌 中学数学高级教师」实测教训，2026-09-09）。
+    body_text_llm = _n1_normalize(body_text, collapse_cjk_spaces=False)
     body_text = _n1_normalize(body_text)  # N1：全角标点统一为半角
     body_text = _normalize_label_text(body_text)
     body_text = _strip_footer(body_text)
+    body_text_llm = _normalize_label_text(body_text_llm)
+    body_text_llm = _strip_footer(body_text_llm)
     # JS 渲染站点（如 maths/physics）的正文容器可能只含导航骨架，但 meta description
     # 中保存了完整讲座摘要。即便 content_div 已命中，也要把 meta 摘要补进 body_text，
     # 保证 LLM/OCR 能读到主讲人/时间/地点等关键字段。
@@ -2992,6 +3020,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         if not _meta_head or _meta_head not in re.sub(r'\s+', '', body_text):
             body_text = body_text + ' ' + ' '.join(meta_parts)
             body_text = re.sub(r'\s+', ' ', body_text).strip()
+            body_text_llm = body_text_llm + ' ' + ' '.join(meta_parts)
+            body_text_llm = re.sub(r'\s+', ' ', body_text_llm).strip()
     ocr_text = ''
     # 提前从 URL 解析年份/完整日期（供 OCR 图片年份门控、CV1 校验、最终兜底共用）
     url_year = _year_from_url(url)
@@ -3121,6 +3151,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                         _pdf_text = '\n'.join(_pages_text)
                         if _pdf_text:
                             body_text = body_text + '\n' + _pdf_text
+                            body_text_llm = body_text_llm + '\n' + _pdf_text
                             text = text + '\n' + _pdf_text
                         # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
                         # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
@@ -3154,7 +3185,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
-        nonlocal ocr_text, body_text, text
+        nonlocal ocr_text, body_text, body_text_llm, text
         candidates = imgs[:3] + _pdf_local_imgs
         if ocr_text or not candidates:
             return
@@ -3170,6 +3201,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             ocr_text = _ocr_char_fix(ocr_text)
             # 重新归一化标签（N1/N1e），使 OCR 文本里的中英文标签也能被正确扫描
             body_text = _normalize_label_text((body_text + ' ' + ocr_text).strip())
+            body_text_llm = _normalize_label_text((body_text_llm + ' ' + ocr_text).strip())
             text = _normalize_label_text((text + ' ' + ocr_text).strip())
 
     # 纯海报页（正文几乎为空 / 正文虽长但全是 CMS 元信息无结构化讲座标签）
@@ -3697,7 +3729,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 # CJK：折叠空格、去尾部职称，取头部 2~4 字人名
                 if re.search(r'[\u4e00-\u9fff]', sp):
                     sp = re.sub(r'\s+', '', sp)
-                sp_clean = re.sub(r'\s*(?:高级实验师|高级讲师|高级教师|高级工程师|高级会计师|高级经济师|实验师|工程师|会计师|经济师|特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', sp).strip()
+                sp_clean = re.sub(r'\s*' + _TITLE_ALT_FULL + r'.*$', '', sp).strip()
                 # 从 4 字到 2 字降序尝试，取最长有效姓名。
                 # 原「{2,4}」贪婪匹配后只做一次守卫：当 4 字无效时无法回退到 3 字/2 字，
                 # 导致「陈玺上海大学…」被整个当成 speaker。
@@ -3732,6 +3764,12 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                                 rest = sp[len(name):].strip()
                     result['speaker'] = name
                     if rest and len(rest) > 2:
+                        # 姓名后残文若以复合职称开头（如「中学数学高级教师(邀请人…)广州外国语学校」），
+                        # 先剥头部职称再提单位——否则职称残文会被 _extract_affiliation 当单位
+                        # （idx772 speakerAffiliation='数学高级教师' 实测教训，2026-09-09）。
+                        _rest_stripped = re.sub(r'^' + _TITLE_ALT_FULL + r'\s*', '', rest)
+                        if _rest_stripped and _rest_stripped != rest:
+                            rest = _rest_stripped
                         result['speakerAffiliation'] = _extract_affiliation(rest)
                 elif sp_clean:
                     result['speaker'] = sp_clean
@@ -3823,7 +3861,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                     if re.search(r'[\u4e00-\u9fff]', sp):
                         sp = re.sub(r'\s+', '', sp)
                     # 去掉尾部职称后缀
-                    sp_clean = re.sub(r'\s*(?:高级实验师|高级讲师|高级教师|高级工程师|高级会计师|高级经济师|实验师|工程师|会计师|经济师|特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', sp).strip()
+                    sp_clean = re.sub(r'\s*' + _TITLE_ALT_FULL + r'.*$', '', sp).strip()
                     # 尝试拆分姓名+单位（括号形式）
                     mm = re.match(r'(.+?)\s*[（(]([^）)]{2,40})[）)]', sp)
                     if mm:
@@ -4596,6 +4634,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 apply_llm_text_hybrid(result, body_text, url, _provider, _judge,
                                       default_year, publish_time, title_year, url_year,
                                       rich_only=not _USE_LLM_TEXT,
+                                      llm_text=body_text_llm,
                                       title_text=' '.join(
                                           x for x in (list_title or '', title or '')
                                           if x))
