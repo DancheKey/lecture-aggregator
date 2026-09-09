@@ -127,6 +127,15 @@ def _split_speakers(s):
 # 主要结构比较：返回差异字段列表（空 = 一致）
 # 只在"两者都能产出"的共同字段上比较，规则缺失的字段不报差异（否则每页都误触发）。
 # ---------------------------------------------------------------------------
+def _norm_aff(s):
+    """单位比较归一化：去空白/全角转半角/小写/去常见标点，避免标点与写法差异误报分歧。
+    不能复用 _norm_location（它会把「华南师范大学」等剥空，单位恰是机构名本身）。"""
+    if not s:
+        return ''
+    s = _norm_for_match(str(s)).lower()
+    return re.sub(r'[，,。.\s、;；:：()（）\-—]+', '', s)
+
+
 def compare_struct(rule, llm):
     diffs = []
     rs, ls = _split_speakers(rule.get('speaker')), _split_speakers(llm.get('speaker'))
@@ -140,6 +149,10 @@ def compare_struct(rule, llm):
         diffs.append('location')
     if rule.get('topic') and llm.get('topic') and not _similar_topic(rule.get('topic'), llm.get('topic')):
         diffs.append('topic')
+    # 单位（2026-09-09 新增）：双方都有值才比较（规则空仍走仅填空通道，行为不变）
+    ra, la = _norm_aff(rule.get('speakerAffiliation')), _norm_aff(llm.get('speakerAffiliation'))
+    if ra and la and ra != la:
+        diffs.append('speakerAffiliation')
     return diffs
 
 
@@ -478,8 +491,13 @@ def _try_fill_speaker(result, a, trace_text):
 
 def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=None,
                          title_year=None, url_year=None, rich_only=False,
-                         extra_source=''):
+                         extra_source='', force_fields=None):
     """仅填空融合：规则已有值的字段一律不动（铁律：不破坏已提取值）。
+
+    例外（2026-09-09）：force_fields 中的字段允许「有闸门覆盖」——模型 B 裁决明确
+    支持 llm 的字段可跳过仅填空，但仍必须通过溯源/合法性闸门（speaker 值级溯源、
+    单位 _is_valid_affiliation、其余 snippet 溯源），闸门不过照样拒绝并记 llmRejected。
+    与 2026-09-05 回退的「A 主导覆盖」（无裁决无闸门）不同，此处是 B 裁决+闸门双保险。
 
     规则为空才考虑 A 的值，且必须通过 snippet 溯源闸门；被闸门拦下的字段名
     记入 llmRejected，便于事后统计 A 的幻觉率。含 abstract/speakerBio——
@@ -493,14 +511,16 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
     """
     rejected = []
     adopted = []
+    _force = force_fields or frozenset()
     _fields = _RICH_FIELDS if rich_only else _ALL_FIELDS
     # speaker 溯源范围 = 正文 + 标题（见 apply_llm_text_hybrid 的 title_text 说明）
     _trace_text = (body_text or '') + ' ' + (extra_source or '')
     for fld in _fields:
         cur = (result.get(fld) or '').strip()
         lv = (a.get(fld) or '').strip()
-        # 仅填空：规则已有值的字段一律保留（含摘要/简介，2026-09-05 修订）
-        if cur and cur not in _NOISE:
+        # 仅填空：规则已有值的字段一律保留（含摘要/简介，2026-09-05 修订）；
+        # 例外：B 裁决明确支持 llm 的字段（force_fields）继续走下方闸门后覆盖
+        if cur and cur not in _NOISE and fld not in _force:
             continue
         if fld in ('abstract', 'speakerBio'):
             # A 仅在规则为空时补全；值须先截断到段落边界（去溢出），再经 snippet
@@ -592,7 +612,7 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
 def apply_llm_text_hybrid(result, body_text, url, provider, judge,
                           default_year=None, publish_time=None,
                           title_year=None, url_year=None, rich_only=False,
-                          title_text=''):
+                          title_text='', llm_text=None):
     """双轨解析 + 分歧裁决。原地修改 result 并打溯源标记，返回 result。
 
     provider: 模型 A（ModelProvider）；judge: 裁决模型 B（ModelProvider 或 None）。
@@ -602,6 +622,10 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
         物理学院「学术报告（第N期）XX大学李永强教授」）主讲人只写在标题里，
         正文根本没有姓名，A 从标题读到的是真实信息，其 snippet 在 body_text 中
         匹配不上会被误判为幻觉。标题是页面自有文本，属合法出处。
+    llm_text: 未折叠原文（保留 CJK 间空格）。A 提取、B 裁决与溯源闸门统一以
+        此为证据源；为空则回落 body_text。规则正则依赖的折叠版 body_text
+        不再喂给 LLM——否则「彭斌 中学数学高级教师」这类姓名/职称边界空格
+        在 A/B 看到之前就灭失，B 的「原文支持」判定天然缺证据（idx772 教训）。
     """
     result['llmTextEnhanced'] = False
     result['llmVerdict'] = None
@@ -610,12 +634,16 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
     if provider is None:
         return result  # 无模型可用 -> 纯规则保底
 
+    # LLM 证据源：优先未折叠原文；溯源闸门 _norm_for_match 会去掉全部空白，
+    # 故折叠/未折叠文本对闸门等价，但未折叠文本保留了姓名/职称边界证据。
+    llm_src = (llm_text or '').strip() or (body_text or '')
+
     # ⚠ 老页面单行折叠问题（如 physics/20110112/791.html）：
     # body_text 被折叠成单行后，「讲座人:高兴森教授,张飞时 间:...」会被 LLM 误当
     # 两个人名（高兴森+张飞），导致 speaker='张飞' 或 'Xingsen Gao'。
     # 修复：在「时间/地点/题目/摘要/主讲/报告」等字段关键词前插入换行，
     # 让 LLM 按行读取，正则截断到换行符即可正确终止。
-    _body_text_fixed = re.sub(r'(?<=.)(\s*)(时\s*间|地\s*点|题\s*目|摘\s*要|主讲|报告|演讲|嘉宾|邀请)[：:\s]', r'\n\2:', body_text or '')
+    _body_text_fixed = re.sub(r'(?<=.)(\s*)(时\s*间|地\s*点|题\s*目|摘\s*要|主讲|报告|演讲|嘉宾|邀请)[：:\s]', r'\n\2:', llm_src)
 
     a_raw = None
     try:
@@ -632,7 +660,7 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
     if rich_only:
         # 丰富字段模式：直接 only-fill abstract/speakerBio/职称/单位，
         # 不比较结构字段、不调 B，结构字段完全由规则主导。
-        adopted = _merge_a_into_result(result, a, body_text, default_year, publish_time,
+        adopted = _merge_a_into_result(result, a, llm_src, default_year, publish_time,
                                        title_year, url_year, rich_only=True,
                                        extra_source=title_text)
         if adopted:
@@ -643,7 +671,7 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
     diffs = compare_struct(result, a)
     if not diffs:
         # 一致：仅填空融合（规则已有值不覆盖）
-        adopted = _merge_a_into_result(result, a, body_text, default_year, publish_time,
+        adopted = _merge_a_into_result(result, a, llm_src, default_year, publish_time,
                                        title_year, url_year, extra_source=title_text)
         result['llmVerdict'] = 'consistent'
         if adopted:
@@ -666,8 +694,15 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
 
     # 保守偏向规则：仅当 B 明确支持 llm 且给出采纳字段时才采用 A
     if verdict.get('verdict') == 'llm' and verdict.get('fields'):
-        adopted = _merge_a_into_result(result, a, body_text, default_year, publish_time,
-                                       title_year, url_year, extra_source=title_text)
+        # B 明确支持的字段允许「有闸门覆盖」（2026-09-09）：fields 形态兼容
+        # {field: 值} 与 {field: 'llm'} 两种；值明确为 rule/unknown 的不进 force
+        vf = verdict.get('fields') or {}
+        force = {f for f, v in vf.items()
+                 if f in _ALL_FIELDS
+                 and str(v).strip().lower() not in ('rule', 'unknown', '')}
+        adopted = _merge_a_into_result(result, a, llm_src, default_year, publish_time,
+                                       title_year, url_year, extra_source=title_text,
+                                       force_fields=force)
         if adopted:
             result['llmTextEnhanced'] = True
             if 'speaker' in adopted:
