@@ -16,7 +16,8 @@
 import re
 from datetime import datetime, date
 
-PERIOD_OFFSET = {'上午': 0, '早上': 0, '中午': '中午', '下午': 12, '晚上': 12, '傍晚': 12}
+PERIOD_OFFSET = {'上午': 0, '早上': 0, '中午': '中午', '下午': 12, '晚上': 12, '傍晚': 12,
+                 '晚': 12}
 
 FULL_PATTERNS = [
     r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]',
@@ -83,7 +84,7 @@ def _build(m, seg, y, mo, d):
         return None
     seg = seg[m.start():]
     period = 0
-    pm = re.search(r'(上午|早上|中午|下午|晚上|傍晚)', seg)
+    pm = re.search(r'(上午|早上|中午|下午|晚上|傍晚|晚)', seg)
     if pm:
         period = PERIOD_OFFSET[pm.group(1)]
     # 时钟时间抽取（支持 冒号 / 中文点 / 中英混排 am·pm 前缀或后缀，大小写）：
@@ -130,6 +131,19 @@ def _build(m, seg, y, mo, d):
         if _valid(h1_raw, m1_raw):
             h1 = _final_hh(h1_raw, s1)
             end = datetime(y_i, mo_i, d_i, h1, m1_raw)
+            # 「下午 09:00-12:00」型（ctld598，2026-09-10 用户裁定自动纠正）：
+            # 时段词与数字矛盾——+12 偏移使区间倒挂（end <= start），而按数字
+            # 字面量是合理上午段（起点 7-11 点、时长 0-8 小时）→ 数字优先，
+            # 时段词视为发布者笔误。不误伤：
+            #   「晚7：30-9：00」两时刻均 +12 后 19:30-21:00 正挂 → 不触发；
+            #   「下午2:30-4:00」字面 02:30 起点为凌晨不合理 → 不触发，照常 +12。
+            # 带显式 am/pm 后缀的时刻各按自身后缀处理，不进此分支。
+            if (period == 12 and not s0 and not s1 and end <= start
+                    and 7 <= h0_raw < 12):
+                lit = (h1_raw * 60 + m1_raw) - (h0_raw * 60 + m0_raw)
+                if 0 < lit <= 8 * 60:
+                    start = datetime(y_i, mo_i, d_i, h0_raw, m0_raw)
+                    end = datetime(y_i, mo_i, d_i, h1_raw, m1_raw)
     return {'start': start, 'end': end, 'has_time': True}
 
 

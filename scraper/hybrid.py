@@ -489,19 +489,72 @@ def _try_fill_speaker(result, a, trace_text):
     return True
 
 
+# ---------------------------------------------------------------------------
+# 规则值污染检测（audit_data_quality 核心规则子集，2026-09-09）：
+# 「仅填空」保护的是干净值，不是任何非空值。规则值被判定为形态学污染
+# （超长/括号不闭合/混入职称·机构·正文标签）时，该字段开放给 A 重建，
+# 仍须过溯源/合法性闸门——闸门不过照样保留规则值。背景：存量「规则=A=
+# 同一污染值」病例（idx2747 地点混简介、idx2185 单位混任职经历、idx2932
+# 姓名括号截断、idx2635 姓名被机构名顶替）被「仅填空+保守裁决」共同锁死。
+# ---------------------------------------------------------------------------
+_DIRTY_TITLE_RE = re.compile(
+    r'(教授|副教授|研究员|副研究员|助理研究员|讲师|院士|博士后|博导|硕导|'
+    r'院长|副院长|所长|主任|副校长|校长|书记|主编|编委|委员|会员|'
+    r'Prof\.?|Professor|Dr\.?|Director|Dean|Chair)', re.I)
+_DIRTY_ORG_RE = re.compile(
+    r'(大学|学院|研究院|研究所|实验室|研究中心|公司|集团|'
+    r'University|Institute|College|School|Academy|Laboratory)', re.I)
+_DIRTY_LOC_LABEL_RE = re.compile(
+    r'(主办|承办|协办|报告人|主讲人|主持人|摘要|报告题目|内容简介|嘉宾介绍|'
+    r'嘉宾简介|议程|日程|联系人|会议号|会议 ?ID|腾讯会议|Zoom|欢迎各位|主办单位)')
+_AFF_ORG_HEAD_RE = re.compile(
+    r'^[^，,、;；]{0,30}?(大学|学院|研究院|研究所|实验室|中心|系|'
+    r'University|Institute|College|School)', re.I)
+
+
+def _is_dirty_value(fld, v):
+    """规则值形态学污染检测：True 则该字段不受「仅填空」保护（走闸门后可覆盖）。"""
+    if not v or not isinstance(v, str):
+        return False
+    if fld == 'speaker':
+        if _DIRTY_TITLE_RE.search(v) or _DIRTY_ORG_RE.search(v):
+            return True
+        if v.count('(') != v.count(')') or v.count('（') != v.count('）'):
+            return True
+        if len(v) > 6 and re.search(r'[\u4e00-\u9fa5]', v) and '·' not in v:
+            return True
+        return False
+    if fld == 'speakerAffiliation':
+        if _DIRTY_TITLE_RE.search(v) and not _AFF_ORG_HEAD_RE.search(v):
+            return True
+        if len(v) > (80 if re.search(r'[A-Za-z]', v) else 45):
+            return True
+        if v.count('(') != v.count(')') or v.count('（') != v.count('）'):
+            return True
+        return False
+    if fld == 'location':
+        if len(v) > 60:
+            return True
+        if _DIRTY_LOC_LABEL_RE.search(v):
+            return True
+        if re.search(r'[A-Za-z]{25,}', v):
+            return True
+        return False
+    return False
+
+
 def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=None,
                          title_year=None, url_year=None, rich_only=False,
                          extra_source='', force_fields=None):
     """仅填空融合：规则已有值的字段一律不动（铁律：不破坏已提取值）。
 
-    例外（2026-09-09）：force_fields 中的字段允许「有闸门覆盖」——模型 B 裁决明确
+    例外一（2026-09-09）：force_fields 中的字段允许「有闸门覆盖」——模型 B 裁决明确
     支持 llm 的字段可跳过仅填空，但仍必须通过溯源/合法性闸门（speaker 值级溯源、
     单位 _is_valid_affiliation、其余 snippet 溯源），闸门不过照样拒绝并记 llmRejected。
     与 2026-09-05 回退的「A 主导覆盖」（无裁决无闸门）不同，此处是 B 裁决+闸门双保险。
-
-    规则为空才考虑 A 的值，且必须通过 snippet 溯源闸门；被闸门拦下的字段名
-    记入 llmRejected，便于事后统计 A 的幻觉率。含 abstract/speakerBio——
-    2026-09-05 起回退 A 主导实验（maths 8806 脏值覆盖事故），全部字段一律仅填空。
+    例外二（2026-09-09）：规则值被 _is_dirty_value 判定为形态学污染的字段同样
+    不受仅填空保护（仅限 speaker/speakerAffiliation/location），仍走同一套闸门。
+    「不破坏已提取值」的本意是不破坏干净值，被污染的值不在此列。
     rich_only=True 时只处理丰富/补全型字段（abstract/speakerBio/职称/单位），
     不碰结构字段（speaker/topic/location），确保结构字段完全由规则主导。
     extra_source：额外合法出处文本（页面标题）。speaker 溯源时与正文一并参与匹配，
@@ -519,8 +572,12 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
         cur = (result.get(fld) or '').strip()
         lv = (a.get(fld) or '').strip()
         # 仅填空：规则已有值的字段一律保留（含摘要/简介，2026-09-05 修订）；
-        # 例外：B 裁决明确支持 llm 的字段（force_fields）继续走下方闸门后覆盖
-        if cur and cur not in _NOISE and fld not in _force:
+        # 例外一：B 裁决明确支持 llm 的字段（force_fields）继续走下方闸门后覆盖；
+        # 例外二：规则值形态学污染且 A 值干净的字段走闸门后重建（B 对脏值的
+        #         裁决实测不稳定——idx2747 两轮 llm/rule 翻转，形态学确凿的
+        #         错误不能因 B 的随机保守而锁死；双方都脏则保留规则不动）
+        if cur and cur not in _NOISE and fld not in _force \
+                and not (_is_dirty_value(fld, cur) and not _is_dirty_value(fld, lv)):
             continue
         if fld in ('abstract', 'speakerBio'):
             # A 仅在规则为空时补全；值须先截断到段落边界（去溢出），再经 snippet
@@ -643,7 +700,12 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
     # 两个人名（高兴森+张飞），导致 speaker='张飞' 或 'Xingsen Gao'。
     # 修复：在「时间/地点/题目/摘要/主讲/报告」等字段关键词前插入换行，
     # 让 LLM 按行读取，正则截断到换行符即可正确终止。
-    _body_text_fixed = re.sub(r'(?<=.)(\s*)(时\s*间|地\s*点|题\s*目|摘\s*要|主讲|报告|演讲|嘉宾|邀请)[：:\s]', r'\n\2:', llm_src)
+    # 2026-09-09：llm_text 已改传保留块级结构的分行原文（真实网页形态），
+    # 此时插行 hack 反而会把行内自然出现的「报告/嘉宾」等词误切新行，跳过。
+    if '\n' in llm_src:
+        _body_text_fixed = llm_src
+    else:
+        _body_text_fixed = re.sub(r'(?<=.)(\s*)(时\s*间|地\s*点|题\s*目|摘\s*要|主讲|报告|演讲|嘉宾|邀请)[：:\s]', r'\n\2:', llm_src)
 
     a_raw = None
     try:
@@ -713,6 +775,16 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
         # compare_struct 中不算分歧，若不单独补，只要时间/地点任一字段有分歧，
         # A 从标题里正确读到的主讲人就会被连带丢弃（如物理学院「学术报告（第N期）
         # 国防科技大学李永强教授」——姓名只写在标题里）。
+        # 2026-09-09 追加：形态学确凿污染的字段（规则值脏）仍走闸门重建——
+        # B 对脏值的裁决实测不稳定（idx2747 两轮 llm/rule 翻转），不能让
+        # 127 字地点这类确凿错误因 B 的随机保守而锁死。非脏字段不受影响
+        # （_merge_a_into_result 的脏值豁免要求「规则脏且 A 干净」才覆盖）。
+        adopted = _merge_a_into_result(result, a, llm_src, default_year, publish_time,
+                                       title_year, url_year, extra_source=title_text)
+        if adopted:
+            result['llmTextEnhanced'] = True
+            if 'speaker' in adopted:
+                result['speakerSource'] = 'llm'
         _trace = (_body_text_fixed or '') + ' ' + (title_text or '')
         if _try_fill_speaker(result, a, _trace):
             result['llmFilled'] = 'speaker'
