@@ -258,3 +258,113 @@ def trim_dangling_unit_prefix(value):
     if not value:
         return value
     return re.sub(r'[。．.！!；;]\s*(?:组织|主办|承办|协办|支持|指导)$', '', str(value)).strip()
+
+
+# ===========================================================================
+# 语义词表：职称 / 行政职务 / 尊称（G4 收敛，2026-09-10）
+#
+# 收敛前同一类词表在 5+ 处各写各的：
+#   parsers._ORG_TITLE_SUFFIXES（16 项职务）+ 倒装职务正则内联同一份表
+#   hybrid._SPEAKER_TITLE_NOISE / _AFFIL_INVALID / _TITLE_RE / 尾部剥离正则 ×3 / _DIRTY_TITLE_RE
+#   scripts/audit_fields._AFFIL_TITLE_ONLY
+#   server._speaker_keys / scripts/generate_frontend_data.speaker_keys
+# 新增一个职称要改 5 处，漏改即产生「某模块认识、某模块不认识」的静默分叉
+# （C2 多主讲人误判、C3 守卫缺失即由此暴露）。现统一在此定义，各处按语义组合引用。
+#
+# 注意：本块只影响「姓名/单位的职称剥离与判脏」，不参与摘要边界截断，
+# 故**不递增 VOCAB_VERSION**（不触发 LLM 文本缓存失效）。
+# ===========================================================================
+
+# A) 学术职称/称号后缀。剥离姓名尾部职称时用；顺序须长词优先。
+#    内容与 server/generate 原 speaker_keys 表逐字一致（收敛不得改变既有行为）。
+NAME_TITLE_SUFFIXES = (
+    '博士生导师', '硕士生导师', '特聘教授', '特任教授', '长聘教授', '副教授',
+    '助理教授', '副研究员', '助理研究员', '研究员', '教授', '讲师', '博士后',
+    '博士', '院士', '老师', '导师',
+)
+
+# B) 行政职务后缀。用于「倒装职务 → 机构名」推导，以及单位尾部的职务剥离。
+#    ⚠ 复合职务必须整体成词且排在单体之前，否则会被单体截断：
+#    「总经理」被「经理」截成「总」、「副校长」被「校长」截成「副」、
+#    「主任医师」被「主任」截成「医师」。
+ORG_TITLE_SUFFIXES = (
+    '副总编辑', '副主任', '副校长', '副会长', '总经理', '主任医师', '副主任医师',
+    '总编辑', '主任', '处长', '院长', '所长', '科长', '局长', '部长', '总监',
+    '经理', '工程师', '书记', '主席', '顾问', '会长',
+)
+
+# C) 通用尊称
+HONORIFIC_SUFFIXES = ('先生', '女士')
+
+# 尾部剥离用超集：姓名/单位末尾出现即应去掉的职称、职务、尊称字样。
+TAIL_TITLE_SUFFIXES = NAME_TITLE_SUFFIXES + ORG_TITLE_SUFFIXES + HONORIFIC_SUFFIXES
+
+# 机构性单位结尾词：判断「XX 中心主任」里的 XX 是否为机构名
+# （parsers._derive_org_from_title 用）。
+ORG_UNIT_ENDS = (
+    '中心', '总公司', '学院', '院', '系', '所', '处', '局', '部', '公司', '集团',
+    '大学', '办公室', '馆', '站', '室', '社', '刊', '报', '台',
+)
+
+
+def _alt(words):
+    """构造「备选词」正则片段：长度降序 + `(?:...)` 分组。
+
+    ⚠️ 分组不可省：`'a|b$'` 的 `$` 只绑定最后一个分支 b，前面的 a 会退化成
+    任意位置匹配（G4 收敛时实测踩到此坑，见 docs 记录）。
+    """
+    return '(?:' + '|'.join(re.escape(w) for w in sorted(set(words), key=len, reverse=True)) + ')'
+
+
+NAME_TITLE_SUFFIX_RE = re.compile(_alt(NAME_TITLE_SUFFIXES))
+ORG_TITLE_SUFFIX_RE = re.compile(_alt(ORG_TITLE_SUFFIXES))
+TAIL_TITLE_RE = re.compile(_alt(TAIL_TITLE_SUFFIXES) + '$')
+# 整串**仅由**职称/职务/尊称构成（可重复），如「教授」「副教授研究员」。
+# 显式带 ^...$：调用方可能用 match / search / fullmatch，锚定后三者语义一致。
+TITLE_ONLY_RE = re.compile('^(?:' + _alt(TAIL_TITLE_SUFFIXES) + ')+$')
+
+
+def strip_name_title_suffix(name):
+    """去掉姓名尾部的**一个**职称/称号后缀（长词优先）。
+
+    与旧 server._speaker_keys / generate.speaker_keys 内的循环逐字等价；
+    按长度降序比较，保证「副教授」先于「教授」命中（否则会截成「张三副」）。
+    """
+    if not name:
+        return name
+    t = str(name)
+    for s in sorted(set(NAME_TITLE_SUFFIXES), key=len, reverse=True):
+        if t.endswith(s) and len(t) > len(s):
+            return t[:-len(s)]
+    return t
+
+
+def split_speaker_names(raw):
+    """按 `[、,，/]` 拆分多人姓名并去空白。"""
+    return [p.strip() for p in re.split(r'[、,，/]', str(raw)) if p.strip()]
+
+
+def speaker_keys(name):
+    """讲者归一化键：全角转半角、去职称后缀；英文 lower；多人逐人拆键。
+
+    本函数是 server.py `_speaker_keys` 与 scripts/generate_frontend_data.py
+    `speaker_keys()` 的**唯一实现**——两者必须严格一致（前端一致性守卫测试会
+    拦截部署），收敛到此处后天然一致，不会再出现两侧漂移。
+    """
+    if not name:
+        return []
+    t = ''.join(chr(ord(c) - 0xFEE0) if 0xFF01 <= ord(c) <= 0xFF5E else c for c in str(name))
+    t = strip_name_title_suffix(t)
+    keys = []
+    for part in split_speaker_names(t):
+        if re.search(r'[A-Za-z]', part):
+            part = part.lower()
+        keys.append(part)
+    return keys
+
+
+def is_title_only(value):
+    """整串是否**仅**由职称/职务/尊称构成——用于拒绝把职称当单位/姓名的脏值。"""
+    if not value:
+        return False
+    return bool(TITLE_ONLY_RE.fullmatch(str(value).strip()))

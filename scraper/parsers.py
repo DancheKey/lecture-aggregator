@@ -7,7 +7,9 @@ import unicodedata
 import requests
 from urllib.parse import urljoin, unquote, urlparse
 from bs4 import BeautifulSoup
-from timeparse import parse_cn_time, _year_from_text, resolve_lecture_time, _date_from_title
+from timeparse import (parse_cn_time, _year_from_text, resolve_lecture_time,
+                       _date_from_title, is_reasonable_span as _is_reasonable_span,
+                       COLLAPSED_SHIFT_MAX_MINUTES)
 import field_vocab as _fv  # 字段边界统一词表（单一事实源）
 
 # N1a / O3a（2026-07-20 修正）— CJK 间空格不再无脑删除：
@@ -306,12 +308,10 @@ def _looks_like_real_name(s):
 # 倒装职务推导机构名（2026-09-09，idx2635）：无法自动补校名时，取职务里的机构作
 # 为 affiliation，如「网络中心主任 林南晖」→ affiliation=网络中心。仅在倒装分支、
 # affiliation 为空时调用（仅填空，不覆盖已有干净值）。
-_ORG_TITLE_SUFFIXES = ('主任', '处长', '院长', '所长', '科长', '局长', '部长',
-                       '总监', '经理', '工程师', '书记', '主席', '总编辑', '顾问',
-                       '副会长', '会长')
-_ORG_UNIT_ENDS = ('中心', '总公司', '学院', '院', '系', '所', '处', '局', '部',
-                  '公司', '集团', '大学', '办公室', '馆', '站', '室', '社', '刊',
-                  '报', '台')
+# 职务/机构结尾词表已收敛到 field_vocab（G4，2026-09-10）——改词表请改
+# scraper/field_vocab.py，勿在此处再开副本（曾出现「某模块认识某职称、别处不认识」的分叉）。
+_ORG_TITLE_SUFFIXES = _fv.ORG_TITLE_SUFFIXES
+_ORG_UNIT_ENDS = _fv.ORG_UNIT_ENDS
 
 
 def _derive_org_from_title(title):
@@ -2727,8 +2727,10 @@ def _cross_validate(result, url_date, ocr_text, publish_time, url_year):
                 # 第二时刻没有。先尝试 end+12h——若由此得到的时长合理（≤6h），
                 # 说明是偏移缺失而非字段颠倒，修正 end 而不是 swap。
                 # （idx2924「晚7:30-9:00」旧逻辑 swap 成 09:00-19:30，彻底颠倒）
+                # 判据与阈值统一在 timeparse（C5，2026-09-10），与 §_parse_segment
+                # 的同类裁决共用一处定义，改阈值只需改 timeparse。
                 en12 = en + datetime.timedelta(hours=12)
-                if datetime.timedelta(0) < en12 - st <= datetime.timedelta(hours=6):
+                if _is_reasonable_span(st, en12, COLLAPSED_SHIFT_MAX_MINUTES):
                     result['lectureEnd'] = en12.strftime('%Y-%m-%d %H:%M:%S')
                     notes.append('cv-end-plus-12h-pm-inherit')
                 else:
@@ -3731,7 +3733,10 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         # 须在压空格/其他处理之前利用原始空格拆分；仅当姓名过 _looks_like_real_name、
         # 职务非人名且以明确职务词结尾才触发，避免「张三 李四」连写两姓名被误拆。
         # 拆后 sp 置为纯姓名，职务段写入 speakerTitle 作为职称。
-        _inv_m = re.match(r'^(?P<job>[一-鿿·]{2,6}(?:主任|处长|院长|所长|科长|局长|部长|总监|经理|工程师|书记|主席|总编辑|顾问|副会长|会长))(?P<n>[一-鿿·]{2,4})$', sp)
+        # 职务词表取自 field_vocab（单一事实源）。量词用懒匹配 `{2,6}?`：
+        # 贪婪会先把「华众联创总经理」的 job 吃成「华众联创总」、再由单体「经理」收尾，
+        # 把复合职务截断；懒匹配从短到长试，优先整词命中「总经理」（G4，2026-09-10）。
+        _inv_m = re.match(r'^(?P<job>[一-鿿·]{2,6}?' + _fv.ORG_TITLE_SUFFIX_RE.pattern + r')(?P<n>[一-鿿·]{2,4})$', sp)
         if _inv_m and _inv_m.group('n') != _inv_m.group('job'):
             _it, _in = _inv_m.group('job'), _inv_m.group('n')
             if (_in != _it and _looks_like_real_name(_in)

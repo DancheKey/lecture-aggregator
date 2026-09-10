@@ -209,7 +209,17 @@ llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类�
 1. **词表单一事实源**：字段标签/元信息块锚点/邀请语/页脚标记全部定义在
    `scraper/field_vocab.py`。规则截断、hybrid 对 A 值的截断、llm_provider 摘要边界、
    出口闸门、prompt 示例——一律引用它，**严禁再在任何模块内私拷一份词表**。
-   词表变更必须递增 `VOCAB_VERSION`（llm_provider 文本缓存按它失效，修复自动重放）。
+   - **边界类词表变更必须递增 `VOCAB_VERSION`**（llm_provider 文本缓存按它失效，修复自动重放）。
+   - **「语义词表」也收纳在同一文件**（2026-09-10，G4 收敛）：`NAME_TITLE_SUFFIXES`
+     （学术职称/称号，17 项）、`ORG_TITLE_SUFFIXES`（行政职务，22 项，含「总经理/副校长/副主任」
+     等复合职务——复合词必须整体成词，否则会被单体词截断）、`HONORIFIC_SUFFIXES`、`ORG_UNIT_ENDS`，
+     以及纯函数 `speaker_keys()` / `strip_name_title_suffix()` / `is_title_only()` /
+     `split_speaker_names()`。原先这 10 处（parsers ×2、hybrid ×5、audit_fields、server、
+     generate_frontend_data）各写各的，新增一个职称要改 5 处；现在**只需改本文件一处**。
+     语义词表不参与摘要边界截断，故其变更**不递增 `VOCAB_VERSION`**。
+     ⚠ `server._speaker_keys` 与 `generate.speaker_keys` 现已共用 `field_vocab.speaker_keys()`，
+     改这里即两端同时生效（旧版是两处手抄、靠守卫测试盯着是否同步）。
+     ⚠ 拼装正则时必须用 `(?:...)` 分组：`'a|b$'` 的 `$` 只绑定最后一个分支，前者会退化成任意位置匹配。
 2. **融合一律仅填空**：`hybrid._merge_a_into_result` 对所有字段（含 abstract/speakerBio）
    只在规则为空时采纳 A 值，规则已有值绝不被覆盖。A 主导覆盖实验（2026-09-02）
    已回退，勿再打开。

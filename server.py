@@ -25,9 +25,11 @@ SITE_DIR = os.path.join(ROOT, 'site')
 DATA_DIR = os.path.join(ROOT, 'data')
 SCRAPER = os.path.join(ROOT, 'scraper', 'scraper.py')
 SOURCES_PATH = os.path.join(ROOT, 'scraper', 'sources.yaml')
-# 确保 scripts/ 下的共享模块可被导入（如 excluded_urls）
+# 确保 scripts/ 与 scraper/ 下的共享模块可被导入（excluded_urls、field_vocab）
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 from excluded_urls import load_excluded
+import field_vocab as _fv
 
 
 def _warn(msg):
@@ -61,27 +63,12 @@ def _speaker_keys(name):
     """讲者归一化键（2026-09-06）：去空白/职称后缀、全角转半角；英文 lower。
     多主讲人（'A、B'）逐人拆分，返回键数组——同名同人判定为完全一致，
     跨语言（张三/Zhang San）暂不合键（避免同音误并），留作后续。
-    逻辑须与 scripts/generate_frontend_data.py 的 speaker_keys() 严格一致，
-    否则前端一致性守卫测试会拦截部署。"""
-    if not name:
-        return []
-    t = str(name)
-    t = ''.join(chr(ord(c) - 0xFEE0) if 0xFF01 <= ord(c) <= 0xFF5E else c for c in t)
-    for suf in ('博士生导师', '硕士生导师', '特聘教授', '特任教授', '长聘教授',
-                '副教授', '助理教授', '副研究员', '助理研究员', '研究员',
-                '教授', '讲师', '博士后', '博士', '院士', '老师', '导师'):
-        if t.endswith(suf) and len(t) > len(suf):
-            t = t[:-len(suf)]
-            break
-    keys = []
-    for part in re.split(r'[、,，/]', t):
-        part = part.strip()
-        if not part:
-            continue
-        if re.search(r'[A-Za-z]', part):
-            part = part.lower()
-        keys.append(part)
-    return keys
+
+    实现已收敛到 scraper/field_vocab.speaker_keys()（G4，2026-09-10）——它同时是
+    scripts/generate_frontend_data.py 的唯一实现，两端由构造保证一致，
+    不再依赖「两处手抄保持同步」。
+    """
+    return _fv.speaker_keys(name)
 
 
 def _attach_unit_types(data):
