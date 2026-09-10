@@ -246,9 +246,10 @@ llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类�
 16. **数据双份一致性**：`data/lectures.json`（爬虫产出）与 `site/lectures.json`（Pages 实际读）必须一致；手动改数据后务必运行 `python scripts/generate_frontend_data.py` 重新生成全部前端切片。（2026-08-05 体检修正：**不得用 `cp data/lectures.json site/lectures.json`**——site 那份是脚本加工产物，含排除名单过滤与 unitType 标注，cp 会使其失效。）
 17. **正文时间标注里的「号」字导致未来年污染**：中文日期结尾有「日」也有「号」（如「2023年12月29号下午14:00」）。`timeparse._parse_segment` 完整中文日期正则只写了 `\s*日`，没兼容 `号`，导致命中正文 `时间：2023年12月29号` 后完整年份未被识别，回退到 `M月D日` 并用 `default_year=当前系统年`（如 2026）填充，生成 `2026-12-29` 这种错误。根因修复：`timeparse._parse_segment` 第 1 步改为 `\s*[日号]`。同时 `parsers.py` 高优先级时间标注递归调用传入 `title_year`/`url_year` 作为年份回退（仍不传 `publish_time`，防旧讲座重发被抬年）。修复后必须删旧记录重抓（计算机学院 2026-12-29 等 4 条即此修复）。
 18. **dedup 误删不同讲座（致命隐性丢数据）**：`scraper.dedup` 原判定键为 `(college, _normalize_title(title))`。当某院列表标题是通用词（如「学术报告通知」「学术讲座信息」），且 §1.3 的 `_clean_title` 已把锚文本里的日期前缀去掉后，多个**不同日期、不同 URL**的讲座会归一化成同一标题 → 撞键被合并成 1 条，其余**静默丢弃**。计算机学院曾因此从列表可达的 42 条掉到 21 条（如 `2682`「学术报告通知」与 `2715`「学术报告通知」撞键只留 1 条，零散丢失、不易察觉）。根因修复：`dedup` 判定键改为 `(college, 归一化标题, 讲座日期, 来源URL)`——**只要 sourceUrl 不同就视为不同讲座，绝不合并且丢弃**；同 URL 真重复仍正确合并（保留字段更完整的）。⚠️ 以后新增/修源若发现某院条数明显少于列表可达数，先怀疑 dedup 而非增量。
-19. **首页 / 统计页数字动画定格在旧数 + 统计页访问量为 0**：
-    - 数字动画旧实现设了 `CEIL = 950` 软上限，完整 JSON 加载前数字滚到 950 就停下，等好几秒后才跳到真实值（如 1741），造成「卡死」错觉。第一版修复用 `SPEED * sqrt(elapsed)`，但平方根曲线数值增长偏慢（2 秒才到几十），用户反馈「前面太慢、到 1000+ 才快」。第二版改**指数逼近曲线** `1 + (CEIL-1)*(1-exp(-K*t))`（`CEIL=2200`），但上限高于真实值，网络慢时滚动会**超过真实值再回落**，体感差。最终定为**二次加速 + 封顶**：`v = min(TARGET, 1 + A*t^2)`（`TARGET=1700`≈当前真实总量、`A=70`），起步慢（约 1 秒到 70）、逐渐加快、到 ~5 秒封顶 1700（低于真实 1741，永不超、不回落）；数据到达后由 `finalizeCountAnimation` 平滑过渡到真实值（见 §3.7.1）。
-    - 统计页访问量为 0 的根因是 CSP 太严：`stats.html` 的 `connect-src 'self'` 把 `countapi.xyz` 和不蒜子都拦截了；`index.html` 的 CSP 也没放行 `countapi.xyz`。修复：两页 CSP 统一放行 `https://busuanzi.ibruce.info` 与 `https://api.countapi.xyz`，并让 `loadSiteVisits` 先读 `localStorage` 共享缓存、再按「后端 > countapi > 不蒜子」优先级获取（见 §3.7.2）。
+19. **首页 / 统计页数字动画的「假数字」陷阱**：
+    - 两页动画机制**不同**（详见 §3.7.1）：首页 `site/app.js` 是**目标驱动**——每加载一片数据就 `bumpCount()` 把目标抬到「当前已加载的真实条数」，再用 easeOutCubic 滚过去，任一时刻显示的都是真实条数（50 → 1100 → …）；统计页 `site/stats.js` 在 `stats.json` 到达前按**线性**（`SPEED = 65`/秒）慢速增长作「加载中占位」，数据到达后 `finalizeCountAnimation()` 快速滚到真实值定格。
+    - 历史教训（防止回退）：早期用固定软上限 `CEIL`（如 950 / 2200）——低于真实值时会把假数字停在屏幕上数秒（像卡死），高于真实值时慢网络下会**超了真实值再回落**。**结论：动画任何阶段都不许把固定上限当终点，最终值只能由真实数据 `finalize` 决定。**
+    - 站点总访问量由页脚 `site/footer-counter.js` 加载 `busuanzi.aspark.cc` 写入（localStorage 5 分钟缓存），详见 §3.7.2。
 
 
 ---
@@ -295,36 +296,34 @@ llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类�
 - 理由：增量 `since` 只补新讲座、不回头修旧记录；而漏抓的往往是历史老讲座（2015–2022），增量永远补不上。常见根因两类：① 解析器 bug（如 §2.17「号」字、§2.18 dedup 误删）→ 旧记录不会自动更新；② 列表标题/新闻过滤误判 → 须修代码后全量重爬。
 - 多个源同时被指出问题时，逐个 `--full --source` **串行**重爬（避免写同一 `data/lectures.json` 互相覆盖）。
 
-### 3.7 首页 / 统计页数字动画与访问量一致性（纯静态部署）
+### 3.7 首页 / 统计页数字动画与站点总访问量（纯静态部署）
 
-公网无后端，首页先加载 `lectures/latest.json`（50 条）再后台加载 `lectures.json`（全量）；统计页直接加载 `lectures/stats.json`。两页顶部都有「讲座数 / 来源通知数」滚动动画，底部共享站点总访问量。为保证体验与一致性，约定如下：
+公网无后端：首页先加载 `lectures/latest.json`（50 条）再按分片后台加载全量；统计页直接加载 `lectures/stats.json`。两页顶部都有「讲座数 / 来源通知数」滚动动画，页脚各显示「本站总访问量」。
+> **2026-09-10 代码级核实**：本节旧版本关于「访问量优先级」与「动画曲线常量」的描述与代码完全对不上（`loadSiteVisits` / `countapi` / `busuanzi.ibruce.info` / `TARGET=1700` 全站 grep 0 命中），已按下述**真实实现**重写，旧描述作废。
 
-#### 3.7.1 数字滚动动画：从 1 二次加速、封顶不超真实值、数据到达后平滑过渡
-- 旧的实现用 `CEIL = 950` 作为滚动软上限，导致 950 这个「历史数字」在屏幕上停留数秒，等完整 JSON 到达后才跳到真实值（如 1741），视觉上像「卡死」。
-- 正确做法：`startCountAnimation` 从 1 开始按**二次加速 + 封顶**曲线 `v = min(TARGET, 1 + A * elapsed^2)` 增长（`TARGET = 1700` 为软上限，略低于当前真实总量 `1741`；`A = 70` 为加速度）：起步慢（约 1 秒到 70）、**逐渐加快**、到约 5 秒封顶在 1700。因为 `TARGET` 低于真实值，**滚动永远不超过真实值、不会出现「超了再回落」**；数据到达后调用 `finalizeCountAnimation`，从当前显示值平滑过渡（easeOutCubic，约 700ms）到 `totalCount` / `sourceNoticeCount`。
-- 调参经验：用户三次反馈迭代——① 去掉 950 硬上限（防定格）→ ② 不能用 `sqrt`（前期数值增长太慢）→ ③ 不能用「指数逼近到高于真实值的 CEIL」（网络慢会超真实值再回落）。最终二次加速封顶最稳：**TARGET 必须 ≤ 真实总量**，否则慢网络下仍会超了回落。若真实总量长期变化（如涨到 3000），把 `TARGET` 同步上调即可。
-- 涉及文件：`site/app.js`（`displayTotal` / `displaySource`）、`site/stats.js`（`displayLecture` / `displaySource`）。
+#### 3.7.1 数字滚动动画（两页机制不同，勿混用）
+- **首页 `site/app.js`（目标驱动）**：`startCountAnimation()` 只做初始化（`_countTarget = 0`）；每加载完一片数据调 `bumpCount()`，把滚动目标抬到**当前已加载的真实条数**（`_countTarget = totalCount`；来源数同理），`_countTick()` 用 easeOutCubic（`1-(1-t)^3`）在 500–600ms 内从当前显示值滚到目标。任一时刻显示的都是真实条数，**不会定格成死值、也不会超真实值**。
+- **统计页 `site/stats.js`（线性占位 → 冲刺定格）**：数据未到时按**线性** `v = max(1, 1 + SPEED*elapsed)`（`SPEED = 65`，每秒约 65）慢速增长，明确是「加载中占位」；`stats.json` 到达后调 `finalizeCountAnimation()`，用 easeOutCubic 在 300ms 内滚到 `lectureCount` / `sourceNoticeCount` 定格。
+- **历史教训（保留，防止回退）**：① 早期用固定软上限（`CEIL = 950`）→ 该「历史数字」在屏幕上停数秒，像卡死；② 用 `sqrt` 曲线前期增长太慢；③ 用「指数逼近到一个高于真实值的上限」→ 慢网络下**超了真实值再回落**。最终结论：**动画任何阶段都不许把固定上限当终点，最终值只能由真实数据 `finalize` 决定**；加载阶段宁可慢速线性，也不许滚到「像真实的假数字」上。
+- 涉及文件：`site/app.js`（`displayTotal` / `displaySource` / `bumpCount` / `_countTick`）、`site/stats.js`（`displayLecture` / `displaySource` / `finalizeCountAnimation`）。
 
-#### 3.7.2 站点总访问量：两页必须同源、共享缓存
-- 问题：统计页 CSP 仅允许 `connect-src 'self'`，把 `countapi.xyz` 和不蒜子脚本都拦截了；首页 CSP 又未放行 `countapi.xyz`。结果统计页拿不到访问量，显示 0。
-- 正确做法：
-  1. 两页 CSP 统一放行 `https://busuanzi.ibruce.info`（script + connect）与 `https://api.countapi.xyz`（connect）。
-  2. `loadSiteVisits` 优先级：**本地后端 `/api/visits` > countapi.xyz > 不蒜子**。任一来源成功都把值写入 `localStorage['site_visits_total']`。
-  3. 每次进入页面**先读 `localStorage` 缓存**，即使第三方接口暂时失败也不显示 0；接口成功后更新缓存供另一页读取。
-  4. 两页使用同一 countapi 命名空间 `lecture-aggregator/site`，与不蒜子站点 PV 语义一致，保证跨页一致。
-- 涉及文件：`site/app.js`、`site/stats.js`、`site/index.html`（CSP）、`site/stats.html`（CSP）。
+#### 3.7.2 站点总访问量：单一路径 —— 页脚 `footer-counter.js` + `busuanzi.aspark.cc`
+- **真实实现（唯一）**：`site/index.html` / `site/stats.html` 页脚各有 `<span id="busuanzi_site_pv">`，由 `site/footer-counter.js` 动态加载 `https://busuanzi.aspark.cc/js` 写入；`footer-counter.js` 用 `localStorage`（键 `lecture_site_count_value` / `lecture_site_count_ts`）做 **5 分钟缓存**，有效期内刷新不重复计数。
+- **CSP 只需放行一个域名**：两页 CSP 的 `script-src` / `connect-src` 均放行 `https://busuanzi.aspark.cc`（**不是** `busuanzi.ibruce.info`，原版不蒜子域名已废弃）。
+- ⚠️ **以下旧描述已作废，勿再据此排查**：`loadSiteVisits()` 函数、`countapi.xyz` / `api.countapi.xyz`、`localStorage['site_visits_total']`、`busuanzi.ibruce.info` —— 全站（含 `site/` 代码）grep **0 命中**（2026-09-10 核实后删除）。前端**不调用**本地 `/api/visits`（该接口仅 `server.py` 提供，供自托管场景预留，见 §3.8）。
+- 涉及文件：`site/footer-counter.js`、`site/index.html`（CSP + 页脚 span）、`site/stats.html`（CSP + 页脚 span）。
 
 ### 3.8 站点访问量：本地独立计数 + 「每年每月」报告（不依赖外部）
 
 #### 3.8.1 外部计数器的本质局限（必须先讲清）
-- **纯静态站（GitHub Pages）没有后端**，就不可能在「服务端」聚合访问量。busuanzi / countapi.xyz 这类外部服务扮演的正是「接收每次点击的远端」。
+- **纯静态站（GitHub Pages）没有后端**，就不可能在「服务端」聚合访问量。`busuanzi.aspark.cc` 这类外部服务扮演的正是「接收每次点击的远端」（当前页脚总访问量的唯一来源，见 §3.7.2）。
 - 它们**只返回累计总数**，永远给不了「按年 / 按月」的明细。因此「每年每个月的访问量」用外部服务**原理上就做不到**——外部接口从未记录过按月数据。
-- 外链一旦失效（busuanzi 抽风、countapi 限流/关停），统计就跟着失效或归零。这正是不依赖外部方案的动机。
+- 外链一旦失效（busuanzi 抽风 / 关停），页脚访问量就跟着失效或归零。这正是不依赖外部方案的动机。
 
 #### 3.8.2 本地独立计数器（已落地，零外部依赖）
 - `server.py` 的 `GET /api/visits` 就是**完全本地**的计数器：把 `{"total": N, "by_day": {"YYYY-MM-DD": 次数}}` 写到 `data/visits.json`，不连任何外部服务。
 - 本次升级后它**按本地日期累计 `by_day`**（同一 IP 3 分钟内只计 1 次，防刷），旧格式（仅 `total`）自动兼容为「历史遗留总数」。
-- 首页/统计页 `loadSiteVisits` 的**第一优先级就是 `/api/visits`**——所以本地 `server.py` 运行时，统计根本不走外部；只有公网静态版（无后端）才回退到 countapi/不蒜子。
+- ⚠️ **前端目前并不调用 `/api/visits`**（`site/` 全站 grep 0 命中）：本地预览与公网一样，页脚访问量都走 `footer-counter.js` + `busuanzi.aspark.cc`（§3.7.2）。该接口是**为将来自托管预留的**（见 §3.8.4），前端未接入前它不产生任何页面影响。
 
 #### 3.8.3 生成「每年每月」报告（独立运行的代码）
 - 脚本：`scripts/gen_visits_report.py`（纯标准库，跨平台直接跑）。
@@ -336,8 +335,8 @@ llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类�
 - 该报告**刻意不放进 `site/`**，因此不会被部署到公网；只作本地/自托管查看用。`reports/` 也不入库（生成的产物）。
 
 #### 3.8.4 公网要真正「不依赖外部」怎么做
-- GitHub Pages 本身无后端，必须自己**自托管一个计数端点**：把 `server.py`（或只保留 `/api/visits` 的极简服务）跑在可达地址（VPS / 内网穿透 / 自己的机器），把前端 `loadSiteVisits` 第一优先级的 `/api/visits` 指向它（例如改 baseURL 或部署时注入配置）。这样访问量完全自控，外链崩了也不影响。
-- 若暂不自托管，公网仍走 countapi/不蒜子当「总访问量」降级来源（仅总数，无按月明细），与本地 `by_day` 互不冲突。
+- GitHub Pages 本身无后端，必须自己**自托管一个计数端点**：把 `server.py`（或只保留 `/api/visits` 的极简服务）跑在可达地址（VPS / 内网穿透 / 自己的机器），再改造前端访问量获取逻辑指向它。⚠️ 注意目前 `footer-counter.js` **写死了走 `busuanzi.aspark.cc`**，接入自托管端点需先给它加一个 `/api/visits` 分支（改 baseURL 或部署时注入配置）。这样访问量完全自控，外链崩了也不影响。
+- 若暂不自托管，公网页脚仍走 `busuanzi.aspark.cc` 当「总访问量」来源（仅总数，无按月明细），与本地 `by_day` 互不冲突。
 
 #### 3.8.5 历史月份明细无法补回
 - 外部服务从未记录按月数据，过去的月份明细**无法补回**。本报告里的「按年每月」数据，从**启用按日记录之日起**随真实访问累加；当前 `data/visits.json` 里早于按日记录的总数是「历史遗留」，不摊到具体月份。
@@ -358,8 +357,10 @@ llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类�
 | 本地服务/计数 | `server.py`（含 `/api/visits` 按日累计 `by_day`，数据写 `data/visits.json`） |
 | 访问量报告 | `scripts/gen_visits_report.py` → `reports/visits-by-month.html`（按年/月，自包含单文件） |
 | 主数据 | `data/lectures.json` |
-| 静态副本 | `site/lectures.json` + `site/lectures/{latest,lite,stats}.json` |
+| 静态副本 | `site/lectures.json` + `site/lectures/{latest,stats,chunks}.json` + `site/lectures/chunk_NNNN.json`（首页按 `chunks.json` 清单分片加载） |
+| 页脚访问量 | `site/footer-counter.js` → `busuanzi.aspark.cc`（§3.7.2） |
 | 前端 | `site/index.html` + `app.js`；`site/stats.html` + `stats.js` |
-| 部署说明 | `deploy.md` |
+| 远端合并 | `scripts/merge_remote.py`（本地/远端 `lectures.json` 合并，默认只读报告，`--apply` 才写盘） |
+| 部署说明 | `docs/deploy.md`（§3 有增量陷阱警示框） |
 | 每日自动 | `.github/workflows/daily.yml` + `.github/workflows/deploy.yml` |
-| 离线重跑工具 | `tools/reparse_posters.py`、`tools/news_recheck.py`、`tools/clean_location_pollution.py` |
+| 离线重跑工具 | `tools/reparse_posters.py`、`tools/news_recheck.py`、`tools/clean_location_pollution.py`（⚠️ 本地调试工具，`tools/` 已 `.gitignore` 不入库） |
