@@ -932,7 +932,7 @@ const app = createApp({
             // 再以 /api/lectures?since=<新mtime> 增量拉取——服务端比对 mtime 判定
             // unchanged 返回空数组，页面既不刷新也无成功提示。抓取后文件必然已变，
             // 直接全量加载并给出提示。
-            this.loadLectures(false);
+            this.loadLectures();
             this.showToast(j.message || '抓取完成');
           } else {
             this.showToast('抓取失败：' + ((j && j.message) || ''));
@@ -967,7 +967,7 @@ const app = createApp({
     // IPv6 回环时浏览器返回的 hostname 是「[::1]」（带方括号），一并覆盖
     const isLocal = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname);
     if (isLocal) {
-      this.loadLectures(false);
+      this.loadLectures();
     } else {
       this._loadStaticLatest();
     }
