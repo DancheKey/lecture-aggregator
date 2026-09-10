@@ -37,6 +37,12 @@
     .min-w-badge { min-width: 1.25rem; }
     .min-w-page { min-width: 36px; }
     .max-w-college { max-width: 45%; }
+    /* 卡片底部「想听 + 点赞」操作组：移动端随标签流式排列（两按钮始终相邻同行，
+       放不下则整组换到下一行左端）；桌面端恢复右推，与原版式一致。
+       注意：不用 Tailwind 的 sm:ml-auto——它不在预编译产物中（会静默失效），
+       故此处用媒体查询显式声明。 */
+    .card-actions { margin-left: 0; }
+    @media (min-width: 640px) { .card-actions { margin-left: auto; } }
     /* 详情字段行图标：1.05em 与正文字号联动，-0.18em 修正基线使其视觉居中 */
     .d-ico { width: 1.05em; height: 1.05em; vertical-align: -0.18em; flex-shrink: 0; }
     /* 「进行中」状态徽章的呼吸圆点 */
@@ -196,9 +202,9 @@
                 </template>
               </div>
               <!-- 右侧筛选控件：桌面端单行右侧，移动端也保持单行（搜索+筛选同行） -->
-              <div class="flex items-center gap-2 w-full sm:w-auto">
+              <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <!-- 搜索框：移动端弹性占满剩余空间，桌面端固定宽度 -->
-                <div class="relative flex-1 sm:flex-none sm:w-44">
+                <div class="relative flex-1 sm:flex-none sm:w-44 min-w-0">
                   <input v-model="query" type="search" :placeholder="searchPlaceholder"
                     class="w-full px-3 py-1.5 text-12pt rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
                   <button v-if="query" type="button" @click="query = ''"
@@ -216,14 +222,18 @@
                   <option value="">年份</option>
                   <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
                 </select>
-                <span v-if="speaker" class="flex-none inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
-                  讲者：{{ speaker }}
-                  <button type="button" @click="clearSpeaker" aria-label="清除讲者筛选"
-                    class="ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
-                </span>
-                <button v-if="hasActiveFilter" @click="clearFilters()"
-                  class="flex-none px-2 py-1.5 text-12pt rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
-                  title="清除所有筛选条件">✕ 清除</button>
+                <!-- 讲者筛选片 + 清除按钮：移动端整组独占第二行（第一行搜索框因此变宽），
+                     桌面端接在同行右端。不用 flex-none——整组占位由 w-full / sm:w-auto 控制。 -->
+                <div v-if="speaker || hasActiveFilter" class="flex flex-wrap items-center gap-2 w-full sm:w-auto min-w-0">
+                  <span v-if="speaker" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt min-w-0">
+                    <span class="truncate">讲者：{{ speaker }}</span>
+                    <button type="button" @click="clearSpeaker" aria-label="清除讲者筛选"
+                      class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+                  </span>
+                  <button v-if="hasActiveFilter" @click="clearFilters()"
+                    class="shrink-0 px-2 py-1.5 text-12pt rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
+                    title="清除所有筛选条件">✕ 清除</button>
+                </div>
               </div>
             </div>
           </div>
@@ -356,9 +366,12 @@
                   </template>
                   <button v-for="c in sourceCampuses(l)" :key="c" @click="onTagClick('campus', c)"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
-                  <!-- 想听按钮：ml-auto 推到右侧，点赞数字 min-w 防挤压 -->
+                  <!-- 想听 + 点赞：包成一个整体（.card-actions）——避免「想听被 ml-auto 留在上一行右端、
+                       点赞被迫换行到下一行左端」的割裂。移动端整组随标签流式排列（放不下则整组换行，
+                       两按钮仍相邻同行）；桌面端由 .card-actions 的媒体查询恢复右推。 -->
+                  <div class="card-actions flex items-center gap-2 shrink-0">
                   <button @click="toggleWant(l.sourceUrl, $event)"
-                    :class="['ml-auto px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
+                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
                     title="想听就点^_^">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" :fill="hasWanted(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
@@ -373,6 +386,7 @@
                     </svg>
                     <span class="min-w-badge text-center">{{ capDisplay(likeCount(l.sourceUrl)) }}</span>
                   </button>
+                  </div>
                 </div>
                 <!-- 多来源：展开各官方原文链接 -->
                 <div v-if="l.merged && expanded[l.sourceUrl]" class="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
