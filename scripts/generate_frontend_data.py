@@ -304,9 +304,50 @@ def warn_uncommitted_scripts():
               f'提交脚本自身；若这些改动影响出片/解析，请手动 commit 后再推送')
 
 
+def write_visits_snapshot():
+    """把访问量台账的最后一条快照出片为 site/lectures/visits.json。
+
+    用途：页脚在 busuanzi 失效时的**降级数据源**——公网是纯静态托管，页面只能
+    读静态文件，所以降级值必须随站发布。台账由 scripts/fetch_visits_snapshot.py
+    每日在 CI 中累积；本地若从未跑过该脚本则台账不存在，此时跳过（不影响其余
+    产物，页脚仍走 busuanzi 实时值）。
+
+    只出片**末值**，不含历史明细——历史明细归 data/ 台账与 reports/ 报告所有，
+    避免把完整历史暴露在公网可访问的静态目录下。
+    """
+    history_path = os.path.join(ROOT, 'data', 'visits_history.json')
+    if not os.path.exists(history_path):
+        print('[skip] 无访问量台账，跳过 visits.json 出片')
+        return
+    try:
+        with open(history_path, encoding='utf-8') as f:
+            hist = json.load(f)
+    except (ValueError, OSError) as e:
+        print(f'[warn] 访问量台账读取失败，跳过出片：{type(e).__name__}: {e}')
+        return
+
+    snaps = hist.get('snapshots') or []
+    if not snaps:
+        print('[skip] 访问量台账为空，跳过 visits.json 出片')
+        return
+
+    last = snaps[-1]
+    payload = {
+        'date': last.get('date', ''),
+        'capturedAt': last.get('capturedAt', ''),
+        'site_pv': int(last.get('site_pv') or 0),
+        'site_uv': int(last.get('site_uv') or 0),
+    }
+    atomic_write_json(os.path.join(SITE_DIR, 'visits.json'), payload)
+    print(f"[done] visits.json: 截至 {payload['date']} "
+          f"累计 pv={payload['site_pv']} uv={payload['site_uv']}")
+
+
 def main():
     warn_uncommitted_scripts()
     os.makedirs(SITE_DIR, exist_ok=True)
+    # 访问量快照出片与讲座数据无关，先独立执行——即使无讲座数据也应保留降级数据源
+    write_visits_snapshot()
     data, updated_at = load_lectures()
     if not data:
         print('[warn] 没有讲座数据，跳过生成')
