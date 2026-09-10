@@ -322,26 +322,34 @@ const app = createApp({
       return now <= e ? 'ongoing' : 'ended';
     },
     // 状态徽章：label + 样式类（vendor 预编译 CSS 无绿色系，进行中用蓝 + 呼吸点）
+    // labelShort：移动端（<640px）专用的紧凑文案。长倒计时「即将开始 · 还有 17 时 44 分 59 秒」
+    // 在窄屏会把元信息行撑出卡片右缘，故移动端改用「还有 17:44:59」；两套文案由 CSS 切换显示
+    // （见 index.html 元信息行的 sm:hidden / hidden sm:inline），无需 JS 监听视口宽度。
     statusInfo(l) {
       const st = this.statusOf(l);
-      if (st === 'tbd') return { label: '时间待定', cls: 'bg-slate-100 text-slate-400', dot: false };
-      if (st === 'ongoing') return { label: '进行中', cls: 'bg-blue-100 text-blue-700', dot: true };
-      if (st === 'ended') return { label: '已结束', cls: 'bg-slate-100 text-slate-400', dot: false };
+      if (st === 'tbd') return { label: '时间待定', labelShort: '时间待定', cls: 'bg-slate-100 text-slate-400', dot: false };
+      if (st === 'ongoing') return { label: '进行中', labelShort: '进行中', cls: 'bg-blue-100 text-blue-700', dot: true };
+      if (st === 'ended') return { label: '已结束', labelShort: '已结束', cls: 'bg-slate-100 text-slate-400', dot: false };
       // upcoming：依赖 this.tick 触发响应式（mounted 里 setInterval 每秒更新）
       // 混合判定：剩余不足 24 小时 → 秒级滚动（时分秒，实时跳变）；
       // 满 24 小时 → 按「日历日差」显示整天天数（符合「本周六/星期二间隔几天」语义）
       const s = new Date(String(l.lectureStart || '').replace(' ', 'T')).getTime();
       const diffMs = s - this.tick;
       const DAY = 86400000;
-      let countdown;
+      let countdown, countdownShort;
+      const p2 = n => String(n).padStart(2, '0');
       if (diffMs < DAY) {
         // 不足 24 小时：时分秒实时滚动（不足 1 小时省略「时」）
         const h = Math.floor(diffMs / 3600000);
         const m = Math.floor((diffMs % 3600000) / 60000);
         const sec = Math.floor((diffMs % 60000) / 1000);
-        countdown = h > 0
-          ? `还有 ${h} 时 ${m} 分 ${sec} 秒`
-          : `还有 ${m} 分 ${sec} 秒`;
+        if (h > 0) {
+          countdown = `还有 ${h} 时 ${m} 分 ${sec} 秒`;
+          countdownShort = `${h}:${p2(m)}:${p2(sec)}`;
+        } else {
+          countdown = `还有 ${m} 分 ${sec} 秒`;
+          countdownShort = `${m}:${p2(sec)}`;
+        }
       } else {
         // 满 24 小时：按日历日差（自然日边界，非剩余时长取整）
         const sd = new Date(s), td = new Date(this.tick);
@@ -350,10 +358,11 @@ const app = createApp({
            Date.UTC(td.getFullYear(), td.getMonth(), td.getDate())) / DAY
         );
         countdown = `还有 ${dayGap} 天`;
+        countdownShort = `${dayGap} 天`;
       }
       return diffMs <= 7 * DAY
-        ? { label: '即将开始 · ' + countdown, cls: 'bg-orange-100 text-orange-600', dot: false }
-        : { label: '未开始', cls: 'bg-slate-100 text-slate-600', dot: false };
+        ? { label: '即将开始 · ' + countdown, labelShort: '还有 ' + countdownShort, cls: 'bg-orange-100 text-orange-600', dot: false }
+        : { label: '未开始', labelShort: '未开始', cls: 'bg-slate-100 text-slate-600', dot: false };
     },
     truncate(s, maxLen) {
       if (!s) return '';

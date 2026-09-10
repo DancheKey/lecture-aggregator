@@ -240,8 +240,10 @@
                 class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
                 <!-- 元信息行：单位 · 时间（🕒 图标化）+ 右侧状态徽章（四态：进行中/即将开始/未开始/已结束） -->
                 <div class="flex items-center gap-2 text-11pt mb-1.5 flex-nowrap">
-                  <span class="font-medium text-slate-600 truncate min-w-0 max-w-college">{{ l.college }}</span>
-                  <span class="text-slate-300 shrink-0">·</span>
+                  <!-- 学院名：移动端（<640px）隐藏——窄屏下它会把「时间 + 倒计时徽章」挤出卡片右缘；
+                       学院信息在卡片底部标签行已有，此处不必重复占用横向空间 -->
+                  <span class="hidden sm:inline font-medium text-slate-600 truncate min-w-0 max-w-college">{{ l.college }}</span>
+                  <span class="hidden sm:inline text-slate-300 shrink-0">·</span>
                   <span class="whitespace-nowrap inline-flex items-center gap-1 text-slate-600">
                     <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -250,7 +252,9 @@
                   </span>
                   <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1', statusInfo(l).cls]">
                     <span v-if="statusInfo(l).dot" class="live-dot rounded-full shrink-0" style="width:6px;height:6px;background:currentColor"></span>
-                    {{ statusInfo(l).label }}
+                    <!-- 移动端用紧凑倒计时（还有 17:44:59），桌面端保留完整语义（即将开始 · 还有 17 时 44 分 59 秒） -->
+                    <span class="sm:hidden">{{ statusInfo(l).labelShort }}</span>
+                    <span class="hidden sm:inline">{{ statusInfo(l).label }}</span>
                   </span>
                 </div>
                 <!-- 标题 -->
@@ -432,7 +436,7 @@
     </transition>
   </div>
 
-  <script defer src="app.js?v=72621f8de5"></script>
+  <script defer src="app.js?v=15d8e30cfd"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
