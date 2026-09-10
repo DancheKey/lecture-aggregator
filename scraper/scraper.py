@@ -34,6 +34,27 @@ def _atomic_write_json(path, obj, indent=2):
     os.replace(tmp, path)
 
 
+def _decide_updated_at(prev_updated_at, before_snapshot, out, now_iso, is_incremental):
+    """决定本次写盘使用哪个 updatedAt（拆分更新时间，2026-09-10）。
+
+    updatedAt 的语义是「数据最后一次真正变化的时间」，而不是「程序最后一次运行的时间」。
+    增量模式且本次前后内容完全一致时沿用旧值：否则「没抓到新讲座也改写数据文件」会让
+    每日 CI 提交与本地人工推送争抢 `updatedAt` 所在的那一行，产生纯由时间戳造成的伪
+    冲突。页面要展示的「今天跑过没」由独立的 site/lectures/last_run.json 承担。
+
+    判定保守：非增量模式、缺少旧值或快照、比较异常，一律按「有变化」处理（退化为原有
+    行为），绝不因误判成「没变化」而丢掉更新。
+    """
+    if not is_incremental or not prev_updated_at or before_snapshot is None:
+        return now_iso
+    try:
+        if json.dumps(out, ensure_ascii=False, sort_keys=True) == before_snapshot:
+            return prev_updated_at
+    except Exception:
+        pass
+    return now_iso
+
+
 def _decode_html(raw):
     """鲁棒解码 HTML：优先 <meta charset> 声明，其次 UTF-8 严格，再次 GB18030 兜底。
 
@@ -1110,11 +1131,19 @@ def main():
     # 读取现有记录：增量模式作为基底（合并写回）+ 已抓 URL 集合（跳过解析/OCR）
     data_path = os.path.join(ROOT, 'data', 'lectures.json')
     existing = []
+    prev_updated_at = ''
+    before_snapshot = None
     if os.path.exists(data_path):
         try:
             raw = json.load(open(data_path, encoding='utf-8'))
             # 兼容新版包裹格式 {updatedAt, data} 与旧版纯数组
-            existing = raw.get('data', []) if isinstance(raw, dict) else raw
+            if isinstance(raw, dict):
+                existing = raw.get('data', []) or []
+                prev_updated_at = raw.get('updatedAt') or ''
+            else:
+                existing = raw
+            # 处理前快照：用于判定本次是否真的改变了数据内容（见 _decide_updated_at）
+            before_snapshot = json.dumps(existing, ensure_ascii=False, sort_keys=True)
         except Exception as e:
             print(f'[ABORT] 读取 data/lectures.json 失败：{e}。为避免覆盖丢失数据，已中止。', file=sys.stderr)
             return
@@ -1279,8 +1308,12 @@ def main():
         return
     data_dir = os.path.join(ROOT, 'data')
     os.makedirs(data_dir, exist_ok=True)
+    # 拆分更新时间：内容没变则沿用旧 updatedAt，使数据文件逐字节不变（见 _decide_updated_at）
+    data_updated_at = _decide_updated_at(prev_updated_at, before_snapshot, out, now_iso, is_incremental)
+    if data_updated_at == prev_updated_at:
+        print(f'[INCREMENTAL] 本次未改变任何记录，updatedAt 沿用 {prev_updated_at}（数据文件内容不变）')
     _atomic_write_json(os.path.join(data_dir, 'lectures.json'),
-                       {'updatedAt': now_iso, 'data': out})
+                       {'updatedAt': data_updated_at, 'data': out})
     # 局部修复模式不更新 last_scrape.json，避免影响下一次全量/定时增量调度
     if not args.source:
         if failed_sources:

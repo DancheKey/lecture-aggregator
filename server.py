@@ -104,6 +104,8 @@ def _attach_unit_types(data):
     out = []
     for item in data:
         it = dict(item)
+        # 剥离内部索引字段（2026-09-10）：与 generate 端一致，属无消费者的孤儿字段，不下发
+        it.pop('__idx', None)
         if item.get('lectureIndex') is not None:
             dates = url_dates.get(item.get('sourceUrl') or '', set())
             it['unitType'] = 'session' if len(dates) == 1 else 'issue'

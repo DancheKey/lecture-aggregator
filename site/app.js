@@ -21,7 +21,8 @@ const app = createApp({
     return {
       all: [],
       mtime: 0,
-      updatedAt: '',   // 数据更新时间（ISO 字符串），来自后端 mtime 或静态文件 updatedAt
+      updatedAt: '',   // 数据最后变化时间（ISO 字符串），来自后端 mtime 或静态文件 updatedAt
+      lastRunAt: '',   // 最近一次抓取运行时间（来自 CI 写入的 lectures/last_run.json）
       // 校区固定顺序（与 sources.yaml / 后端一致）
       campusList: ['', '石牌', '大学城', '佛山', '汕尾', '校级'],
       campus: '',
@@ -58,6 +59,13 @@ const app = createApp({
 
   computed: {
     totalCount() { return this.all.length; },
+
+    // 「更新于」显示的日期（2026-09-10）：优先用 last_run.json 的最近运行时间——它由 CI
+    // 每次运行刷新（空增量日也刷新），因此即便今天没有新讲座，页面也照常显示今天，
+    // 不会让访客误以为站点停更；拿不到该文件时回退到 updatedAt（数据最后变化时间）。
+    displayUpdatedAt() {
+      return this.lastRunAt || this.updatedAt || '';
+    },
 
     // 来源通知总数（合并后按各讲座的 sourceCount 求和），用于首页说明与统计一致性
     // 口径与 stats.js / generate_frontend_data.py 统一：sourceCount 缺失时回退到 sources 长度
@@ -694,16 +702,15 @@ const app = createApp({
     },
     // 多来源讲座：返回去重后的所有校区（用于标签展示）
     sourceCampuses(l) {
-      if (!l || !l.sources || !l.sources.length) return [l.campus];
+      // 空校区不参与渲染：否则会生成一个只有「#」没有文字的标签（点它也不会有任何按钮高亮）
+      if (!l) return [];
       const seen = new Set();
       const out = [];
+      const push = (c) => { if (c && !seen.has(c)) { seen.add(c); out.push(c); } };
       // 主记录自身的校区
-      if (l.campus && !seen.has(l.campus)) { seen.add(l.campus); out.push(l.campus); }
-      // 合并来源的校区
-      l.sources.forEach(s => {
-        const c = s.campus || l.campus;
-        if (!seen.has(c)) { seen.add(c); out.push(c); }
-      });
+      push(l.campus);
+      // 合并来源的校区（缺省回退到主记录）
+      (l.sources || []).forEach(s => push(s.campus || l.campus));
       return out;
     },
     // 切换多来源讲座的原文链接展开
@@ -727,7 +734,17 @@ const app = createApp({
      * 浏览器缓存使用 default，让 GitHub Pages 的 max-age=600 生效，避免每次刷新
      * 都重新下载 6MB 的 lectures.json。
      */
+    // 最近一次抓取运行时间（2026-09-10）：独立小文件，由 CI 每次运行刷新，
+    // 与数据版本 updatedAt 分离，见 displayUpdatedAt 的说明。
+    _loadLastRun() {
+      fetch('lectures/last_run.json', { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(j => { if (j && j.lastRunAt) this.lastRunAt = j.lastRunAt; })
+        .catch(() => {});
+    },
+
     loadLectures() {
+      this._loadLastRun();
       fetch('/api/lectures', { cache: 'default' })
         .then(r => {
           if (!r.ok) throw new Error('api-unavailable');

@@ -95,6 +95,16 @@ jobs:
           # 2026-08-05 体检修复（中等-20）：generate_frontend_data.py 的缓存破坏
           # 会改写 site/index.html / site/stats.html（追加 ?v=hash），必须一并提交，
           # 否则 CI 侧的 JS 版本号更新被静默丢弃。
+          # 运行时间戳（2026-09-10）：页面「更新于」显示的是「最近一次成功运行」的日期，
+          # 与 data/lectures.json 的 updatedAt（数据最后真正变化的时间）分离。空增量日数据
+          # 文件零改动，不与本地推送争抢同一行；本文件每次运行都刷新，且由 CI 独占维护
+          # （本地生成脚本不写它），因此永远与本地改动落在不同文件，可被 git 自动合并。
+          mkdir -p site/lectures
+          # 用 date -u -d '+8 hours' 而非 TZ=Asia/Shanghai：后者依赖系统 tzdata，
+          # 在缺少时区的环境下会输出错误的小时数却仍标注 +08:00（实测本机 Git Bash 差 8 小时）。
+          LAST_RUN=$(date -u -d '+8 hours' +'%Y-%m-%dT%H:%M:%S+08:00')
+          printf '{\n  "lastRunAt": "%s"\n}\n' "$LAST_RUN" > site/lectures/last_run.json
+          echo "last_run.json = $LAST_RUN"
           # 2026-08-08 修复：补充分片产物，确保手机端分片加载可用。
           git add \
             data/lectures.json \
@@ -102,6 +112,7 @@ jobs:
             site/lectures.json \
             site/lectures/latest.json \
             site/lectures/stats.json \
+            site/lectures/last_run.json \
             site/lectures/chunk_*.json \
             site/lectures/chunks.json \
             site/index.html \
@@ -129,7 +140,9 @@ jobs:
                 fi
                 echo "::warning::git push 失败 (try $i)，拉取远程最新再试..."
                 sleep 5
-                git pull --rebase origin main || true
+                # 与上面的首次同步保持一致：失败必须收尾（abort），不能让仓库停在半完成的
+                # rebase 状态、也不该用 `|| true` 把错误吞掉——否则后续重试建立在破损状态上。
+                git pull --rebase origin main || { echo "::error::重试前同步失败，中止 rebase"; git rebase --abort; exit 1; }
               fi
             done
             echo "推送成功"
