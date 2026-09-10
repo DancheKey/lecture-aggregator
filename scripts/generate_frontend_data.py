@@ -242,6 +242,12 @@ def with_unit(item, url_dates):
     # 剥离内部索引字段（2026-09-10）：全仓无任何代码生成或消费它，属孤儿字段，
     # 无需随每份前端产物下发；源数据 data/lectures.json 中保留不动。
     it.pop('__idx', None)
+    # ⚠ 以下字段**有意保留下发，勿剥离**（2026-09-10 决策，非疏漏）：
+    #   images / hasPosterImage / imageParseMethod
+    # 它们是「哪些讲座是海报图、用的哪种解析方式」的重处理索引——日后要
+    # 针对海报类讲座重跑 OCR/VLM 时，靠这三个字段就能精准筛出目标集合，
+    # 不必再回头全量重抓。体积占比很小（约 2.2%，见 code-review 报告 G3），
+    # 前端虽不渲染，但作为处理台账随产物携带是刻意的取舍。
     if item.get('lectureIndex') is not None:
         dates = url_dates.get(item.get('sourceUrl') or '', set())
         it['unitType'] = 'session' if len(dates) == 1 else 'issue'
