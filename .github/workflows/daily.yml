@@ -66,8 +66,21 @@ jobs:
           SCNU_LLM_TEXT: '1'
         run: python scraper/scraper.py
 
+      # 访问量快照（2026-09-10）：用 GET 取 busuanzi 当日累计值落盘入库。
+      # 必须走 GET——该端点 POST 会计数 +1，用 POST 会每天给自家 PV 灌水。
+      # 取数失败不阻断：脚本内部以 ::warning:: 告警并退出 0，
+      # 避免外部服务抖动影响讲座数据的正常更新与部署。
+      # 台账是公网访问量的唯一本地备份——busuanzi 一旦失效，历史只在这里还活着。
+      - name: 抓取访问量快照（busuanzi）
+        run: python scripts/fetch_visits_snapshot.py
+
       - name: 同步静态数据源并生成前端切片
         run: python scripts/generate_frontend_data.py
+
+      # 访问量趋势报告：随仓库入库（不在公网页面展示，Pages 只发布 site/），
+      # 便于任意机器 pull 后直接查看历史趋势。
+      - name: 生成访问量趋势报告
+        run: python scripts/gen_visits_trend.py
 
       # 铁律护栏：抓取生成的数据必须通过不变量测试，否则阻断提交/部署
       # （防止 CI 整体重跑退化、title 被 topic 覆盖、复合键重复等回归）。
@@ -117,6 +130,11 @@ jobs:
             site/lectures/chunks.json \
             site/index.html \
             site/stats.html
+          # 访问量台账与报告：仅在文件存在时加入。busuanzi 取数失败时这两个文件
+          # 会缺失，不能因此让整个提交步骤失败——否则连讲座数据也提交不上去。
+          for _f in data/visits_history.json reports/visits-trend.html; do
+            if [ -f "$_f" ]; then git add "$_f"; fi
+          done
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else

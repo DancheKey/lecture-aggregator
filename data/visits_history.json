@@ -1,0 +1,17 @@
+{
+  "source": "busuanzi.aspark.cc",
+  "siteUrl": "https://danchekey.github.io/lecture-aggregator/",
+  "snapshots": [
+    {
+      "date": "2026-09-10",
+      "capturedAt": "2026-09-10T23:03:44+08:00",
+      "site_pv": 1087,
+      "site_uv": 897,
+      "page_pv": 1065,
+      "page_uv": 896,
+      "uv_delta": 0,
+      "pv_delta": 0,
+      "note": "基线（无前序记录，日增不可用）"
+    }
+  ]
+}

@@ -40,6 +40,31 @@
     return null;
   }
 
+  // 降级数据源：busuanzi 不可用时，读取随站发布的静态快照
+  // site/lectures/visits.json（由 scripts/fetch_visits_snapshot.py 每日在 CI 中
+  // 累积、generate_frontend_data.py 出片）。
+  //
+  // 只填入纯数字，不附加日期或任何说明文字——与 busuanzi 正常时的显示完全
+  // 一致，避免页面出现「截至某日」这类别扭的标注（用户明确要求）。
+  // 该值不写入 localStorage 缓存：下次访问仍应优先尝试实时值，
+  // 一旦 busuanzi 恢复就自动回到实时计数。
+  var _fallbackTried = false;
+  function fallbackToArchive() {
+    if (_fallbackTried) return;
+    _fallbackTried = true;
+    if (extractCount(getEl())) return;      // 已有实时值，无需降级
+    fetch('lectures/visits.json', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var el = getEl();
+        if (!el || !d) return;
+        if (extractCount(el)) return;       // 期间 busuanzi 成功，实时值优先
+        var n = parseInt(d.site_pv, 10);
+        if (!isNaN(n) && n > 0) el.textContent = String(n);
+      })
+      .catch(function () { /* 无快照可用时保留占位符 */ });
+  }
+
   // 加载 busuanzi 并缓存
   function loadBusuanziAndCache() {
     var el = getEl();
@@ -67,6 +92,7 @@
         clearInterval(pollTimer);
       } else if (pollCount >= 50) {
         clearInterval(pollTimer);
+        fallbackToArchive();   // 5 秒仍无数值 → 判定不可用，改用随站快照
       }
     }, 100);
 
@@ -74,6 +100,7 @@
     var script = document.createElement('script');
     script.async = true;
     script.src = 'https://busuanzi.aspark.cc/js';
+    script.onerror = fallbackToArchive;   // 脚本加载失败（服务下线/被墙）同样降级
     document.head.appendChild(script);
   }
 
