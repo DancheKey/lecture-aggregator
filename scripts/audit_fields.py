@@ -28,6 +28,7 @@ from collections import Counter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
+import field_vocab as _fv  # noqa: E402  语义词表单一事实源（G4，2026-09-10）
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -35,14 +36,15 @@ _TODAY = datetime.date.today()
 _MIN_DATE = datetime.date(2000, 1, 1)
 _MAX_DATE = datetime.date(_TODAY.year + 2, 12, 31)
 
-_TITLE_NAME_RE = re.compile(r'[\u4e00-\u9fff]{2,4}(?:教授|副教授|研究员|讲师|博士|老师|院士|先生|女士)')
+_TITLE_NAME_RE = re.compile(r'[\u4e00-\u9fff]{2,4}(?:' + _fv.NAME_TITLE_SUFFIX_RE.pattern + r')')
 _BIO_HEAD_NAME_RE = re.compile(
     r'^[\u4e00-\u9fff·]{2,4}\s*[,，,]\s*|'
     r'^[\u4e00-\u9fff]{2,4}\s*[（(]|'
     r'^(?:Professor|Dr\.?|Mr\.?|Ms\.?|Mrs\.?)\s+[A-Z][A-Za-z]+')
 _LOC_BAD = re.compile(r'版权所有|首页|联系我们|地址：广州市|邮编|Copyright|粛ICP|粤ICP|点击')
 _LOC_TAIL_TAG = re.compile(r'(?:报告|讲座|主讲人|报告人|时间|地点)$')
-_AFFIL_TITLE_ONLY = re.compile(r'^(?:特聘教授|特任教授|助理教授|副教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)+$')
+# 纯职称/职务判据：词表收敛到 field_vocab（G4，2026-09-10）；改词表请改那边。
+_AFFIL_TITLE_ONLY = _fv.TITLE_ONLY_RE
 _EN_GLUE = re.compile(r'(?<![A-Z])[a-z]{2,}[A-Z]')     # camelCase 粘连（SeoulNational），排除 UNLV/SIUE 全大写缩写
 _NAV_CHAIN = re.compile(
     r'(?:学术活动|科研项目|科研成果|科研平台|研究方向|重大项目|学科方向|'

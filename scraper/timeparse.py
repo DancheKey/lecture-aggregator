@@ -138,10 +138,13 @@ def _build(m, seg, y, mo, d):
             #   「晚7：30-9：00」两时刻均 +12 后 19:30-21:00 正挂 → 不触发；
             #   「下午2:30-4:00」字面 02:30 起点为凌晨不合理 → 不触发，照常 +12。
             # 带显式 am/pm 后缀的时刻各按自身后缀处理，不进此分支。
+            _lo, _hi = COLLAPSED_LITERAL_START_HOURS
             if (period == 12 and not s0 and not s1 and end <= start
-                    and 7 <= h0_raw < 12):
-                lit = (h1_raw * 60 + m1_raw) - (h0_raw * 60 + m0_raw)
-                if 0 < lit <= 8 * 60:
+                    and _lo <= h0_raw < _hi):
+                # 阈值与判据统一在文件末尾（C5）：命中即「假倒挂」，取字面时刻。
+                if is_reasonable_span(datetime(y_i, mo_i, d_i, h0_raw, m0_raw),
+                                      datetime(y_i, mo_i, d_i, h1_raw, m1_raw),
+                                      COLLAPSED_LITERAL_MAX_MINUTES):
                     start = datetime(y_i, mo_i, d_i, h0_raw, m0_raw)
                     end = datetime(y_i, mo_i, d_i, h1_raw, m1_raw)
     return {'start': start, 'end': end, 'has_time': True}
@@ -637,3 +640,39 @@ def parse_cn_time(text, default_year=None, publish_time=None, title_year=None, u
     if res:
         return res
     return None
+
+
+# ===========================================================================
+# 「时段词 vs 数字」矛盾裁决的统一入口（C5 收敛，2026-09-10）
+#
+# 同一类问题——「时段词（上午/下午/晚）与数字时刻矛盾导致区间倒挂」——过去被分别
+# 打了两个补丁，各带一套阈值、彼此不知道对方存在：
+#   ① 本模块 _parse_segment：起点字面 7–11 点、字面时长 ≤8h → 数字优先（忽略时段词）
+#   ② parsers._cross_validate 的 CV3：end 补 +12h 后时长 ≤6h → 修正 end（end 缺偏移）
+# 两者当前不冲突（本模块先跑，倒挂至此已修），但「将来发现第三个变体该改哪一处」
+# 无从判断。现将**阈值与「合理正挂区间」判据**收敛到此处，两处裁决各自调用。
+#
+# ⚠ 两处的**动作**不同，不可强行合并成一个函数：
+#   ① 取消两个时刻的全部偏移、直接取字面（「下午09:00-12:00」→ 09:00-12:00）
+#   ② 只补 end 缺失的 +12h 偏移（「晚7:30-9:00」→ 19:30-21:00）
+# 所以只统一「阈值 + 判据」，动作留在各自上下文，并互相注明对方位置。
+# ===========================================================================
+
+# ① 本模块：字面时刻被视为「合理上午段」的最大时长（分钟）
+COLLAPSED_LITERAL_MAX_MINUTES = 8 * 60
+# ①：字面起点被视为「上午」的小时区间 [lo, hi)
+COLLAPSED_LITERAL_START_HOURS = (7, 12)
+# ② CV3：end 补 +12h 后被视为「合理偏移」的最大时长（分钟）
+COLLAPSED_SHIFT_MAX_MINUTES = 6 * 60
+
+
+def is_reasonable_span(start_dt, end_dt, max_minutes):
+    """end 位于 start 之后且间隔不超过 max_minutes —— 「并非真倒挂」的判据。
+
+    两处时段词裁决共用：命中即认为区间是「偏移应用不一致」造成的**假倒挂**，
+    应修正偏移而非交换首尾。输入为两个 datetime（或 None）。
+    """
+    if not start_dt or not end_dt:
+        return False
+    delta = (end_dt - start_dt).total_seconds() / 60.0
+    return 0 < delta <= max_minutes

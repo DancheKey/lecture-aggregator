@@ -23,6 +23,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 语义词表单一事实源（G4，2026-09-10）：speaker_keys 与 server.py 共用同一实现，
+# 两端不再各抄一份（旧守卫测试要求两者严格一致，收敛后由构造保证）。
+sys.path.insert(0, os.path.join(ROOT, 'scraper'))
+import field_vocab as _fv  # noqa: E402
 DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
 SITE_LECTURES_PATH = os.path.join(ROOT, 'site', 'lectures.json')
 SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
@@ -216,26 +220,12 @@ def build_stats(data, updated_at):
 def speaker_keys(name):
     """讲者归一化键（2026-09-06）：去空白/职称后缀、全角转半角；英文 lower。
     多主讲人（'A、B'）逐人拆分，返回键数组——同名同人判定为完全一致，
-    跨语言（张三/Zhang San）暂不合键（避免同音误并），留作后续。"""
-    if not name:
-        return []
-    t = str(name)
-    t = ''.join(chr(ord(c) - 0xFEE0) if 0xFF01 <= ord(c) <= 0xFF5E else c for c in t)
-    for suf in ('博士生导师', '硕士生导师', '特聘教授', '特任教授', '长聘教授',
-                '副教授', '助理教授', '副研究员', '助理研究员', '研究员',
-                '教授', '讲师', '博士后', '博士', '院士', '老师', '导师'):
-        if t.endswith(suf) and len(t) > len(suf):
-            t = t[:-len(suf)]
-            break
-    keys = []
-    for part in re.split(r'[、,，/]', t):
-        part = part.strip()
-        if not part:
-            continue
-        if re.search(r'[A-Za-z]', part):
-            part = part.lower()
-        keys.append(part)
-    return keys
+    跨语言（张三/Zhang San）暂不合键（避免同音误并），留作后续。
+
+    实现已收敛到 scraper/field_vocab.speaker_keys()（G4，2026-09-10），
+    与 server.py 的 _speaker_keys() 共用同一份代码。
+    """
+    return _fv.speaker_keys(name)
 
 
 def with_unit(item, url_dates):

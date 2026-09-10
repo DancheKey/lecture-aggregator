@@ -59,9 +59,12 @@ def flatten_fields(fields):
 # ---------------------------------------------------------------------------
 # 语义归一（比较用，不对原结果做改动）
 # ---------------------------------------------------------------------------
-_SPEAKER_TITLE_NOISE = ('教授', '研究员', '副教授', '讲师', '博士', '院士', '老师',
-                        '主任', '院长', '所长', '博导', '硕导', '助理', '工程师',
-                        '专家', '先生', '女士', '博士后')
+# 语义词表收敛到 field_vocab（G4，2026-09-10）。此处是「比较用」归一化——把任意位置
+# 出现的职称/职务/尊称都抹掉（比 speaker_keys 的「只去尾部」更激进），故取两表并集；
+# 另保留几个**不在**主表、仅比较时需抹除的简称：博导/硕导/助理/专家。
+_SPEAKER_TITLE_NOISE = (tuple(_fv.NAME_TITLE_SUFFIXES) + tuple(_fv.ORG_TITLE_SUFFIXES)
+                        + tuple(_fv.HONORIFIC_SUFFIXES)
+                        + ('博导', '硕导', '助理', '专家'))
 
 
 def _norm_speaker(s):
@@ -198,9 +201,9 @@ def _clean_affiliation(v):
 
 # 单位字段质量校验：A 偶发把职称片段（如"助理"）误填进 affiliation，
 # 必须含机构后缀且不能是纯职称词，否则拒绝并回到规则兜底。
-_AFFIL_INVALID = re.compile(
-    r'^(教授|副教授|助理教授|助理|讲师|研究员|副研究员|助理研究员|博士|博士后|院士|主任|院长|所长|老师|先生|女士)$'
-)
+# 纯职称/职务/尊称判据：词表取自 field_vocab（G4，2026-09-10），允许「教授研究员」
+# 这类拼接式（`+`）。调用处用 .match()，带 ^...$ 锚定，语义与旧版一致。
+_AFFIL_INVALID = re.compile(_fv.TITLE_ONLY_RE.pattern)
 # 合法机构标识词（白名单）。覆盖：高校/科院/实验室/研究所/中小学/企业/协会/博物馆/政府/
 # 医院等中文机构类型，中文高校常用缩写（交大/科大/理工/中科院…），以及英文与多语种
 # （葡/德/法/西/荷/意等）高校与研究机构的常见写法。纯职称词由上方 _AFFIL_INVALID 黑名单拦截。
@@ -268,9 +271,8 @@ _AFFIL_RE = re.compile(
     r'|([\u4e00-\u9fff]{2,10}?(?:大学|研究院|研究所)(?:[\u4e00-\u9fff]{0,6}?(?:分校|校区|学部|学院|系|中心))?)'
     r'|([A-Za-z][A-Za-z\s]*(?:University|College|Institute|School|Department|Centre|Center|Laboratory|Lab)(?:\s+(?:of|and|&|at|in|[A-Za-z]+)){0,8})'
 )
-_TITLE_RE = re.compile(
-    r'(教授|副教授|研究员|副研究员|助理研究员|讲师|助理教授|博士后|博士|主任医师|副主任医师)'
-)
+# 从正文抽职称用：词表取自 field_vocab，另补两个医学职称（不在主表，仅此处抽职称用）。
+_TITLE_RE = re.compile(_fv.NAME_TITLE_SUFFIX_RE.pattern + r'|主任医师|副主任医师')
 
 
 # 规则兜底提取单位时，可能连带命中「毕业于/就读于/现为」等动词前缀或学历词，
@@ -360,7 +362,7 @@ def _infer_affiliation(bio):
     if m:
         aff = (m.group(1) or m.group(2) or m.group(3) or m.group(4) or '').strip()
         aff = _strip_affil_prefix(aff)
-        aff = re.sub(r'(助理教授|教授|副教授|讲师|研究员|副研究员|助理研究员|博士后|博士|院士|主任|院长|所长|老师|先生|女士)$', '', aff).strip(' ,，')
+        aff = _fv.TAIL_TITLE_RE.sub('', aff).strip(' ,，')
         if _is_valid_affiliation(aff):
             return aff
     # 全英文 bio 且无现单位表达时：通常现单位在最后，取最后一个有效机构
@@ -369,7 +371,7 @@ def _infer_affiliation(bio):
         for m in _AFFIL_RE.finditer(bio):
             cand = (m.group(1) or m.group(2) or m.group(3) or '').strip()
             cand = _strip_affil_prefix(cand)
-            cand = re.sub(r'(助理教授|教授|副教授|讲师|研究员|副研究员|助理研究员|博士后|博士|院士|主任|院长|所长|老师|先生|女士)$', '', cand).strip(' ,，')
+            cand = _fv.TAIL_TITLE_RE.sub('', cand).strip(' ,，')
             if _is_valid_affiliation(cand):
                 last = cand
         if last:
@@ -388,7 +390,7 @@ def _infer_affiliation(bio):
         aff = new_aff
     aff = _strip_affil_prefix(aff)
     # 清理尾部职称词
-    aff = re.sub(r'(助理教授|教授|副教授|讲师|研究员|副研究员|助理研究员|博士后|博士|院士|主任|院长|所长|老师|先生|女士)$', '', aff).strip(' ,，')
+    aff = _fv.TAIL_TITLE_RE.sub('', aff).strip(' ,，')
     return aff
 
 
@@ -497,10 +499,14 @@ def _try_fill_speaker(result, a, trace_text):
 # 同一污染值」病例（idx2747 地点混简介、idx2185 单位混任职经历、idx2932
 # 姓名括号截断、idx2635 姓名被机构名顶替）被「仅填空+保守裁决」共同锁死。
 # ---------------------------------------------------------------------------
+# 判脏用「职称/职务」正则：词表取自 field_vocab（G4，2026-09-10），
+# 另保留未进主表的补充词（博导/硕导/主编/编委/委员/会员/校长/副院长）与英文头衔。
+# 实测（全库 2958 条）：改用统一词表后 speaker 判脏 0 变化；speakerAffiliation 5 条
+# 由「不脏」转「脏」（都是单位里混入职务、本应清理的值），方向正确，且仍受溯源闸门保护。
 _DIRTY_TITLE_RE = re.compile(
-    r'(教授|副教授|研究员|副研究员|助理研究员|讲师|院士|博士后|博导|硕导|'
-    r'院长|副院长|所长|主任|副校长|校长|书记|主编|编委|委员|会员|'
-    r'Prof\.?|Professor|Dr\.?|Director|Dean|Chair)', re.I)
+    _fv.NAME_TITLE_SUFFIX_RE.pattern + '|' + _fv.ORG_TITLE_SUFFIX_RE.pattern +
+    r'|博导|硕导|主编|编委|委员|会员|校长|副院长'
+    r'|Prof\.?|Professor|Dr\.?|Director|Dean|Chair', re.I)
 _DIRTY_ORG_RE = re.compile(
     r'(大学|学院|研究院|研究所|实验室|研究中心|公司|集团|'
     r'University|Institute|College|School|Academy|Laboratory)', re.I)
