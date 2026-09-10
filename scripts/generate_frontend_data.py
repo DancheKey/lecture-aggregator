@@ -248,6 +248,9 @@ def with_unit(item, url_dates):
     仅对含 lectureIndex 的记录附加该字段；其它记录原样透传，不污染主数据。
     """
     it = dict(item)
+    # 剥离内部索引字段（2026-09-10）：全仓无任何代码生成或消费它，属孤儿字段，
+    # 无需随每份前端产物下发；源数据 data/lectures.json 中保留不动。
+    it.pop('__idx', None)
     if item.get('lectureIndex') is not None:
         dates = url_dates.get(item.get('sourceUrl') or '', set())
         it['unitType'] = 'session' if len(dates) == 1 else 'issue'
