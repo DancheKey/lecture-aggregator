@@ -89,6 +89,8 @@ def dirty_aff(v, speaker=''):
         return '空值'
     if len(v) < 3 or len(v) > 60:
         return '长度异常(%d)' % len(v)
+    if v.count('(') != v.count(')') or v.count('（') != v.count('）'):
+        return '括号未闭合'
     if speaker and len(speaker) >= 2 and speaker in v:
         return '含主讲人姓名'
     if TITLE_RE.search(v):
@@ -151,6 +153,38 @@ def time_change_ok(old, new):
     return True, ''
 
 
+def anchor_window_ok(rec, html_text, new_val):
+    """同URL多记录页（一页多讲座）锚点窗口验证（2026-09-09）。
+
+    背景：parse_detail 对「一页多讲座」页面通常只返回单条结果（如
+    swc/2021/0621/32.html 五个子讲座只提取一条）。若不校验，同一条
+    结果会错位覆盖所有同页记录（speaker 全变「穆洁尘」事故）。
+    规则：新值必须出现在「该记录锚点（topic 片段 / 讲座时刻）附近的
+    源页文本窗口」内，证明该值属于这个子讲座而非其他子讲座。
+    无锚点或锚点不在源页 → 拒绝修改（保留旧值，宁可不改不可错改）。
+    """
+    if not new_val:
+        return True, ''
+    anchors = []
+    tp = str(rec.get('topic') or '').strip()
+    if len(tp) >= 6:
+        anchors.append(tp[:20])
+    m = re.search(r'(\d{1,2}:\d{2})', str(rec.get('lectureStart') or ''))
+    if m:
+        anchors.append(m.group(1))
+    if not anchors:
+        return False, '多讲座页无锚点(topic/时间均缺)'
+    for anc in anchors:
+        pos = html_text.find(anc)
+        if pos < 0:
+            continue
+        win = html_text[max(0, pos - 300): pos + 300]
+        if str(new_val) in win:
+            return True, ''
+        return False, '新值不在锚点(%s)±300字窗口内(疑多讲座错位)' % anc
+    return False, '锚点未在源页找到'
+
+
 # ============ 抓取（bytes 落盘，避免编码误判） ============
 SESSION = requests.Session()
 SESSION.headers.update({
@@ -196,6 +230,12 @@ def main():
 
     data = json.load(open(DATA_PATH, encoding='utf-8'))
     recs = data['data']
+    # 同URL记录数：>1 即「一页多讲座」页，字段修改须过锚点窗口验证
+    url_counts = {}
+    for _r in recs:
+        _u = _r.get('sourceUrl') or ''
+        if _u:
+            url_counts[_u] = url_counts.get(_u, 0) + 1
 
     # 1) 目标 idx 集合
     if args.ids:
@@ -258,6 +298,16 @@ def main():
             if not ok:
                 skipped.append({'idx': idx, 'field': f, 'old': old, 'new': new, 'why': why})
                 continue
+            # 一页多讲座：parse_detail 只返回单条结果，须验证新值属于本子讲座
+            if url_counts.get(url, 0) > 1 and f in ('speaker', 'speakerAffiliation', 'location'):
+                _txt = re.sub(r'<[^>]+>', ' ', html)
+                import html as _hmod
+                _txt = _hmod.unescape(_txt)
+                aok, awhy = anchor_window_ok(r, _txt, new)
+                if not aok:
+                    skipped.append({'idx': idx, 'field': f, 'old': old, 'new': new,
+                                    'why': awhy})
+                    continue
             if f in ('lectureStart', 'lectureEnd'):
                 tok, twhy = time_change_ok(old, new)
                 if not tok:

@@ -37,7 +37,7 @@ def get(r, *keys):
 # 职称/职务词（姓名与单位都不该含）
 # 注：不含「研究生」——「XX研究生院」是机构名，会造成大量误报（清华深研院、工程物理研究院研究生院）
 TITLE_RE = re.compile(
-    r'(教授|副教授|研究员|副研究员|助理研究员|讲师|院士|博士|硕士|博士后|'
+    r'(教授|副教授|研究员|副研究员|助理研究员|讲师(?!团)|院士|博士|硕士|博士后|'
     r'老师|主任|院长|所长|书记|校长|会长|主席|主编|编辑|编委|工程师|'
     r'博导|硕导|特聘|客座|兼职|名誉|系主任|教授级|高级教师|正高级|'
     r'同学|女士|先生|Prof\.|Dr\.|Professor|Ph\.?D|PhD)'
@@ -50,8 +50,11 @@ ORG_RE = re.compile(r'(大学|学院|研究所|研究院|实验室|中心|公司
 # 期刊/出版社（误当单位）
 # 注：不含裸「新闻」——「新闻与传播学院」是正规学院名，会误伤清华/暨大
 JOURNAL_RE = re.compile(
+    # 2026-09-10 去掉「出版社」：以「出版社」结尾的多为真实出版机构（idx371
+    # 「中国社会科学院中国社会科学出版社」经用户确认为正确单位），期刊名误当单位
+    # 的主要形态是英文刊名（Journal/Nature/Letters 等），保留英文词即可覆盖。
     r'(Journal|Proceedings|Nature|Letters|Physical Review|'
-    r'PRB|PRL|ACS|IEEE|Elsevier|Springer|学报|杂志|期刊|出版社|日报|周报)',
+    r'PRB|PRL|ACS|IEEE|Elsevier|Springer|学报|杂志|期刊|日报|周报)',
     re.I
 )
 # 含 Science 但属于合法机构/学科名的搭配，需先剔除再判期刊，
@@ -80,11 +83,21 @@ EN_ORG_RE = re.compile(
 # 单位首段含机构词 → 后面的职称词属头衔描述（如「北京大学博雅荣休教授、博士生导师」），
 # 2026-09-09 经用户逐条确认为合规形态，不再标脏（真脏形态如「教授，华南师大」仍会命中）
 AFF_HEAD_OK_RE = re.compile(
-    r'^[^，,、;；]*?(大学|学院|研究院|研究所|实验室|中心|系|公司|'
+    r'^[^，,、;；]*?(大学|学院|研究院|研究所|实验室|中心|系|公司|办公室|'
     r'University|Institute|College|School|Laboratory|Center|Centre|Academy)',
     re.I)
 # 地点建筑词：含完整楼栋/厅室的地址属正常长形态
-LOC_BLD_RE = re.compile(r'栋|楼|室|厅|馆|校区|校园|会议室|报告厅|大厦')
+# 2026-09-09 补充英文词：idx2876「Lecture Hall on the 5th floor of School of Psychology」
+# 是合法英文地点，此前因不认英文楼栋词被误报过长
+LOC_BLD_RE = re.compile(r'栋|楼|室|厅|馆|校区|校园|会议室|报告厅|大厦|'
+                        r'Hall|Floor|Building|Auditorium|Room', re.I)
+# 纯头衔占位简介（2026-09-10）：speakerBio 整体只是头衔词（如 idx171 旧值「教授」——
+# 把 Professor 头衔误当简介填入），无信息量，视为占位坏值
+BIO_TITLE_ONLY_RE = re.compile(
+    r'^(教授|副教授|助理教授|研究员|副研究员|助理研究员|讲师|博士后|博士|院士|'
+    r'博导|博士生导师|硕导|硕士生导师|客座教授|特聘教授|讲座教授|兼职教授|'
+    r'Professor|Associate Professor|Assistant Professor|Prof\.?|Dr\.?|Doctor)$',
+    re.I)
 
 
 def is_journal_name(a):
@@ -106,7 +119,9 @@ def is_multi_speaker(s):
     if ORG_RE.search(s) or TITLE_RE.search(s):
         return False
     parts = [p.strip() for p in re.split(r'[、,，/&]| and | AND ', s) if p.strip()]
-    return len(parts) >= 2 and all(len(p) <= 12 for p in parts)
+    # 每段 ≤30 字：英文全名（名+姓）天然 12~25 字，
+    # 如 idx2504「Ernesto Macaro, David Lasagabaster, 胡光伟」
+    return len(parts) >= 2 and all(len(p) <= 30 for p in parts)
 
 
 def has_unclosed_paren(s):
@@ -209,14 +224,18 @@ def scan(recs):
             # 首段含机构词时，职称词属头衔描述（「北京大学博雅荣休教授」），不标
             if TITLE_RE.search(aff) and not AFF_HEAD_OK_RE.search(aff):
                 issues.append(('单位', 'speakerAffiliation', '高', '单位含职称/学位', aff, r))
-            if is_journal_name(aff):
+            # 期刊/出版社编辑任职场景（idx295「与Nature Ecology & Evolution 编辑面对面」，
+            # 讲者是期刊编辑，期刊名即雇主单位）→ 合法值，豁免
+            if is_journal_name(aff) and not re.search(r'编辑', (r.get('title') or '')):
                 issues.append(('单位', 'speakerAffiliation', '高', '疑似期刊/出版社误当单位', aff, r))
             if spk and spk in aff:
                 issues.append(('单位', 'speakerAffiliation', '高', '单位中含主讲人姓名', aff, r))
             if has_unclosed_paren(aff):
                 issues.append(('单位', 'speakerAffiliation', '中', '括号未闭合（抓取截断）', aff, r))
-            # 英文机构全称天然长（阈值 80）；中文多机构并列/重点实验室后缀也常见（45）
-            aff_len_limit = 80 if EN_ORG_RE.search(aff) else 45
+            # 英文机构全称天然长（阈值 130：联合学院/双机构全称如 idx1879 的
+            # 「Aberdeen - South China Normal University (SCNU) Joint Institute / ...」123 字
+            # 为真实全称）；中文多机构并列/重点实验室后缀也常见（45）
+            aff_len_limit = 130 if EN_ORG_RE.search(aff) else 45
             if len(aff) > aff_len_limit:
                 issues.append(('单位', 'speakerAffiliation', '中', f'单位过长({len(aff)}字)', aff, r))
             # 英文单词粘连：连续 >18 个字母且无空格
@@ -224,6 +243,12 @@ def scan(recs):
                 issues.append(('单位', 'speakerAffiliation', '中', '英文单词粘连（空格丢失）', aff, r))
             if '\n' in aff:
                 issues.append(('单位', 'speakerAffiliation', '高', '单位含换行', aff, r))
+
+        # ---------- 简介 ----------
+        bio = (r.get('speakerBio') or '').strip()
+        if bio and BIO_TITLE_ONLY_RE.match(bio):
+            issues.append(('简介', 'speakerBio', '中',
+                           '简介仅为头衔词，疑似占位坏值（真实简介应含人物经历）', bio, r))
 
         # ---------- 时间 ----------
         if not st:
@@ -252,7 +277,9 @@ def scan(recs):
                                        f'时长异常({delta_h:.0f}小时)，疑似把页面其他日期当成结束时间',
                                        f'{st} → {en}', r))
                     elif delta_h > 8:
-                        issues.append(('时间', 'lectureEnd', '中',
+                        # 2026-09-10 降级「中」→「低」：同日 8~24h 基本是全天论坛/工作坊，
+                        # 误抓场景（把其他日期当结束）通常 >24h，已由上一档单独报「高」。
+                        issues.append(('时间', 'lectureEnd', '低',
                                        f'时长偏长({delta_h:.1f}小时)，可能是全天会议或误抓',
                                        f'{st} → {en}', r))
                 except Exception:
@@ -263,7 +290,11 @@ def scan(recs):
             issues.append(('缺失', 'location', '低', '地点缺失', '(空)', r))
         else:
             # 含建筑词且 ≤60 字 = 完整地址正常形态，豁免长度检查（正文标签仍单独检）
-            bld_ok = bool(LOC_BLD_RE.search(loc)) and len(loc) <= 60
+            # 线上会议完整形态（腾讯会议+会议ID/链接，忽略空格差异）同样豁免
+            # （idx1141「会议 ID+密码」、idx2224/2243「会议ID+链接」均为合法长形态）
+            online_ok = '腾讯会议' in loc and (
+                '会议ID' in loc.replace(' ', '') or 'meeting.tencent.com' in loc)
+            bld_ok = (bool(LOC_BLD_RE.search(loc)) and len(loc) <= 60) or online_ok
             if len(loc) > 40 and not bld_ok:
                 issues.append(('地点', 'location', '高', f'地点过长({len(loc)}字)，疑似正文段落混入', loc, r))
             elif len(loc) > 30 and not bld_ok:
@@ -282,7 +313,9 @@ def scan(recs):
                 d = (datetime.datetime.strptime(pt[:10], '%Y-%m-%d') -
                      datetime.datetime.strptime(st[:10], '%Y-%m-%d')).days
                 if d > 1:
-                    issues.append(('跨字段', 'publishTime', '中',
+                    # 2026-09-10 降级「中」→「低」：发布晚于讲座日是回顾性报道的
+                    # 正常现象，仅提示非污染。
+                    issues.append(('跨字段', 'publishTime', '低',
                                    f'发布日期晚于讲座日 {d} 天（疑似回顾稿/新闻）', f'{pt[:10]} vs {st[:10]}', r))
             except Exception:
                 pass

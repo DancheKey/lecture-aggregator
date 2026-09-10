@@ -47,6 +47,9 @@ EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格�
    版权声明——即使原样出现在网页里，也严禁填入 abstract/speakerBio（选错段落等同无中生有）；
    页面只有这类通用文本而没有本场专属摘要/简介时，对应字段一律返回 null。
 2. 仅从给定正文中提取字段；原文没有的字段一律返回 null（不得省略键）。
+2a. **排除干扰**：侧边栏「资讯及通知」「通知公告」「相关阅读/相关链接」等栏目列表中的
+   其他讲座/新闻条目不是本场讲座内容，严禁把其中的标题、日期、主讲人提取为本场字段值
+   （历次实测坑：串页/侧边栏串扰曾被误当本场信息）。
 3. 每个字段附 snippet：直接抄录该字段在原文中的原句片段（含前后少量上下文），用于溯源核验。
 4. 输出严格 JSON（不要 markdown 代码块、不要解释），结构如下：
 {
@@ -63,7 +66,6 @@ EXTRACTION_ONLY_SYSTEM = """你是一个学术讲座信息抽取助手。严格�
 }
 5. 时间必须基于正文明确写出的日期与时间，不要猜测年份；年份无法确定时 lectureStart 用 null。
 6. speaker 必须基于正文明确写出的主讲人姓名；正文无明确人名返回 null，严禁根据标题猜测。
-6a. **语言保持一致**：原文中的中文姓名必须保留为中文，严禁翻译为拼音或英文（如原文"高兴森"→speaker必须是"高兴森"，不能是"Xingsen Gao"）。
 6a. **语言保持一致**：原文中的中文姓名必须保留为中文，严禁翻译为拼音或英文（如原文"高兴森"→speaker必须是"高兴森"，不能是"Xingsen Gao"）。
 6b. **英文 speaker 禁区**：英文语境下，speaker 只提取真实人名（如 "John Smith"、"刘潇屿"），**严禁把职位/头衔/机构名当作 speaker**，包括但不限于：Professor / Associate Professor / Postdoctoral Associate / Research Fellow / Director / Dean / Chair 等；若原文只出现 "Name + Title"，speaker 取 Name，Title 归 speakerTitle 字段。
 7. abstract 与 speakerBio 只提取各自段落的正文，必须到此为止：遇到「主讲人简介/报告人简介/专家简介/
@@ -116,7 +118,14 @@ _VERDICT_FIELD_SEMANTICS = (
     "在那个时刻开始。对比时以**日期部分**为准，时刻格式不必强求一致。\n"
     "- topic = 讲座真正的题目；title = 通知页面的外包装标题（如「学术报告（第N期）」）。"
     "两者可以不同，都合法，都不算错。\n"
-    "- location = 讲座地点（楼栋+房间号），不含学校名。\n"
+    "- location = 讲座地点（楼栋+房间号），不含学校名。线上讲座的会议链接/会议号"
+    "可作为地点，但链接之外不得拼接其他字段内容。\n"
+    "- affiliation = 主讲人**当前所属单位/机构**（如 XX大学XX学院），不得包含职称"
+    "（教授/副教授/研究员/院长/主任）、不得包含人物简介、任职经历、聘任仪式描述等"
+    "非单位内容。\n"
+    "- location/affiliation 判据：若一方的值只是纯地点短语/纯机构名，另一方在其后"
+    "又拼接了讲者简介、任职经历、头衔、其他字段内容，则**短而纯的那一方更准确**，"
+    "即使长值看起来「信息更完整」——拼接内容属于其他字段或根本不属于结构化信息。\n"
     "- self_extract 是你自己的独立提取结果，仅作对比依据与留痕，不直接被采纳；"
     "最终采纳以 verdict / fields 为准。"
 )
@@ -417,7 +426,7 @@ class AgnesProvider(ModelProvider):
               and _fields_useful(cached)):
             return cached
         # 词表版本不匹配的旧缓存视为未命中——词表修复后自动重提，脏值不再固化
-        txt = body_text[:3500]
+        txt = body_text[:6000]
         messages = [
             {"role": "system", "content": EXTRACTION_ONLY_SYSTEM},
             {"role": "user", "content": "讲座正文：\n" + txt},
@@ -445,7 +454,7 @@ class AgnesProvider(ModelProvider):
     def extract_verdict(self, body_text, rule_fields, llm_fields, *, temperature=0.0):
         if not self.api_key:
             return {'verdict': 'unknown', 'fields': {}}
-        txt = (body_text or '')[:3500]
+        txt = (body_text or '')[:6000]
         rule_s = json.dumps(rule_fields or {}, ensure_ascii=False)
         llm_s = json.dumps(llm_fields or {}, ensure_ascii=False)
         # 方案A三步裁决（2026-09-05）：①独立提取结构字段 -> ②与双方对比 -> ③裁决。
@@ -455,7 +464,9 @@ class AgnesProvider(ModelProvider):
                   "speaker(主讲人姓名)、speakerTitle(职称)、affiliation(单位)、"
                   "lectureStart(讲座开始日期时间)、lectureEnd(讲座结束时间)、"
                   "location(地点)、topic(讲座题目)、title(通知标题)。"
-                  "原文没有的字段填 null。\n"
+                  "原文没有的字段填 null。"
+                  "侧边栏「资讯及通知/通知公告/相关链接」列表里的其他讲座或新闻条目"
+                  "不是本场讲座内容，严禁把其中的标题、日期、主讲人当作本场字段值。\n"
                   "第二步【对比】：把你的独立提取结果与『规则解析结果』『大模型解析结果』"
                   "逐字段对比，判断哪一方更准确，或是否都无法确定。\n"
                   "第三步【裁决】：输出严格 JSON：\n"
@@ -538,7 +549,7 @@ class ZhipuProvider(ModelProvider):
               and cached.get('_vocabVersion') == _fv.VOCAB_VERSION
               and _fields_useful(cached)):
             return cached
-        txt = body_text[:3500]
+        txt = body_text[:6000]
         messages = [
             {"role": "system", "content": EXTRACTION_ONLY_SYSTEM},
             {"role": "user", "content": "讲座正文：\n" + txt},
@@ -559,7 +570,7 @@ class ZhipuProvider(ModelProvider):
         """分歧裁决：读原文 + 规则结果 + A 结果，返回裁决 dict。"""
         if not self.api_key:
             return {'verdict': 'unknown', 'fields': {}}
-        txt = (body_text or '')[:3500]
+        txt = (body_text or '')[:6000]
         rule_s = json.dumps(rule_fields or {}, ensure_ascii=False)
         llm_s = json.dumps(llm_fields or {}, ensure_ascii=False)
         # 方案A三步裁决（2026-09-05）：①独立提取结构字段 -> ②与双方对比 -> ③裁决。
@@ -569,7 +580,9 @@ class ZhipuProvider(ModelProvider):
                   "speaker(主讲人姓名)、speakerTitle(职称)、affiliation(单位)、"
                   "lectureStart(讲座开始日期时间)、lectureEnd(讲座结束时间)、"
                   "location(地点)、topic(讲座题目)、title(通知标题)。"
-                  "原文没有的字段填 null。\n"
+                  "原文没有的字段填 null。"
+                  "侧边栏「资讯及通知/通知公告/相关链接」列表里的其他讲座或新闻条目"
+                  "不是本场讲座内容，严禁把其中的标题、日期、主讲人当作本场字段值。\n"
                   "第二步【对比】：把你的独立提取结果与『规则解析结果』『大模型解析结果』"
                   "逐字段对比，判断哪一方更准确，或是否都无法确定。\n"
                   "第三步【裁决】：输出严格 JSON：\n"

@@ -36,6 +36,14 @@ FIXTURES = [
     ('physics12119.html', 'https://physics.scnu.edu.cn/a/20221011/12119.html'),
     ('physics11773.html', 'https://physics.scnu.edu.cn/a/20211117/11773.html'),
     ('physics12127.html', 'https://physics.scnu.edu.cn/a/20221018/12127.html'),
+    # 2026-09-10 psy「讲座一/二」多场串页修复回归（与 KnownDefectTest 对应）
+    ('psy940.html', 'http://psy.scnu.edu.cn/a/20151228/940.html'),
+    ('psy1305.html', 'http://psy.scnu.edu.cn/a/20170612/1305.html'),
+    ('psy1385.html', 'http://psy.scnu.edu.cn/a/20171117/1385.html'),
+    ('psy961.html', 'http://psy.scnu.edu.cn/a/20160113/961.html'),
+    ('psy1323.html', 'http://psy.scnu.edu.cn/a/20170626/1323.html'),
+    ('psy1179.html', 'http://psy.scnu.edu.cn/a/20161130/1179.html'),
+    ('psy127.html', 'http://psy.scnu.edu.cn/a/20130301/127.html'),
 ]
 
 

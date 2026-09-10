@@ -29,6 +29,7 @@ golden-case 回归测试（Q3）——锁定 parser 关键案例，防止改候�
 案例来源：评审文档第六节 + 历次补丁验证（补丁4/16/17/9-10/abstract 泄漏）。
 """
 import os
+import re
 import sys
 import unittest
 
@@ -145,10 +146,32 @@ CASES = [
      'count': 1, 'speakers': ['李海欧']},
     {'url': 'https://physics.scnu.edu.cn/a/20221018/12127.html', 'fixture': 'physics12127.html',
      'count': 1, 'speakers': ['陈理想']},
+    # 2026-09-10 round-16 多场串页修复回归（psy「讲座一/二」结构，源页已实证）。
+    # 当前 parser 仅拆分达标；字段级缺陷（bio/abs 串页、location 串场）由 KnownDefectTest 锁定。
+    # psy940 两场连排（无「讲座一/二」标签，仅两块 题目/时间/地点）：同讲者刘贤臣两场
+    {'url': 'http://psy.scnu.edu.cn/a/20151228/940.html', 'fixture': 'psy940.html',
+     'count': 2, 'speakers': ['刘贤臣', '刘贤臣'], 'field_garbage': False},
+    # psy1323 讲座一/二（各带 简介+讲座内容）：杨启正 / 杨立行 同校两场
+    {'url': 'http://psy.scnu.edu.cn/a/20170626/1323.html', 'fixture': 'psy1323.html',
+     'count': 2, 'speakers': ['杨启正', '杨立行'],
+     'topic_sub': ['Post-Concussion Syndrome', 'Individual differences'],
+     'field_garbage': False},
+    # psy127 无摘要多场页（源页仅 时间/地点/题目/主讲人）：不得产出「学术讲座一」栏目标题垃圾摘要
+    {'url': 'http://psy.scnu.edu.cn/a/20130301/127.html', 'fixture': 'psy127.html',
+     'count': 2, 'speakers': ['乐国安', '沈模卫'],
+     'topic_sub': ['基于网络平台的社会心理与行为研究', '论心理学原理与应用'],
+     'field_garbage': True},
     # 直播已下线(404)且无本地副本：唯一保留 skip 语义的 case（文档化例外）。
     {'url': 'http://ctld.scnu.edu.cn/a/20250310/4409.html', 'fixture': 'ctld4409.html',
      'count': 2, 'speakers': ['卢晓中', '赵淦森'], 'topic_sub': [], 'may_404': True},
 ]
+
+
+# 字段尾部垃圾词（历次修复实录）：多场页「讲座一/二」串场尾巴、psy 早期沙龙页
+# 「心理学学术沙龙」栏目词、psy127「学术讲座一」栏目标题、页脚版权/导航词。
+_TAIL_GARBAGE_RE = re.compile(
+    r'(讲座一|讲座二|学术讲座一|心理学学术沙龙|版权所有|Copyright|'
+    r'关于华南师范大学|上一篇|下一篇)\s*$')
 
 
 def _check_no_bio_leak(self, url, recs):
@@ -188,16 +211,140 @@ def _make_test(case):
                 self.fail(f"无 topic 含 {sub!r}；topics={topics}")
         # 跨讲者 bio 泄漏
         _check_no_bio_leak(self, case['url'], recs)
+        # 字段尾部垃圾（仅 field_garbage=True 的 case 启用；False=该页已知垃圾、由 KnownDefect 锁）
+        if case.get('field_garbage'):
+            for r in recs:
+                for fld in ('abstract', 'speakerBio', 'location'):
+                    v = (r.get(fld) or '').strip()
+                    if v:
+                        m = _TAIL_GARBAGE_RE.search(v)
+                        if m:
+                            self.fail(
+                                f"{case['url']} {fld} 尾部含栏目/页脚垃圾 "
+                                f"{m.group(0)!r}: ...{v[-40:]!r}")
     return test
 
 
 class GoldenTest(unittest.TestCase):
-    pass
+    def test_00_ctld432_inverted_speaker(self):
+        """idx2635 职务倒装「主讲人：网络中心主任 林南晖」→ speaker=林南晖 + speakerTitle=网络中心主任。
+
+        极端场景兜底要求：模型 A/B 全不可用时，纯规则也能识别这种
+        「职务在前、姓名在后」的反常写法（真实页 ctld432 的正文排版）。
+        affiliation 因无法自动补校名，最终人工落库为「网络中心」，此处不做规则断言。"""
+        html = load_html({'fixture': 'ctld432.html',
+                          'url': 'http://ctld.scnu.edu.cn/a/20170922/432.html'})
+        recs = P.parse_detail(html, 'http://ctld.scnu.edu.cn/a/20170922/432.html',
+                              '', '', default_year=None)
+        recs = recs if isinstance(recs, list) else [recs]
+        self.assertEqual(len(recs), 1)
+        r = recs[0]
+        self.assertEqual(r.get('speaker'), '林南晖')
+        self.assertEqual(r.get('speakerTitle'), '网络中心主任')
+        # 2026-09-09 规则增强：倒装职务推导机构名（无法补校名，取职务机构）
+        self.assertEqual(r.get('speakerAffiliation'), '网络中心')
 
 
 for _i, _c in enumerate(CASES):
     _slug = _c['url'].rstrip('/').split('/')[-1].replace('.html', '')
     setattr(GoldenTest, f'test_{_i:02d}_{_slug}', _make_test(_c))
+
+
+class KnownDefectTest(unittest.TestCase):
+    """2026-09-10 round-16 已知解析缺陷清单（源页锚点均已实证）——期望行为用 @expectedFailure 锁定。
+
+    这些页面的库内数据是人工修复的，但 parser 重抓会再次产出污染。
+    每个用例锁定「正确行为」：当前失败（xfail）= 已知缺陷；
+    若未来修复使某个用例意外通过（unexpected success），unittest 会报红提醒摘除标记并更新基线。
+    期望值证据：tmp/_r14/_probe_r16*.py 对源页的逐段探测。
+    """
+
+    @staticmethod
+    def _parse(fixture, url):
+        html = load_html({'fixture': fixture, 'url': url})
+        recs = P.parse_detail(html, url, college='', campus='', default_year=None)
+        return recs if isinstance(recs, list) else [recs]
+
+    @unittest.expectedFailure
+    def test_psy1305_should_split_two(self):
+        """psy1305 郑东萍/林安迪讲座一/二应拆 2 条，location 不串讲者名。当前未拆(1 条)。"""
+        recs = self._parse('psy1305.html', 'http://psy.scnu.edu.cn/a/20170612/1305.html')
+        self.assertEqual(len(recs), 2)
+        by = {r.get('speaker'): r for r in recs}
+        self.assertEqual(set(by), {'郑东萍', '林安迪'})
+        self.assertEqual(by['郑东萍'].get('location'), '心理学院201会议室')
+        self.assertIn('Hawaii', by['郑东萍'].get('speakerAffiliation') or '')
+        self.assertIn('Impartiality', by['林安迪'].get('topic') or '')
+        self.assertIn('ecological', by['郑东萍'].get('abstract') or '')
+        self.assertIn('friendship and morality', by['林安迪'].get('abstract') or '')
+
+    @unittest.expectedFailure
+    def test_psy961_should_split_two_speaker_not_garbage(self):
+        """psy961 张喜淋/张洳源应拆 2 条；speaker 不得取成 'Cognitive Sciences' 垃圾值。当前未拆。"""
+        recs = self._parse('psy961.html', 'http://psy.scnu.edu.cn/a/20160113/961.html')
+        self.assertEqual(len(recs), 2)
+        spk = [r.get('speaker') for r in recs]
+        self.assertCountEqual(spk, ['张喜淋', '张洳源'])
+        for r in recs:
+            self.assertNotIn('Cognitive Sciences', r.get('speaker') or '')
+            self.assertNotIn('讲座一', r.get('location') or '')
+
+    @unittest.expectedFailure
+    def test_psy940_fields_clean(self):
+        """psy940 拆分已达标，但 r1 location 串第二场描述、abstract 为日期行垃圾、bio 尾串日期行。"""
+        recs = self._parse('psy940.html', 'http://psy.scnu.edu.cn/a/20151228/940.html')
+        self.assertEqual(len(recs), 2)
+        r1 = recs[0]
+        self.assertEqual(r1.get('location'), '心理学院5楼学术报告厅')
+        self.assertEqual((r1.get('abstract') or '').strip(), '')   # 源页无讲座一摘要
+        self.assertFalse(_TAIL_GARBAGE_RE.search(r1.get('speakerBio') or ''))
+
+    @unittest.expectedFailure
+    def test_psy1385_fields_pairing(self):
+        """psy1385 拆分已达标，但两场 location 串「讲座二」、胡玉正 bio 尾串耿凤基简介标签、aff 错同。"""
+        recs = self._parse('psy1385.html', 'http://psy.scnu.edu.cn/a/20171117/1385.html')
+        self.assertEqual(len(recs), 2)
+        by = {r.get('speaker'): r for r in recs}
+        hu, geng = by['胡玉正'], by['耿凤基']
+        self.assertNotIn('讲座二', hu.get('location') or '')
+        self.assertIn('马里兰', geng.get('speakerAffiliation') or '')
+        self.assertNotIn('耿凤基', hu.get('speakerBio') or '')
+        self.assertFalse(_TAIL_GARBAGE_RE.search(geng.get('speakerBio') or ''))
+        self.assertTrue((hu.get('abstract') or '').startswith('Substance use disorder'))
+
+    @unittest.expectedFailure
+    def test_psy1323_abstract_attribution(self):
+        """psy1323 拆分已达标，但两场 abstract 错位（讲座一内容给了杨立行且尾串「讲座二」）。"""
+        recs = self._parse('psy1323.html', 'http://psy.scnu.edu.cn/a/20170626/1323.html')
+        self.assertEqual(len(recs), 2)
+        by = {r.get('speaker'): r for r in recs}
+        self.assertTrue((by['杨启正'].get('abstract') or '').startswith('轻度头外伤'))
+        self.assertTrue((by['杨立行'].get('abstract') or '').startswith('Conaway'))
+        for r in recs:
+            self.assertFalse(_TAIL_GARBAGE_RE.search(r.get('speakerBio') or ''))
+            self.assertNotIn('杨立行', by['杨启正'].get('speakerBio') or '')
+
+    @unittest.expectedFailure
+    def test_psy1179_bio_pairing_and_affiliation(self):
+        """psy1179 拆分已达标，但刘勋 bio 复制了周晓林简介（互串）、aff 均错取中科院、location 串「讲座二」。"""
+        recs = self._parse('psy1179.html', 'http://psy.scnu.edu.cn/a/20161130/1179.html')
+        self.assertEqual(len(recs), 2)
+        by = {r.get('speaker'): r for r in recs}
+        zhou, liu = by['周晓林'], by['刘勋']
+        self.assertIn('北京大学', zhou.get('speakerAffiliation') or '')
+        self.assertIn('百人计划', liu.get('speakerBio') or '')
+        self.assertNotIn('1400', zhou.get('speakerBio') or '')   # 1400次被引是刘勋简介特征
+        self.assertEqual(zhou.get('location'), '心理学院201')
+
+    @unittest.expectedFailure
+    def test_psy127_speaker_time_pairing(self):
+        """psy127 拆分已达标，但讲者与开始时间错位（乐国安=讲座一 9:30，沈模卫=讲座二 15:30）。"""
+        recs = self._parse('psy127.html', 'http://psy.scnu.edu.cn/a/20130301/127.html')
+        self.assertEqual(len(recs), 2)
+        by = {r.get('speaker'): r for r in recs}
+        self.assertEqual((by['乐国安'].get('lectureStart') or '')[11:16], '09:30')
+        self.assertEqual((by['沈模卫'].get('lectureStart') or '')[11:16], '15:30')
+        self.assertEqual(by['乐国安'].get('lectureIndex'), 1)
 
 
 if __name__ == '__main__':
