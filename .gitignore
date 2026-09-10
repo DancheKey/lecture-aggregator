@@ -16,6 +16,8 @@ data/*.bak.*
 data/*.bak*
 *.bak.json
 data/.backups/
+# 批量修复前的全量快照（pre_ 前缀，单文件 ~6MB，26 个即上百 MB），不入库
+data/lectures.json.pre_*
 data/powershell.txt
 # 一次性修复脚本（fix_5708.py 等），不入库
 fix_*.py
