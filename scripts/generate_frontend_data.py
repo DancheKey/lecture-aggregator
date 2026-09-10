@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 
 # 确保 scripts/ 下的共享模块（如 excluded_urls）可被 import
@@ -288,7 +289,27 @@ def write_chunks(data, updated_at):
     print(f'[done] chunks.json + {len(chunks)} 片 (每片 {CHUNK_SIZE} 条, 共 {n} 条)')
 
 
+def warn_uncommitted_scripts():
+    """scripts/ 或 scraper/ 有未提交改动时提醒手动提交（CI 不代为提交脚本本身）。
+
+    背景：本脚本会改写 site/index.html / site/stats.html（打 JS 版本号），而 CI 的
+    git add 列表含这两个 HTML、不含脚本自身（见 docs/PARSING_RULES.md §3.3）。本地若
+    只提交了 HTML、忘了提交脚本，公网会用旧脚本重跑出片且无人察觉。此处显式告警，
+    消除「以为 CI 会自动处理」的误解。CI 工作树干净，故该提示只会在本地出现。
+    """
+    try:
+        r = subprocess.run(['git', 'status', '--porcelain', '--', 'scripts/', 'scraper/'],
+                           cwd=ROOT, capture_output=True, text=True, timeout=10)
+    except Exception:
+        return
+    changed = [l for l in (r.stdout or '').splitlines() if l.strip()]
+    if r.returncode == 0 and changed:
+        print(f'[warn] scripts/ 或 scraper/ 存在 {len(changed)} 个未提交改动——CI 不会代为'
+              f'提交脚本自身；若这些改动影响出片/解析，请手动 commit 后再推送')
+
+
 def main():
+    warn_uncommitted_scripts()
     os.makedirs(SITE_DIR, exist_ok=True)
     data, updated_at = load_lectures()
     if not data:

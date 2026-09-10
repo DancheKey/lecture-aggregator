@@ -20,15 +20,19 @@ data/.backups/
 data/lectures.json.pre_*
 
 # ===== 本地校验/批量修复脚本（仅本地用，公网 CI 不依赖，不推送） =====
-# 以下 3 个脚本 CI 工作流（daily/deploy/test.yml）均未调用，纯本地数据校验/回填工具：
+# 以下 4 个脚本 CI 工作流（daily/deploy/test.yml）均未调用，纯本地数据校验/回填工具：
 scripts/fill_affiliation_batch2.py
 scripts/gen_aff_report.py
 scripts/truncate_polluted_aff.py
+# 物理学院存量数据修复（\xa0 分隔的姓名/单位粘连），一次性、已跑完，留本地备查
+scripts/fix_physical_nbsps.py
 data/powershell.txt
 # 2026-09-10：tests 下三个测试原本也在此被忽略（当时判定「CI 未调用」），但它们是纯离线断言、
 # 覆盖时间解析 / 幻觉守卫 / 数据质量——恰是规则解析改动最密集处。已解除忽略并纳入 test.yml。
-# 一次性修复脚本（fix_5708.py 等），不入库
-fix_*.py
+# 一次性修复脚本（如根目录 fix_5708.py），不入库。
+# 2026-09-10：必须写成 /fix_*.py 限定根目录——旧写法 fix_*.py 会把 scripts/ 下同期新建的
+# 修复脚本一并静默忽略（曾吞掉 scripts/fix_physical_nbsps.py，git status 不显示、无从察觉）。
+/fix_*.py
 
 # ===== 本地调试/开发工具（仅本地使用，不推送公网） =====
 # tools/ 下均为一次性诊断/回填/OCR 基准脚本，网站运行（爬虫+前端切片）不依赖它们；

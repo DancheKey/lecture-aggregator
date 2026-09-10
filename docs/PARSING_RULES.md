@@ -234,7 +234,7 @@ llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类�
 4. **侧边栏噪声**：详情页选错正文容器会抓到侧边栏「新闻推荐 2026-04-10」。优先用列表标题日期；正文「时间：」解析失败不要回退整段搜索。
 5. **工作坊算讲座**：`EXCLUDE_TITLE_KW` 已移除「工作坊」（汕尾教学工作坊是真实讲座）。除非明确说某院工作坊不算，否则保留。
 6. **负向词过滤**：`EXCLUDE_TITLE_KW` 含 通知/招聘/答辩/公示/大赛/培训/宣讲/论文/发表/成果获… 混入非讲座时优先加 `exclude_urls` 或负向词，而非改解析器。
-7. **统计一致性**：首页去重讲座数 = 统计页 `lectureCount`；`sourceNoticeCount`（来源通知数）通常略大。不一致是 `generate_frontend_data.py` 计数口径错。统计页 `stats.json` 须含 `campusMap` 与每条 `s`(sourceCount)。
+7. **统计一致性**：首页去重讲座数 = 统计页 `lectureCount`；`sourceNoticeCount`（来源通知数）与它**口径不同、不要求大小关系**——一页多讲座时非首条 slug 的 `sourceCount=0`，故通知数**可少于**讲座数（实测 2942 < 2958）。两者只需各自口径自洽。不一致是 `generate_frontend_data.py` 计数口径错。统计页 `stats.json` 须含 `campusMap` 与每条 `s`(sourceCount)。
 8. **年份区间误当紧凑日期**：`timeparse` 紧凑日期正则分隔符已收紧为仅空格/制表符 `[ \t]{0,2}`；`_parse_compact_run` 对「4 位数字且前两位 19/20 → 视为年份跳过」，避免「2004-2016 年」被误识成 `2016-02-02`。
 9. **OCR 引擎 = RapidOCR**：仅当正文 <50 字才懒加载 OCR；批量修数据无需禁用 OCR；个别海报图不可读时 OCR 静默返回空串，解析走纯文本 + URL 日期兜底。
 10. **旧讲座批量重发 → URL/侧边栏日期全错**：某些学院（如 `geography.scnu.edu.cn/learning/`）把 2016–2024 旧讲座在某天批量重发，URL/`publishTime`/侧边栏日期全指向重发日，唯一可信是正文「时间：…」标注。须信正文标注且**解析时不传 publish_time**（见 §1.2、§2.2）。

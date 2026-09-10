@@ -559,7 +559,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._api_lecture_stats_get()
         if self.path.split('?')[0] == '/api/lectures':
             path = os.path.join(DATA_DIR, 'lectures.json')
-            # 解析 since 参数（文件 mtime，秒级浮点）
+            # 解析 since 参数（文件 mtime，秒级浮点）。
+            # 2026-09-10 注：此增量分支**当前无调用方**——前端 app.js 已统一改为直接全量加载
+            # （历史上先传新 mtime 会导致服务端判 unchanged、页面既不刷新也无提示，故弃用）。
+            # 保留该分支供将来做真正的增量拉取；勿以为它正在生效，也勿因「没人用」顺手删。
             qs = self.path.partition('?')[2]
             since = None
             for p in qs.split('&'):
