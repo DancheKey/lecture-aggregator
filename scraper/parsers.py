@@ -302,6 +302,27 @@ def _looks_like_real_name(s):
 # （欧阳/司马/…）或含 ·/字母的少数民族/音译名。否则像「文刘磊明」这类 4 字粘连误读
 # 会被 _looks_like_real_name 误放（首字「文」属百家姓、无禁用子串），导致在 cut=2 处
 # 错切成「陈家 / 文刘磊明」。
+
+# 倒装职务推导机构名（2026-09-09，idx2635）：无法自动补校名时，取职务里的机构作
+# 为 affiliation，如「网络中心主任 林南晖」→ affiliation=网络中心。仅在倒装分支、
+# affiliation 为空时调用（仅填空，不覆盖已有干净值）。
+_ORG_TITLE_SUFFIXES = ('主任', '处长', '院长', '所长', '科长', '局长', '部长',
+                       '总监', '经理', '工程师', '书记', '主席', '总编辑', '顾问',
+                       '副会长', '会长')
+_ORG_UNIT_ENDS = ('中心', '总公司', '学院', '院', '系', '所', '处', '局', '部',
+                  '公司', '集团', '大学', '办公室', '馆', '站', '室', '社', '刊',
+                  '报', '台')
+
+
+def _derive_org_from_title(title):
+    for s in _ORG_TITLE_SUFFIXES:
+        if title.endswith(s):
+            org = title[:-len(s)]
+            if org and org.endswith(_ORG_UNIT_ENDS):
+                return org
+    return None
+
+
 _COMPOUND_SURNAMES = (
     '欧阳', '司马', '上官', '诸葛', '东方', '独孤', '南宫', '令狐', '皇甫',
     '慕容', '司徒', '轩辕', '宇文', '长孙', '拓拔', '鲜于', '尉迟', '公羊',
@@ -988,7 +1009,10 @@ VLM_PROMPT = """你是一个学术讲座海报信息提取助手。下面是一�
   · 【同一时段并列多场】同一张海报在同一日期并列安排了 ≥2 场讲座（如上下或左右分块，各自有独立的主讲人、题目、地点，即使没有「第N讲」字样）。典型如「上午 9:00 分论坛A（主讲人甲，地点X）／分论坛B（主讲人乙，地点Y）」「平行论坛」「分会场」「专题一/专题二」。
   · 只要海报上出现 ≥2 个独立的主讲人+题目组合，就应按多场输出数组，【不要合并成一场】。
 - 字段缺失则对应值为空字符串 ""
-- 不要编造信息，海报中不存在的字段就留空
+- 实事求是，绝对不要编造：只提取海报上【实际印出】的文字并逐字照抄；海报上没有的字段一律留空字符串 ""
+- 如果图片只是人物照片、风景图或不含讲座文字（无标题/主讲人/时间），所有字段返回空字符串，不要根据图片内容想象或补全任何讲座信息
+- 文字模糊看不清就留空，禁止猜测或用常识补全姓名、单位、机构名
+- 禁止输出示例性/占位性内容（如 张三、李四、某某大学、XX大学）
 - 年份规则：仅当海报【明确印出】4 位年份（如「2023年5月11日」「2023-05-11」）时，lectureStart 才输出完整「YYYY-MM-DD HH:MM」；若海报只写「5月11日」「07-04」等【无年份】日期，【不要猜测年份】，lectureStart 只输出「MM-DD HH:MM」（系统会按网页发布年份自动补全为正确年份）
 - speaker 字段只放姓名，职称放到 speakerTitle，单位放到 speakerAffiliation"""
 
@@ -1013,6 +1037,7 @@ LLM_TEXT_PROMPT = """你是一个学术讲座信息提取助手。从下面的�
 - 只输出 JSON，不要 markdown 代码块、不要解释
 - 字段缺失则对应值为空字符串 "" 或 null（时间未知用 null）
 - 不要编造信息，正文中不存在的字段就留空
+- 实事求是：abstract/speakerBio 必须逐字摘自正文原文（至多规整空白），禁止改写、扩写、意译或虚构；正文没有就留空
 - speaker 必须基于正文明确写出的主讲人姓名；若正文里没有明确人名，请返回空字符串，不要根据标题猜测
 - speaker 只放姓名，职称放到 speakerTitle，单位放到 speakerAffiliation
 - 时间必须基于正文明确写出的日期与时间，不要猜测年份
@@ -1226,6 +1251,34 @@ def _normalize_vlm_keys(f):
     return out
 
 
+# 模板占位符（站点通用海报以 XXX 填充讲者/题目，视为空值）
+_PLACEHOLDER_RE = re.compile(r'^[xXｘＸ]{2,}$')
+
+# LLM/VLM 幻觉指纹（2026-09-10 round-12）：无证据时（无文字人像照当海报、缺简介页）
+# 模型会编造「张三/李华，北京大学/清华大学计算机系教授，长期从事量子计算…」家族假值
+# （13 条实测污染，speaker 甚至被编成「约翰·史密斯」）。占位人名+名校/模板句组合才判
+# 幻觉，避免误杀同名真人；仅用于校验 LLM/VLM 生成值，正文权威标签提取不经过此守卫。
+_HALLUC_NAME_RE = re.compile(
+    r'^(张三|李四|王五|李华|李航|约翰·史密斯|John\s*Smith)\s*[，,：:]')
+# 确定性占位名（不含常见真名歧义）可整值匹配，拦截 speaker='李四' 这类裸名
+_HALLUC_NAME_FULL_RE = re.compile(
+    r'^(张三|李四|王五|约翰·史密斯|John\s*Smith)$')
+_HALLUC_TMPL_RE = re.compile(
+    r'北京大学计算机科学|清华大学计算机科学|长期从事量子计算|'
+    r'长期从事数据安全和隐私保护|长期从事机器学习和数据挖掘|'
+    r'本讲座将探讨量子计算')
+
+
+def _is_hallucinated(v):
+    """LLM/VLM 生成字段值是否命中幻觉指纹（命中即丢弃，宁缺勿错）。"""
+    v = (v or '').strip()
+    if not v:
+        return False
+    if _HALLUC_NAME_RE.match(v) or _HALLUC_TMPL_RE.search(v):
+        return True
+    return bool(_HALLUC_NAME_FULL_RE.match(v))
+
+
 def _vlm_fields_useful(f):
     """VLM 返回字段是否「有用」（至少含一个非空关键字段）。
 
@@ -1233,6 +1286,12 @@ def _vlm_fields_useful(f):
     回溯重抽——否则空 dict 在 Python 里为 truthy，会被误判为「VLM 成功」：既设
     vlmExtracted:true、又旁路文本多讲座拆分器、又让 rebackfill 跳过该记录，导致
     多讲座表格页（如 ctld/4290）被永久卡死、永远不拆。
+
+    2026-09-10 占位守卫：站点通用模板海报常以「XXX」填充讲者/题目（seri 59 实测：
+    模板图 speaker=title='XXX'），此类占位值视为空，不使 VLM 结果被判「有用」。
+    2026-09-10 幻觉守卫（round-12）：VLM 对无文字人像照会编造「李四/王五」家族假讲座
+    （cs 5487 实测：报告人证件照被解出 2 场「量子力学/相对论」），命中幻觉指纹的字段
+    视为空——全部字段均幻法则整体判 VLM 失败，放行正文权威标签/OCR 兜底。
     """
     if not f:
         return False
@@ -1241,7 +1300,11 @@ def _vlm_fields_useful(f):
     if not isinstance(f, dict):
         return False
     _KEYS = ('speaker', 'title', 'topic', 'lectureStart', 'location', 'abstract', 'speakerBio')
-    return any((f.get(k) or '').strip() for k in _KEYS)
+    for k in _KEYS:
+        v = (f.get(k) or '').strip()
+        if v and not _PLACEHOLDER_RE.match(v) and not _is_hallucinated(v):
+            return True
+    return False
 
 
 def _parse_vlm_json(text):
@@ -2650,16 +2713,25 @@ def _cross_validate(result, url_date, ocr_text, publish_time, url_year):
         ls_d = _date_head(ls)
         if pub_d and ls_d and pub_d > ls_d:
             notes.append('cv-publish-after-lecture')
-    # CV3：结束早于开始 → 交换；时分越界 → 置空
+    # CV3：结束早于开始 → 修正；时分越界 → 置空
     le = result.get('lectureEnd')
     if ls and le:
         try:
             st = datetime.datetime.fromisoformat(ls)
             en = datetime.datetime.fromisoformat(le)
             if en < st:
-                result['lectureStart'] = le
-                result['lectureEnd'] = ls
-                notes.append('cv-end-before-start-swapped')
+                # 「晚7：30-9：00」型：区间首时刻继承了「晚/下午」的 +12h 偏移，
+                # 第二时刻没有。先尝试 end+12h——若由此得到的时长合理（≤6h），
+                # 说明是偏移缺失而非字段颠倒，修正 end 而不是 swap。
+                # （idx2924「晚7:30-9:00」旧逻辑 swap 成 09:00-19:30，彻底颠倒）
+                en12 = en + datetime.timedelta(hours=12)
+                if datetime.timedelta(0) < en12 - st <= datetime.timedelta(hours=6):
+                    result['lectureEnd'] = en12.strftime('%Y-%m-%d %H:%M:%S')
+                    notes.append('cv-end-plus-12h-pm-inherit')
+                else:
+                    result['lectureStart'] = le
+                    result['lectureEnd'] = ls
+                    notes.append('cv-end-before-start-swapped')
         except (ValueError, TypeError):
             pass
     for f in ('lectureStart', 'lectureEnd'):
@@ -2860,6 +2932,10 @@ def _gate_record(r, url=''):
         nv = _fv.trim_dangling_labels(nv)
         # 纯短中文残段（如「学术讲座」）：标题/栏目名混入，不可能是真实摘要/简介
         if nv and re.fullmatch(r'[\u4e00-\u9fff]{2,8}', nv):
+            nv = ''
+        # 占位符守卫（idx2924 等 18 条）：源页预告的「摘要：XXX」占位或生成失败残留，
+        # 无信息量，置空比留占位诚实
+        if nv and nv.strip().lower() in ('xxx', 'xxxx', 'xxxxx', 'n/a', 'tbd'):
             nv = ''
         # 摘要=简介复制守卫：无独立摘要的页面，叙事兜底曾把简介开头塞进 abstract
         # （psy229 式「1977 年获台湾辅仁大学…」与 speakerBio 前段完全重合）。
@@ -3416,7 +3492,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         '地点|题目|主题|讲座主题|演讲题目|报告主题|'
         '时间|主讲[人师]|讲座人|主持人|主讲|报告人|主讲嘉宾|讲座嘉宾|演讲人|邀请人|'
         'Speaker|Presenter|Lecturer|'
-        '主要内容|摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
+        # 「主要内容」须紧跟冒号才算字段标签（2026-09-10 io1563 实测：摘要散文
+        # 「以《联合国海洋法公约》为主要内容的…」被裸词截断在「为」）
+        '主要内容(?=[:：])|摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
         '讲座内容|讲座简介|报告内容|讲座概要|内容概要|'
         '简历|主讲人简介|主讲人简历|简介|专家介绍|专家简介|面向对象|会议报名截止日期|报名截止日期|截止日期|截止时间|发布|来源'
         '|Topic|Title|Venue|Location|Abstract|Bio|Synopsis'
@@ -3450,7 +3528,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         r'|地点(?=[:：\s]*(?:[^，。；、]{0,12}?(?:楼|室|厅|馆|号|校区|学院|大学|研究院)))'
         r'|主讲[人师]|讲座人|主持人|主讲|报告人|主讲嘉宾|讲座嘉宾|演讲人|邀请人|'
         r'Speaker|Presenter|Lecturer|'
-        r'主要内容|摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
+        r'主要内容(?=[:：])|摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
         r'讲座内容|讲座简介|报告内容|讲座概要|内容概要|'
         r'简历|主讲人简介|主讲人简历|简介|专家介绍|专家简介|面向对象|会议报名截止日期|报名截止日期|截止日期|截止时间|发布|来源'
         r'|Topic|Title|Venue|Location|Abstract|Bio|Synopsis'
@@ -3639,6 +3717,27 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             r'(?:主要内容|讲座内容|报告内容|摘要|内容简介|讲座简介|报告简介|'
             r'主讲人简介|报告人简介|简介|专家介绍|专家简介|面向对象)',
             sp, 1)[0].strip()
+        # 职务倒装式：标签值形如「职务词 + 空格 + 姓名」
+        # （如「主讲人： 网络中心主任 林南晖」CTLD432。职务在前、姓名在后）。
+        # 须在压空格/其他处理之前利用原始空格拆分；仅当姓名过 _looks_like_real_name、
+        # 职务非人名且以明确职务词结尾才触发，避免「张三 李四」连写两姓名被误拆。
+        # 拆后 sp 置为纯姓名，职务段写入 speakerTitle 作为职称。
+        _inv_m = re.match(r'^(?P<job>[一-鿿·]{2,6}(?:主任|处长|院长|所长|科长|局长|部长|总监|经理|工程师|书记|主席|总编辑|顾问|副会长|会长))(?P<n>[一-鿿·]{2,4})$', sp)
+        if _inv_m and _inv_m.group('n') != _inv_m.group('job'):
+            _it, _in = _inv_m.group('job'), _inv_m.group('n')
+            if (_in != _it and _looks_like_real_name(_in)
+                    and not _looks_like_real_name(_it)
+                    and any(_it.endswith(t) for t in
+                            ('主任','处长','院长','所长','科长','局长','部长',
+                             '总监','经理','工程师','书记','主席','总编辑',
+                             '顾问','副会长','会长'))):
+                sp = _in
+                if not result.get('speakerTitle'):
+                    result['speakerTitle'] = _it
+                if not result.get('speakerAffiliation'):
+                    _org = _derive_org_from_title(_it)
+                    if _org:
+                        result['speakerAffiliation'] = _org
         # 折叠「主讲人：张三 张三，…」式姓名重复：华师部分通知在标签后把姓名又写一遍作为
         # 简介开头（如教师发展中心「主讲人：姜小芳 姜小芳，华南师范大学…」；正文经单行化后，
         # 标签段「主讲人：姜小芳」与简介段「姜小芳，…」被粘成「姜小芳 姜小芳」）。不折叠会导致
@@ -4110,7 +4209,11 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         r'会议时间|会议地点|报名|咨询'
     )
 
-    bio_pat = rf'(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介|Bio)[\s:：]*'
+    # 英文标签 Bio 必须前后均非字母：否则会误命中摘要正文里的
+    # Biological / Biomedical / Biomarkers / Biology / Biolinguistics 等词，
+    # 造成「简介起点落在摘要中间 + 开头被削掉 Bio 三字符 + 摘要与简介粘连」。
+    bio_pat = (rf'(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介'
+               rf'|(?<![A-Za-z])Bio(?![A-Za-z]))[\s:：]*')
     m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|{BIO_STOP}|$))', body_text)
     if m:
         bio = m.group(1).strip()
@@ -4631,6 +4734,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             if _provider is not None:
                 # rich_only=True 时 A 只填充 abstract/speakerBio（及规则空的职称/单位），
                 # 不干预结构字段（speaker/time/location/topic），由规则主导。
+                _pre_llm_abs = result.get('abstract')
+                _pre_llm_bio = result.get('speakerBio')
                 apply_llm_text_hybrid(result, body_text, url, _provider, _judge,
                                       default_year, publish_time, title_year, url_year,
                                       rich_only=not _USE_LLM_TEXT,
@@ -4638,6 +4743,12 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                                       title_text=' '.join(
                                           x for x in (list_title or '', title or '')
                                           if x))
+                # 幻觉守卫（round-12）：文本模型对缺简介/摘要页会编造「张三，北京大学…」
+                # 家族假值（cs 5294/ggy 5684 等 6 条实测），命中即回滚为调用前值。
+                if _is_hallucinated(result.get('abstract')):
+                    result['abstract'] = _pre_llm_abs
+                if _is_hallucinated(result.get('speakerBio')):
+                    result['speakerBio'] = _pre_llm_bio
         except Exception as _e:
             print(f'[HYBRID_ERR] {url}: {_e}', file=sys.stderr)
 
@@ -4669,6 +4780,33 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # ---- VLM 多讲座拆分（海报含多场独立讲座，VLM 已返回数组）----
     # 每场讲座已由 _apply_vlm_to_result 填入字段，此处生成多条独立记录。
     # 每条独立走一遍通用后处理（D-FINAL / C1-UNIVERSAL / _clean_location / F-AFF 等）。
+    # 单场退回守卫（2026-09-10，seri 模板海报实测）：海报页判定（_is_meta_skeleton）
+    # 会让带正文字段标签的页面也走 VLM；当海报实为站点通用模板图（讲者/题目印 XXX
+    # 占位、时间地点是模板残留场次）时，单场 partial 会整体顶替正文权威字段
+    # （R1「时间：」标签解析出的 lectureStart、正文报告人）——张冠李戴
+    # （seri 59：正文朱永官 2023-12-16 被模板图的 2023-10-20 顶替）。故当正文
+    # 已解析出时间与讲者时，单场 VLM 退回正文主记录，仅补缺失的摘要/简介。
+    # 真海报页（正文无字段）不受影响：result 时间/讲者为空，条件不成立。
+    if len(_vlm_sessions or []) == 1 and (_vlm_sessions[0][0].get('lectureStart')
+                                          and result.get('lectureStart')
+                                          and result.get('speaker')):
+        _r0 = _vlm_sessions[0][0]
+        for _k in ('abstract', 'speakerBio'):
+            if not (result.get(_k) or '').strip() and (_r0.get(_k) or '').strip() \
+                    and not _is_hallucinated(_r0.get(_k)):
+                result[_k] = _r0[_k]
+        _vlm_sessions = []
+    # 多场退回守卫（2026-09-10 round-12，cs 5487 实测）：正文已有权威讲者+时间时，
+    # VLM「多场」结果不得顶替正文——报告人证件照/无字图被 VLM 编造成多场讲座
+    # （李四/王五）会经此路径整页覆盖正文权威值。真实多场海报页正文无字段标签，
+    # speaker/lectureStart 为空，不受影响。命中时仅补非幻觉的摘要/简介后丢弃场次。
+    if _vlm_sessions and result.get('speaker') and result.get('lectureStart'):
+        for _p, _pt in _vlm_sessions:
+            for _k in ('abstract', 'speakerBio'):
+                if not (result.get(_k) or '').strip() and (_p.get(_k) or '').strip() \
+                        and not _is_hallucinated(_p.get(_k)):
+                    result[_k] = _p[_k]
+        _vlm_sessions = []
     if _vlm_sessions:
         _vlm_recs = []
         for partial, pt in _vlm_sessions:
@@ -4713,6 +4851,11 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 continue
             _ab = (_ff.get('abstract') or '').strip()
             _bio = (_ff.get('speakerBio') or _ff.get('bio') or '').strip()
+            # 幻觉守卫（round-12）：VLM 对无字图会编造「量子计算/张三」家族摘要，写入前拦截
+            if _is_hallucinated(_ab):
+                _ab = ''
+            if _is_hallucinated(_bio):
+                _bio = ''
             if _ab and (not (result.get('abstract') or '').strip()
                         or _abstract_is_nav_noise(result.get('abstract') or '')):
                 result['abstract'] = _ab
