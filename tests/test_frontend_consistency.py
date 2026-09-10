@@ -99,6 +99,58 @@ class ConsistencyTest(unittest.TestCase):
         self.assertEqual(gen_ex, srv_ex, 'generate ↔ server 排除名单不一致')
         self.assertEqual(gen_ex, scr_ex, 'generate ↔ scraper 排除名单不一致')
 
+    def test_speaker_keys_semantics(self):
+        """speakerKeys 语义显式断言（2026-09-10）。
+
+        与上面几条的关系须知：test_synthetic_pipelines_equal 与
+        test_real_data_pipelines_equal 的「逐条全字段相等」其实已经**隐式**覆盖了
+        speakerKeys —— 只要两条实现都产出该字段，取值不同就会失败。那部分是有效的。
+        但它只能证明「两边算得一样」，证明不了「算得对」：若某次把两侧同时改错
+        （例如分隔符词表一起删掉、后缀表一起改坏），全字段比较会双双通过。
+        本用例因此单独锁定取值语义，专门防这种「一起错」。
+
+        期望语义（两条实现须完全一致）：
+          单人      -> 1 键
+          多人      -> 逐人各一键，且键中不含分隔符
+          职称后缀  -> 剥除（'李明教授' -> '李明'）
+          空 / None -> 空数组
+        """
+        cases = [
+            ('张三', ['张三']),
+            ('黄加耀, 刘轩奕', ['黄加耀', '刘轩奕']),
+            ('魏文娅、傅承哲', ['魏文娅', '傅承哲']),
+            ('张三、李四、王五', ['张三', '李四', '王五']),
+            ('李明教授', ['李明']),
+            ('', []),
+            (None, []),
+        ]
+        for name, want in cases:
+            got_gen = gen.speaker_keys(name)
+            got_srv = srv._speaker_keys(name)
+            self.assertEqual(got_gen, want,
+                             f'generate.speaker_keys({name!r}) 期望 {want}，实际 {got_gen}')
+            self.assertEqual(got_srv, want,
+                             f'server._speaker_keys({name!r}) 期望 {want}，实际 {got_srv}')
+
+    def test_speaker_keys_no_separator_leak(self):
+        """真实数据回归：speakerKeys 的每一项都不得残留多人分隔符。
+
+        防的是「拆了但没拆干净」——如 'A、B' 只剥掉首段分隔符却把 '、' 留在键里，
+        会让前端讲者聚合视图多出脏键（同一讲者聚不到一起）。数据侧全量扫描。
+        """
+        if not os.path.exists(DATA_PATH):
+            self.fail('缺少 data/lectures.json——本测试要求仓库内存在主数据')
+        with open(DATA_PATH, encoding='utf-8') as f:
+            raw = json.load(f)
+        data = raw.get('data', []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
+        self.assertTrue(data, 'data/lectures.json 为空，无法做 speakerKeys 回归')
+        bad = []
+        for r in data:
+            for k in gen.speaker_keys(r.get('speaker')):
+                if any(sep in k for sep in ('、', ',', '，', '/')):
+                    bad.append((k, r.get('sourceUrl')))
+        self.assertEqual(bad, [], f'speakerKeys 残留分隔符 {len(bad)} 例：{bad[:5]}')
+
     def test_real_data_pipelines_equal(self):
         """真实 data/lectures.json：两条实现输出必须逐条相等（全量回归）。"""
         if not os.path.exists(DATA_PATH):

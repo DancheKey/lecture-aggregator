@@ -20,14 +20,13 @@ data/.backups/
 data/lectures.json.pre_*
 
 # ===== 本地校验/批量修复脚本（仅本地用，公网 CI 不依赖，不推送） =====
-# 以下 6 个文件 CI 工作流（daily/deploy/test.yml）均未调用，纯本地数据校验/回填工具：
+# 以下 3 个脚本 CI 工作流（daily/deploy/test.yml）均未调用，纯本地数据校验/回填工具：
 scripts/fill_affiliation_batch2.py
 scripts/gen_aff_report.py
 scripts/truncate_polluted_aff.py
-tests/test_data_quality.py
-tests/test_hallucination_guard.py
-tests/test_timeparse.py
 data/powershell.txt
+# 2026-09-10：tests 下三个测试原本也在此被忽略（当时判定「CI 未调用」），但它们是纯离线断言、
+# 覆盖时间解析 / 幻觉守卫 / 数据质量——恰是规则解析改动最密集处。已解除忽略并纳入 test.yml。
 # 一次性修复脚本（fix_5708.py 等），不入库
 fix_*.py
 

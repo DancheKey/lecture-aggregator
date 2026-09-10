@@ -70,8 +70,16 @@ def stamp_script_version(html_name, js_name):
     ver = _short_hash(js_path)
     with open(html_path, 'r', encoding='utf-8') as f:
         html = f.read()
-    # 匹配 src="js_name" 或 src="js_name?v=xxxx"（无论单/双引号），统一替换为带新版本号
-    pat = re.compile(r'src=(["\'])' + re.escape(js_name) + r'(?:\?v=[0-9a-fA-F]+)?\1')
+    # 匹配 src="js_name" 或 src="js_name?v=xxxx"（无论单/双引号），统一替换为带新版本号。
+    # 版本号字符集必须宽松：历史上一处手写的 "?v=20260906g" 含非十六进制字符 'g'，
+    # 被旧正则 (?:\?v=[0-9a-fA-F]+)? 整体失配 -> 该 script 版本号永久冻结（且静默无告警），
+    # 回访用户持续跑旧 JS，正是本机制本该防住的事。故改用 [^"']* 兜住任意版本号形态，
+    # 只以引号收边界。
+    pat = re.compile(r'src=(["\'])' + re.escape(js_name) + r'(?:\?v=[^"\']*)?\1')
+    if pat.search(html) is None:
+        print(f'[warn] {html_name} 中未找到对 {js_name} 的引用，版本号未更新'
+              f'（请检查该 script 是否被改名/删除）')
+        return
     new_html = pat.sub(r'src="%s?v=%s"' % (js_name, ver), html)
     if new_html != html:
         atomic_write_text(html_path, new_html)

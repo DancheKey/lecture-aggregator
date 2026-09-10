@@ -28,3 +28,12 @@ jobs:
       # 一致性守卫：server.py 下发路径与切片生成路径必须逐条一致
       - name: Run frontend-consistency guard tests
         run: python tests/test_frontend_consistency.py
+      # 以下三项 2026-09-10 纳入：此前被 .gitignore 挡在 CI 之外（当时误判为「CI 未调用」），
+      # 覆盖时间解析 / 幻觉守卫 / 数据质量——恰是规则解析改动最密集、却无回归护栏的三块。
+      # 均纯离线、秒级完成，不引入网络与密钥依赖。
+      - name: Run timeparse tests
+        run: python tests/test_timeparse.py
+      - name: Run hallucination-guard tests
+        run: python tests/test_hallucination_guard.py
+      - name: Run data-quality tests
+        run: python tests/test_data_quality.py
