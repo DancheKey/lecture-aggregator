@@ -95,6 +95,23 @@
     @media (min-width: 1700px) {
       .motto-side { display: block; }
     }
+    /* 数据未加载完整时的提示条（加载中 / 加载失败两态）：筛选只作用于「已加载」的数据，
+       不提示会让访客把残缺的筛选结果（如「石牌 0 条」）误当成真值。
+       颜色、间距在此显式声明，避免依赖未包含在预编译产物中的 Tailwind 类。 */
+    .data-hint {
+      display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+      margin-bottom: 1rem; padding: .5rem .75rem;
+      border: 1px solid; border-radius: .5rem;
+      font-size: 12pt; line-height: 1.4;
+    }
+    .data-hint--loading { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+    .data-hint--error { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .data-hint__btn {
+      margin-left: auto; padding: .25rem .625rem; white-space: nowrap;
+      background: #d97706; color: #fff; border: none; border-radius: .375rem;
+      font-size: 11pt; font-weight: 500; cursor: pointer;
+    }
+    .data-hint__btn:hover { background: #b45309; }
   </style>
 </head>
 <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
@@ -236,6 +253,16 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- 数据未加载完整时的醒目标注：筛选只作用于「已加载」的数据，
+               避免访客把残缺的筛选结果（如某校区 0 条）误当成真实结果 -->
+          <div v-if="dataStage === 'partial'" class="data-hint data-hint--loading">
+            <span>⏳ 数据加载中，当前已加载 {{ displayTotal }} 场，筛选结果可能不完整…</span>
+          </div>
+          <div v-else-if="dataStage === 'partial-error'" class="data-hint data-hint--error">
+            <span>⚠ 部分数据加载失败（已加载 {{ displayTotal }} 场），筛选结果不完整</span>
+            <button type="button" class="data-hint__btn" @click="retryLoadFull">重新加载全部</button>
           </div>
 
           <!-- 时间线 -->
@@ -450,7 +477,7 @@
     </transition>
   </div>
 
-  <script defer src="app.js?v=15d8e30cfd"></script>
+  <script defer src="app.js?v=2251e84c98"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->

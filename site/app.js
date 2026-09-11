@@ -822,7 +822,8 @@ const app = createApp({
       const chunks = (manifest && manifest.chunks) || [];
       if (!chunks.length) return this._loadFullSingle();
       this.dataStage = 'partial';
-      for (let i = this.loadedChunks || 0; i < chunks.length; i++) {
+      const failed = [];
+      for (let i = 0; i < chunks.length; i++) {
         let ok = false;
         for (let attempt = 0; attempt < 3 && !ok; attempt++) {
           try {
@@ -837,16 +838,19 @@ const app = createApp({
             if (attempt < 2) await this._sleep(800 * Math.pow(2, attempt));
           }
         }
-        if (!ok) {
-          // 该分片最终失败：保留已加载的真实条数，展示重试入口；
-          // 绝不 finalize 到 50 死值，避免手机端数字定格成假数据。
-          this.dataStage = 'partial-error';
-          return;
-        }
-        this.loadedChunks = i + 1;
+        // 单片最终失败不再中止：记录后继续加载后续分片。
+        // 弱网下把损失从「此后所有分片全部缺失」压到「仅缺失该片」。
+        if (!ok) failed.push(chunks[i]);
       }
       this.loadedChunks = 0;
-      this.dataStage = 'full';
+      if (failed.length) {
+        // 仍有分片失败：保留已加载的真实条数并暴露重试入口；
+        // 绝不 finalize 到 50 死值，避免数字定格成假数据。
+        this.dataStage = 'partial-error';
+        console.warn(`共 ${failed.length} 个分片加载失败（可重试）：`, failed);
+      } else {
+        this.dataStage = 'full';
+      }
     },
 
     _loadFullSingle() {
@@ -925,7 +929,8 @@ const app = createApp({
       if (!this._countRAF) this._countRAF = requestAnimationFrame(this._countTick);
     },
     retryLoadFull() {
-      // 断点续传：从失败的分片继续，已加载条数保留并显示，不回退到 50。
+      // 重新加载全部分片：_mergeChunk 幂等（按 key 去重），已成功分片会命中浏览器缓存、
+      // 重复合并也不会产生重复条目，失败的分片借此补上；已加载条数保留并显示，不回退到 50。
       this.dataStage = 'partial';
       this._loadStaticFull();
     },
