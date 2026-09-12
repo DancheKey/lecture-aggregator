@@ -12,6 +12,17 @@
       "uv_delta": 0,
       "pv_delta": 0,
       "note": "基线（无前序记录，日增不可用）"
+    },
+    {
+      "date": "2026-09-12",
+      "capturedAt": "2026-09-12T08:33:59+08:00",
+      "site_pv": 1119,
+      "site_uv": 925,
+      "page_pv": 1097,
+      "page_uv": 924,
+      "uv_delta": 28,
+      "pv_delta": 32,
+      "note": ""
     }
   ]
 }

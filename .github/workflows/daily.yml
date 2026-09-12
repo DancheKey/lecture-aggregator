@@ -118,29 +118,28 @@ jobs:
           LAST_RUN=$(date -u -d '+8 hours' +'%Y-%m-%dT%H:%M:%S+08:00')
           printf '{\n  "lastRunAt": "%s"\n}\n' "$LAST_RUN" > site/lectures/last_run.json
           echo "last_run.json = $LAST_RUN"
-          # 2026-08-08 修复：补充分片产物，确保手机端分片加载可用。
-          git add \
-            data/lectures.json \
-            data/last_scrape.json \
-            site/lectures.json \
-            site/lectures/latest.json \
-            site/lectures/stats.json \
-            site/lectures/last_run.json \
-            site/lectures/chunk_*.json \
-            site/lectures/chunks.json \
-            site/index.html \
-            site/stats.html
-          # 访问量台账与报告：仅在文件存在时加入。busuanzi 取数失败时这两个文件
-          # 会缺失，不能因此让整个提交步骤失败——否则连讲座数据也提交不上去。
-          for _f in data/visits_history.json reports/visits-trend.html; do
-            if [ -f "$_f" ]; then git add "$_f"; fi
-          done
+          # 2026-09-12 事故修复：显式文件清单改为目录级纳入。
+          # 旧清单漏掉新增出片产物 site/lectures/visits.json，提交后工作区仍残留
+          # 未暂存改动，git pull --rebase 因 "You have unstaged changes" 报 exit 128
+          # 中止 → 整班 cron 失败并连带跳过 Pages 部署（当日新讲座与访问量快照全丢）。
+          # data/ 与 site/ 在 CI 中全部由脚本产出，目录级纳入不会误收 gitignore 内容；
+          # 报告单独条件加入，避免其生成失败时 pathspec 报错。
+          git add -A data site
+          if [ -f reports/visits-trend.html ]; then git add reports/visits-trend.html; fi
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
             echo "存在变更，准备提交..."
             git status --short
             git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')"
+            # 防线（2026-09-12）：rebase 对未暂存改动零容忍，残留会以 exit 128 整班失败。
+            # 若仍有未落入上面目录级 add 的改动（例如此后新增到其他目录的产物），补入本次提交。
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "::warning::提交后仍有未纳入的改动，自动补入本次提交："
+              git status --short
+              git add -A
+              git commit --amend --no-edit
+            fi
             echo "提交成功，同步远端..."
             # 运行期间若仓库被其他提交推进（如人工推送），先 rebase 再 push，避免 non-fast-forward 失败
             # rebase 失败时 abort 退出，交给下一班 cron 重跑（已有 concurrency 排队，重跑成本低）
