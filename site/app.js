@@ -745,6 +745,8 @@ const app = createApp({
      */
     // 最近一次抓取运行时间（2026-09-10）：独立小文件，由 CI 每次运行刷新，
     // 与数据版本 updatedAt 分离，见 displayUpdatedAt 的说明。
+    // 调用点在 mounted()：本地与公网是两条互斥的加载路径，必须各自都能取到该文件，
+    // 只挂在 loadLectures() 上会让公网静态路径永远拿不到 lastRunAt（表现为「更新于」停在数据日）。
     _loadLastRun() {
       fetch('lectures/last_run.json', { cache: 'no-store' })
         .then(r => (r.ok ? r.json() : null))
@@ -753,7 +755,6 @@ const app = createApp({
     },
 
     loadLectures() {
-      this._loadLastRun();
       fetch('/api/lectures', { cache: 'default' })
         .then(r => {
           if (!r.ok) throw new Error('api-unavailable');
@@ -979,6 +980,9 @@ const app = createApp({
     // 公网静态托管不要先等 /api/lectures 超时；先秒开 latest.json，后台再补全量。
     // 本地后端（127.0.0.1/localhost）仍优先 /api/lectures，保证数据最新。
     // IPv6 回环时浏览器返回的 hostname 是「[::1]」（带方括号），一并覆盖
+    // 「更新于」用的运行时间与数据版本无关，两条加载路径都要拉取：
+    // 公网静态托管走 _loadStaticLatest()，若只在 loadLectures() 里拉就会永远显示数据日。
+    this._loadLastRun();
     const isLocal = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname);
     if (isLocal) {
       this.loadLectures();
