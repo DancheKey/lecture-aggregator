@@ -39,49 +39,49 @@ CSS = """
 *{box-sizing:border-box}
 body{margin:0;padding:36px 20px 48px;background:#F7F7F5;color:#2C2C2A;
   font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
-  font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased}
-.wrap{max-width:920px;margin:0 auto}
-h1{font-size:19px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
-.sub{color:#888780;font-size:12px;margin:0}
+  font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:960px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+.sub{color:#888780;font-size:13.5px;margin:0}
 header{margin-bottom:24px}
-.subline{color:#B4B2A9;font-size:12px;margin:4px 0 0}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+.subline{color:#B4B2A9;font-size:13px;margin:4px 0 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));
   gap:12px;margin-bottom:22px}
-.kpi{background:#F1F0EC;border-radius:10px;padding:14px 16px}
-.kpi-k{font-size:12px;color:#888780;margin-bottom:6px}
-.kpi-v{font-size:25px;font-weight:600;line-height:1.2;letter-spacing:-.02em}
-.kpi-d{font-size:12px;color:#B4B2A9;margin-top:5px}
+.kpi{background:#F1F0EC;border-radius:10px;padding:15px 17px}
+.kpi-k{font-size:13.5px;color:#888780;margin-bottom:6px}
+.kpi-v{font-size:30px;font-weight:600;line-height:1.2;letter-spacing:-.02em}
+.kpi-d{font-size:13px;color:#B4B2A9;margin-top:5px}
 .card{background:#fff;border:1px solid #E8E6E0;border-radius:12px;
   padding:18px 20px 16px;margin-bottom:22px}
 .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .ranges{display:flex;gap:8px}
-.ranges button{font:inherit;font-size:12px;padding:4px 14px;border-radius:999px;
+.ranges button{font:inherit;font-size:14px;padding:5px 17px;border-radius:999px;
   border:1px solid #E1E0DA;background:#fff;color:#5F5E5A;cursor:pointer}
 .ranges button:hover{border-color:#C9C7BE}
 .ranges button.on{background:#E6F1FB;color:#185FA5;border-color:#B5D4F4}
-.legend{margin-left:auto;display:flex;gap:16px;font-size:12px;color:#888780}
+.legend{margin-left:auto;display:flex;gap:16px;font-size:13.5px;color:#888780}
 .legend i{display:inline-block;vertical-align:middle;margin-right:6px}
 .sw-line{width:16px;height:2.5px;background:#185FA5;border-radius:2px}
 .sw-bar{width:10px;height:10px;background:#C9DDF3;border-radius:3px}
-.cap{color:#B4B2A9;font-size:12px;margin:12px 0 0}
-.cap b{color:#7A7972;font-weight:600}
+.cap{color:#888780;font-size:13.5px;margin:12px 0 0}
+.cap b{color:#5F5E5A;font-weight:600}
 .empty{color:#888780;padding:28px 0;text-align:center}
 .tb-head{display:flex;align-items:center;gap:12px;margin:0 0 12px}
-h2{font-size:14px;font-weight:600;margin:0}
-.tb-head button{margin-left:auto;font:inherit;font-size:12px;padding:4px 12px;
+h2{font-size:16px;font-weight:600;margin:0}
+.tb-head button{margin-left:auto;font:inherit;font-size:14px;padding:5px 14px;
   border-radius:8px;border:1px solid #E1E0DA;background:#fff;color:#5F5E5A;cursor:pointer}
 .tb-head button:hover{border-color:#C9C7BE;background:#FAFAF8}
-.tbl{max-height:520px;overflow:auto;border:1px solid #E8E6E0;border-radius:12px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:9px 14px;text-align:right;border-bottom:1px solid #F1F0EC;white-space:nowrap}
-th{position:sticky;top:0;background:#FAFAF8;font-weight:600;color:#5F5E5A;z-index:1}
+.tbl{max-height:560px;overflow:auto;border:1px solid #E8E6E0;border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:11px 15px;text-align:right;border-bottom:1px solid #F1F0EC;white-space:nowrap}
+th{position:sticky;top:0;background:#FAFAF8;font-weight:600;color:#5F5E5A;font-size:14px;z-index:1}
 td:first-child,th:first-child{text-align:left}
 td.l,th.l{text-align:left}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#FCFCFB}
-.note{color:#B45309;font-size:12px}
-.foot{margin-top:28px;color:#B4B2A9;font-size:12px;line-height:1.7}
-.foot b{color:#7A7972;font-weight:600}
+.note{color:#B45309;font-size:13.5px}
+.foot{margin-top:28px;color:#888780;font-size:13.5px;line-height:1.8}
+.foot b{color:#5F5E5A;font-weight:600}
 """
 
 JS = """var META = {};
@@ -130,8 +130,8 @@ function renderChart() {
   }
   if (snaps.length === 1) {
     var s0 = snaps[0];
-    box.innerHTML = '<div class="empty">仅 1 条快照（' + s0.date + '）：累计访问 '
-      + fmt(s0.site_pv) + ' 次 / 访客 ' + fmt(s0.site_uv)
+    box.innerHTML = '<div class="empty">仅 1 条快照（' + s0.date + '）：累计访问次数 '
+      + fmt(s0.site_pv) + ' 次 / 累计访客数 ' + fmt(s0.site_uv)
       + ' 人。<br>至少需要 2 条快照才能绘制趋势线。</div>';
     return;
   }
@@ -161,13 +161,13 @@ function renderChart() {
     g += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + R + '" y2="' + y.toFixed(1)
       + '" stroke="' + (v === yLo ? '#D3D1C7' : '#E8E6E0') + '" stroke-width="1"/>';
     g += '<text x="' + (L - 10) + '" y="' + (y + 4).toFixed(1)
-      + '" font-size="11" fill="#888780" text-anchor="end">' + fmt(v) + '</text>';
+      + '" font-size="12" fill="#888780" text-anchor="end">' + fmt(v) + '</text>';
   });
   dT.forEach(function (v) {
     if (v === 0) return;
     var y = yR(v);
     g += '<text x="' + (R + 10) + '" y="' + (y + 4).toFixed(1)
-      + '" font-size="11" fill="#B4B2A9" text-anchor="start">' + fmt(v) + '</text>';
+      + '" font-size="12" fill="#B4B2A9" text-anchor="start">' + fmt(v) + '</text>';
   });
 
   var bw = Math.min(36, Math.max(1.5, pw / snaps.length * 0.7));
@@ -177,7 +177,7 @@ function renderChart() {
     var x = xOf(s) - bw / 2, y = yR(v), h = B - y;
     g += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1)
       + '" height="' + h.toFixed(1) + '" rx="3" fill="#C9DDF3">'
-      + '<title>' + s.date + ' 日增访客 ' + v + '</title></rect>';
+      + '<title>' + s.date + ' 日新增访客 ' + v + ' 人</title></rect>';
   });
 
   g += '<polyline points="'
@@ -191,13 +191,13 @@ function renderChart() {
     var x = xOf(s), y = yL(Number(s.site_uv) || 0);
     g += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1)
       + '" r="4" fill="#ffffff" stroke="#185FA5" stroke-width="2.5">'
-      + '<title>' + s.date + ' 累计访客 ' + fmt(s.site_uv) + '</title></circle>';
+      + '<title>' + s.date + ' 累计访客数 ' + fmt(s.site_uv) + ' 人</title></circle>';
     if (showVal) {
       var anchor = 'middle', lx = x;
       if (i === 0) { anchor = 'start'; lx = x + 9; }
       else if (i === snaps.length - 1) { anchor = 'end'; lx = x - 9; }
       g += '<text x="' + lx.toFixed(1) + '" y="' + (y - 12).toFixed(1)
-        + '" font-size="11" fill="#185FA5" text-anchor="' + anchor + '">'
+        + '" font-size="12" fill="#185FA5" text-anchor="' + anchor + '">'
         + fmt(s.site_uv) + '</text>';
     }
   });
@@ -221,7 +221,7 @@ function renderChart() {
     var has = snaps.some(function (s) { return Math.abs(dn(s.date) - t) < 0.5; });
     var lab = span <= 45 ? iso(t).slice(5) : span <= 400 ? iso(t).slice(0, 7) : iso(t).slice(0, 4);
     g += '<text x="' + x.toFixed(1) + '" y="' + (B + 22)
-      + '" font-size="11" fill="' + (has ? '#5F5E5A' : '#B4B2A9')
+      + '" font-size="12" fill="' + (has ? '#5F5E5A' : '#B4B2A9')
       + '" text-anchor="middle">' + lab + '</text>';
   });
 
@@ -237,12 +237,12 @@ function renderChart() {
   }
 
   box.innerHTML = '<svg viewBox="0 0 680 250" width="100%" role="img"'
-    + ' aria-label="累计访客折线与日增访客柱状组合趋势图">'
+    + ' aria-label="累计访客数折线与日新增访客柱状组合趋势图">'
     + '<title>站点访问量趋势</title><desc>' + snaps[0].date + ' 至 '
-    + snaps[snaps.length - 1].date + ' 的累计访客折线与每日新增访客柱状图。</desc>'
+    + snaps[snaps.length - 1].date + ' 的累计访客数折线与每日新增访客柱状图。</desc>'
     + g + '</svg>'
     + '<p class="cap">覆盖 <b>' + (span + 1) + '</b> 天 · 快照 <b>' + snaps.length
-    + '</b> 条 · 左轴累计访客（人），右轴日增访客' + missTxt + '</p>';
+    + '</b> 条 · 左轴累计访客数（人），右轴日新增访客' + missTxt + '</p>';
 }
 
 function renderTable() {
@@ -373,8 +373,8 @@ def main():
       <button type="button" data-range="0">全部</button>
     </div>
     <div class="legend">
-      <span><i class="sw-line"></i>累计访客</span>
-      <span><i class="sw-bar"></i>日增访客</span>
+      <span><i class="sw-line"></i>累计访客数</span>
+      <span><i class="sw-bar"></i>日新增访客</span>
     </div>
   </div>
   <div id="chart"></div>
@@ -387,14 +387,16 @@ def main():
 </div>
 <div class="tbl">
   <table>
-    <thead><tr><th>日期</th><th>累计 PV</th><th>累计 UV</th>
-    <th>日增 PV</th><th>日增 UV</th><th class="l">备注</th></tr></thead>
+    <thead><tr><th>日期</th><th>累计访问次数</th><th>累计访客数</th>
+    <th>日新增访问</th><th>日新增访客</th><th class="l">备注</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
 </div>
 
 <div class="foot">
-  日增 = 本次快照 − 上一条记录；负值一律记 0 并标注（意味着对方计数器重置）。
+  <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。<br>
+  <b>累计访客数</b>：按访客去重，同一访客重复访问不再累加。<br>
+  「日新增」= 本次快照 − 上一条记录；负值一律记 0 并标注（意味着对方计数器重置）。
   每日由 CI 用 GET 取数（不计数，避免污染统计）。<br>
   横轴按<b>真实日期等距</b>绘制，缺失快照的日期不跳过、不补 0，避免把断档画成连续趋势；
   左轴按数据范围自适应（累计值不从 0 起算，否则曲线会被压平贴顶）。
