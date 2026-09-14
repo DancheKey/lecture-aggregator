@@ -4203,7 +4203,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     SUMMARY_LABELS = (
         '讲座内容简介|课程内容简介|培训内容简介|工作坊内容简介|'
         '讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|报告简介|讲座简介|'
-        '讲座主题简介|讲座内容|讲座简介|报告内容|讲座概要|内容概要|摘要|主要内容'
+        '讲座主题简介|讲座内容|讲座简介|报告内容|讲座概要|内容概要|摘要|主要内容(?=[:：])'
         '|Abstract|Synopsis'
     )
 
@@ -4288,7 +4288,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         r'报告时间|报告地点|报告题目|报告内容|'
         r'时间|地点|题目[：:]|主题[：:]|'
         r'(?:组织单位|主办单位|承办单位|协办单位|支持单位|指导单位|单位)[：:]|'
-        r'主讲人介绍|报告人简介|主讲人简历|专家介绍|$))',
+        r'主讲人介绍|报告人简介|主讲人简历|专家简介|主讲人简介|专家介绍|$))',
         body_text)
     if m:
         abstract = (m.group(1) or '').strip()

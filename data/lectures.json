@@ -21,7 +21,7 @@
       "publishTimeSource": "companion",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "abstract": "腔 QED 是研究光与物质相互作用的系统,在量子光学和量子信息等研究中有重要应用价值。光纤微腔具有模式体积小、耦合强度大以及光子直接单模光纤耦合输入输出等特点,适合进行腔 QED 的实验研究。本报告",
+      "abstract": "腔 QED 是研究光与物质相互作用的系统,在量子光学和量子信息等研究中有重要应用价值。光纤微腔具有模式体积小、耦合强度大以及光子直接单模光纤耦合输入输出等特点,适合进行腔 QED 的实验研究。本报告主要内容是利用基于光纤微腔的 Purcell 区域腔 QED 系统进行量子光学和量子信息等研究,具体包括两能级原子共振荧光过程中的光子贝尔态制备 , 并进一步基于该过程证明了共振荧光中有多光子纠缠现象;超快高保真中性原子内态探测 ; 直接产生违背量子非局域性的原子 - 通讯 C 波段光子量子纠缠。",
       "llmTextEnhanced": true,
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
