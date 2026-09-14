@@ -1,49 +1,300 @@
 <!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>站点访问量趋势</title><style>
-body{margin:0;padding:32px 20px;background:#f8fafc;color:#0f172a;
-  font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;line-height:1.6}
-.wrap{max-width:900px;margin:0 auto}
-h1{font-size:20px;font-weight:700;margin:0 0 6px}
-.sub{color:#64748b;font-size:13px;margin-bottom:24px}
-.cards{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:28px}
-.card{flex:1 1 160px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px}
-.card .k{font-size:12px;color:#64748b}
-.card .v{font-size:26px;font-weight:700;margin-top:4px}
-h2{font-size:15px;font-weight:700;margin:28px 0 12px}
-table{width:100%;border-collapse:collapse;background:#fff;
-  border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;font-size:13px}
-th,td{padding:8px 12px;text-align:right;border-bottom:1px solid #f1f5f9}
-th{background:#f8fafc;font-weight:600;color:#475569}
+*{box-sizing:border-box}
+body{margin:0;padding:36px 20px 48px;background:#F7F7F5;color:#2C2C2A;
+  font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto}
+h1{font-size:19px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+.sub{color:#888780;font-size:12px;margin:0}
+header{margin-bottom:24px}
+.subline{color:#B4B2A9;font-size:12px;margin:4px 0 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:12px;margin-bottom:22px}
+.kpi{background:#F1F0EC;border-radius:10px;padding:14px 16px}
+.kpi-k{font-size:12px;color:#888780;margin-bottom:6px}
+.kpi-v{font-size:25px;font-weight:600;line-height:1.2;letter-spacing:-.02em}
+.kpi-d{font-size:12px;color:#B4B2A9;margin-top:5px}
+.card{background:#fff;border:1px solid #E8E6E0;border-radius:12px;
+  padding:18px 20px 16px;margin-bottom:22px}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.ranges{display:flex;gap:8px}
+.ranges button{font:inherit;font-size:12px;padding:4px 14px;border-radius:999px;
+  border:1px solid #E1E0DA;background:#fff;color:#5F5E5A;cursor:pointer}
+.ranges button:hover{border-color:#C9C7BE}
+.ranges button.on{background:#E6F1FB;color:#185FA5;border-color:#B5D4F4}
+.legend{margin-left:auto;display:flex;gap:16px;font-size:12px;color:#888780}
+.legend i{display:inline-block;vertical-align:middle;margin-right:6px}
+.sw-line{width:16px;height:2.5px;background:#185FA5;border-radius:2px}
+.sw-bar{width:10px;height:10px;background:#C9DDF3;border-radius:3px}
+.cap{color:#B4B2A9;font-size:12px;margin:12px 0 0}
+.cap b{color:#7A7972;font-weight:600}
+.empty{color:#888780;padding:28px 0;text-align:center}
+.tb-head{display:flex;align-items:center;gap:12px;margin:0 0 12px}
+h2{font-size:14px;font-weight:600;margin:0}
+.tb-head button{margin-left:auto;font:inherit;font-size:12px;padding:4px 12px;
+  border-radius:8px;border:1px solid #E1E0DA;background:#fff;color:#5F5E5A;cursor:pointer}
+.tb-head button:hover{border-color:#C9C7BE;background:#FAFAF8}
+.tbl{max-height:520px;overflow:auto;border:1px solid #E8E6E0;border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 14px;text-align:right;border-bottom:1px solid #F1F0EC;white-space:nowrap}
+th{position:sticky;top:0;background:#FAFAF8;font-weight:600;color:#5F5E5A;z-index:1}
 td:first-child,th:first-child{text-align:left}
-tr:last-child td{border-bottom:none}
-.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:12px}
-.bar-date{width:84px;color:#64748b;flex:none}
-.bar-track{flex:1;background:#f1f5f9;border-radius:4px;height:16px;overflow:hidden}
-.bar-fill{height:100%;background:#0ea5e9;border-radius:4px}
-.bar-val{width:56px;text-align:right;color:#334155;flex:none}
-.note{color:#b45309;font-size:12px}
-.empty{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:24px;color:#64748b}
-.foot{margin-top:32px;color:#94a3b8;font-size:12px}
+td.l,th.l{text-align:left}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#FCFCFB}
+.note{color:#B45309;font-size:12px}
+.foot{margin-top:28px;color:#B4B2A9;font-size:12px;line-height:1.7}
+.foot b{color:#7A7972;font-weight:600}
 </style></head>
 <body><div class="wrap">
-<h1>站点访问量趋势</h1>
-<div class="sub">数据来源：busuanzi（公网）每日快照 · 生成于 2026-09-13 19:16 ·
-数据截至 2026-09-14</div>
-<div class="cards"><div class="card"><div class="k">累计访问次数</div><div class="v">1155</div></div><div class="card"><div class="k">累计访客数</div><div class="v">948</div></div><div class="card"><div class="k">记录天数</div><div class="v">4</div></div><div class="card"><div class="k">起止</div><div class="v">2026-09-10 → 2026-09-14</div></div></div>
 
-<h2>近 30 天新增访客（UV）</h2>
-<div class="bar-row"><span class="bar-date">2026-09-10</span><span class="bar-track"><span class="bar-fill" style="width:0%"></span></span><span class="bar-val">0</span></div><div class="bar-row"><span class="bar-date">2026-09-12</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">28</span></div><div class="bar-row"><span class="bar-date">2026-09-13</span><span class="bar-track"><span class="bar-fill" style="width:46%"></span></span><span class="bar-val">13</span></div><div class="bar-row"><span class="bar-date">2026-09-14</span><span class="bar-track"><span class="bar-fill" style="width:35%"></span></span><span class="bar-val">10</span></div>
+<header>
+  <h1>站点访问量趋势</h1>
+  <p class="sub">数据来源 busuanzi（公网）每日快照 · 覆盖
+    2026-09-10 至 2026-09-13</p>
+  <p class="subline">生成于 2026-09-14 09:17 · 台账 data/visits_history.json</p>
+</header>
 
-<h2>快照明细</h2>
-<table>
-<thead><tr><th>日期</th><th>累计 PV</th><th>累计 UV</th>
-<th>日增 PV</th><th>日增 UV</th><th>备注</th></tr></thead>
-<tbody><tr><td>2026-09-14</td><td>1155</td><td>948</td><td>13</td><td>10</td><td style="text-align:left"></td></tr><tr><td>2026-09-13</td><td>1142</td><td>938</td><td>23</td><td>13</td><td style="text-align:left"></td></tr><tr><td>2026-09-12</td><td>1119</td><td>925</td><td>32</td><td>28</td><td style="text-align:left"></td></tr><tr><td>2026-09-10</td><td>1087</td><td>897</td><td>0</td><td>0</td><td style="text-align:left"><span class="note">基线（无前序记录，日增不可用）</span></td></tr></tbody>
-</table>
+<div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v">1,133</div><div class="kpi-d">较前次 +14</div></div><div class="kpi"><div class="kpi-k">累计访客数</div><div class="kpi-v">937</div><div class="kpi-d">较前次 +12</div></div><div class="kpi"><div class="kpi-k">日均新增访客</div><div class="kpi-v">13</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">4 天</div><div class="kpi-d">快照 3 条，缺 1 天</div></div></div>
+
+<div class="card">
+  <div class="toolbar">
+    <div class="ranges">
+      <button type="button" data-range="7" class="on">近 7 天</button>
+      <button type="button" data-range="30">近 30 天</button>
+      <button type="button" data-range="0">全部</button>
+    </div>
+    <div class="legend">
+      <span><i class="sw-line"></i>累计访客</span>
+      <span><i class="sw-bar"></i>日增访客</span>
+    </div>
+  </div>
+  <div id="chart"></div>
+</div>
+
+<div class="tb-head">
+  <h2>快照明细</h2>
+  <span class="sub">共 <span id="tcount">0</span> 条</span>
+  <button type="button" id="toggleRows">展开全部</button>
+</div>
+<div class="tbl">
+  <table>
+    <thead><tr><th>日期</th><th>累计 PV</th><th>累计 UV</th>
+    <th>日增 PV</th><th>日增 UV</th><th class="l">备注</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
 
 <div class="foot">
-说明：日增 = 本次快照 − 上一条记录。负值一律记 0 并标注（意味着对方计数器重置）。
-每日由 CI 用 GET 取数（不计数，避免污染统计）；台账存于 data/visits_history.json。
+  日增 = 本次快照 − 上一条记录；负值一律记 0 并标注（意味着对方计数器重置）。
+  每日由 CI 用 GET 取数（不计数，避免污染统计）。<br>
+  横轴按<b>真实日期等距</b>绘制，缺失快照的日期不跳过、不补 0，避免把断档画成连续趋势；
+  左轴按数据范围自适应（累计值不从 0 起算，否则曲线会被压平贴顶）。
 </div>
-</div></body></html>
+
+</div>
+<script>var META = {"source": "busuanzi（公网）", "siteUrl": "https://danchekey.github.io/lecture-aggregator/", "generatedAt": "2026-09-14 09:17"};
+var SNAPS = [{"date": "2026-09-10", "capturedAt": "2026-09-10T23:03:44+08:00", "site_pv": 1087, "site_uv": 897, "page_pv": 1065, "page_uv": 896, "uv_delta": 0, "pv_delta": 0, "note": "基线（无前序记录，日增不可用）"}, {"date": "2026-09-12", "capturedAt": "2026-09-12T08:33:59+08:00", "site_pv": 1119, "site_uv": 925, "page_pv": 1097, "page_uv": 924, "uv_delta": 28, "pv_delta": 32, "note": ""}, {"date": "2026-09-13", "capturedAt": "2026-09-13T02:54:44+08:00", "site_pv": 1133, "site_uv": 937, "page_pv": 1111, "page_uv": 936, "uv_delta": 12, "pv_delta": 14, "note": ""}];
+
+var L = 58, R = 636, T = 26, B = 206;
+var RANGE = 7, EXPANDED = false;
+
+function dn(s) {
+  var a = s.split('-');
+  return Date.UTC(+a[0], +a[1] - 1, +a[2]) / 86400000;
+}
+function iso(n) {
+  return new Date(n * 86400000).toISOString().slice(0, 10);
+}
+function fmt(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  return Number(v).toLocaleString('en-US');
+}
+function inRange(snaps, r) {
+  if (!r || snaps.length < 2) return snaps.slice();
+  var last = dn(snaps[snaps.length - 1].date);
+  return snaps.filter(function (s) { return last - dn(s.date) <= r - 1; });
+}
+function niceTicks(lo, hi, seg) {
+  var span = hi - lo;
+  if (!(span > 0)) span = 1;
+  var raw = span / seg;
+  var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  var n = raw / mag;
+  var step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
+  if (!(step > 0)) step = 1;
+  var a = Math.floor(lo / step) * step;
+  var b = Math.ceil(hi / step) * step;
+  var out = [];
+  for (var v = a; v <= b + step * 1e-6; v += step) out.push(Math.round(v * 1e6) / 1e6);
+  return out;
+}
+
+function renderChart() {
+  var box = document.getElementById('chart');
+  var snaps = inRange(SNAPS, RANGE);
+  if (!snaps.length) {
+    box.innerHTML = '<div class="empty">该时间范围内没有快照记录。</div>';
+    return;
+  }
+  if (snaps.length === 1) {
+    var s0 = snaps[0];
+    box.innerHTML = '<div class="empty">仅 1 条快照（' + s0.date + '）：累计访问 '
+      + fmt(s0.site_pv) + ' 次 / 访客 ' + fmt(s0.site_uv)
+      + ' 人。<br>至少需要 2 条快照才能绘制趋势线。</div>';
+    return;
+  }
+
+  var t0 = dn(snaps[0].date);
+  var t1 = dn(snaps[snaps.length - 1].date);
+  var span = Math.max(t1 - t0, 1);
+  var pw = R - L, ph = B - T;
+  function xOf(s) { return L + (dn(s.date) - t0) / span * pw; }
+
+  var uvs = snaps.map(function (s) { return Number(s.site_uv) || 0; });
+  var yT = niceTicks(Math.min.apply(null, uvs), Math.max.apply(null, uvs), 3);
+  var yLo = yT[0], yHi = yT[yT.length - 1];
+  function yL(v) { return B - (v - yLo) / ((yHi - yLo) || 1) * ph; }
+
+  var dmax = Math.max.apply(null, snaps.map(function (s) {
+    return Math.max(0, Number(s.uv_delta) || 0);
+  }));
+  var dT = niceTicks(0, dmax || 1, 2);
+  var dHi = dT[dT.length - 1] || 1;
+  function yR(v) { return B - v / dHi * ph; }
+
+  var g = '';
+
+  yT.forEach(function (v) {
+    var y = yL(v);
+    g += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + R + '" y2="' + y.toFixed(1)
+      + '" stroke="' + (v === yLo ? '#D3D1C7' : '#E8E6E0') + '" stroke-width="1"/>';
+    g += '<text x="' + (L - 10) + '" y="' + (y + 4).toFixed(1)
+      + '" font-size="11" fill="#888780" text-anchor="end">' + fmt(v) + '</text>';
+  });
+  dT.forEach(function (v) {
+    if (v === 0) return;
+    var y = yR(v);
+    g += '<text x="' + (R + 10) + '" y="' + (y + 4).toFixed(1)
+      + '" font-size="11" fill="#B4B2A9" text-anchor="start">' + fmt(v) + '</text>';
+  });
+
+  var bw = Math.min(36, Math.max(1.5, pw / snaps.length * 0.7));
+  snaps.forEach(function (s) {
+    var v = Math.max(0, Number(s.uv_delta) || 0);
+    if (!v) return;
+    var x = xOf(s) - bw / 2, y = yR(v), h = B - y;
+    g += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1)
+      + '" height="' + h.toFixed(1) + '" rx="3" fill="#C9DDF3">'
+      + '<title>' + s.date + ' 日增访客 ' + v + '</title></rect>';
+  });
+
+  g += '<polyline points="'
+    + snaps.map(function (s) {
+        return xOf(s).toFixed(1) + ',' + yL(Number(s.site_uv) || 0).toFixed(1);
+      }).join(' ')
+    + '" fill="none" stroke="#185FA5" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+
+  var showVal = snaps.length <= 8;
+  snaps.forEach(function (s, i) {
+    var x = xOf(s), y = yL(Number(s.site_uv) || 0);
+    g += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1)
+      + '" r="4" fill="#ffffff" stroke="#185FA5" stroke-width="2.5">'
+      + '<title>' + s.date + ' 累计访客 ' + fmt(s.site_uv) + '</title></circle>';
+    if (showVal) {
+      var anchor = 'middle', lx = x;
+      if (i === 0) { anchor = 'start'; lx = x + 9; }
+      else if (i === snaps.length - 1) { anchor = 'end'; lx = x - 9; }
+      g += '<text x="' + lx.toFixed(1) + '" y="' + (y - 12).toFixed(1)
+        + '" font-size="11" fill="#185FA5" text-anchor="' + anchor + '">'
+        + fmt(s.site_uv) + '</text>';
+    }
+  });
+
+  var tk = [];
+  if (span <= 10) {
+    for (var tDay = t0; tDay <= t1 + 1e-6; tDay++) tk.push(tDay);
+  } else if (span <= 45) {
+    for (var tWeek = t0; tWeek <= t1 + 1e-6; tWeek += 7) tk.push(tWeek);
+    if (tk[tk.length - 1] < t1 - 1e-6) tk.push(t1);
+  } else {
+    var keyLen = span <= 400 ? 7 : 4;
+    var seenKey = {};
+    snaps.forEach(function (s) {
+      var k = s.date.slice(0, keyLen);
+      if (!seenKey[k]) { seenKey[k] = 1; tk.push(dn(s.date)); }
+    });
+  }
+  tk.forEach(function (t) {
+    var x = L + (t - t0) / span * pw;
+    var has = snaps.some(function (s) { return Math.abs(dn(s.date) - t) < 0.5; });
+    var lab = span <= 45 ? iso(t).slice(5) : span <= 400 ? iso(t).slice(0, 7) : iso(t).slice(0, 4);
+    g += '<text x="' + x.toFixed(1) + '" y="' + (B + 22)
+      + '" font-size="11" fill="' + (has ? '#5F5E5A' : '#B4B2A9')
+      + '" text-anchor="middle">' + lab + '</text>';
+  });
+
+  var missing = [];
+  for (var d = t0; d <= t1 + 1e-6; d++) {
+    if (!snaps.some(function (s) { return Math.abs(dn(s.date) - d) < 0.5; })) missing.push(iso(d));
+  }
+  var missTxt = '';
+  if (missing.length) {
+    missTxt = ' · 无快照：' + (missing.length <= 4
+      ? missing.join('、')
+      : missing.slice(0, 3).join('、') + ' 等 ' + missing.length + ' 天');
+  }
+
+  box.innerHTML = '<svg viewBox="0 0 680 250" width="100%" role="img"'
+    + ' aria-label="累计访客折线与日增访客柱状组合趋势图">'
+    + '<title>站点访问量趋势</title><desc>' + snaps[0].date + ' 至 '
+    + snaps[snaps.length - 1].date + ' 的累计访客折线与每日新增访客柱状图。</desc>'
+    + g + '</svg>'
+    + '<p class="cap">覆盖 <b>' + (span + 1) + '</b> 天 · 快照 <b>' + snaps.length
+    + '</b> 条 · 左轴累计访客（人），右轴日增访客' + missTxt + '</p>';
+}
+
+function renderTable() {
+  var all = inRange(SNAPS, RANGE);
+  var rows = all.slice().reverse();
+  var limit = EXPANDED ? rows.length : Math.min(rows.length, 7);
+  var h = '';
+  rows.slice(0, limit).forEach(function (s) {
+    var note = s.note ? '<span class="note">' + s.note + '</span>' : '';
+    h += '<tr><td>' + s.date + '</td><td>' + fmt(s.site_pv) + '</td><td>' + fmt(s.site_uv)
+      + '</td><td>' + fmt(s.pv_delta) + '</td><td>' + fmt(s.uv_delta)
+      + '</td><td class="l">' + note + '</td></tr>';
+  });
+  document.getElementById('tbody').innerHTML = h;
+  var btn = document.getElementById('toggleRows');
+  if (rows.length > 7) {
+    btn.style.display = '';
+    btn.textContent = EXPANDED ? '收起（仅显示最近 7 条）' : '展开全部 ' + rows.length + ' 条';
+  } else {
+    btn.style.display = 'none';
+  }
+  document.getElementById('tcount').textContent = rows.length;
+}
+
+document.querySelectorAll('.ranges button').forEach(function (b) {
+  b.addEventListener('click', function () {
+    RANGE = Number(b.getAttribute('data-range'));
+    document.querySelectorAll('.ranges button').forEach(function (x) {
+      x.classList.toggle('on', x === b);
+    });
+    renderChart();
+    renderTable();
+  });
+});
+document.getElementById('toggleRows').addEventListener('click', function () {
+  EXPANDED = !EXPANDED;
+  renderTable();
+});
+
+renderChart();
+renderTable();
+</script>
+</body></html>
