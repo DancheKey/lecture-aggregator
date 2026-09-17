@@ -400,16 +400,18 @@ const app = createApp({
       // （如"关于征集国家社科基金...关于申报教育部..."），不是讲座摘要。
       // 特征：含"资讯及通知"栏目标题，或 ≥2 条"关于…通知/公告/申报/征集"短语。
       if (/资讯及通知|(?:关于.{2,40}(?:通知|公告|申报|征集|转发|招标|遴选).*){2,}/.test(ab)) return '';
-      // 上限 500 字防超长脏数据；展示层默认 3 行截断 + 展开按钮（见 abstractLong / expandedAbstract）
-      return this.truncate(ab, 500);
+      // 上限 5000 字防超长脏数据（全库现有摘要最长约 4100 字，均不受影响）；
+      // 展示层默认 3 行截断 + 展开按钮（见 abstractLong / expandedAbstract）
+      return this.truncate(ab, 5000);
     },
     // 摘要是否超长（超过约 3 行时提供展开按钮；130 字 ≈ 12pt 字号下 3 行的阅读量）
     abstractLong(l) {
       return this.abstractOf(l).length > 130;
     },
-    // 主讲简介全文（原 220 字截断放宽到 400，避免头衔/单位在截断处丢失）
+    // 主讲简介全文（放宽到 2000：全库 >400 字简介有数百条，原 400 字上限会把
+    // 头衔/单位/邮箱在截断处丢失；仍保留防超长脏数据底线）
     bioText(l) {
-      return this.truncate(this.cleanFooter(l.speakerBio), 400);
+      return this.truncate(this.cleanFooter(l.speakerBio), 2000);
     },
     // 简介是否需要折叠：超过约两行（80 字）时默认截为两行并提供展开按钮；
     // 不超两行则直接完整显示（不出现按钮）
