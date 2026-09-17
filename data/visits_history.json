@@ -78,6 +78,17 @@
       "uv_delta": 9,
       "pv_delta": 14,
       "note": ""
+    },
+    {
+      "date": "2026-09-18",
+      "capturedAt": "2026-09-18T04:15:28+08:00",
+      "site_pv": 1215,
+      "site_uv": 994,
+      "page_pv": 1193,
+      "page_uv": 992,
+      "uv_delta": 8,
+      "pv_delta": 9,
+      "note": ""
     }
   ]
 }
