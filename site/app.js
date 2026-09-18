@@ -10,9 +10,9 @@ const WANTED_KEY = 'lecture_wanted_urls_v1';
 const STAT_KEY = 'lecture_stats_v1';      // 本地缓存 + 后端合并后的讲座访问/点赞/想听统计
 const COUNT_CAP = 300;                    // 点赞/想听超过此值显示 "300+"，防止虚高数字
 
-// 配置项：若已部署「工作流触发代理」（持有 PAT 的 Cloudflare Worker / Vercel Function 等，
-// 见 SECURITY.md R6），把其地址填到此处，公网「抓取新数据」按钮即可立即触发 GitHub Actions；
-// 留空则按钮走友好降级——网站已配置「每日凌晨 3 点自动更新」，无需手动操作。
+// 配置项：若已部署「工作流触发代理」（持有 PAT 的 Cloudflare Worker / Vercel Function 等），
+// 把其地址填到此处，公网「抓取新数据」按钮即可立即触发 GitHub Actions；
+// 留空则按钮走友好降级——网站每天自动更新两次，无需手动操作。
 // ⚠️ 切勿把 PAT 直接写进前端：静态页无保密环境，会被任何人查看源码拿到。
 const WORKFLOW_DISPATCH_URL = '';
 
@@ -963,9 +963,9 @@ const app = createApp({
                 if (r.ok) this.showToast('已触发后台更新，几分钟后刷新即可看到最新数据');
                 else throw new Error('dispatch-failed');
               })
-              .catch(() => this.showToast('立即更新触发失败，网站已配置每日凌晨 3 点自动更新'));
+              .catch(() => this.showToast('立即更新触发失败，网站每天自动更新两次（约 11:00 与次日 01:00）'));
           } else {
-            this.showToast('网站已配置每日凌晨 3 点自动更新；如需立即更新，请在本机运行爬虫或手动触发工作流');
+            this.showToast('网站每天自动更新两次（约 11:00 与次日 01:00）；如需立即更新，请在本机运行爬虫或手动触发工作流');
           }
         })
         .finally(() => { this.scraping = false; });

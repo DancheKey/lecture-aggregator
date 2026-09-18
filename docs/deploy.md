@@ -1,8 +1,8 @@
 # 木铎金声 · 华南师范大学讲座聚合 — 部署说明
 
-> 当前已上线公网演示（CloudStudio 静态托管）：
-> **https://54d91f8875ba42539336af61185dbd02.app.codebuddy.work**
-> 数据：115 条讲座，覆盖 2020–2026 年。
+> 当前已上线公网（GitHub Pages，由 Actions 自动部署）：
+> **https://danchekey.github.io/lecture-aggregator/**
+> 数据覆盖 2020 年至今，每天两班自动增量更新。
 
 ---
 
@@ -12,7 +12,6 @@
 site/                 ← 前端（Vue3 + Tailwind CDN，纯静态）
   index.html          首页（信息流 + 筛选 + 点赞）
   stats.html          学院/部处 × 年份 统计表
-  sources.html        信息源管理（需后端）
   app.js / style.css
   lectures.json       ← 静态数据源（切片脚本生成：排除名单过滤 + unitType 标注，勿用 cp 覆盖）
   scnu-emblem.png / motto.png / site-title.png
@@ -25,8 +24,8 @@ server.py              ← 本地开发/全栈后端（静态托管 + /api/*）
 因此默认只能在「本机 + 常驻 Python 进程」下运行。要放到公网，有两条路线：
 
 - **方案 A（已采用）纯静态部署**：把数据预先生成为 `site/lectures.json`，前端直接读取，
-  不依赖后端。优点是零运维、免费/廉价、不怕崩；缺点是「网页上点抓取」「信息源管理」不可用
-  （这两个功能需后端，保留给本地或全栈部署，并在前端做了友好降级提示）。
+  不依赖后端。优点是零运维、免费/廉价、不怕崩；缺点是「网页上点抓取」不可用
+  （该功能需后端，保留给本地或全栈部署，并在前端做了友好降级提示）。
 - **方案 B 全栈部署**：保留 `server.py` 全部功能（含网页抓取），需一台公网云服务器 + 守护进程 + 域名。
 
 ---
@@ -67,7 +66,7 @@ python scripts/generate_frontend_data.py
 | **自有服务器 Nginx** | `root` 指向 `site/`；`location / { try_files $uri $uri/ /index.html; }` |
 
 > 纯静态托管下，若未配置「工作流触发代理」，`index.html` / `stats.html` 的「抓取新数据」
-> 会提示「网站已配置每日凌晨 3 点自动更新…」；`sources.html` 不可用（属管理后台）。
+> 会走友好降级提示（提示网站已配置定时自动更新，无需手动操作）。
 
 ### 3. 自动每日更新（GitHub Actions，推荐）
 
@@ -75,7 +74,9 @@ python scripts/generate_frontend_data.py
 
 - **定时**：每天两班（GitHub cron 用 UTC）——**03:00 UTC（北京时间 11:00）** 与
   **17:00 UTC（北京时间次日 01:00）** 自动运行爬虫增量更新（2026-08-05 按 daily.yml 实际配置修正）；
-- **手动**：Actions 页面 `Run workflow`，或通过网站「抓取新数据」按钮经代理触发（见 SECURITY.md R6）；
+- **手动**：Actions 页面 `Run workflow`；或在网站点「抓取新数据」经代理触发——需自建一个持有
+  GitHub PAT 的触发代理（Cloudflare Worker / Vercel Function 等），把其地址填入
+  `site/app.js` 的 `WORKFLOW_DISPATCH_URL`（留空则前端走降级提示）。⚠️ 切勿把 PAT 写进前端；
 - 运行方式：GitHub 临时云机器装 Python + 依赖（含 RapidOCR，已缓存 pip）→ 跑 `scraper/scraper.py`
   （增量，**只补新讲座，不会重复解析已抓过的旧 URL**）→ 跑 `scripts/generate_frontend_data.py`
   生成前端切片（`site/lectures.json`、`site/lectures/latest.json`、`site/lectures/stats.json`）
@@ -174,7 +175,8 @@ server {
 
 ## 五、已知限制
 
-1. 纯静态部署下：**网页抓取**、**信息源管理**不可用（前端已做降级提示）。
+1. 纯静态部署下：**网页抓取**不可用（前端已做降级提示）。信息源管理接口 `/api/sources`
+   仅在本地运行 `server.py` 时可用，且目前无 Web 管理界面。
 2. 点赞数据是**浏览器本地存储**（localStorage），换设备/清缓存会清零，不跨用户共享。
 3. 静态数据是部署时的**快照**，更新需重新走「爬虫 → 同步 → 部署」流程。
 4. 爬虫依赖 RapidOCR（CPU 模式较慢、包体大），全栈部署时首抓需耐心等待。
