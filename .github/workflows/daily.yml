@@ -13,11 +13,13 @@ on:
     - cron: '0 16 * * *'
   workflow_dispatch: {}
 
-# 本工作流需要写回仓库（提交更新后的数据），并发布 Pages
+# 本工作流需要写回仓库（提交更新后的数据），并发布 Pages；
+# issues: write 供「信息源健康检查」在发现失效栏目时自动创建/更新告警 Issue。
 permissions:
   contents: write
   pages: write
   id-token: write
+  issues: write
 
 # 同一时间只跑一个抓取任务；新触发排队（不取消正在跑的），避免并发写冲突
 concurrency:
@@ -99,6 +101,19 @@ jobs:
           name: 字段体检报告
           path: reports/audit_fields_report.html
           retention-days: 30
+
+      # 信息源健康检查（2026-09-18）：主动探测 sources.yaml 中每个栏目 URL 的可达性。
+      # 为什么需要它：scraper.fetch() 对 4xx/5xx 是「返回 None 不抛异常」，collect_links(None)
+      # 又静默返回空列表——因此「学院把栏目网址换掉、旧链接 404」不会进入 failed_sources，
+      # 现有失败源告警完全检测不到，外在表现只是「这个学院好久没新讲座」。
+      # 本步把这种静默失效变成主动告警：异常时自动创建/更新 GitHub Issue，借邮件通知维护者。
+      # 台账 data/source_health.json 随本次提交入库；脚本始终退出 0，不影响数据部署。
+      # 置于「提交并推送」之前，以确保台账被本次提交带走。
+      - name: 信息源健康检查（自动告警）
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/check_source_health.py
 
       - name: 提交并推送（仅在有变化时）
         run: |
