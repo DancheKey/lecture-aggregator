@@ -16,6 +16,19 @@ const COUNT_CAP = 300;                    // 点赞/想听超过此值显示 "30
 // ⚠️ 切勿把 PAT 直接写进前端：静态页无保密环境，会被任何人查看源码拿到。
 const WORKFLOW_DISPATCH_URL = '';
 
+// 配置项：信息源报告的接收通道。
+// 公网静态站（GitHub Pages）没有后端，接不住表单 POST；因此页面直接把内容
+// POST 到 Web3Forms —— 一个面向静态站的表单转发服务（免费额度 250 条/月），
+// 由它把内容转发到维护者邮箱。即：静态站不「接收」，只「发起」。
+// access_key 按官方说明不是密钥、可公开：它只是「投递到哪个邮箱」的别名，
+// 读不到任何数据；防滥用靠蜜罐 + 服务端限流。
+// 注意：跨域域名必须在 index.html 的 CSP connect-src 中放行，否则浏览器会当场掐断。
+const REPORT_ENDPOINT = 'https://api.web3forms.com/submit';
+const REPORT_ACCESS_KEY = '1e9b5b37-ad58-4943-b509-8a4ab7974dd3';
+// 反连点节流：同一浏览器 60 秒内只允许提交一次
+const SRC_REPORT_TS = 'srcReportLastAt';
+const SRC_REPORT_GAP_MS = 60000;
+
 const app = createApp({
   data() {
     return {
@@ -34,6 +47,11 @@ const app = createApp({
       showLikedOnly: false,  // 仅显示已点赞讲座
       scraping: false,
       showMenu: false,    // 顶部栏更多操作下拉菜单
+      showReport: false,  // 信息源报告弹窗显隐
+      // 信息源报告表单：用于反馈「某单位换了讲座栏目网址 / 栏目已失效」
+      // hp 为反垃圾蜜罐（视觉隐藏，真人看不见，机器人会去填）
+      reportForm: { unit: '', campus: '', url: '', oldUrl: '', note: '', contact: '', hp: '' },
+      reportSending: false,  // 报告提交中（防重复点击 + 按钮态）
       likes: {},          // url -> count（本地点赞数）
       likedUrls: new Set(), // 当前浏览器已点赞的 url 集合
       wants: {},          // url -> count（本地想听数）
@@ -662,11 +680,11 @@ const app = createApp({
         })
         .catch(() => { this.lectureStats = localStats; });
     },
-    showToast(msg) {
+    showToast(msg, ms = 2000) {
       this.toast.message = msg;
       this.toast.show = true;
       clearTimeout(this.toast.timer);
-      this.toast.timer = setTimeout(() => { this.toast.show = false; }, 2000);
+      this.toast.timer = setTimeout(() => { this.toast.show = false; }, ms);
     },
 
     /* ---------- 筛选交互 ---------- */
@@ -969,6 +987,139 @@ const app = createApp({
           }
         })
         .finally(() => { this.scraping = false; });
+    },
+
+    /* ---------- 信息源报告（反馈栏目网址变更 / 长期无更新） ---------- */
+    openReport() { this.showReport = true; },
+    closeReport() { this.showReport = false; },
+
+    _nowStr() {
+      const d = new Date(), p = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    },
+
+    // 结构化报告文本：既能粘贴进收集表，也能直接复制发给维护者
+    buildReportText() {
+      const f = this.reportForm;
+      return [
+        '【信息源报告】',
+        '单位名称：' + (f.unit || '（未填）'),
+        '所在校区：' + (f.campus || '（未填）'),
+        '新的讲座栏目网址：' + (f.url || '（未填）'),
+        '原栏目网址：' + (f.oldUrl || '（未填）'),
+        '补充说明：' + (f.note || '（无）'),
+        '联系方式：' + (f.contact || '（未填）'),
+        '报告时间：' + this._nowStr(),
+      ].join('\n');
+    },
+
+    // 剪贴板：优先 navigator.clipboard（仅在安全上下文 https / localhost 可用），
+    // 被拒或不可用时回退 textarea + execCommand（局域网 http 直连场景）
+    copyText(text) {
+      const fallback = () => new Promise((resolve, reject) => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          ok ? resolve() : reject(new Error('execCommand-failed'));
+        } catch (e) { reject(e); }
+      });
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text).catch(fallback);
+      }
+      return fallback();
+    },
+
+    _reportFilled() {
+      const f = this.reportForm;
+      return !!(f.unit || '').trim() && !!(f.url || '').trim();
+    },
+
+    copyReport() {
+      if (!this._reportFilled()) { this.showToast('请先填写「单位名称」和「新的讲座栏目网址」'); return; }
+      this.copyText(this.buildReportText())
+        .then(() => this.showToast('报告内容已复制到剪贴板'))
+        .catch(() => this.showToast('复制失败，请手动选择文本复制'));
+    },
+
+    // 重置表单（含蜜罐）
+    _resetReportForm() {
+      this.reportForm = { unit: '', campus: '', url: '', oldUrl: '', note: '', contact: '', hp: '' };
+    },
+
+    // 站内提交：POST 到 Web3Forms，由其转发到维护者邮箱。
+    // 任一环节失败（断网 / 被拦 / 额度用尽）→ 自动把内容复制好并保留弹窗，报告不会丢。
+    async submitReport() {
+      if (this.reportSending) return;
+      if (!this._reportFilled()) { this.showToast('请先填写「单位名称」和「新的讲座栏目网址」'); return; }
+
+      // 蜜罐命中：按成功处理，不给机器人反馈，也不消耗额度
+      if ((this.reportForm.hp || '').trim()) {
+        this.closeReport(); this._resetReportForm();
+        this.showToast('报告已提交，感谢反馈！');
+        return;
+      }
+
+      let last = 0;
+      try { last = parseInt(localStorage.getItem(SRC_REPORT_TS) || '0', 10) || 0; } catch (e) { last = 0; }
+      if (last && Date.now() - last < SRC_REPORT_GAP_MS) {
+        this.showToast('刚刚已提交过一次，请稍后再试'); return;
+      }
+
+      const text = this.buildReportText();
+      // 未配置通道：退化为复制（零配置仍可用）
+      if (!REPORT_ACCESS_KEY) {
+        try { await this.copyText(text); this.showToast('报告内容已复制，请发送给维护者'); }
+        catch (e) { this.showToast('复制失败，请手动记录报告内容'); }
+        return;
+      }
+
+      const f = this.reportForm;
+      const payload = {
+        access_key: REPORT_ACCESS_KEY,
+        subject: '【信息源报告】' + (f.unit || '未填单位'),
+        from_name: '木铎金声 · 讲座聚合站',
+        botcheck: false,
+        '单位名称': f.unit,
+        '所在校区': f.campus || '不确定 / 不适用',
+        '新的讲座栏目网址': f.url,
+        '原栏目网址': f.oldUrl || '（未填）',
+        '补充说明': f.note || '（无）',
+        '联系方式': f.contact || '（未填）',
+        '报告时间': this._nowStr(),
+        '页面地址': location.href,
+      };
+      // 联系方式像邮箱时设为 replyto，便于直接回信确认
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((f.contact || '').trim())) payload.replyto = f.contact.trim();
+
+      this.reportSending = true;
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 12000);
+      try {
+        const res = await fetch(REPORT_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: ctl.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error((data && data.message) || ('HTTP ' + res.status));
+        try { localStorage.setItem(SRC_REPORT_TS, String(Date.now())); } catch (e) { /* 隐私模式忽略 */ }
+        this.closeReport(); this._resetReportForm();
+        this.showToast('报告已提交，感谢反馈！');
+      } catch (e) {
+        // 兜底：内容复制到剪贴板，弹窗留在原地，用户可直接发给维护者
+        try { await this.copyText(text); } catch (e2) { /* 忽略 */ }
+        this.showToast('提交失败，报告内容已复制，请发送给维护者', 4000);
+      } finally {
+        clearTimeout(timer);
+        this.reportSending = false;
+      }
     },
   },
 
