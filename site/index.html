@@ -7,8 +7,10 @@
        - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
          站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
        - 访问量使用 busuanzi.aspark.cc（国内可用的免费计数服务，兼容原版不蒜子写法），
-         script-src / connect-src 需放行 busuanzi.aspark.cc；localStorage 5 分钟缓存防重复计数。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc; object-src 'none'; base-uri 'self'; form-action 'self'" />
+         script-src / connect-src 需放行 busuanzi.aspark.cc；localStorage 5 分钟缓存防重复计数。
+       - 「报告信息源问题」弹窗把内容 POST 到 Web3Forms（静态站无后端的转发通道），
+         connect-src 必须放行其接口域名，否则浏览器会当场掐断该请求。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc https://api.web3forms.com; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <!-- footer-counter.js 动态加载 busuanzi，5 分钟内不重复计数 -->
   <meta name="referrer" content="no-referrer" />
   <title>木铎金声</title>
@@ -78,6 +80,70 @@
     .search-clear:hover { color: #1e293b; background-color: #e2e8f0; }
     /* 搜索框：为右侧清除按钮留出空间（所有尺寸） */
     .search-pad { padding-left: .75rem; padding-right: 2.25rem; }
+    /* 信息源报告弹窗：纯自定义 CSS，不依赖 vendor/tailwind.css 预编译产物
+       （该产物是按需子集，新增 utility 类会静默失效，故此处显式声明） */
+    .src-mask {
+      position: fixed; inset: 0; z-index: 60;
+      background: rgba(15, 23, 42, .45);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .src-modal {
+      background: #fff; border-radius: .75rem;
+      width: 100%; max-width: 30rem; max-height: calc(100vh - 2rem);
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 20px 45px rgba(15, 23, 42, .28);
+    }
+    .src-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .9rem 1.25rem; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+    }
+    .src-head h3 { margin: 0; font-size: 14pt; font-weight: 600; color: #1e293b; }
+    .src-x {
+      border: none; background: transparent; cursor: pointer;
+      color: #94a3b8; font-size: 12pt; line-height: 1;
+      padding: .25rem .35rem; border-radius: .375rem;
+    }
+    .src-x:hover { color: #475569; background: #f1f5f9; }
+    .src-body { padding: 1rem 1.25rem; overflow-y: auto; }
+    .src-intro { margin: 0 0 1rem; font-size: 11.5pt; line-height: 1.65; color: #64748b; }
+    .src-field { display: block; margin-bottom: .85rem; }
+    .src-label {
+      display: block; margin-bottom: .3rem;
+      font-size: 11.5pt; font-weight: 500; color: #334155;
+    }
+    .src-label em { color: #ef4444; font-style: normal; }
+    .src-input {
+      width: 100%; box-sizing: border-box;
+      padding: .5rem .7rem; font-size: 12pt; font-family: inherit;
+      color: #1e293b; background: #fff;
+      border: 1px solid #cbd5e1; border-radius: .5rem;
+    }
+    .src-input::placeholder { color: #94a3b8; }
+    .src-input:focus {
+      outline: none; border-color: #60a5fa;
+      box-shadow: 0 0 0 2px rgba(96, 165, 250, .25);
+    }
+    textarea.src-input { resize: vertical; min-height: 3.75rem; line-height: 1.55; }
+    .src-foot {
+      display: flex; gap: .6rem; justify-content: flex-end; flex-shrink: 0;
+      padding: .85rem 1.25rem; border-top: 1px solid #e2e8f0; background: #f8fafc;
+    }
+    .src-btn {
+      padding: .5rem 1.1rem; font-size: 12pt; font-family: inherit;
+      border-radius: .5rem; cursor: pointer; transition: background .15s, border-color .15s;
+    }
+    .src-btn.primary { border: none; background: #2563eb; color: #fff; }
+    .src-btn.primary:hover { background: #1d4ed8; }
+    .src-btn.ghost { border: 1px solid #cbd5e1; background: #fff; color: #475569; }
+    .src-btn.ghost:hover { background: #f1f5f9; }
+    .src-btn:disabled { opacity: .6; cursor: default; }
+    .src-note { margin: .35rem 0 0; font-size: 10.5pt; line-height: 1.6; color: #94a3b8; }
+    /* 反垃圾蜜罐：视觉与无障碍树都隐藏，真人看不见，只有自动化脚本会去填 */
+    .src-hp {
+      position: absolute; left: -9999px; width: 1px; height: 1px;
+      opacity: 0; pointer-events: none;
+    }
     /* 讲座卡片：边框 + 悬停抬升，参考 RSS 阅读器信息流视觉 */
     .lecture-card {
       transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
@@ -157,6 +223,10 @@
                 </button>
                 <a href="stats.html" @click="showMenu = false"
                   class="block px-4 py-2 text-12pt text-slate-600 hover:bg-slate-50 hover:text-blue-600">讲座统计</a>
+                <button @click="openReport(); showMenu = false"
+                  class="block w-full text-left px-4 py-2 text-12pt text-slate-600 hover:bg-slate-50 hover:text-blue-600 border-t border-slate-100">
+                  报告信息源问题
+                </button>
               </div>
             </div>
           </div>
@@ -454,6 +524,66 @@
       </span>
     </footer>
 
+    <!-- 信息源报告弹窗：反馈某学院/部处讲座栏目换了网址、打不开或长期无新讲座。
+         纯静态站接不住 POST，故由页面直接 POST 到 Web3Forms（见 app.js 的
+         REPORT_ENDPOINT），由其转发到维护者邮箱；提交失败时自动降级为复制内容。 -->
+    <div v-if="showReport" class="src-mask" @click.self="closeReport()">
+      <div class="src-modal" role="dialog" aria-modal="true" aria-labelledby="src-modal-title">
+        <div class="src-head">
+          <h3 id="src-modal-title">报告信息源问题</h3>
+          <button class="src-x" @click="closeReport()" aria-label="关闭">✕</button>
+        </div>
+        <div class="src-body">
+          <p class="src-intro">
+            如果某个学院 / 部处的讲座栏目换了网址、页面打不开，或长期没有新讲座，
+            请把新地址填在下面，我们会在后续更新中纳入抓取。
+          </p>
+          <label class="src-field">
+            <span class="src-label">单位名称 <em>*</em></span>
+            <input v-model="reportForm.unit" class="src-input" maxlength="60"
+              placeholder="如：数学科学学院、图书馆" />
+          </label>
+          <label class="src-field">
+            <span class="src-label">所在校区</span>
+            <select v-model="reportForm.campus" class="src-input">
+              <option value="">不确定 / 不适用</option>
+              <option v-for="c in campusList.filter(x => x)" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </label>
+          <label class="src-field">
+            <span class="src-label">新的讲座栏目网址 <em>*</em></span>
+            <input v-model="reportForm.url" class="src-input" maxlength="300"
+              placeholder="https://…" />
+          </label>
+          <label class="src-field">
+            <span class="src-label">原栏目网址（若还记得）</span>
+            <input v-model="reportForm.oldUrl" class="src-input" maxlength="300"
+              placeholder="选填，便于核对替换" />
+          </label>
+          <label class="src-field">
+            <span class="src-label">补充说明</span>
+            <textarea v-model="reportForm.note" class="src-input" rows="3" maxlength="500"
+              placeholder="选填，例如：原网址 404、栏目已迁到「学术活动」下"></textarea>
+          </label>
+          <label class="src-field">
+            <span class="src-label">你的联系方式</span>
+            <input v-model="reportForm.contact" class="src-input" maxlength="80"
+              placeholder="选填，便于回访确认" />
+          </label>
+          <!-- 蜜罐：真人看不见也不会填，自动化脚本常会填 → 命中即静默丢弃 -->
+          <input v-model="reportForm.hp" class="src-hp" type="text" tabindex="-1"
+            aria-hidden="true" autocomplete="off" />
+          <p class="src-note">提交后内容直接送达维护者邮箱，不会公开显示。</p>
+        </div>
+        <div class="src-foot">
+          <button class="src-btn ghost" :disabled="reportSending" @click="copyReport()">仅复制内容</button>
+          <button class="src-btn primary" :disabled="reportSending" @click="submitReport()">
+            {{ reportSending ? '提交中…' : '提交报告' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast 提示：淡入 + 上浮（常驻元素类切换，见样式注释） -->
     <div :class="['toast-fixed px-4 py-2 rounded-lg bg-slate-800 text-white text-12pt shadow-lg', toast.show ? 'toast-on' : 'toast-off']"
       aria-live="polite">
@@ -472,7 +602,7 @@
     </transition>
   </div>
 
-  <script defer src="app.js?v=f006ae1a5e"></script>
+  <script defer src="app.js?v=96544829c1"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
