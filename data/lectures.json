@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-20T14:38:23+08:00",
+  "updatedAt": "2026-09-22T04:55:00+08:00",
   "data": [
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20260920/13396.html",
@@ -56,6 +56,34 @@
       "llmAdopted": "speakerTitle|speakerAffiliation",
       "qaGate": "inviter",
       "listTitle": "勷勤数学•领军学者报告-王术"
+    },
+    {
+      "sourceUrl": "http://iqm.scnu.edu.cn/a/20260921/557.html",
+      "images": [],
+      "college": "量子物质研究院",
+      "campus": "大学城",
+      "title": "[2026年9月23日]刘宏恺——New Physics Opportunities at the Electron-ion Collider",
+      "topic": "New Physics Opportunities at the Electron-ion Collider",
+      "lectureStart": "2026-09-23 10:00:00",
+      "lectureEnd": "2026-09-23 11:00:00",
+      "location": "理8栋230会议室",
+      "speaker": "刘宏恺",
+      "speakerTitle": "Associate Professor",
+      "speakerAffiliation": "Guangdong Technion–Israel Institute of Technology (GTIIT",
+      "inviter": "",
+      "speakerBio": "Hongkai Liu is an Associate Professor at the Guangdong Technion–Israel Institute of Technology (GTIIT). He received his Ph.D. in Physics from the University of Pittsburgh and subsequently held postdoctoral positions at the Technion and Brookhaven National Laboratory. His research focuses on collider physics, neutrino physics, and effective field theories.",
+      "organizer": "量子物质研究院",
+      "publishTime": "2026-09-21 14:58:00",
+      "publishTimeSource": "position",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "The electron-ion collider (EIC) is designed to study QCD physics. Beyond its QCD program, several distinctive features, such as the excellent electron beam kinematic reconstruction, forward detectors, and polarized electron and proton beams make it a uniquely powerful facility for searches beyond the Standard Model (BSM). In this talk, I will present two representative BSM scenarios that can be constrained at the EIC: dark sector models and SMEFT operators involving electrons and top quarks.",
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle|speakerAffiliation",
+      "qaGate": "speakerBio",
+      "listTitle": "[2026年9月23日]刘宏恺——New Physics Opportunities at the Electron-ion Collider"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260920/8848.html",
