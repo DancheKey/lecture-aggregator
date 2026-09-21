@@ -114,13 +114,13 @@
     },
     {
       "date": "2026-09-21",
-      "capturedAt": "2026-09-21T03:12:34+08:00",
-      "site_pv": 1328,
-      "site_uv": 1084,
-      "page_pv": 1302,
-      "page_uv": 1083,
-      "uv_delta": 8,
-      "pv_delta": 9,
+      "capturedAt": "2026-09-21T14:37:54+08:00",
+      "site_pv": 1333,
+      "site_uv": 1088,
+      "page_pv": 1307,
+      "page_uv": 1087,
+      "uv_delta": 12,
+      "pv_delta": 14,
       "note": ""
     }
   ]
