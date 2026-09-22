@@ -688,6 +688,25 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
         # 其余字段（职称/单位/结构字段）：规则已有值不覆盖（仅填空补全）
         if not lv or lv in _NOISE:
             continue
+        if fld == 'location':
+            # A 的 location 值先过与规则**同一套**的地点清理（parsers._clean_location，单一事实源）。
+            # 缺口（2026-09-22 实测）：A 会把紧随地点之后的下一行标签前缀吸进值尾
+            # （源页「报告地点：理8栋118报告厅 / 报告摘要」→ A 输出「理8栋118报告厅报告」），
+            # 而 snippet 溯源**拦不住**这种溢出——snippet 是真实原文片段，值却多带了标签残片。
+            # 清理后与规则值一致则视为无差异，不覆盖（既省一次采纳，也避免污染下游）。
+            try:
+                from parsers import _clean_location
+                lv = _clean_location(lv)
+            except Exception:
+                pass
+            if not lv or lv in _NOISE or lv == cur:
+                continue
+            if not _snippet_ok(a.get(fld + 'Snippet'), body_text):
+                rejected.append(fld)
+                continue
+            result[fld] = lv
+            adopted.append(fld)
+            continue
         if fld == 'speakerAffiliation':
             lv = _clean_affiliation(lv)
             if not lv or not _is_valid_affiliation(lv) or _is_host_affiliation(lv):
