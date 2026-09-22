@@ -401,7 +401,11 @@ def _infer_title(bio):
         return ''
     head = bio[:40]
     for m in _TITLE_RE.finditer(head):
-        t = m.group(1)
+        # ⚠ 取 group(0)：_TITLE_RE 由 field_vocab 的姓名职称词表（全 (?:...) 非捕获组）
+        # 拼接而成，整条正则捕获组数为 0。旧代码写 group(1)，命中即抛
+        # IndexError: no such group，把后续 bio 回退（时间校验/单位兜底）整段带崩
+        # （G4 词表统一时留下的旧伤，2026-09-22 修复）。
+        t = m.group(0)
         # 排除「博士毕业于 / 博士学位 / 博士后」这类非当前职称的误匹配
         if t == '博士' and any(k in head[m.end():m.end() + 3]
                                for k in ('毕业', '学位', '后')):
@@ -473,6 +477,41 @@ def _is_plausible_speaker(value, trace_text):
         if _norm_for_match(seg) not in _trace:
             return False
     return True
+
+
+_AFFIL_TRACE_PAREN = re.compile(r'[（(][^）)]{1,40}[）)]')
+
+
+def _norm_affil_trace(s):
+    """单位溯源归一化：在 _norm_for_match（去空白＋全角转半角）之上，
+    再统一大小写与各类连接符——A 复述长英文机构名时常混用 - – — 与大小写。"""
+    s = _norm_for_match(s or '').lower()
+    return re.sub(r'[–—―‐‑−]', '-', s)
+
+
+def _is_plausible_affiliation(value, trace_text):
+    """单位终检：值本身必须字面可溯源到原文（正文或标题），与 speaker 同口径。
+
+    补上单位字段此前只走「snippet 级」闸门的缺口：A 只要附一段真实原文作背书，
+    值却自行翻译/改写也照样放行——iqm557 实测源页与 snippet 全为英文，A 给出的
+    值却是「广东以色列理工学院（GTIIT）」，源页中并无这个中文名。
+    改校验值本身后，翻译/改写天然被拒（目标文字在原文中不存在）。
+    允许的差异仅限：大小写、各类连接符、括号注记的有无。
+    """
+    v = _norm_affil_trace(value)
+    if len(v) < 3:
+        return False
+    tr = _norm_affil_trace(trace_text)
+    if not tr:
+        return False
+    if v in tr:
+        return True
+    # 括号注记容忍：A 补写或省略「(GTIIT)」「（中国）」这类附注
+    core = _AFFIL_TRACE_PAREN.sub('', v)
+    if len(core) >= 4 and core in tr:
+        return True
+    # 长值（多级机构名）容忍：首尾各取一片均命中，仍须确系原文
+    return len(v) >= 12 and v[:6] in tr and v[-6:] in tr
 
 
 def _try_fill_speaker(result, a, trace_text):
@@ -646,6 +685,14 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             # 标题型姓名，也能天然挡住 LLM 的形近字错误（错字在原文里不存在）。
             if not _is_plausible_speaker(lv, _trace_text):
                 rejected.append('speaker')
+                continue
+        elif fld == 'speakerAffiliation':
+            # 单位同样采用「值级溯源」而非 snippet 级：A 常附一段真实原文作
+            # snippet、值却自行翻译（iqm557：snippet 为英文原文，值是中文译名）。
+            # 只验 snippet 拦不住改写，必须校验值本身是否字面出现在原文中。
+            # 规则值不走此处（上方仅填空分支已放行），故不影响正则提取结果。
+            if not _is_plausible_affiliation(lv, _trace_text):
+                rejected.append('speakerAffiliation')
                 continue
         elif not _snippet_ok(a.get(fld + 'Snippet'), body_text):
             rejected.append(fld)

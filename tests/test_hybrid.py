@@ -13,7 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scraper'))
 from llm_provider import MockProvider
-from hybrid import apply_llm_text_hybrid, compare_struct, _clean_affiliation
+from hybrid import (apply_llm_text_hybrid, compare_struct, _clean_affiliation,
+                    _infer_title, _is_plausible_affiliation)
 import field_vocab as _fv
 
 # 正文含可溯源片段，供 snippet 闸门匹配
@@ -260,6 +261,75 @@ class TestAffiliationBrackets(unittest.TestCase):
         self.assertEqual(_clean_affiliation('清华大学 日期:3月3日'), '清华大学')
         self.assertEqual(_clean_affiliation(''), '')
         self.assertEqual(_clean_affiliation(None), '')
+
+
+class TestInferTitleNoCrash(unittest.TestCase):
+    """_infer_title 崩溃修复（2026-09-22）。
+
+    _TITLE_RE 由 field_vocab 的全 (?:...) 非捕获组词表拼成，捕获组数为 0；
+    旧代码取 group(1) 命中即抛 IndexError，把 bio 回退整段带崩
+    （全库 221 条满足触发条件，golden 里记作 expected failure）。
+    """
+
+    def test_regex_has_no_capture_group(self):
+        """守卫前提：词表若改成带捕获组，本测试与新实现都需重新审视。"""
+        from hybrid import _TITLE_RE
+        self.assertEqual(_TITLE_RE.groups, 0)
+
+    def test_returns_title_without_raising(self):
+        cases = {
+            '张三，北京大学教授，博士生导师': '教授',
+            '李四，博士毕业于清华大学，现为副教授': '副教授',
+            '王五，博士，华南师范大学研究员': '博士',  # 首个匹配即返回（预存词表行为）
+            '赵六': '',
+            '': '',
+        }
+        for bio, want in cases.items():
+            self.assertEqual(_infer_title(bio), want, bio)
+
+    def test_bio_fallback_fills_title_on_real_record(self):
+        """端到端：兜底确实能把职称写进 result（旧代码此处抛异常）。"""
+        result = {'speakerBio': '温永立，清华大学教授，主要从事人工智能研究。'}
+        from hybrid import _apply_bio_fallback
+        _apply_bio_fallback(result)
+        self.assertEqual(result.get('speakerTitle'), '教授')
+
+
+class TestAffiliationValueTrace(unittest.TestCase):
+    """单位字段值级溯源闸门（2026-09-22）。
+
+    旧实现只走 snippet 级闸门：A 附一段真实原文作背书、值却自行翻译时照样放行
+    （iqm557：源页与 snippet 全英文，A 的值是「广东以色列理工学院（GTIIT）」）。
+    """
+
+    SRC = ('Hongkai Liu is an Associate Professor at the Guangdong '
+           'Technion-Israel Institute of Technology (GTIIT). '
+           'He obtained his PhD from Tsinghua University.')
+
+    def test_translated_value_rejected(self):
+        """A 自行翻译的中文机构名 -> 值在原文中不存在 -> 拒绝。"""
+        self.assertFalse(_is_plausible_affiliation('广东以色列理工学院（GTIIT）', self.SRC))
+        self.assertFalse(_is_plausible_affiliation('南华师范大学', 'South China Normal University'))
+
+    def test_literal_value_adopted(self):
+        """原文中字面存在的机构名 -> 采纳（含 en dash / 省略括号注记）。"""
+        for v in ('Guangdong Technion–Israel Institute of Technology (GTIIT)',
+                  'Guangdong Technion-Israel Institute of Technology',
+                  'Tsinghua University',
+                  'Technion-Israel Institute of Technology'):
+            self.assertTrue(_is_plausible_affiliation(v, self.SRC), v)
+
+    def test_chinese_source_keeps_chinese_value(self):
+        self.assertTrue(_is_plausible_affiliation('华南师范大学心理学院',
+                                                  '主讲人：曹艺轩（华南师范大学心理学院）'))
+        self.assertTrue(_is_plausible_affiliation('清华大学（北京）', '清华大学计算机系'))
+
+    def test_unmatched_and_empty_rejected(self):
+        """原文完全没有、或溯源文本为空 -> 一律拒绝（不是照单全收）。"""
+        self.assertFalse(_is_plausible_affiliation('北京大学', '清华大学'))
+        self.assertFalse(_is_plausible_affiliation('北京大学', ''))
+        self.assertFalse(_is_plausible_affiliation('', self.SRC))
+        self.assertFalse(_is_plausible_affiliation(None, self.SRC))
 
 
 if __name__ == '__main__':
