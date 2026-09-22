@@ -13,7 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scraper'))
 from llm_provider import MockProvider
-from hybrid import apply_llm_text_hybrid, compare_struct
+from hybrid import apply_llm_text_hybrid, compare_struct, _clean_affiliation
+import field_vocab as _fv
 
 # 正文含可溯源片段，供 snippet 闸门匹配
 BODY = ('讲座通知。题目：深度学习前沿。主讲人：温永立 教授（清华大学计算机系）。'
@@ -216,6 +217,49 @@ class TestSnippetGate(unittest.TestCase):
         apply_llm_text_hybrid(r, BODY, None, provider, None)
         self.assertNotIn('abstract', r)
         self.assertIn('abstract', r.get('llmRejected', ''))
+
+
+class TestAffiliationBrackets(unittest.TestCase):
+    """单位字段括号清理：只剥「不配对」的悬挂括号，保留合法闭合括号。
+
+    2026-09-22 回归守卫——旧实现用 str.strip(字符集合) 剥两端括号，把
+    「广东以色列理工学院（GTIIT）」的合法右括号一并剥成「…（GTIIT」，
+    前端模板再补一对括号，用户看到的就是「少一个右括号」（iqm557）。
+    """
+
+    BALANCED = (
+        '广东以色列理工学院（GTIIT）',
+        'Guangdong Technion–Israel Institute of Technology (GTIIT)',
+        '北京大学（北京）',
+        '香港中文大学(深圳)',
+        '兰州大学威尔士学院；英国威尔士三一圣大卫大学（UWTSD）',
+    )
+
+    def test_balanced_parens_kept(self):
+        """配对的合法括号必须原样保留。"""
+        for v in self.BALANCED:
+            self.assertEqual(_fv.trim_dangling_brackets(v), v, v)
+
+    def test_dangling_brackets_still_removed(self):
+        """真悬挂括号仍要清理——修 bug 不得丢掉这个既有能力。"""
+        cases = {
+            '助理研究员 (': '助理研究员',
+            '北京大学)': '北京大学',
+            '（北京大学）': '北京大学',      # 整体被包裹 → 剥外层（前端模板自带括号）
+            '  清华大学  ': '清华大学',
+            '清华大学：': '清华大学',
+        }
+        for raw, want in cases.items():
+            self.assertEqual(_fv.trim_dangling_brackets(raw), want, raw)
+
+    def test_clean_affiliation_keeps_balanced(self):
+        """hybrid._clean_affiliation（A 模型值写回路径）同样不得削掉合法括号。"""
+        for v in self.BALANCED:
+            self.assertEqual(_clean_affiliation(v), v, v)
+        # 元数据粘连截断与空值行为保持不变
+        self.assertEqual(_clean_affiliation('清华大学 日期:3月3日'), '清华大学')
+        self.assertEqual(_clean_affiliation(''), '')
+        self.assertEqual(_clean_affiliation(None), '')
 
 
 if __name__ == '__main__':

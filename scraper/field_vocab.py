@@ -368,3 +368,83 @@ def is_title_only(value):
     if not value:
         return False
     return bool(TITLE_ONLY_RE.fullmatch(str(value).strip()))
+
+
+# ---------------------------------------------------------------------------
+# 悬挂括号清理（2026-09-22，单一事实源）
+#
+# 病根：此前「单位字段两端括号清理」有两处各自实现，且都按**字符集合**剥括号：
+#   ① hybrid._clean_affiliation 的 `.strip(' )）:：-—、,，')`
+#   ② parsers F-AFF 的 `re.sub(r'[（(）)]+$', '', …)`
+# str.strip 剥的是「集合内任意字符」，不是「配对括号」，于是把
+# 「广东以色列理工学院（GTIIT）」这类**合法的闭合括号**一起剥掉，留下
+# 「…（GTIIT」（iqm557 实测；前端模板 `（{{ aff }}）` 本身配平，渲染出来就是
+# 用户看到的「少一个右括号」）。
+#
+# 本函数改为按**括号配平**判定：只有「不配对」的悬挂括号才剥离，合法配对的
+# 括号原样保留；同时保住原逻辑清理真悬挂（「助理研究员 (」）的能力。
+# 两处消费方必须共用本函数——与 _alt 同一条教训：分叉实现必然漂移。
+#
+# 注意：本函数是**后处理**（不改词表、不改 A 的提取输入），因此不递增
+# VOCAB_VERSION——llm_provider 的文本缓存仍然有效，重放存量时无需重调模型。
+# ---------------------------------------------------------------------------
+_BR_LEFT = '（('
+_BR_RIGHT = '）)'
+# 单位字段两端需剥离的非括号噪声（即原 strip 字符集去掉括号后的部分）
+_AFF_PUNCT = ' \t\r\n:：-—、,，'
+
+
+def _br_balance(t):
+    """括号净值：左括号数 − 右括号数。"""
+    return sum(t.count(c) for c in _BR_LEFT) - sum(t.count(c) for c in _BR_RIGHT)
+
+
+def _br_enclosed(t):
+    """t 是否「被自身最外层的一对括号整体包裹」（首尾配对、内部不提前闭合）。"""
+    if len(t) < 2 or t[0] not in _BR_LEFT or t[-1] not in _BR_RIGHT:
+        return False
+    bal = 0
+    for ch in t[1:-1]:
+        if ch in _BR_LEFT:
+            bal += 1
+        elif ch in _BR_RIGHT:
+            bal -= 1
+            if bal < 0:
+                return False        # 内部先冒出孤儿右括号 → 首尾并非一对
+    return bal == 0
+
+
+def trim_dangling_brackets(value):
+    """清理字符串两端**不配对**的悬挂括号；配对的合法括号原样保留。
+
+    实测语义（2026-09-22 修复 iqm557「…（GTIIT」少右括号）：
+      '广东以色列理工学院（GTIIT）'                                -> 原样（旧逻辑误剥成 '…（GTIIT'）
+      'Guangdong Technion–Israel Institute of Technology (GTIIT)'  -> 原样
+      '北京大学（北京）'                                          -> 原样
+      '香港中文大学(深圳)'                                        -> 原样
+      '（北京大学）'                                              -> '北京大学'（剥外层；前端模板自带括号）
+      '助理研究员 ('                                              -> '助理研究员'（真悬挂，保留清理能力）
+      '北京大学)'                                                 -> '北京大学'（孤儿右括号）
+    """
+    if not value:
+        return value
+    s = str(value).strip(_AFF_PUNCT)
+    # ① 整体被一对括号包裹 → 剥外层（前端模板已自带「（）」，值不应重复带）
+    while _br_enclosed(s):
+        s = s[1:-1].strip(_AFF_PUNCT)
+    # ② 尾部：剩余部分括号配平（左>右）说明该右括号是合法闭合括号 → 保留；
+    #    尾部左括号同理（剩余部分 右>左 才是配对）。
+    while s and s[-1] in _BR_LEFT + _BR_RIGHT:
+        rest = s[:-1]
+        b = _br_balance(rest)
+        if (s[-1] in _BR_RIGHT and b > 0) or (s[-1] in _BR_LEFT and b < 0):
+            break
+        s = rest.strip(_AFF_PUNCT)
+    # ③ 头部：同规则
+    while s and s[0] in _BR_LEFT + _BR_RIGHT:
+        rest = s[1:]
+        b = _br_balance(rest)
+        if (s[0] in _BR_LEFT and b < 0) or (s[0] in _BR_RIGHT and b > 0):
+            break
+        s = rest.strip(_AFF_PUNCT)
+    return s

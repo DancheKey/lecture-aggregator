@@ -4543,8 +4543,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         if _TITLE_ONLY.fullmatch(_aff_dn):
             result['speakerAffiliation'] = ''
         else:
-            _aff2 = re.sub(r'^[（(）)]+', '', result['speakerAffiliation'].strip())
-            _aff2 = re.sub(r'[（(）)]+$', '', _aff2.strip())
+            # 悬挂括号按「配平」判定清理（单一事实源 field_vocab.trim_dangling_brackets）：
+            # 只剥不配对的悬挂括号，保留「…（GTIIT）」这类合法闭合括号（iqm557 病根）。
+            _aff2 = _fv.trim_dangling_brackets(result['speakerAffiliation'])
             # 中文单位（含汉字）：仅折叠 CJK 字符之间的空格（OCR 拆字如「暨 南 大学」→「暨南大学」），
             # **不得整串删空格**——混合单位 "Sichuan University, 四川大学" 的英文词间空格
             # 曾被整串删除变成 "SichuanUniversity,四川大学"（iqm447 实测病根）。

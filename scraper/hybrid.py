@@ -196,7 +196,9 @@ def _clean_affiliation(v):
     if not v:
         return ''
     m = _AFFIL_CUT.search(str(v))
-    return (str(v)[:m.start()] if m else str(v)).strip(' )）:：-—、,，')
+    # 两端括号按「配平」清理，不用 str.strip(字符集合)——后者会把合法闭合括号
+    # 一并剥掉（2026-09-22 iqm557「…（GTIIT」少右括号的根因）。
+    return _fv.trim_dangling_brackets(str(v)[:m.start()] if m else str(v))
 
 
 # 单位字段质量校验：A 偶发把职称片段（如"助理"）误填进 affiliation，
