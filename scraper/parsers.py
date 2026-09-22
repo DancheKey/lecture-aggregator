@@ -1902,11 +1902,12 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
         if v and not result.get(dst):
             result[dst] = v
     # 主讲人清洗守卫（与 OCR 路径一致）：仅保留像人名的字符
+    # 分隔符含半角/全角逗号（VLM「黄加耀, 刘轩奕」）。
     if result.get('speaker') and not _looks_like_real_name(result['speaker']):
-        # 多主讲人用「、」连接：逐段校验，全为有效人名时保留
-        if '、' in result['speaker']:
-            _segs = [s.strip() for s in result['speaker'].split('、') if s.strip()]
-            if not (_segs and all(_looks_like_real_name(s) for s in _segs)):
+        if re.search(r'[、,，]', result['speaker']):
+            _segs = [s.strip() for s in re.split(r'[、,，]', result['speaker']) if s.strip()]
+            if not (_segs and all(_looks_like_real_name(s) for s in _segs)
+                    and len(set(_segs)) == len(_segs)):
                 result['speaker'] = ''
                 result['speakerAffiliation'] = ''
         else:
@@ -3932,6 +3933,18 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             if _mp:
                 _plat = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp.group(1), _mp.group(1))
                 _loc_fb = _plat + ' ' + re.sub(r'\s+', '', _mp.group(2))
+        # FB4：议程括号内会场（ggy5326「会议签到（文3栋一楼108门前）」「（一楼第二演讲厅）」）。
+        # 正文无「地点：」标签、页脚地址被 FB1 正确拒绝时，从议程/正文括号内取第一个
+        # 含楼栋室厅特征的片段；值须短（<=20 字）且不得是行政区/人名碎片。
+        if not _loc_fb:
+            for _mb in re.finditer(r'[（(]([^（）()]{2,20})[)）]', text):
+                _bv = re.sub(r'\s+', '', _mb.group(1)).strip()
+                if not _bv or len(_bv) > 20:
+                    continue
+                if re.search(r'(?:楼|栋|室|厅|教室|会议室|报告厅|演讲厅)', _bv) \
+                        and not re.match(r'^(?:主持人|发言嘉宾|线上|注)', _bv):
+                    _loc_fb = _bv
+                    break
         if _loc_fb:
             result['location'] = _loc_fb
 
@@ -4374,9 +4387,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         if m2 and _looks_like_real_name(m2.group(1)):
             result['speaker'] = m2.group(1)
     if result.get('speaker') and not _looks_like_real_name(result['speaker']):
-        # 多主讲人用「、」连接：逐段校验，全为有效人名时保留
-        if '、' in result['speaker']:
-            _segs = [s.strip() for s in result['speaker'].split('、') if s.strip()]
+        # 多主讲人用「、」「,」「，」连接：逐段校验，全为有效人名时保留
+        if re.search(r'[、,，]', result['speaker']):
+            _segs = [s.strip() for s in re.split(r'[、,，]', result['speaker']) if s.strip()]
             if not (_segs and all(_looks_like_real_name(s) for s in _segs)):
                 result['speaker'] = ''
                 result['speakerAffiliation'] = ''
@@ -5001,11 +5014,12 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         result['timeNote'] = (result.get('timeNote') or '') + ';' + ';'.join(cv_notes)
 
     # F3 第 5 步（终检）：任何来源的 speaker 若非有效人名则清空（覆盖叙事兜底等路径）。
+    # 分隔符含半角/全角逗号（VLM「黄加耀, 刘轩奕」），与 4376 处守卫对称。
     if result.get('speaker') and not _looks_like_real_name(result['speaker']):
-        # 多主讲人用「、」连接：逐段校验，全为有效人名时保留
-        if '、' in result['speaker']:
-            _segs = [s.strip() for s in result['speaker'].split('、') if s.strip()]
-            if not (_segs and all(_looks_like_real_name(s) for s in _segs)):
+        if re.search(r'[、,，]', result['speaker']):
+            _segs = [s.strip() for s in re.split(r'[、,，]', result['speaker']) if s.strip()]
+            if not (_segs and all(_looks_like_real_name(s) for s in _segs)
+                    and len(set(_segs)) == len(_segs)):
                 result['speaker'] = ''
                 result['speakerAffiliation'] = ''
         else:
@@ -5095,6 +5109,21 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # ---- 多主讲人连写拆分（同一公告含多位主讲人，报告人字段以「[头衔]姓名职称」拼接）----
     # 例如 cs 4145 论坛「报告人：国家杰青刘梦赤教授长江学者陈建二教授长江学者卢晓中教授」。
     # 与多讲座拆分（按时间/主题分块）互斥：此处各主讲人共享同一题目/时间/地点，仅主讲人不同。
+    # VLM/标签路径 speaker 为「姓名, 姓名」但 multi_speakers 未置时（xz301），从 speaker
+    # 派生——须同时能按「和」把题目/标题拆成 n 段才拆（防面板同台误拆）。
+    if not sessions and not multi_speakers and result.get('speaker'):
+        _sp_raw = result['speaker']
+        if re.search(r'[,，、]', _sp_raw) and not _looks_like_real_name(_sp_raw):
+            _sp_parts = [x.strip() for x in re.split(r'[,，、]', _sp_raw) if x.strip()]
+            if len(_sp_parts) >= 2 and all(_looks_like_real_name(x) for x in _sp_parts) \
+                    and len(set(_sp_parts)) == len(_sp_parts):
+                _topic_src = (result.get('topic') or '').strip()
+                _title_src = (result.get('title') or '').strip()
+                # topic 拆不出 n 段（如 VLM 把系列名填进 topic）时回退 title 再拆（xz301）
+                if (_topic_src and _split_topic_segments(_topic_src, len(_sp_parts))) or \
+                        (_title_src and _split_topic_segments(_title_src, len(_sp_parts))):
+                    multi_speakers = [{'name': x, 'honorific': '', 'aff': ''}
+                                      for x in _sp_parts]
     if not sessions and multi_speakers and len(multi_speakers) >= 2:
         _sp_recs = _split_by_speakers(result, multi_speakers)
         if _sp_recs:
@@ -5152,6 +5181,19 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 r['speaker'] = ''
                 r['speakerAffiliation'] = ''
             _vlm_recs.append(r)
+        # VLM 多场共享 topic 时按 title 拆分逐场分配（xz301：海报只印系列名+合题，
+        # VLM 给各场填同一个系列名 topic；可拆题目在 title「集成光子学和超快光学
+        # 技术和应用」按「和」拆 2 段）。各场 topic 互异时不动；title 拆不出 n 段也不动。
+        if len(_vlm_recs) >= 2 and len({(r.get('topic') or '').strip()
+                                        for r in _vlm_recs}) == 1:
+            _tsrc = (result.get('title') or '').strip()
+            _vsegs = _split_topic_segments(_tsrc, len(_vlm_recs)) if _tsrc else None
+            if _vsegs and len(_vsegs) == len(_vlm_recs):
+                for _r, _sg in zip(_vlm_recs, _vsegs):
+                    _sg2 = re.sub(r'\s*(?:[Bb]y\s+[A-Za-z][A-Za-z\.\-\s]*)$', '',
+                                  _sg).strip(' ；;，,')
+                    if _sg2:
+                        _r['topic'] = _sg2
         return _vlm_recs
 
     # ---- 图文页补摘要/简介（治本地科院「摘要被导航垃圾污染、缺主讲人简介」问题）----
@@ -5801,12 +5843,22 @@ def _split_topic_segments(topic, n):
     兼容半角/全角括号与 1)/1）、一) 等写法；段首序号由 split 消费。
     分段前先剥尾部邀请语（「欢迎各位老师参加！」常粘在题目值末尾，
     会顶掉段尾的 By 名字导致配对失败——physics791 实测）。
+    编号分段失败时，n=2 且题目以「和」并列两主题时按首个有效「和」拆
+    （xz301「集成光子学和超快光学技术和应用」），每段须 ≥4 字守卫。
     """
     import field_vocab as _fvocab
     topic = _fvocab.INVITATION_TAIL_RE.sub('', topic).strip()
     parts = re.split(r'(?:^|(?<=[\s；;，,]))[0-9０-９一二三四五六]{1,3}\s*[)）]\s*', topic)
     parts = [p.strip(' ；;，,') for p in parts if p.strip()]
-    return parts if len(parts) == n else None
+    if len(parts) == n:
+        return parts
+    if n == 2 and '和' in topic:
+        for _m in re.finditer('和', topic):
+            _left = topic[:_m.start()].strip()
+            _right = topic[_m.end():].strip()
+            if len(_left) >= 4 and len(_right) >= 4:
+                return [_left, _right]
+    return None
 
 
 def _pair_speakers_to_segments(speakers, segs):
@@ -5863,8 +5915,18 @@ def _split_by_speakers(base, speakers):
     if n < 2 or any(not x for x in _names) or len(set(_names)) < n:
         return None
     out = []
-    segs = _split_topic_segments((base.get('topic') or '').strip(), n) if n >= 2 else None
+    # 题目优先取 topic，为空时回退 title（xz301 海报页 topic 空、题目在 title）；
+    # topic 非空但拆不出 n 段（VLM 把系列名填进 topic）时同样回退 title 再拆。
+    _seg_src = (base.get('topic') or '').strip() or (base.get('title') or '').strip()
+    segs = _split_topic_segments(_seg_src, n) if n >= 2 else None
+    if not segs:
+        _alt_src = (base.get('title') or '').strip()
+        if _alt_src and _alt_src != _seg_src:
+            segs = _split_topic_segments(_alt_src, n)
     seg_assign = _pair_speakers_to_segments(speakers, segs) if segs else None
+    if segs and seg_assign is None:
+        # 无 By 拼音配对时按顺序配对（xz301 黄加耀↔集成光子学、刘轩奕↔超快光学）
+        seg_assign = {i: i for i in range(min(len(segs), n))}
     for i, spk in enumerate(speakers):
         rec = dict(base)
         rec['speaker'] = spk['name']
@@ -6345,6 +6407,38 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                               '_no': mk.group(), 'splitMode': 'nth-session'})
             if len(cand5) >= 2:
                 sessions = cand5
+    # 候选5b：英文「TalkN: / TalkN：」分场标记（seri23 环境研究院双报告）。
+    # 页眉共享 报告人/地点/时间，两场同刻开场 → 打 _numbered=True 豁免
+    # 末尾 distinct-time 检查；topic 取标记后到「报告人」之间的英文题目。
+    if len(sessions) < 2:
+        _TALK_RE = re.compile(r'Talk\s*[0-9０-９]+\s*[：:]', re.I)
+        _tk_marks = list(_TALK_RE.finditer(text))
+        if len(_tk_marks) >= 2:
+            _page_dt_t = base_start
+            if not _page_dt_t:
+                _pdtt = parse_cn_time(text, default_year=default_year,
+                                      publish_time=publish_time,
+                                      title_year=title_year, url_year=url_year)
+                if _pdtt and _pdtt.get('start'):
+                    _page_dt_t = _pdtt['start']
+            cand_t = []
+            for _i, _mk in enumerate(_tk_marks):
+                _seg = text[_mk.end():
+                            _tk_marks[_i + 1].start() if _i + 1 < len(_tk_marks)
+                            else len(text)]
+                _tp_m = re.match(r'\s*(.+?)\s*(?=报告人|主讲人|欢迎|$)',
+                                 _seg, re.S)
+                if not _tp_m:
+                    continue
+                _tp = re.sub(r'\s+', ' ', _tp_m.group(1)).strip()
+                _tp = _clean_session_topic(_tp)
+                if not _tp or len(_tp) < 5:
+                    continue
+                cand_t.append({'topic': _tp, 'start': _page_dt_t, 'end': None,
+                               'block': _seg, '_numbered': True,
+                               '_no': _mk.group(), 'splitMode': 'talk-n'})
+            if len(cand_t) >= 2 and all(c['start'] for c in cand_t):
+                sessions = cand_t
     # 候选6（兜底，CTLD「智能升级」系列通识课等）：正文以「专题一：…专题二：…」式
     # 裸并列专题排列——每个专题含独立题目与主讲人，但时间/地点统一写在块外的
     # 「一、培训安排」段（位于首专题之前），故候选1 逐块解析不到时间而全跳过、
@@ -6680,13 +6774,44 @@ def split_record_by_sessions(base, sessions, full_text=''):
                     r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
                     r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', cand).strip()
                 # 从 3 字到 2 字降序取最长有效姓名；避免「陈玺上海大学…」被贪婪匹配成「陈玺上」。
+                # 块内英文姓名优先（seri23 Talk1/Talk2）：cand 为「报告人: <单位>」型时
+                # （可跨行吞入下一行的「Silvia Lacorte教授」），中文启发式仍从开头取
+                # 单位前 2~3 字当人名（「西班牙」）；凡 cand 含单位关键词即在
+                # cand+块内残文中找拉丁姓名，命中则优先。
+                # ⚠ 职称组**必需**（不可选）：简介里大量出现期刊名（IEEE Transactions /
+                # Journal of Economic Interaction and Coordination / Brain Injury），
+                # 职称可选会把期刊名当成主讲人（golden psy940/psy1323/5708 实测回归）。
+                # 另加期刊特征词排除，双保险。
+                _en_line = None
+                if re.search(
+                        r'(?:大学|学院|研究所|研究院|研究中心|实验室|学系|医院|公司|集团)', cand):
+                    _en_m = re.search(
+                        r'([A-Z][A-Za-z.\'\-]+(?:\s+(?:[A-Z][A-Za-z.\'\-]+|of|and|de|van))+)\s*'
+                        r'(副?\s*教\s*授|副?\s*研\s*究\s*员|助理\s*研\s*究\s*员|讲\s*师|博\s*士|院\s*士)',
+                        cand + ' ' + block[sp_m.end():sp_m.end() + 240])
+                    if _en_m and not re.search(
+                            r'(?:Journal|Transactions|Archives|Review|Letters|Proceedings|'
+                            r'Nature|Science|IEEE|Press|Bulletin|Report)', _en_m.group(1)):
+                        _en_nm = _en_m.group(1).strip().rstrip('.')
+                        if _looks_like_real_name(_en_nm):
+                            _en_line = (_en_nm, re.sub(r'\s+', '', _en_m.group(2) or ''))
                 nm = None
-                for _l in range(min(3, len(cand_core)), 1, -1):
+                for _l in ([] if _en_line else range(min(3, len(cand_core)), 1, -1)):
                     _nm = re.match(rf'^([\u4e00-\u9fff]{{{_l}}})', cand_core)
                     if _nm and _looks_like_real_name(_nm.group(1)):
                         nm = _nm
                         break
-                if nm:
+                if _en_line:
+                    rec['speaker'] = _en_line[0]
+                    rec['speakerSource'] = 'block'
+                    if _en_line[1]:
+                        rec['speakerTitle'] = _en_line[1]
+                    elif speaker_title:
+                        rec['speakerTitle'] = speaker_title
+                    _aff_en = _extract_affiliation(cand)
+                    if _aff_en:
+                        rec['speakerAffiliation'] = _aff_en
+                elif nm:
                     name = nm.group(1)
                     # 性别字守卫：简介常写「陈俊 男, 博士」，CJK 间空格被 N1a 折叠后成
                     # 「陈俊男」，3 字被当成完整姓名。末字为性别字、其后紧邻标点或结束时，
