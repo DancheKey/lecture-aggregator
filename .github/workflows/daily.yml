@@ -115,6 +115,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/check_source_health.py
 
+      # G5（2026-09-22）：出片脚本会改写 HTML 版本戳，但 git add 清单不含 scripts/。
+      # 若 scripts/ 有未提交改动，显式告警（不阻断）——避免「以为 CI 会处理」的静默落差。
+      - name: 检查 scripts/ 未提交改动（告警）
+        if: always()
+        run: |
+          if [ -n "$(git status --porcelain -- scripts/)" ]; then
+            echo "::warning::scripts/ 存在未提交改动（CI 的 git add 不含 scripts/，不会被自动提交，请手动 commit）："
+            git status --short -- scripts/
+          else
+            echo "scripts/ 无未提交改动"
+          fi
+
       - name: 提交并推送（仅在有变化时）
         run: |
           set -e
@@ -133,10 +145,10 @@ jobs:
           LAST_RUN=$(date -u -d '+8 hours' +'%Y-%m-%dT%H:%M:%S+08:00')
           printf '{\n  "lastRunAt": "%s"\n}\n' "$LAST_RUN" > site/lectures/last_run.json
           echo "last_run.json = $LAST_RUN"
-          # 2026-09-12 事故修复：显式文件清单改为目录级纳入。
-          # 旧清单漏掉新增出片产物 site/lectures/visits.json，提交后工作区仍残留
-          # 未暂存改动，git pull --rebase 因 "You have unstaged changes" 报 exit 128
-          # 中止 → 整班 cron 失败并连带跳过 Pages 部署（当日新讲座与访问量快照全丢）。
+           # 2026-09-12 事故修复：显式文件清单改为目录级纳入。
+           # 旧清单漏掉新增出片产物 site/lectures/visits.json，提交后工作区仍残留
+           # 未暂存改动，后续同步步骤报 exit 128 中止 → 整班 cron 失败并连带跳过
+           # Pages 部署（当日新讲座与访问量快照全丢）。
           # data/ 与 site/ 在 CI 中全部由脚本产出，目录级纳入不会误收 gitignore 内容；
           # 报告单独条件加入，避免其生成失败时 pathspec 报错。
           git add -A data site
@@ -147,7 +159,7 @@ jobs:
             echo "存在变更，准备提交..."
             git status --short
             git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')"
-            # 防线（2026-09-12）：rebase 对未暂存改动零容忍，残留会以 exit 128 整班失败。
+            # 防线（2026-09-12）：同步/推送对未暂存改动零容忍，残留会以 exit 128 整班失败。
             # 若仍有未落入上面目录级 add 的改动（例如此后新增到其他目录的产物），补入本次提交。
             if [ -n "$(git status --porcelain)" ]; then
               echo "::warning::提交后仍有未纳入的改动，自动补入本次提交："
@@ -156,11 +168,19 @@ jobs:
               git commit --amend --no-edit
             fi
             echo "提交成功，同步远端..."
-            # 运行期间若仓库被其他提交推进（如人工推送），先 rebase 再 push，避免 non-fast-forward 失败
-            # rebase 失败时 abort 退出，交给下一班 cron 重跑（已有 concurrency 排队，重跑成本低）
-            git pull --rebase origin main || { echo "::error::git pull --rebase 失败，中止 rebase 等待下次 cron 重试"; git rebase --abort; exit 1; }
+            # N6 铁律（2026-09-22）：禁止对 data/*.json 做 rebase/行级三方合并
+            # （本地真实事故：无冲突合并却条数漂移、__idx 错位）。
+            # 显式策略：fetch 后若 origin/main 不是 HEAD 祖先（远端已在本轮运行期间
+            # 前进 / 分叉）→ 放弃本轮提交并对齐远端，绝不 rebase。
+            # 不推送即不推进 data/last_scrape.json 水位 → 下轮 cron 重抓同区间，不会漏抓。
+            git fetch origin main
+            if ! git merge-base --is-ancestor origin/main HEAD; then
+              echo "::warning::远端 main 已前进，按铁律放弃本轮数据提交（不做 rebase），下轮 cron 将重抓同区间"
+              git reset --hard origin/main
+              exit 0
+            fi
             echo "推送到 origin/main..."
-            # 最多重试 3 次 push，应对短时并发冲突
+            # 最多重试 3 次 push，应对短时并发冲突；每次重试前重新判断远端是否前进
             for i in 1 2 3; do
               if git push origin main; then
                 echo "推送成功 (try $i)"
@@ -170,11 +190,14 @@ jobs:
                   echo "::error::git push 第 3 次仍失败（请检查仓库 Settings -> Actions -> General -> Workflow permissions 是否为 Read and write permissions）"
                   exit 1
                 fi
-                echo "::warning::git push 失败 (try $i)，拉取远程最新再试..."
+                echo "::warning::git push 失败 (try $i)，5s 后重试（先确认远端是否前进；前进则放弃本轮，绝不 rebase）..."
                 sleep 5
-                # 与上面的首次同步保持一致：失败必须收尾（abort），不能让仓库停在半完成的
-                # rebase 状态、也不该用 `|| true` 把错误吞掉——否则后续重试建立在破损状态上。
-                git pull --rebase origin main || { echo "::error::重试前同步失败，中止 rebase"; git rebase --abort; exit 1; }
+                git fetch origin main
+                if ! git merge-base --is-ancestor origin/main HEAD; then
+                  echo "::warning::远端已前进，放弃本轮数据提交（不做 rebase），下轮 cron 将重抓同区间"
+                  git reset --hard origin/main
+                  exit 0
+                fi
               fi
             done
             echo "推送成功"

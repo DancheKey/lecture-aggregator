@@ -63,7 +63,7 @@ site/lectures.json  +  site/lectures/{latest,stats}.json
 ### 1.4 新闻 vs 预告（两层过滤，`parsers.py`）
 - **第一层 `is_news_record`**：`publishTime > lectureStart`（讲座结束后才发布 = 回顾新闻）。但很多学院回顾稿无显式发布时间戳（`publishTime=None`），第一层失效。
 - **第二层 `is_news_article(title, body)`**：语义特征兜底——(a) 强总结语（讲座圆满结束/活动取得圆满成功）；(b) 「本次/此次讲座|报告」+ 总结性动词，**排除「将/拟/计划」等前向词**（华师预告页也用「本次报告将介绍…取得」，非新闻）；(c) 标题「举办/开展/举行…讲座」且整体不含「通知/预告/公示」；(d) 页脚「供稿+初审+终审」链；(e) 正文「YYYY年M月D日」+ 完成态动词；(f) 标题机构主语+参加动词。
-- **人工复核工具** `tools/news_recheck.py`：重抓 data 每条跑 `is_news_article`，命中写 `tools/news_recheck.json`，`--apply` 删除并同步。
+- **人工复核工具** `tools/news_recheck.py`：重抓 data 每条跑 `is_news_article`，命中写 `tools/news_recheck.json`，`--apply` 删除并同步。（⚠️ 本地调试工具，`tools/` 已 `.gitignore` 不入库——与 §4 离线重跑工具同注）
 
 ### 1.5 论坛/大会整体提取（FC1–FC3，替代 MS1 拆分）
 

@@ -557,47 +557,20 @@ def _try_fill_speaker(result, a, trace_text):
 # 同一污染值」病例（idx2747 地点混简介、idx2185 单位混任职经历、idx2932
 # 姓名括号截断、idx2635 姓名被机构名顶替）被「仅填空+保守裁决」共同锁死。
 # ---------------------------------------------------------------------------
-# 判脏用「职称/职务」正则：词表取自 field_vocab（G4，2026-09-10），
-# 另保留未进主表的补充词（博导/硕导/主编/编委/委员/会员/校长/副院长）与英文头衔。
-# 实测（全库 2958 条）：改用统一词表后 speaker 判脏 0 变化；speakerAffiliation 5 条
-# 由「不脏」转「脏」（都是单位里混入职务、本应清理的值），方向正确，且仍受溯源闸门保护。
-_DIRTY_TITLE_RE = re.compile(
-    _fv.NAME_TITLE_SUFFIX_RE.pattern + '|' + _fv.ORG_TITLE_SUFFIX_RE.pattern +
-    r'|博导|硕导|主编|编委|委员|会员|校长|副院长'
-    r'|Prof\.?|Professor|Dr\.?|Director|Dean|Chair', re.I)
-_DIRTY_ORG_RE = re.compile(
-    r'(大学|学院|研究院|研究所|实验室|研究中心|公司|集团|'
-    r'University|Institute|College|School|Academy|Laboratory)', re.I)
-_DIRTY_LOC_LABEL_RE = re.compile(
-    r'(主办|承办|协办|报告人|主讲人|主持人|摘要|报告题目|内容简介|嘉宾介绍|'
-    r'嘉宾简介|议程|日程|联系人|会议号|会议 ?ID|腾讯会议|Zoom|欢迎各位|主办单位)')
+# 判脏用「职称/职务」等正则：C2 收敛（2026-09-22）后与 audit_fields 同源，
+# 单一事实源在 field_vocab（改词表/判据请改那边）；此处仅保留别名，
+# 避免历史引用（tests 等）与 location 分支继续使用旧名。
+_DIRTY_TITLE_RE = _fv.DIRTY_TITLE_RE
+_DIRTY_ORG_RE = _fv.DIRTY_ORG_RE
+_DIRTY_LOC_LABEL_RE = _fv.FIELD_LABEL_NOISE_RE
 _AFF_ORG_HEAD_RE = re.compile(
     r'^[^，,、;；]{0,30}?(大学|学院|研究院|研究所|实验室|中心|系|'
     r'University|Institute|College|School)', re.I)
 
 
 def _is_multi_speaker_clean(v):
-    """多人主讲人白名单：判断 'A、B' / 'A, B' / 'A/B' 是否为「每段都是干净短姓名」。
-
-    存在的必要性（2026-09-10）：_is_dirty_value 对 speaker 的「过长即污染」判据是
-    `len>6 且含中文且不含 ·`。正常多人姓名（如 '黄加耀, 刘轩奕'、'魏文娅、傅承哲'）
-    长度必然 >6，会被一律判脏 -> 丧失「仅填空」保护、开放给模型 A 覆盖。而多人
-    姓名本身是合法值（前端 speakerKeys 就是按分隔符逐人拆键的），不该被当污染。
-    判据：按分隔符拆出 2 段以上，且每段都短（<=6 字）且不含职称/机构词。
-    另须排除混入字段标签的形态（如 '主讲人：张三、李四'）——否则首段「主讲人：张三」
-    拆开后恰好 <=6 字而被误豁免，反而放行了标签污染。
-    """
-    if _DIRTY_LOC_LABEL_RE.search(v):
-        return False
-    parts = [p.strip() for p in re.split(r'[、,，/]', v) if p.strip()]
-    if len(parts) < 2:
-        return False
-    for p in parts:
-        if len(p) > 6:
-            return False
-        if _DIRTY_TITLE_RE.search(p) or _DIRTY_ORG_RE.search(p):
-            return False
-    return True
+    """多人主讲人白名单——实现已收敛到 field_vocab.is_multi_speaker_clean（C2）。"""
+    return _fv.is_multi_speaker_clean(v)
 
 
 def _is_dirty_value(fld, v):
@@ -605,14 +578,8 @@ def _is_dirty_value(fld, v):
     if not v or not isinstance(v, str):
         return False
     if fld == 'speaker':
-        if _DIRTY_TITLE_RE.search(v) or _DIRTY_ORG_RE.search(v):
-            return True
-        if v.count('(') != v.count(')') or v.count('（') != v.count('）'):
-            return True
-        # 多人主讲人白名单（2026-09-10）：'黄加耀, 刘轩奕' 等正常多人姓名长度必然 >6，
-        # 旧判据会一律判脏 -> 丧失「仅填空」保护、开放给模型 A 覆盖（多人姓名是合法值）。
-        if _is_multi_speaker_clean(v):
-            return False
+        # C2（2026-09-22）：判据收敛到 field_vocab.is_dirty_speaker，与体检同源。
+        return _fv.is_dirty_speaker(v)
         if len(v) > 6 and re.search(r'[\u4e00-\u9fa5]', v) and '·' not in v:
             return True
         return False
