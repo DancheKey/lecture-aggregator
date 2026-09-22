@@ -65,9 +65,18 @@
       "suspectCount": 0,
       "unconfiguredCount": 2,
       "failedKeys": []
+    },
+    {
+      "date": "2026-09-22",
+      "checkedAt": "2026-09-22T14:44:17+08:00",
+      "totalUrls": 59,
+      "failCount": 0,
+      "suspectCount": 0,
+      "unconfiguredCount": 2,
+      "failedKeys": []
     }
   ],
-  "lastCheckedAt": "2026-09-22T04:55:21+08:00",
+  "lastCheckedAt": "2026-09-22T14:44:17+08:00",
   "lastResults": [
     {
       "source": "教育科学学院",
