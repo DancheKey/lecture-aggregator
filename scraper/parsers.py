@@ -3092,15 +3092,94 @@ _SPK_TAIL_TITLE_RE = re.compile(
     r'博士后|博士|院士|老师|导师|先生|女士)$')
 
 
+# 英文职务/头衔词：用于剥离「英文姓名 + 连写英文职务串」形态（physics 12246 实测——
+# 源页「报告人：Juergen Stuhler」后紧跟 Vice President…/Chairman & General Manager… 两行职务）。
+# 词表只收**高置信职务词**，不含 van/von/de 等姓名介词、也不含普通姓名用词，故
+# 「Paul van den Brink」「Ernesto Macaro」等正常外籍姓名不受影响。
+# `Senior` 收录的依据：maths 8474 的 speaker 被写成「Ku Cheng Yeaw Senior」——其
+# speakerTitle='Senior Lecturer'，姓名后粘了未剥净的「Senior」残片，同属本类脏值。
+_EN_SPK_TITLE_RE = re.compile(
+    r'(?<![A-Za-z])(?:'
+    r'Vice\s+President|President|Chairman|Chairwoman|Chair|'
+    r'General\s+Manager|Manager|Deputy|'
+    r'Chief\s+(?:Executive|Technology|Operating|Financial|Scientific)\s+Officer|'
+    r'CEO|CTO|COO|CFO|Professor|Prof|Dean|Director|Head|Lecturer|Senior|'
+    r'PostDoc\w*|Postdoctoral|Research\s+Fellow|Fellow|Researcher|Scientist|'
+    r'Engineer|Consultant|Advisor|Supervisor|Co-?Founder|Founder|Instructor'
+    r')(?![A-Za-z])')
+# 英文姓名敬称前缀。含「P rof.」「Pro.」等源站拆字/缩写形态（iqm 328 的
+# 「P rof. Keh-Fei Liu」、iqm 103 的「Pro.Jean-Paul Blaizot」实测）；
+# 尾随 (?=[A-Z]) 防止把「Paul」「Drew」「Missy」等正常名字的首段误当敬称吃掉。
+_EN_SPK_PREFIX_RE = re.compile(
+    r'^(?:Professor|P\s*rof|Prof|Pro|Dr|Mr|Mrs|Ms|Miss)\.?\s*(?=[A-Z])')
+# 合理英文姓名：1~4 个词，允许词内 - . ’ '（Jean-Paul / O’Neill / J.），总长 ≤ 40。
+_EN_NAME_OK_RE = re.compile(r"^[A-Za-z][A-Za-z\.\-’']*(?:\s+[A-Za-z][A-Za-z\.\-’']*){0,3}$")
+
+# 「机构/团体介绍」型简介的强锚点与开头机构词（xz 49/98、io 826/779/686 实测——
+# speakerBio 被填成「物电学院创新基地成立于2004年…」「交响乐团创建于2013年…」
+# 「英国切斯特大学创建于1839年…」等机构沿革，而非主讲人个人简介）。
+_ORG_BIO_ANCHOR_RE = re.compile(r'(成立于|创建于|始建于|创办于|前身为)')
+_ORG_BIO_HEAD_RE = re.compile(
+    r'(学院|大学|学校|书院|学部|研究院|研究所|实验室|实验中心|中心|基地|'
+    r'医院|公司|集团|协会|学会|乐团|院团|附中|中学|小学)')
+
+
+def _is_org_intro_bio(bio):
+    """判断 speakerBio 是否为「机构/团体介绍」而非人物简介（误填，须清空）。
+
+    两个条件须同时满足，以把影响面压到「机构沿革文本」这一精确形态：
+      ① 出现沿革强锚点（成立于/创建于/始建于/创办于/前身为）；
+      ② 开头 15 字内即出现机构词（说明主语是机构，而非「姓名，机构」式人物简介）。
+    典型人物简介（「荆杰泰,华东师范大学,…」「许进超, 国际数学家大会…」）只有机构词、
+    无沿革锚点 → 不命中；ctld 1239（「我校物理与电信工程学院许桂清老师…」）有机构词、
+    无沿革锚点 → 同样不命中（其 bio 是真人简介，须保留）。
+    """
+    b = (bio or '').strip()
+    if len(b) < 20:
+        return False
+    if not _ORG_BIO_ANCHOR_RE.search(b[:120]):
+        return False
+    return bool(_ORG_BIO_HEAD_RE.search(b[:15]))
+
+
+def _strip_en_title_tail(name):
+    """剥离「英文姓名 + 英文职务串」中的职务部分（physics 12246 等）。
+
+    仅处理**纯拉丁**值（含 CJK 的混写交回中文路径），分两步：
+      ① 剥前缀敬称（Prof./Dr./「P rof.」/「Pro.」）；
+      ② 以**最靠前**的职务词为界截断，并要求其前部仍是合理英文姓名（1~4 词）。
+    无职务词且无前缀时原值返回；截断后头部为空或不像姓名时同样保留原值，
+    避免把「Vice President」（值本身即职务）这类脏值清成空串。
+    """
+    if not isinstance(name, str):
+        return name
+    s = name.strip()
+    if not s or re.search(r'[\u4e00-\u9fff]', s) or not re.search(r'[A-Za-z]', s):
+        return name
+    core = _EN_SPK_PREFIX_RE.sub('', s).strip()
+    if not core:
+        core = s
+    m = _EN_SPK_TITLE_RE.search(core)
+    if m and m.start() > 0:
+        head = core[:m.start()].strip(' \t,;、-–—.')
+        if 1 <= len(head) <= 40 and _EN_NAME_OK_RE.match(head):
+            return head
+    return core if core != s else s
+
+
 def _strip_speaker_title_tail(name):
     """剥离主讲人姓名尾部的职称/修饰词残片（系统级出口清理，覆盖规则与 LLM 两条路径）。
 
-    仅当剥离后头部仍是合理中文姓名（2~6 字纯中文，允许「·」）时才生效；
-    英文姓名（Paul van den Brink）与「黄加耀, 刘轩奕」式多主讲人不受影响。
+    中文路径仅当剥离后头部仍是合理中文姓名（2~6 字纯中文，允许「·」）时才生效；
+    「黄加耀, 刘轩奕」式多主讲人不受影响。英文值走 `_strip_en_title_tail`
+    （2026-09-22 增补：源站常把英文职务串连写在姓名之后，如 physics 12246）。
     """
     if not isinstance(name, str) or not name.strip():
         return name
     s = name.strip()
+    s_en = _strip_en_title_tail(s)
+    if s_en != s:
+        return s_en
     for _ in range(2):
         m = _SPK_TAIL_TITLE_RE.search(s)
         if not m or m.start() == 0:
@@ -3143,6 +3222,11 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         # 主讲人姓名尾部职称/修饰词残片清理（覆盖 LLM 富化值「孙开佳 青年」）。
         if _r.get('speaker'):
             _r['speaker'] = _strip_speaker_title_tail(_r['speaker'])
+        # 主讲人简介被填成「机构/团体介绍」时清空（xz 49/98、io 826/779/686）。
+        # 同样必须放在出口：这类误填既可能来自正文路径的字段串位，也可能来自
+        # LLM/VLM 填空，只有在出口统一判定才能两条路径同时覆盖。
+        if _r.get('speakerBio') and _is_org_intro_bio(_r['speakerBio']):
+            _r['speakerBio'] = ''
     return out
 
 
@@ -5409,6 +5493,92 @@ def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
     return cand
 
 
+def _detect_numbered_reporter_sessions(text, default_year=None, publish_time=None,
+                                       title_year=None, url_year=None,
+                                       base_start=None, base_end=None):
+    """候选8：编号挂在**报告人**上、标号报告人各带题目的多报告（cs 1932）。
+
+    与候选4 互补——候选4 的编号挂在「题目」上（「题目1：…报告人1：…」），
+    此处编号挂在「报告人」上：
+
+        报告人1：沈映珊博士  报告题目：课程教学视频中基于文本索引的研究与评价
+        报告人2：李丁丁博士  报告题目：新型存储架构下虚拟机读写性能优化技术研究
+
+    候选1-7 全部落空的原因：候选1 以「报告题目」分块后块内取不到时间（时间写在
+    页尾「时 间：6月5日上午10:00」，位于全部块之外）而整批跳过；候选2/5/6 的
+    「报告N」「第N讲」「专题N」标记与此页无缘（且「报告人N」被其负向预查天然规避）；
+    候选4/7 要求编号直接挂在题目标签上，此页题目标签无编号。
+
+    场次口径与候选4 一致：各场共用页面**真实存在**的页眉时段（打 _numbered=True
+    豁免末尾 distinct-time 检查），不因「无逐场独立时间」而合并——合并会丢掉
+    「一个报告会多个报告」的可检索性。
+
+    要点：
+      · 同编号按**题目完整性**择优：源站常把全文排两份（正文容器版 + 页尾 meta 摘要版），
+        而 meta 摘要版是**被截断**的短题（cs 1932 实测「新型存储架构」丢掉后半段
+        「下虚拟机读写性能优化技术研究」）。故对同一编号的多次出现比较题目长度、取最长者；
+        同长保留**先出现**者（正文在前、meta 在后）。若简单按位置取末次，会落到截断版。
+      · 末块尾部按「答辩委员会/时间/地点」截断，避免把页尾答辩委员会名单与页眉
+        字段串进本场 block。
+      · speaker 不在此处填写：交由 split_record_by_sessions 从 block 逐块提取
+        （其 `报告人\\d*` 分支已支持带编号标签），避免两处口径不一致。
+    """
+    _REPORTER_MARK_RE = re.compile(
+        r'(?:报告人|主讲人|演讲人|讲者)\s*([0-9]{1,2}|[一二三四五六七八九十]{1,2})\s*[:：]')
+    marks = list(_REPORTER_MARK_RE.finditer(text))
+    if len(marks) < 2:
+        return []
+    _TOPIC_LAB_RE = re.compile(r'(?:报告题目|讲座题目|专题题目|题目|主题)\s*[:：]\s*')
+    # 题目终止符：下一个编号报告人，或页尾「合作导师/答辩委员会/时间/地点」等段落
+    _TOPIC_STOP_RE = re.compile(
+        r'(?=\s*(?:报告人|主讲人|演讲人|讲者|合作导师|导师|答辩委员|时间|地点|'
+        r'摘要|简介|主办|承办|邀请人|\d{4}年|\d{1,2}月\d{1,2}日|$))')
+    _TAIL_CUT_RE = re.compile(r'答辩委员|时\s*间\s*[:：]|地\s*点\s*[:：]')
+    _page_start = base_start
+    _page_end = base_end
+    if not _page_start:
+        _pd = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
+                            title_year=title_year, url_year=url_year)
+        if _pd and _pd.get('start'):
+            _page_start = _pd['start']
+            _page_end = _pd.get('end')
+    if not _page_start:
+        return []
+    # 逐次出现先算出题目，再按编号取「题目最完整」的那一次（见 docstring 要点①）
+    _best = {}
+    for i, mk in enumerate(marks):
+        seg_end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        head = text[mk.end():seg_end]
+        tl = _TOPIC_LAB_RE.search(head)
+        if not tl or tl.start() < 1:
+            # 标号后须先出现姓名、再出现题目标签；否则不是本形态
+            continue
+        _n = re.sub(r'\s*(?:博士|硕士|教授|副教授|讲师|研究员|院士|老师|导师).*$', '',
+                    head[:tl.start()].strip(' \t,，、;；')).strip()
+        if not (2 <= len(_n) <= 20):
+            continue
+        topic = _TOPIC_STOP_RE.split(head[tl.end():])[0].strip()
+        topic = re.sub(r'\s*(?:主讲人|报告人|预告)\s*[:：]?.*$', '', topic).strip()
+        topic = _clean_session_topic(topic)
+        if not topic or len(topic) < 2:
+            continue
+        _key = mk.group(1)
+        if _key not in _best or len(topic) > len(_best[_key][0]):
+            _best[_key] = (topic, mk, seg_end)
+    if len(_best) < 2:
+        return []
+    ordered = sorted(_best.values(), key=lambda x: x[1].start())
+    cand = []
+    for topic, mk, seg_end in ordered:
+        block = text[mk.start():seg_end]
+        tc = _TAIL_CUT_RE.search(block)
+        if tc:
+            block = block[:tc.start()]
+        cand.append({'topic': topic, 'start': _page_start, 'end': _page_end,
+                     'block': block, '_numbered': True, 'splitMode': 'numbered-reporter'})
+    return cand
+
+
 def _detect_plain_numbered_sessions(text, default_year=None, publish_time=None,
                                     title_year=None, url_year=None):
     """候选7（兜底）：纯阿拉伯数字编号列表（「1. 题目 时间：… 地点：…」型，ibc/2779 等）。
@@ -6226,6 +6396,18 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             title_year=title_year, url_year=url_year)
         if len(cand7) >= 2:
             sessions = cand7
+    # 候选8（兜底）：编号挂在「报告人」上的多报告（cs 1932）。
+    # 候选1-7 均落空：候选1 按「报告题目」分块后块内取不到时间（时间在页尾），
+    # 候选4/7 要求编号直接挂在题目标签上（此页「报告题目」无编号）。放在最后，
+    # 只在前 7 个候选都拆不出 ≥2 场时才启用，影响面受控；触发需 ≥2 个不同编号的
+    # 「报告人N：」且各自紧跟「报告题目：」，误命中风险低。
+    if len(sessions) < 2:
+        cand8 = _detect_numbered_reporter_sessions(
+            text, default_year=default_year, publish_time=publish_time,
+            title_year=title_year, url_year=url_year,
+            base_start=base_start, base_end=base_end)
+        if len(cand8) >= 2:
+            sessions = cand8
     # 去重：同 (topic, start) 视为同一场（顶部「题目」常与首期「主题/报告N题目」重复出现）。
     # topic 比较前去掉所有空白，避免正文数学符号/排版导致的「ℤ_{2^k}」与「ℤ _{2^k}」式微差误判为不同场。
     # 同 key 的多块中保留「信息更完整」者（含主讲人/报告人/摘要/参与者等子字段的块优先），
