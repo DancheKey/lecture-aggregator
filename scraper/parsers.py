@@ -392,12 +392,15 @@ _SPEAKER_TITLE = (r'(?:特聘教授|特任教授|长聘教授|副教授|助理�
 # 完整职称交替式（单一事实源，2026-09-09）：供 ①尾部职称剥离（3720/3846 两处）
 # ②姓名后残文的头部职称剥离 复用。含「学段+学科+高级职称」复合形态——
 # 「中学数学高级教师」类复合职称若只剥「高级教师」会把「中学数学」残留在姓名里
-# （idx772 speaker='彭斌中学' 实测教训）。
+# （idx772 speaker='彭斌中学' 实测教训）。2026-09-22 补「青年/资深」等修饰前缀复合职称——
+# 「青年研究员」若只剥「研究员」会把「青年」残留在姓名里（iqm429 speaker='孙开佳青年'、
+# iqm303 '徐子骏青年' 实测教训）。
 _TITLE_ALT_FULL = (
     r'(?:高级实验师|高级讲师|高级教师|高级工程师|高级会计师|高级经济师|特级教师'
     r'|实验师|工程师|会计师|经济师'
     r'|(?:(?:中学|小学|初中|高中)(?:数学|语文|英语|物理|化学|生物|政治|历史|地理|科学|美术|音乐|体育|信息技术)?'
     r'|数学|语文|英语|物理|化学|生物|政治|历史|地理|科学|美术|音乐|体育)?高级(?:教师|讲师|实验师|工程师|会计师|经济师)'
+    r'|(?:青年|资深|特聘|长聘|客座|兼职|访问|荣誉|杰出|首席|优秀)(?:研究员|教授|讲师)'
     r'|特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)'
 )
 
@@ -407,7 +410,7 @@ _ISO_BOUND = r'[\s　（）()，、；:：]'
 
 # 讲者标签值截止词：OCR 文本按空格拼接，标签式「专家姓名：邓万金 活动主题：…」若不加
 # 截止，会把后续标签整段吞入讲者值导致 _looks_like_real_name 失败。遇到这些词即停止取值。
-_SPK_VAL_STOP = (r'活动主题|讲座主题|主讲题目|报告题目|题目|主题|时间|地点|时闻|摘要|'
+_SPK_VAL_STOP = (r'活动主题|讲座主题|主讲题目|报告题目|题目|主题|时间|地点|时闻|日期|摘要|'
                  r'内容简介|讲座简介|报告简介|专家介绍|主讲人简介|报告人简介|简介|'
                  r'主办|主持|参会|报名|承办|协办')
 
@@ -659,6 +662,25 @@ def _extract_meeting_info(raw):
     return plat
 
 
+def _strip_location_label_tail(loc):
+    """剥离地点值尾部的字段标签残片（系统级，2026-09-22）。
+
+    取值常把紧随地点之后的下一行字段标签的前缀词吸进地点尾部：
+      「理8栋118报告厅」+「报告摘要」→「理8栋118报告厅报告」（iqm）
+      「学院101会议室」+「学术报告」→「学院101会议室学术报告」（cs 老页）
+    仅剥「独立成词的标签残片」——以「厅/室/楼/馆/栋」结尾的合法地点词（报告厅/报告楼）
+    不匹配；剥离后须仍 >=2 字（防整段被吃成空）。迭代 3 次以覆盖多层叠加。
+    """
+    if not isinstance(loc, str) or not loc:
+        return loc
+    for _ in range(3):
+        nt = re.sub(r'(?:学术报告|报告|摘要|简介|时间|地点|题目|专家|主讲人|报告人)$', '', loc).strip()
+        if nt == loc or len(nt) < 2:
+            break
+        loc = nt
+    return loc
+
+
 def _clean_location(loc, title=None):
     if not loc:
         return ''
@@ -786,6 +808,8 @@ def _clean_location(loc, title=None):
         if new == loc:
             break
         loc = new
+    # 尾部字段标签残片剥离（系统级，2026-09-22）：见 _strip_location_label_tail。
+    loc = _strip_location_label_tail(loc)
     if not loc:
         if meeting:
             return meeting
@@ -3060,6 +3084,35 @@ def _strip_affil_country_tail(value):
     return _AFFIL_COUNTRY_TAIL_RE.sub('', value).strip()
 
 
+# 主讲人姓名尾部的职称/修饰词残片（LLM 富化路径常产出「孙开佳 青年」——源页
+# 「报告人：孙开佳 / 青年研究员（复旦大学）」被模型拼接时把修饰词留在姓名后）。
+_SPK_TAIL_TITLE_RE = re.compile(
+    r'\s*(?:青年|资深|特聘|长聘|客座|兼职|访问|荣誉|杰出|首席|优秀'
+    r'|特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|'
+    r'博士后|博士|院士|老师|导师|先生|女士)$')
+
+
+def _strip_speaker_title_tail(name):
+    """剥离主讲人姓名尾部的职称/修饰词残片（系统级出口清理，覆盖规则与 LLM 两条路径）。
+
+    仅当剥离后头部仍是合理中文姓名（2~6 字纯中文，允许「·」）时才生效；
+    英文姓名（Paul van den Brink）与「黄加耀, 刘轩奕」式多主讲人不受影响。
+    """
+    if not isinstance(name, str) or not name.strip():
+        return name
+    s = name.strip()
+    for _ in range(2):
+        m = _SPK_TAIL_TITLE_RE.search(s)
+        if not m or m.start() == 0:
+            break
+        head = s[:m.start()].strip()
+        if len(head) >= 2 and re.fullmatch(r'[\u4e00-\u9fff·]{2,6}', head):
+            s = head
+        else:
+            break
+    return s
+
+
 def apply_exit_gate(out, url=''):
     """parse_detail 出口统一闸门：兼容 None / 单条 dict / 多条 list 三种返回形态。"""
     if out is None:
@@ -3082,6 +3135,14 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     _out_recs = out if isinstance(out, list) else ([out] if isinstance(out, dict) else [])
     for _r in _out_recs:
         _r['speakerAffiliation'] = _strip_affil_country_tail(_r.get('speakerAffiliation'))
+        # 地点尾部标签残片清理（2026-09-22）。**必须在出口做**：LLM 文本富化发生在正文路径
+        # 的 _clean_location 之后，其产出的「理8栋118报告厅报告」等残留不会被正文路径清理。
+        # _clean_location 幂等，对已干净的值无副作用。
+        if _r.get('location'):
+            _r['location'] = _clean_location(_r['location'], _r.get('title') or _r.get('topic'))
+        # 主讲人姓名尾部职称/修饰词残片清理（覆盖 LLM 富化值「孙开佳 青年」）。
+        if _r.get('speaker'):
+            _r['speaker'] = _strip_speaker_title_tail(_r['speaker'])
     return out
 
 
@@ -3589,6 +3650,10 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         '教学工作坊时间|教学工作坊地点|'
         '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|报告摘要|'
         '讲座题目|讲座时间|讲座地点|主办单位|学术主持|上一篇|下一篇|标签|Tags|'
+        # 「日期」作字段标签须紧跟冒号（physics 页「演讲人：朱诗亮 日期：06月30日」：
+        #  无此标签时姓名正则 {2,4} 会贪婪吃成「朱诗亮日」；加 (?=[:：]) 限定为标签形态，
+        #  不影响散文里偶现的「日期」二字）。
+        '日期(?=[:：])|'
         '地点|题目|主题|讲座主题|演讲题目|报告主题|'
         '时间|主讲[人师]|讲座人|主持人|主讲|报告人|主讲嘉宾|讲座嘉宾|演讲人|邀请人|'
         'Speaker|Presenter|Lecturer|'
@@ -3730,6 +3795,61 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             r'|Venue|Location)[：:]\s*([^：:\n]{2,40})', ocr_text)
         if loc_ocr and len(loc_ocr.group(1).strip()) >= 2:
             result['location'] = loc_ocr.group(1).strip()
+
+    # LOC-FALLBACK（2026-09-22）：主标签与 OCR 均未取到地点时的三级兜底，**仅在 location 仍为空
+    # 时启用**——不改动存量主路径命中记录的行为，零回归风险。覆盖三类源页写法：
+    #   FB1「地址：X楼Y室」标签（cs 老页「地址：计算机学院学术报告厅（东阶梯教室）」）；
+    #   FB2「时间：中午12:15，理6栋302」式地点与时间同行（physics 周一午餐会报告）；
+    #   FB3 无地点标签的纯线上讲座（maths「腾讯会议：786-655-170」）。
+    if not result.get('location'):
+        _loc_fb = ''
+        # FB1：「地址：」标签。用负向断言排除站点页脚的「联系地址/通讯地址/邮寄地址」——
+        # 校园站页脚常把「联系地址：广东省广州市…」排在「版权所有」之前而存活于 text；
+        # 且值须含地点特征词、不得以行政区开头（纯联系地址无楼栋室厅词）。
+        _ma = re.search(
+            rf'(?<!联系)(?<!通讯)(?<!邮寄)(?<!邮政)(?:地址|Address)[：:]\s*([^\n]+?){LOC_STOP}',
+            text)
+        if _ma:
+            _v = re.sub(r'\s+', '', _ma.group(1)).strip()
+            if re.search(r'(?:楼|室|厅|馆|栋|幢|教室|校区|校园|园区|会议室|报告厅|礼堂|场馆|实验室|中心)', _v) \
+                    and not re.match(r'^(?:广东省|广州市|番禺区|天河区|佛山市|汕尾市|南海区)', _v):
+                _loc_fb = _v
+        # FB2：「时间：」值内嵌地点（「时间：中午12:15，理6栋302」）。按分隔符切分，取含地点
+        # 特征词且非纯时刻的片段。**收紧判据**（2026-09-22 ctld 实测）：片段须短（<=40 字）、
+        # 不得再含日期/时刻/非地点词——否则「授课时间:2016年10月12日…13:30-17:30 收看方式:
+        # 方式一:…教师在线学习中心…」会因串里的「中心」二字误命中特征词，整段被当地点。
+        if not _loc_fb:
+            for _mt in re.finditer(rf'时间[：:]\s*([^\n]+?){LOC_STOP}', text):
+                _tv = _mt.group(1).strip()
+                if not re.search(r'\d\s*[：:]\s*\d', _tv):
+                    continue
+                for _part in re.split(r'[，,；;]', _tv):
+                    _part = _part.strip()
+                    if not _part or len(_part) > 40:
+                        continue
+                    if re.fullmatch(r'[\d\s:：\-–~—至到点分时上午下午中午晚上早]+', _part):
+                        continue
+                    if re.search(r'\d{4}\s*年|\d\s*[：:]\s*\d|方式|收看|登录|附件|网址|http|www|报名|联系', _part):
+                        continue
+                    if re.search(r'(?:楼|室|厅|栋|幢|教室|校区|校园|会议室|报告厅|礼堂|场馆|中心|馆)', _part):
+                        _loc_fb = re.sub(r'\s+', '', _part)
+                        break
+                if _loc_fb:
+                    break
+        # FB3：无实体地点的纯线上讲座。**不用 `_extract_meeting_info` 的宽口径**——它会接受
+        # 泛称「线上会议」（正文「线上/线上线下」等词太常见，会大面积误填），也会把 8 位
+        # 电话/工号（华师总机 85213482）当会议号，并把同一号码重复拼接成值时。
+        # 改为独立正则：只认「具体平台 + 紧邻的 9~11 位（或 3-3-3）会议号」。
+        if not _loc_fb:
+            _mp = re.search(
+                r'(腾讯会议|Zoom|zoom|钉钉|飞书|腾讯课堂|Webex|webex|瞩目)'
+                r'[^\d\n]{0,10}?'
+                r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{9,11})', text)
+            if _mp:
+                _plat = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp.group(1), _mp.group(1))
+                _loc_fb = _plat + ' ' + re.sub(r'\s+', '', _mp.group(2))
+        if _loc_fb:
+            result['location'] = _loc_fb
 
     # 把地点字段里分离出的时间区间回填到讲座时间：
     #  - 若已有日期但时间完全缺失（00:00），用分离出的区间补全 start/end；
