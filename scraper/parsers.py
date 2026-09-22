@@ -42,6 +42,43 @@ def _n1a_normalize(text, keep_word_boundaries=True):
     return re.sub(r'([\u4e00-\u9fff])(\s{1,2})([\u4e00-\u9fff])', _cjk_space, text)
 
 
+# N1f：康煕部首（U+2F00–U+2FDF）与 CJK 部首补充（U+2E80–U+2EFF）码位。
+# 部分站点的正文编辑器会把「题目」「报告人」「牛津大学」等词里的汉字写成部首码位
+# （⽬U+2F6C / ⼈U+2F08 / ⽜U+2F5C / ⼤U+2F24 / ⽉U+2F49 / ⽇U+2F47），与规范汉字码位
+# 不同、肉眼零差异，却会让所有中文标签正则（_TOPIC_DELIM_RE、_ROLE_LABELS、机构名
+# 匹配…）整段失配——iqm 282 的 topic 因此落空回退成全标题、speaker 被切错位。
+# NFKC 对康煕部首区块有 1:1 兼容分解，可安全还原；无分解的字符（如 ⺏）原样保留。
+_RADICAL_RE = re.compile(r'[\u2E80-\u2FDF]')
+
+
+# CJK 部首补充区（U+2E80–U+2EFF）里少数【无 NFKC 分解】、但在中文正文中确被当作
+# 对应汉字使用的码位（源站编辑器误用，与康煕部首同源）。NFKC 救不了这类字符，
+# 只能定向补。仅收录有实测证据的字符，不做推测性扩充。
+_RADICAL_MANUAL = {
+    '\u2EC6': '角',   # ⻆ CJK RADICAL SIMPLIFIED HORN —— iqm/93「从理论物理的视⻆去看」应为「视角」
+}
+
+
+def _nfkc_radicals(text):
+    """康煕部首 / CJK 部首补充 → 规范汉字。
+
+    先走 NFKC 兼容分解（康煕部首区 U+2F00–U+2FDF 全部有 1:1 分解），再对少数无分解
+    的码位查 _RADICAL_MANUAL。这是码位层面的确定性还原（同一汉字的异体码位），
+    不是改写或翻译，值仍可溯源。
+
+    正文文本入口（_n1_normalize）与标题入口（_clean_title）都要调用——后者的取值
+    来自 listTitle 参数等原始串，不经过正文文本管线，否则标题会残留部首码位
+    （iqm 273「从微观量⼦到宏观引⼒波」实测）。
+    """
+    if not text or not _RADICAL_RE.search(text):
+        return text
+    text = _RADICAL_RE.sub(lambda m: unicodedata.normalize('NFKC', m.group(0)), text)
+    for k, v in _RADICAL_MANUAL.items():
+        if k in text:
+            text = text.replace(k, v)
+    return text
+
+
 def _n1_normalize(text, keep_word_boundaries=True, collapse_cjk_spaces=True):
     """N1 通用预处理：全角标点统一为半角（冒号/逗号/括号/斜杠/分号/引号）。
 
@@ -52,6 +89,10 @@ def _n1_normalize(text, keep_word_boundaries=True, collapse_cjk_spaces=True):
     """
     if not text:
         return text
+    # N1f：康煕部首 → 规范汉字。须在 N1a 折叠空格之前——部首码位不在 CJK 统一表意
+    # 区间内，若不还原，「题 目：」这类被 CMS 拆成单字的标签字间空格无法被折叠，
+    # 标签正则仍会失配。
+    text = _nfkc_radicals(text)
     repl = {'：': ':', '，': ',', '（': '(', '）': ')', '／': '/', '【': '[', '】': ']',
             '；': ';', '“': '"', '”': '"', '‘': "'", '’': "'", '　': ' '}
     for k, v in repl.items():
@@ -2500,8 +2541,30 @@ def _is_column_intro(text):
     return False
 
 
+# 标题开头的日期前缀（含被方括号/圆括号/书名类括号包裹的写法）：
+#   裸日期「2024-05-21艺术乡建…」「2023年12月24日红树林…」
+#   包裹日期「[2023年4月6日] 张三——题目」（iqm 源列表页锚文本的固定形态）
+# 包裹符本身无信息量，剥掉后与裸前缀同构。日期本身由时间解析单独处理，不丢信息。
+# 注意要求年份后紧跟月日数字，故「2024年度学术讲座」这类标题不会被误剥。
+_TITLE_DATE_PREFIX_RE = re.compile(
+    r'^\s*[\[（(【〔〖]*\s*(?:19|20)\d{2}\s*[-/年\.]\s*\d{1,2}\s*[-/月\.]\s*\d{1,2}\s*[日号]?\s*'
+    r'[\]）)】〕〗]*\s*')
+
+
+def strip_title_date_prefix(t):
+    """剥掉标题开头的日期前缀（含括号包裹写法）。非字符串原样返回。
+
+    抽为独立函数供存量重放复用，避免重放脚本另写一份正则而与 _clean_title 漂移。
+    """
+    if not isinstance(t, str) or not t:
+        return t
+    return _TITLE_DATE_PREFIX_RE.sub('', t).strip()
+
+
 def _clean_title(t):
-    t = t.strip()
+    # 标题取值可能来自 listTitle 参数等未经正文文本管线的原始串，须先做康煕部首还原，
+    # 否则标题会残留部首码位（iqm 273「从微观量⼦到宏观引⼒波」实测）。
+    t = _nfkc_radicals(t).strip()
     if ' - ' in t:
         t = t.split(' - ')[0].strip()
     if '｜' in t:
@@ -2529,9 +2592,10 @@ def _clean_title(t):
         _idx = max(t.rfind('('), t.rfind('（'))
         if _idx != -1:
             t = t[:_idx].strip()
-    # 列表页锚文本常把发布日期前缀粘进标题（如「2024-05-21艺术乡建…」「2023年12月24日红树林…」）。
+    # 列表页锚文本常把发布日期前缀粘进标题（如「2024-05-21艺术乡建…」「2023年12月24日红树林…」），
+    # 或把日期连同方括号一起写成「[2023年4月6日] 张三——题目」（iqm 源固定形态）。
     # 去掉标题开头的日期前缀，仅保留真实讲座标题。日期本身已由时间解析单独处理。
-    t = re.sub(r'^\s*(?:19|20)\d{2}\s*[-/年\.]\s*\d{1,2}\s*[-/月\.]\s*\d{1,2}\s*[日号]?\s*', '', t).strip()
+    t = strip_title_date_prefix(t)
     # 去掉 8 位连写日期前缀，如「20250911 讲座标题」
     t = re.sub(r'^\s*(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s+', '', t).strip()
     # 去掉无前导年份的「10月29日」「6月6日」等日期前缀（常见于 skc 砺儒讲坛列表页）。
@@ -2972,6 +3036,30 @@ def _gate_record(r, url=''):
     return r
 
 
+# 单位名尾部的「, 国别」后缀（用户 2026-09-22 约定）：
+#   ① 单位名本身含国名（National University of Singapore / University of Hawaii）→ 是名字
+#      的一部分，无逗号分隔，不受影响；
+#   ②「完整机构名 + 逗号 + 国别」（University of Tsukuba, Japan）→ 去掉国别，机构名已完整；
+#   ③「University of California, Berkeley」的 Berkeley 是地名不是国别 → 保留。
+# 故判据 = 逗号 + 国别白名单词 + 「该词已是值的尾部」（后面只能是括号注记或结束）。
+# 第三条同时豁免「Department of Applied Mathematics, Hong Kong Polytechnic University」
+# 这类把地名写在机构名前段的写法（Hong Kong 后面还跟着机构名，不构成尾部后缀）。
+_AFFIL_COUNTRY_TAIL_RE = re.compile(
+    r'\s*,\s*(?:Japan|U\.S\.A\.?|USA|U\.S\.?|US|U\.K\.?|UK|United States(?: of America)?|'
+    r'United Kingdom|China|Germany|France|Australia|Canada|Italy|Spain|Netherlands|'
+    r'Switzerland|Sweden|Belgium|Israel|South Korea|Korea|Hong Kong|Macao|Macau|Taiwan|'
+    r'Russia|India|Brazil|Poland|Austria|Denmark|Norway|Finland|Ireland|New Zealand|'
+    r'Singapore|Malaysia|Thailand|Vietnam|Portugal|Greece|Turkey|Egypt|South Africa)'
+    r'\s*(?=$|[（(])', re.I)
+
+
+def _strip_affil_country_tail(value):
+    """剥掉单位名尾部的国别后缀（判据见 _AFFIL_COUNTRY_TAIL_RE）。非字符串原样返回。"""
+    if not isinstance(value, str) or not value:
+        return value
+    return _AFFIL_COUNTRY_TAIL_RE.sub('', value).strip()
+
+
 def apply_exit_gate(out, url=''):
     """parse_detail 出口统一闸门：兼容 None / 单条 dict / 多条 list 三种返回形态。"""
     if out is None:
@@ -2987,7 +3075,14 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     """详情页解析对外入口：完整管线 + 出口统一闸门。"""
     out = _parse_detail_impl(html, url, college, campus, default_year=default_year,
                              list_title=list_title, skip_news_filter=skip_news_filter)
-    return apply_exit_gate(out, url=url)
+    out = apply_exit_gate(out, url=url)
+    # 出口统一规范化：单位名尾部国别后缀（单条与多场拆分两条路径同样覆盖）。
+    # 置于闸门之后——闸门内的「仅填空/值级溯源」须看到未改动的原值，避免清洗
+    # 影响其对「值是否出自原文」的判断（剥掉后缀后仍是原文子串，溯源自洽）。
+    _out_recs = out if isinstance(out, list) else ([out] if isinstance(out, dict) else [])
+    for _r in _out_recs:
+        _r['speakerAffiliation'] = _strip_affil_country_tail(_r.get('speakerAffiliation'))
+    return out
 
 
 def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
