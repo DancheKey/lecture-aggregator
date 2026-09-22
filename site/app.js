@@ -3,9 +3,7 @@
  */
 const { createApp } = Vue;
 
-const LIKE_KEY = 'lecture_likes_v1';
 const LIKED_KEY = 'lecture_liked_urls_v1';
-const WANT_KEY = 'lecture_wants_v1';
 const WANTED_KEY = 'lecture_wanted_urls_v1';
 const STAT_KEY = 'lecture_stats_v1';      // 本地缓存 + 后端合并后的讲座访问/点赞/想听统计
 const COUNT_CAP = 300;                    // 点赞/想听超过此值显示 "300+"，防止虚高数字
@@ -52,9 +50,7 @@ const app = createApp({
       // hp 为反垃圾蜜罐（视觉隐藏，真人看不见，机器人会去填）
       reportForm: { unit: '', campus: '', url: '', oldUrl: '', note: '', contact: '', hp: '' },
       reportSending: false,  // 报告提交中（防重复点击 + 按钮态）
-      likes: {},          // url -> count（本地点赞数）
-      likedUrls: new Set(), // 当前浏览器已点赞的 url 集合
-      wants: {},          // url -> count（本地想听数）
+      likedUrls: new Set(), // 当前浏览器已点赞的 url 集合（计数见 lectureStats）
       wantedUrls: new Set(), // 当前浏览器已标记想听的 url 集合
       loading: true,       // 首屏数据加载中（避免闪现空列表）
       dataStage: 'loading', // 'loading' | 'partial' | 'partial-error' | 'full'：渐进加载阶段
@@ -483,28 +479,25 @@ const app = createApp({
     /* ---------- 本地点赞（同一浏览器去重） ---------- */
     loadLikes() {
       try {
-        this.likes = JSON.parse(localStorage.getItem(LIKE_KEY) || '{}');
         this.likedUrls = new Set(JSON.parse(localStorage.getItem(LIKED_KEY) || '[]'));
-        // 计数以 lectureStats（后端权威 / 本机 STAT_KEY 缓存）为准；
-        // 不再把旧版 LIKE_KEY 的本地计数合并进 lectureStats，否则刷新后会
-        // 把已取消的脏值重新显示出来。
+        // 计数以 lectureStats（后端权威 / 本机 STAT_KEY 缓存）为准。
+        // 旧版 LIKE_KEY 本地计数键已废弃（N5，2026-09-22）：只写不读的死数据，
+        // 一次性清掉残留，之后不再读写。
+        localStorage.removeItem('lecture_likes_v1');
       } catch (e) {
-        this.likes = {};
         this.likedUrls = new Set();
       }
     },
     saveLikes() {
       try {
-        localStorage.setItem(LIKE_KEY, JSON.stringify(this.likes));
         localStorage.setItem(LIKED_KEY, JSON.stringify(Array.from(this.likedUrls)));
       } catch (e) { /* ignore quota/storage errors */ }
     },
     likeCount(url) {
-      // 后端 lectureStats 为权威（与统计页同源）；无后端时回退本机 this.likes
+      // 计数以 lectureStats（后端权威 / 本机 STAT_KEY 缓存）为唯一来源，
+      // 不回退旧本地计数键（残留脏值会导致「刷新后数值增加」）。
       const s = this.lectureStats[url];
       if (s && typeof s.likes === 'number') return s.likes;
-      // 不再回退本机 localStorage 残留值：本机只代表「本机是否点过赞」(hasLiked)，
-      // 计数以「后端全局权威值」为准，避免旧版逻辑残留的脏值被刷新后显示出来。
       return 0;
     },
     hasLiked(url) {
@@ -534,49 +527,47 @@ const app = createApp({
       const s = this.lectureStats[url];
       const cur = (s && typeof s.likes === 'number') ? s.likes : 0;
       const next = Math.max(0, cur + delta);
-      this.likes[url] = next;
       if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
       this.lectureStats[url].likes = next;
       this.saveLikes();
       this.saveLocalStats();
-      this.showToast(willLike ? '点赞成功' : '已取消点赞');
+      // toast 不先于 fetch 无条件报成功（C1-c）：按真实结果分支提示
       const endpoint = willLike ? 'like' : 'unlike';
       fetch('/api/lecture/' + endpoint, {
         method: 'POST', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       })
-        .then(r => r.json())
+        .then(r => (r && r.ok ? r.json() : null))
         .then(j => {
           if (j && j.ok && typeof j.likes === 'number') {
             // 后端权威值覆盖本机乐观值
             if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
             this.lectureStats[url].likes = j.likes;
-            this.likes[url] = j.likes;
-            this.saveLikes();
             this.saveLocalStats();
+            this.showToast(willLike ? '点赞成功' : '已取消点赞');
+          } else {
+            // 后端失败 / 被节流 / 公网无后端：本机状态已生效，不冒称服务端成功
+            this.showToast('已本地记录');
           }
-          // 后端失败 / 被节流：保留本机乐观值（无后端时即为真实值）
         })
-        .catch(() => { /* 离线：保留本机值 */ });
+        .catch(() => { this.showToast('已本地记录'); }); // 离线：本机值已生效
     },
 
     /* ---------- 本地「想听」（同一浏览器去重，逻辑与点赞对称） ---------- */
     loadWants() {
       try {
-        this.wants = JSON.parse(localStorage.getItem(WANT_KEY) || '{}');
         this.wantedUrls = new Set(JSON.parse(localStorage.getItem(WANTED_KEY) || '[]'));
-        // 计数以 lectureStats（后端权威 / 本机 STAT_KEY 缓存）为准；
-        // 不再把旧版 WANT_KEY 的本地计数合并进 lectureStats，避免刷新后显示
-        // 已取消的旧值。
+        // 计数以 lectureStats（后端权威 / 本机 STAT_KEY 缓存）为准。
+        // 旧版 WANT_KEY 本地计数键已废弃（N5，2026-09-22）：只写不读的死数据，
+        // 一次性清掉残留，之后不再读写。
+        localStorage.removeItem('lecture_wants_v1');
       } catch (e) {
-        this.wants = {};
         this.wantedUrls = new Set();
       }
     },
     saveWants() {
       try {
-        localStorage.setItem(WANT_KEY, JSON.stringify(this.wants));
         localStorage.setItem(WANTED_KEY, JSON.stringify(Array.from(this.wantedUrls)));
       } catch (e) { /* ignore quota/storage errors */ }
     },
@@ -600,29 +591,29 @@ const app = createApp({
       const s = this.lectureStats[url];
       const cur = (s && typeof s.wants === 'number') ? s.wants : 0;
       const next = Math.max(0, cur + delta);
-      this.wants[url] = next;
       if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
       this.lectureStats[url].wants = next;
       this.saveWants();
       this.saveLocalStats();
-      this.showToast(willWant ? '已标记想听' : '已取消想听');
+      // toast 不先于 fetch 无条件报成功（C1-c，与点赞对称）：按真实结果分支提示
       const endpoint = willWant ? 'want' : 'unwant';
       fetch('/api/lecture/' + endpoint, {
         method: 'POST', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       })
-        .then(r => r.json())
+        .then(r => (r && r.ok ? r.json() : null))
         .then(j => {
           if (j && j.ok && typeof j.wants === 'number') {
             if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
             this.lectureStats[url].wants = j.wants;
-            this.wants[url] = j.wants;
-            this.saveWants();
             this.saveLocalStats();
+            this.showToast(willWant ? '已标记想听' : '已取消想听');
+          } else {
+            this.showToast('已本地记录');
           }
         })
-        .catch(() => { /* 离线：保留本机值 */ });
+        .catch(() => { this.showToast('已本地记录'); }); // 离线：本机值已生效
     },
     // 显示计数：超过 300 显示 "300+"，避免被攻击造成虚高数字
     capDisplay(n) {

@@ -580,9 +580,6 @@ def _is_dirty_value(fld, v):
     if fld == 'speaker':
         # C2（2026-09-22）：判据收敛到 field_vocab.is_dirty_speaker，与体检同源。
         return _fv.is_dirty_speaker(v)
-        if len(v) > 6 and re.search(r'[\u4e00-\u9fa5]', v) and '·' not in v:
-            return True
-        return False
     if fld == 'speakerAffiliation':
         if _DIRTY_TITLE_RE.search(v) and not _AFF_ORG_HEAD_RE.search(v):
             return True

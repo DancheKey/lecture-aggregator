@@ -402,8 +402,11 @@ def is_multi_speaker_clean(v):
 
     存在的必要性（C2，2026-09-10 hybrid / 2026-09-22 收敛到此）：判脏若按
     「过长即污染」，正常多人姓名长度必然超限 → 丧失「仅填空」保护、开放给
-    模型 A 覆盖。判据：按分隔符拆出 ≥2 段，每段 ≤6 字且不含职称/机构词；
+    模型 A 覆盖。判据：按分隔符拆出 ≥2 段且不含职称/机构词；每段长度——
+    含拉丁字母的段 ≤30 字符（英文全名如 'Ernesto Macaro'），纯中文段 ≤6 字。
     另须排除混入字段标签的形态（'主讲人：张三、李四' 首段恰好 ≤6 字会被误豁免）。
+    2026-09-22：每段统一 ≤6 是 C2 收敛时引入的回归，丢掉英文全名容纳能力
+    （idx2525 被体检误报「姓名过长」），故按段内字符集分档。
     """
     if not v or not isinstance(v, str):
         return False
@@ -413,7 +416,8 @@ def is_multi_speaker_clean(v):
     if len(parts) < 2:
         return False
     for p in parts:
-        if len(p) > 6:
+        cap = 30 if re.search(r'[A-Za-z]', p) else 6
+        if len(p) > cap:
             return False
         if DIRTY_TITLE_RE.search(p) or DIRTY_ORG_RE.search(p):
             return False
