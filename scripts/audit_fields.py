@@ -50,6 +50,15 @@ _NAV_CHAIN = re.compile(
     r'(?:学术活动|科研项目|科研成果|科研平台|研究方向|重大项目|学科方向|'
     r'人才招聘|本科生教育|研究生教育|党建工作){2,}')
 
+# 「页面本无具名主讲人」白名单（已逐条抓源页核对，2026-09-22）：
+# 这些页面的「报告人：」值本身就是**无姓名的群体指称**，speaker 解析为空是正确结果，
+# 不应计入「疑似漏抓」。空 speaker 的自动判据（bio/标题人名信号）读不到源页原文，
+# 无法识别这类占位值，故用显式白名单登记；新增条目须在注释里附源页原文依据。
+_NO_SPEAKER_PAGES = {
+    # psy 1766 源页原文：「报告人：学院资深前辈们」
+    'http://psy.scnu.edu.cn/a/20190529/1766.html',
+}
+
 
 def _iso(s):
     try:
@@ -102,7 +111,9 @@ def audit(recs):
         spk = (r.get('speaker') or '').strip()
         bio = (r.get('speakerBio') or '').strip()
         title = (r.get('title') or '')
-        if not spk:
+        if not spk and (url or '').strip() in _NO_SPEAKER_PAGES:
+            pass  # 页面本无具名主讲人（源页为群体指称），空 speaker 属正确行为，不计告警
+        elif not spk:
             signals = []
             if bio and _BIO_HEAD_NAME_RE.match(bio):
                 signals.append('bio开头像"姓名,单位"')
