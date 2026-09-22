@@ -12,6 +12,7 @@
 """
 import os
 import re
+import sys
 import json
 import html
 import argparse
@@ -20,6 +21,8 @@ import collections
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
+sys.path.insert(0, os.path.join(ROOT, 'scraper'))
+import field_vocab as _fv  # noqa: E402  多人/判脏词表单一事实源（C2 收敛）
 
 
 def get(r, *keys):
@@ -70,8 +73,6 @@ LOC_LABEL_RE = re.compile(
     r'报告题目|内容简介|欢迎|参加|报名|您想|如何|培训对象|名额|对象[:：]|'
     r'嘉宾|领导|议程|日程|备注|联系人|联系电话)'
 )
-# 多人联讲分隔符
-MULTI_SEP_RE = re.compile(r'[、,，/&]| and | AND ')
 # 英文头衔前缀
 EN_TITLE_RE = re.compile(r'^\s*(Prof|Doctor|Dr|Professor|Mr|Ms|Mrs|Sir|Madam)\.?\s+', re.I)
 
@@ -109,19 +110,6 @@ def is_journal_name(a):
     for ok in SCI_OK:
         t = t.replace(ok, '')
     return bool(JOURNAL_RE.search(t))
-
-
-def is_multi_speaker(s):
-    """判断是否多人联讲（正常形态，不算错误）"""
-    if not MULTI_SEP_RE.search(s):
-        return False
-    # 含机构/职务词的逗号串不算多人，是污染
-    if ORG_RE.search(s) or TITLE_RE.search(s):
-        return False
-    parts = [p.strip() for p in re.split(r'[、,，/&]| and | AND ', s) if p.strip()]
-    # 每段 ≤30 字：英文全名（名+姓）天然 12~25 字，
-    # 如 idx2504「Ernesto Macaro, David Lasagabaster, 胡光伟」
-    return len(parts) >= 2 and all(len(p) <= 30 for p in parts)
 
 
 def has_unclosed_paren(s):
@@ -211,8 +199,9 @@ def scan(recs):
             if EN_TITLE_RE.match(spk):
                 issues.append(('主讲人', 'speaker', '中', '英文名带头衔前缀', spk, r))
             # 外文音译名含「·」为正常形态（如「克里斯蒂安·盖勒兰」），不按过长误报
-            if len(spk) > 6 and re.search(r'[\u4e00-\u9fa5]', spk) \
-                    and '·' not in spk and not is_multi_speaker(spk):
+            # 多人豁免走 field_vocab.is_multi_speaker_clean（C2 收敛，与 audit_fields/hybrid 同源）
+            if len(spk) > 6 and re.search(r'[一-鿿]', spk) \
+                    and '·' not in spk and not _fv.is_multi_speaker_clean(spk):
                 issues.append(('主讲人', 'speaker', '中', f'姓名过长({len(spk)}字)，疑似混入其他内容', spk, r))
             if '\n' in spk or '\t' in spk:
                 issues.append(('主讲人', 'speaker', '高', '姓名含换行/制表符', spk, r))

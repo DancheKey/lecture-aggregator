@@ -308,7 +308,7 @@ llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类�
 
 ### 3.7 首页 / 统计页数字动画与站点总访问量（纯静态部署）
 
-公网无后端：首页先加载 `lectures/latest.json`（50 条）再按分片后台加载全量；统计页直接加载 `lectures/stats.json`。两页顶部都有「讲座数 / 来源通知数」滚动动画，页脚各显示「本站总访问量」。
+公网无后端：首页先加载 `lectures/latest.json`（50 条）再按分片后台加载全量；统计页直接加载 `lectures/stats.json`。两页顶部都有「讲座数 / 来源通知数」滚动动画，页脚显示「本站总访问量」（2026-09-22 用户决定：对外文案不体现第三方；数值实为 busuanzi 站点 PV，与本地 `/api/visits` 口径不可比，详见 `footer-counter.js` 注释）。
 > **2026-09-10 代码级核实**：本节旧版本关于「访问量优先级」与「动画曲线常量」的描述与代码完全对不上（`loadSiteVisits` / `countapi` / `busuanzi.ibruce.info` / `TARGET=1700` 全站 grep 0 命中），已按下述**真实实现**重写，旧描述作废。
 
 #### 3.7.1 数字滚动动画（两页机制不同，勿混用）
