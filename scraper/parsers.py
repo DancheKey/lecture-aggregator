@@ -4766,10 +4766,19 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             _base_dt = datetime.datetime.fromisoformat(_ls)
         except Exception:
             _base_dt = None
+    # 整页讲座结束时间同步传入：多场拆分时各场共用页眉时段，缺 end 会让拆分后
+    # 每条的 lectureEnd 丢失（psy 1305/1226 页眉本身带完整区间）。
+    _base_dt_end = None
+    _le = result.get('lectureEnd')
+    if _le:
+        try:
+            _base_dt_end = datetime.datetime.fromisoformat(_le)
+        except Exception:
+            _base_dt_end = None
     _sessions_pre = detect_multi_session(
         body_text, title=title, default_year=default_year, publish_time=publish_time,
         title_year=title_year, url_year=url_year, soup=soup, url=url,
-        base_start=_base_dt)
+        base_start=_base_dt, base_end=_base_dt_end)
     if not _sessions_pre and not skip_news_filter and is_news_record(result, poster_page=poster_only):
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
@@ -5152,28 +5161,54 @@ def _detect_field_list_sessions(text, default_year=None, publish_time=None,
 
 
 def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
-                                    title_year=None, url_year=None):
-    """候选4：阿拉伯数字编号的「题目N：/报告题目N：」型多报告（cs 4268 等）。
+                                    title_year=None, url_year=None, base_start=None,
+                                    base_end=None):
+    """候选4：显式编号分场的多报告（cs 4268 / psy 1305/961/1226）。
 
+    覆盖三种编号形态（编号与「题目标签」相邻，编号可前置亦可后置）：
+      · 形态1 阿拉伯后置「题目1：CrowdOS… 报告人1：於志文…」（cs 4268，原有能力）
+      · 形态2 中文括号前置「（一）题目：New insight into glial cell function.」（psy 1226）
+      · 形态3 讲座/报告前置「讲座一题目：…」/「讲座一(15:00-16:15) 题目：…」（psy 1305/961）
     形如 题目1：CrowdOS… 报告人1：於志文… 学术报告简介:…
           题目2：… 报告人2：… 学术报告简介:…
-    各场常共用页眉时间（如 '时间：2019年11月29日（星期五）14:30'），块内无独立时间，
-    故从整页解析日期作每段兜底前缀。
+    各场常共用页眉时间（时间写在首场之前或末场之后，块内无独立时间），
+    故用整页时间作每段兜底前缀；形态3 若编号后自带时间括号（「讲座一(15:00-16:15)」），
+    则以该括号内时间为准。
+    慢路径说明：形态2/3 之所以不能由上游候选接手——候选1 按「题目：」分块后
+    块内取不到时间（时间在页眉，位于全部块之外）而整批跳过（psy 1226 实测 0 段）；
+    候选2 的「讲座N」标记要求编号与「题目」被时间/换行隔开，且带
+    (?![题目主题摘要人师]) 负向预查，遇「讲座一题目：」连写时反而全部失效（psy 1305 实测 0 命中）。
 
     注意：同一编号可能既出现在页眉总览（'题目1：CrowdOS…学术报告 时间：…地点：…'）
     又出现在正文章节（'题目1：CrowdOS：… 报告人1：…'），造成重复块。这里每个编号
     只保留最后一次出现（位置最靠后的正文章节），跳过页眉总览，避免多拆伪场。
     """
     _NUM_TOPIC_RE = re.compile(
-        r'(?:报告题目|讲座题目|专题题目|报告专题|题目|主题)\s*[0-9]+\s*[：:]')
+        r'(?:'
+        # 形态1：题目标签 + 阿拉伯数字 + 冒号（「题目1：」）
+        r'(?:报告题目|讲座题目|专题题目|报告专题|题目|主题)\s*[0-9]+\s*[：:]'
+        r'|'
+        # 形态2：括号编号 + 题目标签（「（一）题目：」）
+        r'[（(]\s*[一二三四五六七八九十0-9]+\s*[）)]\s*'
+        r'(?:报告题目|讲座题目|专题题目|题目|主题)\s*[：:]'
+        r'|'
+        # 形态3：讲座/报告 + 数字 [+ 可选时间括号] + 题目标签
+        # （「讲座一题目：」/「讲座一(15:00-16:15) 题目：」）
+        r'(?:讲座|报告)\s*[一二三四五六七八九十0-9]+\s*'
+        r'(?:[（(][^）)]{0,30}[）)]\s*)?'
+        r'(?:报告题目|讲座题目|专题题目|题目|主题)\s*[：:]'
+        r')')
     labels = list(_NUM_TOPIC_RE.finditer(text))
     if len(labels) < 2:
         return []
-    # 同编号只保留最后一次出现（页眉总览 vs 正文章节去重）
+    # 同编号只保留最后一次出现（页眉总览 vs 正文章节去重）。
+    # 编号同时认阿拉伯与中文数字：形态2/3 用中文数字，旧实现只认 [0-9]+ 会取不到而
+    # 退化成「整串比较」，使「（一）题目:」与「（一）题目：」这类半/全角差异无法归一，
+    # 同一场次被当成两场重复拆出。
     _dedup_idx = {}
     _ordered = []
     for _m in labels:
-        _num = re.search(r'[0-9]+', _m.group())
+        _num = re.search(r'[0-9]+|[一二三四五六七八九十百零]+', _m.group())
         _key = _num.group() if _num else _m.group()
         if _key in _dedup_idx:
             _ordered[_dedup_idx[_key]] = _m
@@ -5183,19 +5218,47 @@ def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
     labels = _ordered
     if len(labels) < 2:
         return []
-    # 页眉日期+时间兜底前缀（各场共用开场时间，块内无独立日期/时钟，
+    # 页眉时间兜底前缀（各场共用开场时间，块内无独立日期/时钟，
     # 故把页眉解析出的完整时间一并带入，否则 parse_cn_time 只能取到 00:00）。
-    _page_dt = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
-                             title_year=title_year, url_year=url_year)
+    # 优先取 parse_detail 已算好的整页时间 base_start：直接 parse_cn_time(text) 会被
+    # 正文简介里的历史日期污染——psy 1226 的「1982年9月23日生于北京」会把整页时间
+    # 拉成 1982 年，而页眉实为「2月23日 2:30-5:00」。
+    _page_start = base_start
+    _page_end = base_end
+    if not _page_start:
+        _page_dt = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
+                                 title_year=title_year, url_year=url_year)
+        if _page_dt and _page_dt.get('start'):
+            _page_start = _page_dt['start']
+            _page_end = _page_dt.get('end')
     _page_date_str = ''
-    if _page_dt and _page_dt.get('start'):
-        _d = _page_dt['start']
-        _page_date_str = f'{_d.year}年{_d.month}月{_d.day}日 {_d.hour:02d}:{_d.minute:02d} '
+    _page_date_only_str = ''
+    if _page_start:
+        _page_date_only_str = f'{_page_start.year}年{_page_start.month}月{_page_start.day}日 '
+        # 共享前缀必须带完整区间（起-止），否则各场 end 会缺失（psy 1305 两条本应
+        # 均为 09:20-12:00，缺 end 会从库内现值退化）。
+        _page_date_str = (_page_date_only_str
+                          + f'{_page_start.hour:02d}:{_page_start.minute:02d}')
+        if _page_end:
+            _page_date_str += f'-{_page_end.hour:02d}:{_page_end.minute:02d}'
+        _page_date_str += ' '
+    _LAB_CLOCK_RE = re.compile(r'\d{1,2}\s*[:：]\s*\d{1,2}')
     cand = []
     for i, lab in enumerate(labels):
         blk_start = lab.end()
         blk_end = labels[i + 1].start() if i + 1 < len(labels) else len(text)
         block = text[blk_start:blk_end]
+        # 末块的终点是文本末尾，而整页文本常带重复的第二份（正文容器自带第二份 /
+        # meta 描述），其中含页眉级「时间：…地点：…」及主讲人列表。若不截断，本场的
+        # speaker 会被后文页眉的「主讲人：甲 乙 丙」覆盖——psy 1226 第三场实测变成
+        # 第一场主讲人「肖林」。判据：块内出现「时间…地点」组合，且其后 200 字内仍有
+        # 「主讲人/报告人/题目/主题」（第二份可能被站点截断，故不要求完整题目标签）。
+        # 无此后随判据时不截断，避免误伤「本场自带页眉时间地点」的页面（psy 1305）。
+        if i == len(labels) - 1:
+            _dup = re.search(r'时\s*间\s*[:：][\s\S]{0,80}?地\s*点\s*[:：]', block)
+            if _dup and re.search(r'主讲[人师]|报告人|题目|主题',
+                                  block[_dup.end():_dup.end() + 200]):
+                block = block[:_dup.start()]
         tv = re.match(r'\s*(.+?)\s*' + _TOPIC_VAL_STOP, block)
         if not tv:
             tv = re.match(r'\s*(.+?)(?=\s*(?:报告人|主讲人|演讲人|讲者|报告专家))', block)
@@ -5206,7 +5269,15 @@ def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
         topic = re.sub(r'形式[:：].*$', '', topic).strip()
         if not topic or len(topic) < 2:
             continue
-        dt = parse_cn_time(_page_date_str + block, default_year=default_year,
+        # 时间来源：只在两种「可信来源」里取，**不拼接段文本**——段的终点可能是
+        # 正文末尾，而整页文本常带重复的第二份（meta 描述），其中含带「时 间：」
+        # 权威标签的页眉区间，parse_cn_time 会优先采用该权威标签，把本场时间
+        # 覆盖成页眉区间（psy 961 讲座二被写成 15:00 而非 16:15，实测踩到）。
+        #   ① 编号自带时间（「讲座一(15:00-16:15)」）→ 只解析编号本身 + 日期前缀；
+        #   ② 编号无时间 → 用页眉共享区间（各场同一时段，对应 _numbered=True 豁免）。
+        _clocked = bool(_LAB_CLOCK_RE.search(lab.group()))
+        _src = (_page_date_only_str + lab.group()) if _clocked else _page_date_str
+        dt = parse_cn_time(_src, default_year=default_year,
                            publish_time=publish_time, title_year=title_year, url_year=url_year)
         if not dt or not dt.get('start'):
             continue
@@ -5689,18 +5760,18 @@ def _ms_dedup_guard(sessions):
 
 def detect_multi_session(text, title='', default_year=None, publish_time=None,
                          title_year=None, url_year=None, soup=None, url=None,
-                         base_start=None):
+                         base_start=None, base_end=None):
     """detect_multi_session 对外入口：各候选结果统一过 _ms_dedup_guard。"""
     sessions = _detect_multi_session_impl(
         text, title=title, default_year=default_year, publish_time=publish_time,
         title_year=title_year, url_year=url_year, soup=soup, url=url,
-        base_start=base_start)
+        base_start=base_start, base_end=base_end)
     return _ms_dedup_guard(sessions)
 
 
 def _detect_multi_session_impl(text, title='', default_year=None, publish_time=None,
                                title_year=None, url_year=None, soup=None, url=None,
-                               base_start=None):
+                               base_start=None, base_end=None):
     """检测系列讲座公告（MS1-MS3）。
 
     返回 [] 表示单讲座；否则返回 session 列表（含块文本供拆分时逐块提取）：
@@ -5915,7 +5986,8 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
     if len(sessions) < 2:
         cand4 = _detect_numbered_topic_sessions(
             text, default_year=default_year, publish_time=publish_time,
-            title_year=title_year, url_year=url_year)
+            title_year=title_year, url_year=url_year,
+            base_start=base_start, base_end=base_end)
         if len(cand4) >= 2:
             sessions = cand4
     # 候选5（兜底，abdn / 系列讲坛等）：用「第N讲/第N场」做分段标记。
@@ -6280,6 +6352,13 @@ def split_record_by_sessions(base, sessions, full_text=''):
         is_roundtable = bool(participants) or bool(re.search(r'圆桌|座谈', block))
         # 主讲人（逐块优先；缺失继承前序；圆桌且无主讲人→置空）
         sp_m = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*|讲者简介|(?:第\s*[一二三四五六七八九十0-9]+\s*[讲场]?)?嘉宾)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
+        if not sp_m:
+            # 块内仅有「主讲人简介：」标签时（psy 1226 逐场简介型：每场只写
+            # 「主讲人简介：肖林博士，…」而无独立「主讲人：」行），该标签同样指向本场
+            # 主讲人。不补此路则整段落到下方「继承前序」分支，使拆出的每一场都继承
+            # 第一场主讲人（psy 1226 三条全成「肖林」）。仅在首选正则未命中时启用，
+            # 既有能命中「主讲人：」的页面行为完全不变。
+            sp_m = re.search(rf'(?:主讲人简介|报告人简介|讲者简介)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
         if sp_m:
             if s.get('speaker'):
                 # 块内「嘉宾：」实为下一场主讲（physics807 块末"嘉宾：下一场"会被 sp_m
@@ -6307,7 +6386,16 @@ def split_record_by_sessions(base, sessions, full_text=''):
                         break
                 if nm:
                     name = nm.group(1)
-                    rest2 = cand_core[nm.end():].strip(' （(，,）)')
+                    # 性别字守卫：简介常写「陈俊 男, 博士」，CJK 间空格被 N1a 折叠后成
+                    # 「陈俊男」，3 字被当成完整姓名。末字为性别字、其后紧邻标点或结束时，
+                    # 退一位取前 2 字（psy 1226 第二场实测「陈俊男」）。
+                    # 「男/女」作姓氏之后的姓名末字极罕见，且守卫要求其后紧跟分隔符。
+                    _after = cand_core[len(name):]
+                    if (len(name) >= 3 and name[-1] in '男女'
+                            and _after[:1] in ('', ',', '，', '、', ' ', '\t', '（', '(')
+                            and _looks_like_real_name(name[:-1])):
+                        name = name[:-1]
+                    rest2 = cand_core[len(name):].strip(' （(，,）)')
                     # 城市名守卫：若 name 末字 + rest2 首字构成省/市名，且 rest2[1:] 紧接单位关键词，回退。
                     if len(name) >= 3 and rest2 and len(rest2) >= 2:
                         _CITIES = {'上海', '北京', '天津', '重庆', '黑龙江', '吉林', '辽宁', '河北', '山西',
