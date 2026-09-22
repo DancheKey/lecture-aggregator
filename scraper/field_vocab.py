@@ -371,6 +371,75 @@ def is_title_only(value):
 
 
 # ---------------------------------------------------------------------------
+# Speaker 形态学污染判据（C2 收敛单一事实源，2026-09-22）
+#
+# 病根：多人白名单与判脏正则原只活在 hybrid._is_dirty_value，体检
+# scripts/audit_fields.py 另写 len>5——正常多人姓名在体检里大量误报「过长」，
+# 而职务/机构粘进 speaker 的真脏又只被标成「过长」而非「污染」（C2）。
+# hybrid 与 audit 必须共用下列判据，与 _alt / trim_dangling_brackets 同一条教训。
+#
+# 本块不参与摘要边界截断、不改 VOCAB_VERSION（llm 文本缓存仍有效）。
+# ---------------------------------------------------------------------------
+
+# 职称/职务噪声：field_vocab 主词表 + hybrid 历史补充词 + 英文头衔。
+# 内容与原 hybrid._DIRTY_TITLE_RE 一致，仅修正 Dr 的词边界（2026-09-22）：
+# 旧 `Dr\.?` 无边界会命中 Hedrich/Dreher 内部的 dr/Dr，把真人名判脏。
+DIRTY_TITLE_RE = re.compile(
+    NAME_TITLE_SUFFIX_RE.pattern + '|' + ORG_TITLE_SUFFIX_RE.pattern +
+    r'|博导|硕导|主编|编委|委员|会员|校长|副院长'
+    r'|Prof\.?|Professor|Dr\.?(?![A-Za-z])|Director|Dean|Chair', re.I)
+DIRTY_ORG_RE = re.compile(
+    r'(大学|学院|研究院|研究所|实验室|研究中心|公司|集团|'
+    r'University|Institute|College|School|Academy|Laboratory)', re.I)
+# 字段标签/模板语粘进值（原 hybrid._DIRTY_LOC_LABEL_RE；speaker 与 location 共用）。
+FIELD_LABEL_NOISE_RE = re.compile(
+    r'(主办|承办|协办|报告人|主讲人|主持人|摘要|报告题目|内容简介|嘉宾介绍|'
+    r'嘉宾简介|议程|日程|联系人|会议号|会议 ?ID|腾讯会议|Zoom|欢迎各位|主办单位)')
+
+
+def is_multi_speaker_clean(v):
+    """'A、B' / 'A, B' / 'A/B' 是否为「每段都是干净短姓名」的合法多人值。
+
+    存在的必要性（C2，2026-09-10 hybrid / 2026-09-22 收敛到此）：判脏若按
+    「过长即污染」，正常多人姓名长度必然超限 → 丧失「仅填空」保护、开放给
+    模型 A 覆盖。判据：按分隔符拆出 ≥2 段，每段 ≤6 字且不含职称/机构词；
+    另须排除混入字段标签的形态（'主讲人：张三、李四' 首段恰好 ≤6 字会被误豁免）。
+    """
+    if not v or not isinstance(v, str):
+        return False
+    if FIELD_LABEL_NOISE_RE.search(v):
+        return False
+    parts = [p.strip() for p in re.split(r'[、,，/]', v) if p.strip()]
+    if len(parts) < 2:
+        return False
+    for p in parts:
+        if len(p) > 6:
+            return False
+        if DIRTY_TITLE_RE.search(p) or DIRTY_ORG_RE.search(p):
+            return False
+    return True
+
+
+def is_dirty_speaker(v):
+    """speaker 是否形态学污染（True = 不受「仅填空」保护 / 体检应报「污染」）。
+
+    与原 hybrid._is_dirty_value 的 speaker 分支逐条等价，顺序不得乱：
+      职称/机构词 → 括号不配对 → 多人白名单豁免 → 中文超长且无 · 译名点。
+    """
+    if not v or not isinstance(v, str):
+        return False
+    if DIRTY_TITLE_RE.search(v) or DIRTY_ORG_RE.search(v):
+        return True
+    if v.count('(') != v.count(')') or v.count('（') != v.count('）'):
+        return True
+    if is_multi_speaker_clean(v):
+        return False
+    if len(v) > 6 and re.search(r'[一-鿿]', v) and '·' not in v:
+        return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # 悬挂括号清理（2026-09-22，单一事实源）
 #
 # 病根：此前「单位字段两端括号清理」有两处各自实现，且都按**字符集合**剥括号：

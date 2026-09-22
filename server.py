@@ -1,7 +1,7 @@
 """华师讲座聚合 —— 本地演示服务器（方案 A 增强版）。
 
 - 静态托管 site/（所有响应禁用缓存，刷新即见最新）
-- GET  /api/lectures?since=<mtime>  读取最新 data/lectures.json；若文件未变则返回空数组
+- GET  /api/lectures          读取最新 data/lectures.json（全量；前端不再传 since）
 - POST /api/scrape    以子进程触发采集器重新抓取，返回最新条数与文件时间戳
 - GET    /api/sources          返回信息源列表（来自 scraper/sources.yaml）
 - POST   /api/sources          新增信息源
@@ -546,23 +546,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._api_lecture_stats_get()
         if self.path.split('?')[0] == '/api/lectures':
             path = os.path.join(DATA_DIR, 'lectures.json')
-            # 解析 since 参数（文件 mtime，秒级浮点）。
-            # 2026-09-10 注：此增量分支**当前无调用方**——前端 app.js 已统一改为直接全量加载
-            # （历史上先传新 mtime 会导致服务端判 unchanged、页面既不刷新也无提示，故弃用）。
-            # 保留该分支供将来做真正的增量拉取；勿以为它正在生效，也勿因「没人用」顺手删。
-            qs = self.path.partition('?')[2]
-            since = None
-            for p in qs.split('&'):
-                if p.startswith('since='):
-                    try:
-                        since = float(p[6:])
-                    except ValueError:
-                        pass
-                    break
+            # N4（2026-09-22 批次 B）：删除 since 增量死分支——前端自 2026-08-05
+            # 起已统一全量加载（曾因先传新 mtime 被判 unchanged、页面不刷新），
+            # 全站 0 调用。若将来要做真增量，从 git 历史恢复，勿留两可状态。
             cur_mtime = os.path.getmtime(path) if os.path.exists(path) else 0
-            if since is not None and abs(cur_mtime - since) < 1.0:
-                self._send_json({'data': [], 'mtime': cur_mtime, 'unchanged': True})
-                return
             data = []
             updated_at = ''
             if os.path.exists(path):
@@ -586,7 +573,7 @@ class Handler(SimpleHTTPRequestHandler):
             # 本地下发的 /api/lectures 须与公网静态切片一致地补上 unitType（场/期），
             # 否则 app.js 拿不到该字段会全部回退显示「期」。
             data = _attach_unit_types(data)
-            self._send_json({'data': data, 'mtime': cur_mtime, 'updatedAt': updated_at, 'unchanged': False})
+            self._send_json({'data': data, 'mtime': cur_mtime, 'updatedAt': updated_at})
             return
         if self.path.split('?')[0] == '/api/sources':
             return self._api_sources_get()

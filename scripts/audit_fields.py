@@ -125,16 +125,24 @@ def audit(recs):
             _has_unit_word = bool(re.search(
                 r'University|College|Department|Institute|School|Laboratory|'
                 r'大学|学院|研究院|研究所|系|中心|实验室', spk))
-            if _has_latin and _has_unit_word:
+            # C2（2026-09-22）：与 hybrid 出库判脏同源（field_vocab），消除两类错误——
+            # ① 正常多人姓名不再报「过长」；② 职务/机构粘入标「污染」而非「过长」。
+            if _fv.is_multi_speaker_clean(spk):
+                pass  # 合法多人姓名（'黄加耀, 刘轩奕' 等），不列为问题
+            elif _has_latin and _has_unit_word:
                 issues.append(('讲座人', 'speaker', '高', f'含单位词: {spk}', r))
-            elif (not _has_latin and len(spk) > 5) or (_has_latin and len(spk) > 30):
-                issues.append(('讲座人', 'speaker', '中', f'过长({len(spk)}字): {spk}', r))
-            if re.search(r'[（(]', spk):
+            elif re.search(r'[（(]', spk):
                 issues.append(('讲座人', 'speaker', '高', f'含括号(职称/单位粘入): {spk}', r))
-            if _AFFIL_TITLE_ONLY.fullmatch(spk):
+            elif _AFFIL_TITLE_ONLY.fullmatch(spk):
                 issues.append(('讲座人', 'speaker', '高', f'纯职称词: {spk}', r))
-            if _NAV_CHAIN.search(spk):
+            elif _NAV_CHAIN.search(spk):
                 issues.append(('讲座人', 'speaker', '高', '含导航串', r))
+            elif _fv.is_dirty_speaker(spk):
+                issues.append(('讲座人', 'speaker', '高', f'污染(职称/机构/形态粘入): {spk}', r))
+            elif '·' not in spk and (
+                    (not _has_latin and len(spk) > 5) or (_has_latin and len(spk) > 30)):
+                # 单人超长且非「·」译名（克里斯蒂安·盖勒兰 等不在此列）
+                issues.append(('讲座人', 'speaker', '中', f'过长({len(spk)}字): {spk}', r))
 
         # ---------- 单位 ----------
         aff = (r.get('speakerAffiliation') or '').strip()
@@ -166,10 +174,10 @@ def main():
         print(f'  [{sev}] {cat}: {n}')
     print(f'  合计: {len(issues)}')
 
-    # 空 speaker 真假判定汇总
-    empty_spk = [i for i in issues if i[0] == '讲座人' and 'speaker' in i[2] or
-                 (i[0] == '讲座人' and i[3].startswith(('疑似',)))]
-    kinds = Counter(i[3].split('（')[0] for i in issues if i[0] == '讲座人')
+    # 空 speaker 真假判定汇总（仅统计「疑似漏抓/真空」，不含污染/过长等非空问题）
+    kinds = Counter(
+        i[3].split('（')[0] for i in issues
+        if i[0] == '讲座人' and i[3].startswith('疑似'))
     print()
     print('空讲座人真假分布:')
     for k, n in kinds.most_common():

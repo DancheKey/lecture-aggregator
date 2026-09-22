@@ -781,7 +781,6 @@ const app = createApp({
           return r.json();
         })
         .then(resp => {
-          if (resp.unchanged) return;
           this._applyLectureData(resp);
           this.dataStage = 'full';
           this.loading = false;
