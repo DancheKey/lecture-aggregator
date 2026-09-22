@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scraper'))
 from llm_provider import MockProvider
 from hybrid import (apply_llm_text_hybrid, compare_struct, _clean_affiliation,
-                    _infer_title, _is_plausible_affiliation)
+                    _infer_title, _is_plausible_affiliation, _infer_affiliation)
 import field_vocab as _fv
 
 # 正文含可溯源片段，供 snippet 闸门匹配
@@ -330,6 +330,63 @@ class TestAffiliationValueTrace(unittest.TestCase):
         self.assertFalse(_is_plausible_affiliation('北京大学', ''))
         self.assertFalse(_is_plausible_affiliation('', self.SRC))
         self.assertFalse(_is_plausible_affiliation(None, self.SRC))
+
+
+class TestInferAffiliation(unittest.TestCase):
+    """bio 兜底单位提取：只认现职依据，学历/历史任职一律不取（2026-09-22）。
+
+    旧实现回退时硬取 bio 开头第一个机构，把「2016年获得大连理工大学博士学位」
+    取成「得大连理工大学」（懒惰量词把「获得」切剩「得」）——全库 11 条线上数据
+    被污染，含把学历学校当现职单位。新实现只认两条有据路径，取不到就返回空。
+    """
+
+    def test_lead_form_with_unit(self):
+        """「姓名，机构，职称…」开头形态（机构须以分隔符紧邻姓名）。"""
+        self.assertEqual(
+            _infer_affiliation('刘科海,松山湖材料实验室副研究员。2016年获得大连理工大学博士学位。'),
+            '松山湖材料实验室')
+        self.assertEqual(
+            _infer_affiliation('刘淇,中国科学技术大学认知智能全国重点实验室教授,博导。'),
+            '中国科学技术大学')
+        self.assertEqual(
+            _infer_affiliation('钟子信 (Eric T. Chung) , 香港中文大学教授, 数学系副主任。'),
+            '香港中文大学')
+
+    def test_current_position_phrase(self):
+        """明确现职表达（含「X年X月起在…工作」这类带年份的现职句）。"""
+        self.assertEqual(
+            _infer_affiliation('占萌,现任华中科技大学电气与电子工程学院教授。'),
+            '华中科技大学电气与电子工程学院')
+        self.assertEqual(
+            _infer_affiliation('杨文,研究员。2015年获得加拿大英属哥伦比亚大学博士学位。'
+                               '2023年12月起在澳门大学工作。'),
+            '澳门大学')
+        self.assertEqual(
+            _infer_affiliation('王展鹏,博士,教授。1998年起在北京外国语大学英语系任教。'),
+            '北京外国语大学英语系')
+        self.assertEqual(
+            _infer_affiliation('郭雁秋,现任职于佛罗里达国际大学,tenured副教授。'),
+            '佛罗里达国际大学')
+
+    def test_degree_only_returns_empty(self):
+        """只有学历/博士后经历 -> 不取（学历学校不得当现职单位）。"""
+        self.assertEqual(
+            _infer_affiliation('陈淑慧,中医内科学博士。2008年毕业于广州中医药大学。曾在广东省中医院工作7年。'), '')
+        self.assertEqual(
+            _infer_affiliation('韩彪,于2016年获得法国图卢兹大学博士学位,师从某博士。'), '')
+        self.assertEqual(
+            _infer_affiliation('张振，副研究员，硕士生导师，研究生院副院长。本科毕业于华东理工大学。'), '')
+
+    def test_history_position_returns_empty(self):
+        """历史任职（「X年起任…」，无「现职」语义）/ 空输入 -> 不取。"""
+        self.assertEqual(
+            _infer_affiliation('肖林博士, 2010 年起任第二军医大学神经科学研究所副教授。'), '')
+        self.assertEqual(_infer_affiliation(''), '')
+        self.assertEqual(_infer_affiliation(None), '')
+
+    def test_no_separator_not_matched(self):
+        """姓名与机构间无分隔符 -> 不匹配（防「李博士是新加坡…」切出「士是」残片）。"""
+        self.assertEqual(_infer_affiliation('李博士是新加坡南洋理工大学教授'), '')
 
 
 if __name__ == '__main__':

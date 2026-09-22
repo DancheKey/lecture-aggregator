@@ -270,7 +270,7 @@ def _is_host_affiliation(v):
 # ---------------------------------------------------------------------------
 _AFFIL_RE = re.compile(
     r'([\u4e00-\u9fff]{2,6}大学[\u4e00-\u9fff]{1,8}?(?:学院|研究院|学部|系|中心))'
-    r'|([\u4e00-\u9fff]{2,10}?(?:大学|研究院|研究所)(?:[\u4e00-\u9fff]{0,6}?(?:分校|校区|学部|学院|系|中心))?)'
+    r'|([\u4e00-\u9fff]{2,10}?(?:大学|研究院|研究所|实验室)(?:[\u4e00-\u9fff]{0,6}?(?:分校|校区|学部|学院|系|中心))?)'
     r'|([A-Za-z][A-Za-z\s]*(?:University|College|Institute|School|Department|Centre|Center|Laboratory|Lab)(?:\s+(?:of|and|&|at|in|[A-Za-z]+)){0,8})'
 )
 # 从正文抽职称用：词表取自 field_vocab，另补两个医学职称（不在主表，仅此处抽职称用）。
@@ -282,8 +282,8 @@ _TITLE_RE = re.compile(_fv.NAME_TITLE_SUFFIX_RE.pattern + r'|主任医师|副主
 _AFFIL_PREFIX_NOISE = re.compile(
     r'^(?:'
     r'博士|硕士|本科|研究生|'
-    r'毕业|毕业于|就读于|获|获得|年获|年分别获得|年于|年在|年本科|'
-    r'现为|现任|现任于|现任职|任职|就职于|任职于|工作于|就职|'
+    r'毕业|毕业于|就读于|获得|获|年获|年分别获得|年于|年在|年本科|'
+    r'现任职于|现任职|现任于|现任|现为|任职于|任职|就职于|就职|工作于|'
     r'是|曾|曾任职|曾在|曾任|曾为|于|在|分别|先后'
     r')\s*[于在,，]?\s*'
 )
@@ -351,49 +351,66 @@ def _strip_affil_prefix(aff):
     return aff
 
 
-def _infer_affiliation(bio):
-    if not bio:
+# 「姓名，机构，职称…」开头形态（华师讲座简介最常见格式）。姓名 2-4 汉字，可带
+# 英文名括注（如「钟子信 (Eric T. Chung) , 香港中文大学教授」）；机构与姓名之间
+# **必须**有分隔符（，,、）——否则「李博士是新加坡…」这类会把「士是」当机构前缀。
+_AFFIL_LEAD_RE = re.compile(
+    r'^[\u4e00-\u9fff]{2,4}\s*(?:\([^)]{0,40}\))?\s*[，,、]\s*'
+    r'(' + _AFFIL_RE.pattern + r')'
+)
+# 现职单位锚点：只在明确「当前单位」表达处取机构。带年份的「20XX年X月起在…工作」
+# 「20XX-至今在…」算现职；学历表述（获得/毕业于/就读于）与历史任职（曾任/曾在）
+# 一律不算——那些是履历学校，不是现职单位。
+_AFFIL_CURRENT_RE = re.compile(
+    r'(?:'
+    r'现任职于|现任职|现任于|现任|现为|现就职于|目前任职于|目前在|现担任|现受聘于|受聘于|'
+    r'任职于|就职于|工作于|全职工作|'
+    r'\d{4}\s*年(?:\s*\d{1,2}\s*月)?\s*起\s*(?:至今)?\s*在|'
+    r'\d{4}\s*[-–—~]\s*(?:至今|现在)\s*在'
+    r')\s*(?:于|在)?\s*'
+    r'(' + _AFFIL_RE.pattern + r')'
+)
+
+
+def _clean_affil_candidate(raw):
+    """机构候选统一清洗：剥前缀噪声 → 剥尾部职称词 → 合法性校验。"""
+    if not raw:
         return ''
-    # 优先匹配「现任/现为/任职于」等当前单位表达，避免把学历单位错当现单位。
-    current_re = re.compile(
-        r'(?:现为|现任|现任于|现任职|任职|就职于|任职于|工作于|就职)'
-        r'\s*[于在,，]?\s*'
-        r'(' + _AFFIL_RE.pattern + r')'
-    )
-    m = current_re.search(bio)
-    if m:
-        aff = (m.group(1) or m.group(2) or m.group(3) or m.group(4) or '').strip()
-        aff = _strip_affil_prefix(aff)
-        aff = _fv.TAIL_TITLE_RE.sub('', aff).strip(' ,，')
-        if _is_valid_affiliation(aff):
-            return aff
-    # 全英文 bio 且无现单位表达时：通常现单位在最后，取最后一个有效机构
-    if not re.search(r'[\u4e00-\u9fff]', bio):
-        last = ''
-        for m in _AFFIL_RE.finditer(bio):
-            cand = (m.group(1) or m.group(2) or m.group(3) or '').strip()
-            cand = _strip_affil_prefix(cand)
-            cand = _fv.TAIL_TITLE_RE.sub('', cand).strip(' ,，')
-            if _is_valid_affiliation(cand):
-                last = cand
-        if last:
-            return last
-    # 回退：从 bio 开头提取单位
-    head = bio[:80]
-    m = _AFFIL_RE.search(head)
-    if not m:
-        return ''
-    aff = (m.group(1) or m.group(2) or m.group(3) or '').strip()
-    # 先剥开头常见动词/学历前缀（可循环 3 次）
+    aff = str(raw).strip()
     for _ in range(3):
         new_aff = _AFFIL_PREFIX_NOISE.sub('', aff)
         if new_aff == aff:
             break
         aff = new_aff
     aff = _strip_affil_prefix(aff)
-    # 清理尾部职称词
     aff = _fv.TAIL_TITLE_RE.sub('', aff).strip(' ,，')
-    return aff
+    return aff if _is_valid_affiliation(aff) else ''
+
+
+def _infer_affiliation(bio):
+    """从简介兜底提取**现职**单位；无明确依据时返回空——绝不凭空产生单位。
+
+    只认两条有据路径：
+    ① 「姓名，机构，职称…」开头形态（华师讲座简介最常见格式）；
+    ② 明确现职表达（「现任/任职于…」；或「20XX年X月起在…工作」「20XX-至今在…」）。
+    学历表述（获得/毕业于/就读于）、历史任职（曾任/曾在）、博士后经历一律不作依据：
+    那些是履历学校而非现职单位。旧实现回退时硬取 bio 开头第一个机构，把
+    「2016年获得大连理工大学博士学位」取成「得大连理工大学」，2026-09-22 前
+    实测污染线上 11 条（刘科海·杨文·陈淑慧·韩彪·肖林·曾路等）。
+    """
+    if not bio:
+        return ''
+    bio = str(bio).strip()
+    m = _AFFIL_LEAD_RE.match(bio)
+    if m:
+        aff = _clean_affil_candidate(m.group(1))
+        if aff:
+            return aff
+    for m in _AFFIL_CURRENT_RE.finditer(bio):
+        aff = _clean_affil_candidate(m.group(1))
+        if aff:
+            return aff
+    return ''
 
 
 def _infer_title(bio):
