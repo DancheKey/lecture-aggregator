@@ -60,6 +60,7 @@ def _report(title, existing, new):
     for r in new:
         print('   ', _brief(r))
 
+    existing_urls = {r.get('sourceUrl') for r in existing}
     idx = _build_existing_index(existing)
     print('【跨源检测 _cross_source_dup_with_existing】')
     for r in new:
@@ -75,14 +76,17 @@ def _report(title, existing, new):
 
     new_urls = {r.get('sourceUrl') for r in new}
     out_urls = {r.get('sourceUrl') for r in out}
-    new_dropped = new_urls - out_urls
+    new_dropped = new_urls - out_urls          # B 的 URL 不在产出里 -> 被 skip 或替换
+    old_replaced = existing_urls - out_urls    # A 的 URL 不在产出里 -> 被多轮替换掉
     fused = any(r.get('merged') for r in out)
     print('【判定】')
     if fused:
         print('   ✅ 已融合：含 merged=True 记录，sources 聚合多源，B 信息补全 A')
+    elif old_replaced and not new_dropped:
+        print('   ➡ 同单位多轮替换：旧轮次 A 被替换，保留最新一轮 B，不融合')
     elif new_dropped:
-        print('   ➡ 同单位：命中被丢弃（维持现状，不融合），符合同学院约定')
-    elif not new_dropped:
+        print('   ➡ 同单位命中被丢弃（维持现状，不融合），符合同学院约定')
+    else:
         print('   ⚠ 原样追加（未判为重复，可能漏检）')
     print()
     return out
@@ -165,6 +169,42 @@ def scenario_same_college_multiround():
     return 'C 同单位多轮：xyz先发第一轮后发第二轮（带标记）-> 保留最新、不融合', [A], [B]
 
 
+# ---------- 场景 F：三源展开（同一批 B1/B2 先内部合并，再融进存量 A） ----------
+def scenario_three_sources():
+    A = {
+        'sourceUrl': 'http://iqm.scnu.edu.cn/a/20191114/103.html',
+        'college': 'iqm', 'campus': '石牌',
+        'speaker': 'Blaizot', 'speakerAffiliation': '法国巴黎萨克雷大学',
+        'lectureStart': '2019-11-15T14:30:00',
+        'topic': '量子材料的反常输运性质',
+        'title': '量子物质研究院学术讲座：量子材料的反常输运性质',
+        'location': '理8-210',
+        'publishTime': '2019-11-14T10:00:00',
+    }
+    # B1 与 B2 同讲座，本轮内部先合并成一条带 sources 的记录
+    B = {
+        'sourceUrl': 'https://physics.scnu.edu.cn/a/20191118/806.html',
+        'college': 'physics', 'campus': '石牌',
+        'speaker': 'Blaizot', 'speakerAffiliation': '法国巴黎萨克雷大学',
+        'lectureStart': '2019-11-15T14:30:00',
+        'topic': '量子材料的反常输运性质研究',
+        'title': '物理学院学术报告：量子材料的反常输运性质研究',
+        'location': '大学城理六栋301',
+        'speakerBio': '法国科学院院士，凝聚态物理专家',
+        'publishTime': '2019-11-18T10:00:00',
+        # B 自身已经融合了第三个学院 B2
+        'merged': True,
+        'sourceCount': 2,
+        'sources': [{
+            'sourceUrl': 'http://math.scnu.edu.cn/a/20191116/50.html',
+            'college': 'math',
+            'campus': '石牌',
+            'title': '数学科学学院学术报告：量子输运',
+        }],
+    }
+    return 'F 三源展开：B 自带 B2 source，融进 A 时 B2 应一并展开进 A.sources', [A], [B]
+
+
 # ---------- 场景 D：同单位无标记、时间相同（维持现状 skip 丢B，不融合） ----------
 def scenario_same_college_no_marker():
     A = {
@@ -214,6 +254,15 @@ def main():
     d_title, d_ex, d_new = scenario_same_college_no_marker()
     _report(d_title, d_ex, d_new)
 
+    f_title, f_ex, f_new = scenario_three_sources()
+    out_f = _report(f_title, f_ex, f_new)
+    f_merged = out_f[0]
+    src_urls = {(s.get('sourceUrl') or '').rstrip('/') for s in (f_merged.get('sources') or [])}
+    expect_b2 = 'http://math.scnu.edu.cn/a/20191116/50.html'
+    print(f'   [断言] F.merged={f_merged.get("merged")} '
+          f'sources总数={len(f_merged.get("sources") or [])} '
+          f'B2已展开={expect_b2.rstrip("/") in src_urls}')
+
     # ---------- 场景 E：幂等守卫（跨单位对 incremental_merge 调两次） ----------
     print('=' * 78)
     print('场景 E：幂等守卫')
@@ -254,6 +303,7 @@ def main():
     print('· C 同单位多轮：多轮替换留最新，merged 空（不融合）')
     print('· D 同单位无标记：维持现状 skip 丢后发，merged 空（不融合）')
     print('· E 幂等：重复摄入同一 B，sources 不重复追加、sourceCount 不虚高')
+    print('· F 三源展开：B 自带 sources(B2) 融进 A 时，B2 一并展开进 A.sources')
 
 
 if __name__ == '__main__':

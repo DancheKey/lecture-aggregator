@@ -923,13 +923,29 @@ def _merge_record_into(r_new, r_primary):
             val = r_new.get(field)
             if val:
                 r_primary[field] = val
-    # 追加 sources（跨单位不会同单位，无需折叠；仅按 URL 幂等去重）
-    sources.append({
-        'sourceUrl': r_new.get('sourceUrl', ''),
-        'college': r_new.get('college', ''),
-        'campus': r_new.get('campus', ''),
-        'title': r_new.get('title', ''),
-    })
+    # 追加 sources：不仅追加 r_new 自身 URL，还要把 r_new 自带的 sources
+    # 一并展开并入 r_primary，避免「三院同讲座」边缘 case 下中间源 B2 丢失。
+    # 按 URL 幂等去重；跨单位场景不会与主记录同单位，但需防 r_new.sources 与
+    # r_primary 已存在的 sourceUrl 重复。
+    urls_present = {(s.get('sourceUrl') or '').rstrip('/') for s in sources}
+    for s in (r_new.get('sources') or []):
+        u = (s.get('sourceUrl') or '').rstrip('/')
+        if u and u not in urls_present:
+            sources.append({
+                'sourceUrl': s.get('sourceUrl', ''),
+                'college': s.get('college', ''),
+                'campus': s.get('campus', ''),
+                'title': s.get('title', ''),
+            })
+            urls_present.add(u)
+    if new_url and new_url not in urls_present:
+        sources.append({
+            'sourceUrl': r_new.get('sourceUrl', ''),
+            'college': r_new.get('college', ''),
+            'campus': r_new.get('campus', ''),
+            'title': r_new.get('title', ''),
+        })
+        urls_present.add(new_url)
     r_primary['sources'] = sources
     r_primary['merged'] = True
     r_primary['sourceCount'] = len(sources) + 1

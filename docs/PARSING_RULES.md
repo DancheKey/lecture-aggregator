@@ -289,6 +289,17 @@ llm_provider `_ABSTRACT_BOUNDS`、模型A prompt），彼此漂移导致两类�
 - 修复步骤（详见 `deploy.md` §3 警示框）：从 `data/lectures.json` 删该 URL → `--source <院>` 重抓 → `generate_frontend_data.py` 重新生成切片 → commit/push。
 - 多源串行跑（都写同一 `data/lectures.json`，并行会互相覆盖）。
 
+#### 3.1.1 增量阶段跨源融合（merge-into-A，2026-09-23 定稿）
+`scraper.py::incremental_merge` 在增量摄入时即做跨源去重，命中后行为如下：
+- **跨单位命中**（A 已在库，B 为另一学院新发同讲座）：**不丢弃 B**，而是把 B 融合进 A（A 打 `merged=True`，B 的 `{sourceUrl,college,campus,title}` 进 A 的 `sources`，`sourceCount` 自增，B 的非空字段补 A 的空字段）。这是为了解决「A 先发、B 后发」时 B 被静默丢弃、库里永远只有 A 的缺口。
+  - **location 红线**：location 不参与判重；A 已有 location 时绝不用 B 的 location 覆盖，防止「A 地点正确、B 地点写错」时污染主记录。
+  - **幂等守卫**：A 的 `sources` 已含 B 的 URL 时跳过，避免每日增量重复抓到 B 导致 `sources`/`sourceCount` 虚高。
+  - **三源展开**：若 B 本身已带 `sources`（同一批内 B1/B2 先合并成一条），融进 A 时会把 B 自带的 sources 一并展开并入 A，不丢中间源。
+- **同单位命中**：维持现状，**不融合**。
+  - B 含轮次标记（第二轮/补充通知/更新等）→ 多轮替换，保留最新一轮（由 `_has_round_marker` / `_strip_round_marker` 识别）。
+  - B 无轮次标记 → 命中即 `skip` 丢弃后发（不融合）。这与「保留最新一轮」字面矛盾，但经库内真实案例验证（如历史文化学院李红岩同日多场不同讲座），同单位同日多场可能是真实多场而非重复，用户拍板维持现状。
+- **增量 vs 全量判定差异**：增量检测目前**不靠 location 兜底层**（立场：location  unreliable，曾出现同讲座两地写法不同 / 写错）；全量 `scripts/dedup_existing.py` 保留「同 location + 同单位缺失 + 标题相似度」的兜底路径。两者判定能力不一致，已知且可接受——`dedup_existing.py` 作为事后全量清理兜底。
+
 ### 3.2 数据双份 + 同步
 - `data/lectures.json` 是唯一数据源；`site/lectures.json` 是 GitHub Pages 实际读取的静态切片。
 - **手动改数据后**：运行 `python scripts/generate_frontend_data.py`，它会一次性生成/更新
