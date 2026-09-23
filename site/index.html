@@ -366,7 +366,7 @@
                 <!-- 结构化详情：图标 + 字段名 + 值 三段式（回应反馈#9「字段太灰、界限不分明」）；
                      顺序：题目 → 地点 → 主讲 → 简介（超两行折叠）→ 摘要（默认三行，可展开），
                      简介与摘要均可展开/收起（回应反馈#2「摘要多一点、简介少一点」与 #5「折叠收起」） -->
-                <div v-if="l.topic || l.location || l.speaker || l.host || l.meetingId || l.participants || notesText(l) || l.speakerBio || abstractOf(l)"
+                <div v-if="l.topic || l.location || l.speaker || l.host || l.participants || notesText(l) || l.speakerBio || abstractOf(l)"
                   class="text-12pt text-slate-600 space-y-1 mb-2">
                   <div v-if="l.topic" class="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -397,13 +397,6 @@
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold">主持</span>
                     <span class="text-slate-700 min-w-0">{{ l.host }}</span>
-                  </div>
-                  <div v-if="l.meetingId" class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M2.25 13.5h3.86a7.68 7.68 0 01-1.194 2.764M15.75 10.5a5.25 5.25 0 01-5.25 5.25H6.75a5.25 5.25 0 01-5.25-5.25v-2.25A5.25 5.25 0 016.75 3h3.75a5.25 5.25 0 015.25 5.25v2.25z" />
-                    </svg>
-                    <span class="shrink-0 text-slate-900 font-semibold">会议号</span>
-                    <span class="text-slate-700 min-w-0">{{ l.meetingPlatform ? l.meetingPlatform + ' ' : '' }}{{ l.meetingId }}</span>
                   </div>
                   <div v-if="l.participants" class="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">

@@ -164,11 +164,11 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
 | `lectureStart / lectureEnd` | 该块经 R1+R4+R6 解析 | 独立 |
 | `title` | 原标题 + `---` + 该块主题 | 便于区分 |
 | `host` | 该块 `主持人：`标签值 | 独立（新增可选字段） |
-| `meetingId` | 按序匹配的会议号 | 独立（新增可选字段） |
+| `location`（线上会议） | 该块「会议号/会议 ID：」；缺则全文「腾讯会议专题X:ID」按序匹配 | 独立；格式「平台 号码」，并入 `location`（2026-09-23） |
 | `speaker` | 该块 `主讲人：`；缺失从前序块继承，标注 `speakerSource='inherited'` | 逐块优先 |
 | `speakerTitle / speakerAffiliation` | 同上 | 逐块优先 |
 | `speakerBio` | 统一 `嘉宾简介`段或首块提取 | 共享 |
-| `location` | 统一 `活动地点`段 | 共享 |
+| `location`（线下会场） | 统一 `活动地点`段 | 共享；与线上会议并存时拼接为「会场（平台 号码）」 |
 | `publishTime / sourceUrl / college / campus` | 原 | 共享 |
 
 无 `主讲人：` 的块：speaker 置 null，notes 追加 `"该期为圆桌论坛/座谈会形式，无独立主讲人"`。
@@ -195,10 +195,14 @@ if RT2d 命中（页脚含「初审|…复审|…终审」审签链）:
   "lectureIndex": 1,
   "lectureCount": 4,
   "host": "倪星教授",
-  "meetingId": "562395609",
-  "meetingPlatform": "腾讯会议"
+  "location": "会场（腾讯会议 562-395-609）"
 }
 ```
+
+> 2026-09-23 起：线上会议号不再输出独立字段 `meetingId`/`meetingPlatform`，
+> 统一并入 `location`，前端只展示「地点」。格式：腾讯会议 9 位数字归一为 `xxx-xxx-xxx`；
+> Zoom 等保留原号码。既有含 `meetingId`/`meetingPlatform` 的存量记录由
+> `scripts/fix_meeting_locations.py` 迁移合并。
 
 **MS5 — 拆分后逐条过回顾判定**：
 

@@ -38,26 +38,26 @@
     .adv{color:#666;font-size:12px}
     </style></head><body>
 <h1>讲座数据质量专项扫描报告</h1>
-<div class="sub">数据源 data/lectures.json · 共 2975 条记录 · 生成时间 2026-09-23 15:50</div>
+<div class="sub">数据源 data/lectures.json · 共 2975 条记录 · 生成时间 2026-09-23 17:02</div>
 <div class="cards">
 <div class="card h"><div class="n">0</div><div class="l">高优先级问题</div></div>
 <div class="card m"><div class="n">0</div><div class="l">中优先级问题</div></div>
 <div class="card k"><div class="n">0</div><div class="l">可自动修</div></div>
 <div class="card m"><div class="n">0</div><div class="l">需人工核对</div></div>
 <div class="card"><div class="n">0</div><div class="l">无法修/无需修</div></div>
-<div class="card"><div class="n">321</div><div class="l">字段缺失项</div></div>
+<div class="card"><div class="n">309</div><div class="l">字段缺失项</div></div>
 </div>
 <div class="note"><b>分级说明</b>：<span class="sev 高">高</span> = 值内容被明显污染（正文残段、职称混入姓名、结束时间跨天等），建议修正；<span class="sev 中">中</span> = 疑似问题或轻度不规范，需人工确认。每行「当前值」即数据库里的原始内容，点「源页」可直接打开原通知核对。</div>
 <div class="note"><b>可修性图例</b>：<span class="fxtag fx-a">可自动修</span> = 规则明确、可批量清洗，误伤风险低；<span class="fxtag fx-m">需人工核对</span> = 能修，但要回源页确认真实值，自动补全有臆造风险；<span class="fxtag fx-n">无法修 / 无需修</span> = 源页本身未提供该信息，或当前值是合规写法（并非错误）。每个类别下先给「问题类型 → 条数 → 修复建议」，再逐条列出当前值与源页链接。</div>
 <div class="bar"><button onclick="selAll(true)">全选</button><button onclick="selAll(false)">全不选</button><button onclick="expSel()">导出选中为 CSV</button><span id="cnt" class="mini"></span></div>
-<h2>字段缺失统计（321 项，含人工复核裁定）</h2>
-<div class="note">缺失项没有「当前值」可核对。已对全部缺失项逐条核源页并人工剔除假阳性：<b>需处理的见下方「可补录 / 需人工」清单，共 0 条</b>（建议补录 0、待人工确认 0）；其余 <b>321 条按可信度分两层列出</b>（已扫描确认未提供 / 源页未抓取·无法判定，详见下方折叠区；后者可能含漏抓，需重抓源页确认）。</div>
+<h2>字段缺失统计（309 项，含人工复核裁定）</h2>
+<div class="note">缺失项没有「当前值」可核对。已对全部缺失项逐条核源页并人工剔除假阳性：<b>需处理的见下方「可补录 / 需人工」清单，共 0 条</b>（建议补录 0、待人工确认 0）；其余 <b>309 条按可信度分两层列出</b>（已扫描确认未提供 / 源页未抓取·无法判定，详见下方折叠区；后者可能含漏抓，需重抓源页确认）。</div>
 <table><tr><th>缺失字段</th><th>缺失条数</th><th>占总记录比</th></tr>
 <tr><td>主讲人单位</td><td><b>187</b></td><td>6.3%</td></tr>
-<tr><td>讲座地点</td><td><b>102</b></td><td>3.4%</td></tr>
+<tr><td>讲座地点</td><td><b>90</b></td><td>3.0%</td></tr>
 <tr><td>主讲人</td><td><b>32</b></td><td>1.1%</td></tr>
 </table>
-<details><summary>源页未提供 / 无需补（321 条，默认保持为空，已折叠）</summary>
+<details><summary>源页未提供 / 无需补（309 条，默认保持为空，已折叠）</summary>
 <div class="note">以下缺失项已拿到源页文本并扫描确认：源页本身未提供该字段，无需人工补录；按字段分列，展开可逐条核对源页。</div>
 <details><summary class="fx-n">主讲人单位 缺失 · 已扫描确认未提供（170 条）</summary>
 <table><tr><th style="width:34px"></th><th style="width:120px">学院</th><th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>
@@ -232,7 +232,7 @@
 <tr data-url="https://physics.scnu.edu.cn/a/20101201/789.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2010-12-01</td><td><a href="https://physics.scnu.edu.cn/a/20101201/789.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="https://physics.scnu.edu.cn/a/20101124/788.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2010-11-25</td><td><a href="https://physics.scnu.edu.cn/a/20101124/788.html" target="_blank">源页 ↗</a></td></tr>
 </table></details>
-<details><summary class="fx-n">讲座地点 缺失 · 已扫描确认未提供（98 条）</summary>
+<details><summary class="fx-n">讲座地点 缺失 · 已扫描确认未提供（86 条）</summary>
 <table><tr><th style="width:34px"></th><th style="width:120px">学院</th><th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>
 <tr data-url="https://ose.scnu.edu.cn/a/20241122/141.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>光电科学与工程学院</td><td>2024-11-22</td><td><a href="https://ose.scnu.edu.cn/a/20241122/141.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://bd.scnu.edu.cn/a/20230807/67.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>北斗研究院</td><td>2023-08-07</td><td><a href="http://bd.scnu.edu.cn/a/20230807/67.html" target="_blank">源页 ↗</a></td></tr>
@@ -257,27 +257,15 @@
 <tr data-url="http://ctld.scnu.edu.cn/a/20201104/1246.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-11-09</td><td><a href="http://ctld.scnu.edu.cn/a/20201104/1246.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20201029/1240.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-11-05</td><td><a href="http://ctld.scnu.edu.cn/a/20201029/1240.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20201022/1237.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-10-26</td><td><a href="http://ctld.scnu.edu.cn/a/20201022/1237.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20201010/846.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-10-22</td><td><a href="https://physics.scnu.edu.cn/a/20201010/846.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20201015/1230.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-10-19</td><td><a href="http://ctld.scnu.edu.cn/a/20201015/1230.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20201010/846.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-10-15</td><td><a href="https://physics.scnu.edu.cn/a/20201010/846.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200921/1220.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-09-24</td><td><a href="http://ctld.scnu.edu.cn/a/20200921/1220.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200914/1210.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-09-16</td><td><a href="http://ctld.scnu.edu.cn/a/20200914/1210.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200713/836.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-07-16</td><td><a href="https://physics.scnu.edu.cn/a/20200713/836.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://music.scnu.edu.cn/news/events/2020/0630/673.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>音乐学院</td><td>2020-07-01</td><td><a href="http://music.scnu.edu.cn/news/events/2020/0630/673.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200615/834.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-06-18</td><td><a href="https://physics.scnu.edu.cn/a/20200615/834.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200608/832.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-06-11</td><td><a href="https://physics.scnu.edu.cn/a/20200608/832.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200605/1178.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-06-10</td><td><a href="http://ctld.scnu.edu.cn/a/20200605/1178.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200519/831.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-05-21</td><td><a href="https://physics.scnu.edu.cn/a/20200519/831.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200517/1169.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-05-20</td><td><a href="http://ctld.scnu.edu.cn/a/20200517/1169.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200512/830.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-05-14</td><td><a href="https://physics.scnu.edu.cn/a/20200512/830.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200506/828.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-05-14</td><td><a href="https://physics.scnu.edu.cn/a/20200506/828.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200509/1167.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-05-13</td><td><a href="http://ctld.scnu.edu.cn/a/20200509/1167.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200508/829.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-05-09</td><td><a href="https://physics.scnu.edu.cn/a/20200508/829.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200506/827.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-05-07</td><td><a href="https://physics.scnu.edu.cn/a/20200506/827.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200426/826.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-04-30</td><td><a href="https://physics.scnu.edu.cn/a/20200426/826.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200425/1164.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-04-29</td><td><a href="http://ctld.scnu.edu.cn/a/20200425/1164.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200418/1161.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-04-23</td><td><a href="http://ctld.scnu.edu.cn/a/20200418/1161.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="https://physics.scnu.edu.cn/a/20200414/824.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2020-04-17</td><td><a href="https://physics.scnu.edu.cn/a/20200414/824.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200411/1148.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-04-14</td><td><a href="http://ctld.scnu.edu.cn/a/20200411/1148.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200328/1146.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-03-30</td><td><a href="http://ctld.scnu.edu.cn/a/20200328/1146.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20200317/1134.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2020-03-20</td><td><a href="http://ctld.scnu.edu.cn/a/20200317/1134.html" target="_blank">源页 ↗</a></td></tr>

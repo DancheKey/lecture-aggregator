@@ -630,12 +630,14 @@ def _extract_meeting_info(raw):
     if not plat:
         return ''
     num = ''
-    # 显式标签后的会议号（含/不含连字符、含内部空格）
+    # 显式标签后的会议号（含/不含连字符、含内部空格；标签容忍「会议 ID」中的空格）
+    # 号码用有界模式（3-3-3 / 3-4-4 / 9~12 连写），避免贪婪吞掉后续无关数字（如紧邻日期）
     m = re.search(
-        r'(?:会议号|会议ID|会议号码|腾讯会议号|Meeting\s*ID|会议入会码|入会码)[：:\s]*([0-9][0-9\s-]{5,})',
+        r'(?:会议\s*号|会议\s*ID|会议\s*号码|腾讯会议\s*号|Meeting\s*ID|会议入会码|入会码)'
+        r'[：:\s]*(\d{3}[\s-]?\d{3}[\s-]?\d{3}|\d{3}[\s-]\d{4}[\s-]\d{4}|\d{9,12})',
         s, re.I)
     if m:
-        num = re.sub(r'\s+', '', m.group(1))
+        num = re.sub(r'[\s-]+', '', m.group(1))
     else:
         m = re.search(r'zoom(?:\.us)?/(?:j/|meet/)?(\d{9,11})', s, re.I)
         if m:
@@ -658,8 +660,41 @@ def _extract_meeting_info(raw):
                 if m:
                     num = m.group(1)
     if num:
-        return f'{plat} {num}'
+        return format_meeting_location(plat, num)
     return plat
+
+
+def format_meeting_location(plat, num):
+    """把线上会议「平台 + 号码」格式化为 location 值（2026-09-23 统一并入「地点」字段）。
+
+    用户口径：线上讲座不再用独立的「会议号」字段展示，一律并入 location，
+    显示为「地点 <平台> <号码>」。腾讯会议 9 位纯数字归一为 xxx-xxx-xxx；
+    Zoom 等其它平台号码去除空格后原样保留。
+    """
+    num = re.sub(r'[\s-]+', '', str(num or ''))
+    if not num:
+        return plat or ''
+    if plat == '腾讯会议' and re.fullmatch(r'\d{9}', num):
+        num = f'{num[:3]}-{num[3:6]}-{num[6:]}'
+    return f'{plat} {num}'.strip() if plat else num
+
+
+_MEETING_PLAT_RE = re.compile(r'腾讯会议|Zoom|zoom|Webex|webex|钉钉|飞书|腾讯课堂')
+
+
+def _strip_meeting_fragment(loc):
+    """从 location 值中剔除线上会议片段，返回实体地点残段（2026-09-23）。
+
+    用于多场拆分：base 的 location 可能只含线上会议号（纯线上系列），或含线下会场 +
+    线上会议号（混合），需得到纯线下部分再按场次拼接各自会议号。
+    """
+    if not loc:
+        return ''
+    s = str(loc)
+    s = re.sub(r'[（(][^（）()]*?(?:腾讯会议|Zoom|Webex|钉钉|飞书|腾讯课堂)[^（）()]*?[)）]', '', s)
+    s = re.sub(r'(?:腾讯会议|Zoom|Webex|钉钉|飞书|腾讯课堂)\s*[\d][\d\s-]*', '', s)
+    s = re.sub(r'\s+', '', s).strip('（）()')
+    return s
 
 
 def _strip_location_label_tail(loc):
@@ -685,6 +720,15 @@ def _clean_location(loc, title=None):
     if not loc:
         return ''
     orig = loc
+    # 纯线上会议值（平台 + 号码）直接规范化返回（2026-09-23）：避免下方「统一清空格」
+    # 把「平台 号码」之间的空格粘连（如 Zoom 87397841982 → Zoom87397841982）。
+    _mp_pure = re.fullmatch(
+        r'\s*(腾讯会议|Zoom|Webex|钉钉|飞书|腾讯课堂)\s*[:：]?\s*'
+        r'(\d{3}[\s-]?\d{3}[\s-]?\d{3}|\d{3}[\s-]\d{4}[\s-]\d{4}|\d{9,12})\s*',
+        loc, re.I)
+    if _mp_pure:
+        _p = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp_pure.group(1), _mp_pure.group(1))
+        return format_meeting_location(_p, _mp_pure.group(2))
     meeting = _extract_meeting_info(orig)  # 线上会议平台+会议号（如"腾讯会议 123-456-789"），无则空串
     loc = loc.strip()
     if not loc:
@@ -830,7 +874,11 @@ def _clean_location(loc, title=None):
             return '线上'
         return ''
     if meeting:
-        # 物理地点 + 线上会议信息并存（混合讲座）：物理地点在前，会议信息括注在后
+        # 物理地点 + 线上会议信息并存（混合讲座）：物理地点在前，会议信息括注在后。
+        # 幂等守卫（2026-09-23）：_clean_location 在正文路径与出口闸门会被多次调用，
+        # 若 location 已含线上会议信息则不再重复拼接（否则会议号被反复追加）。
+        if _MEETING_PLAT_RE.search(loc):
+            return loc
         return loc + '（' + meeting + '）'
     return loc
 
@@ -3941,13 +3989,37 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         # 电话/工号（华师总机 85213482）当会议号，并把同一号码重复拼接成值时。
         # 改为独立正则：只认「具体平台 + 紧邻的 9~11 位（或 3-3-3）会议号」。
         if not _loc_fb:
-            _mp = re.search(
-                r'(腾\s*讯\s*会\s*议|Zoom|zoom|钉钉|飞书|腾讯课堂|Webex|webex|瞩目)'
-                r'[^\d\n]{0,10}?'
-                r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{9,11})', text)
-            if _mp:
-                _plat = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp.group(1), _mp.group(1))
-                _loc_fb = _plat + ' ' + re.sub(r'\s+', '', _mp.group(2))
+            # 平台推断（含「会议链接」指向的平台域名 meeting.tencent.com / zoom.us 等）
+            _plat = ''
+            if re.search(r'腾\s*讯\s*会\s*议|tencent', text, re.I):
+                _plat = '腾讯会议'
+            elif re.search(r'zoom', text, re.I):
+                _plat = 'Zoom'
+            elif re.search(r'webex', text, re.I):
+                _plat = 'Webex'
+            elif re.search(r'钉钉', text):
+                _plat = '钉钉'
+            elif re.search(r'飞书', text):
+                _plat = '飞书'
+            elif re.search(r'腾讯课堂', text):
+                _plat = '腾讯课堂'
+            # ① 显式「会议号 / 会议 ID：N」标签（物理学院旧页写法「会议链接：URL 会议 ID：xxx xxx xxx」，
+            #    以及 Zoom「ZOOM会议ID：873 9784 1982」），统一并入 location。
+            _mid = re.search(
+                r'(?:会议\s*号|会议\s*ID|会议\s*号码|腾讯会议\s*号|Meeting\s*ID|入会码|会议入会码)'
+                r'[：:\s]*(\d{3}[\s-]?\d{3}[\s-]?\d{3}|\d{3}[\s-]\d{4}[\s-]\d{4}|\d{9,12})',
+                text, re.I)
+            if _mid and _plat:
+                _loc_fb = format_meeting_location(_plat, _mid.group(1))
+            # ② 平台关键词紧邻号码（原 FB3，兜底①未命中的写法）
+            if not _loc_fb:
+                _mp = re.search(
+                    r'(腾\s*讯\s*会\s*议|Zoom|zoom|钉钉|飞书|腾讯课堂|Webex|webex|瞩目)'
+                    r'[^\d\n]{0,10}?'
+                    r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{9,11})', text)
+                if _mp:
+                    _p2 = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp.group(1), _mp.group(1))
+                    _loc_fb = format_meeting_location(_p2, _mp.group(2))
         # FB4：议程括号内会场（ggy5326「会议签到（文3栋一楼108门前）」「（一楼第二演讲厅）」）。
         # 正文无「地点：」标签、页脚地址被 FB1 正确拒绝时，从议程/正文括号内取第一个
         # 含楼栋室厅特征的片段；值须短（<=20 字）且不得是行政区/人名碎片。
@@ -5271,8 +5343,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 # 拆分（MS4）：以原单条为基底复制 N 份，覆盖 topic/时间/标题；host/会议号/参与者逐块提取；
 #   speaker 逐块优先、缺失继承前序、圆桌论坛置空；location 共享（基底空则整页补「活动地点」）。
 # 逐条过回顾判定（MS5）：拆分后每条独立过 is_news_record，某期日期早于发布则剔除该期。
-# 新增字段：host / meetingId / meetingPlatform / participants / isMultiLecture /
-#   lectureIndex / lectureCount / speakerSource / notes（入库；前端展示 host/会议号/参与者）。
+# 新增字段：host / participants / isMultiLecture / lectureIndex / lectureCount /
+#   speakerSource / notes（入库；前端展示 host/参与者）。会议号统一并入 location（2026-09-23）。
 # ---------------------------------------------------------------------------
 # 主题分隔符：优先匹配「报告N题目/报告N主题」「专题N题目」式系列标签（报告1题目、报告二主题…），
 # 否则退回通用 题目/主题 等。把「报告N题目」排在裸「题目」之前，使其作为整段被一次匹配，
@@ -5767,10 +5839,17 @@ def _split_english_speaker(sp):
         else:
             _title = _raw
         s = s[_hm.end():]
+    # 机构关键词：姓名「之后」出现这些词即视为单位起始，不得吞进姓名
+    # （"Masanori Hanada University of Surrey" 的 University 必须留给 aff 分支，
+    #  否则姓名正则贪婪吃成 "Masanori Hanada University" → _looks_like_real_name 判否 →
+    #  退而用标题兜底，产出 aff='研究员学术' 之类噪音，physics 846 即此坑）。
+    _EN_ORG_KW = (r'University|Universities|College|Institute|Institution|Academy|School|'
+                  r'Department|Faculty|Laboratory|Centre|Center|Corporation|Corp|Company|'
+                  r'Hospital|Research|Group|Foundation|Association')
     # 兼容 "ES&T副主编、加州大学河滨分校Daniel Schlenck教授" 等中文前缀+英文姓名
     m = re.search(
         r'(?<![A-Za-z])'
-        r'([A-Z][a-z]+(?:\s+[A-Z][a-z\.]+){1,3})'
+        r'([A-Z][a-z]+(?:\s+(?!(?:' + _EN_ORG_KW + r')\b)[A-Z][a-z\.]+){1,3})'
         r'(?=\s*(?:的|之)?'
         r'(?:学术讲座|讲座|报告|学术报告|演讲|专场|工作坊|沙龙|讲坛|论坛|会议|'
         r'研讨会|分享会|座谈会|讨论会|大讲堂|开讲|讲座预告|通知|启事|预告|'
@@ -6681,6 +6760,8 @@ def split_record_by_sessions(base, sessions, full_text=''):
     prev_aff = base.get('speakerAffiliation') or ''
     prev_title = base.get('speakerTitle') or ''
     base_title = base.get('title') or ''
+    # 去掉 base 地点中的线上会议片段，得到纯线下会场；多场各自拼接本场会议号（2026-09-23）
+    _base_phys = _strip_meeting_fragment(base.get('location') or '')
     # 补丁7：收集各场次主讲人姓名，用于在共享简介区按姓名锚定各自的简介
     _all_speakers = []
     for s in sessions:
@@ -6745,19 +6826,30 @@ def split_record_by_sessions(base, sessions, full_text=''):
         # splitMode 落库标记（补丁2）：沿用本场次所属候选打出的模式
         if s.get('splitMode'):
             rec['splitMode'] = s['splitMode']
-        # 会议号 + 平台：优先逐块「会议号/Meeting ID」标签；否则用全文「腾讯会议专题X:ID」映射
-        mid_m = re.search(r'(?:会议号|会议ID|腾讯会议号|Meeting ID|会议号码)[：:\s]*([0-9][0-9\s]{5,})', block)
+        # 会议号 + 平台：优先逐块「会议号/Meeting ID」标签；否则用全文「腾讯会议专题X:ID」映射。
+        # 2026-09-23：统一并入 location（前端只展示「地点」），格式「平台 号码」。
+        # 本场已无实体地点 → 直接作为地点；已有实体地点（混合讲座）→ 括注追加；已有线上会议信息 → 保留。
+        mid_m = re.search(
+            r'(?:会议\s*号|会议\s*ID|腾讯会议\s*号|Meeting\s*ID|会议\s*号码)'
+            r'[：:\s]*(\d{3}[\s-]?\d{3}[\s-]?\d{3}|\d{3}[\s-]\d{4}[\s-]\d{4}|\d{9,12})',
+            block)
+        _mid_val = ''
         if mid_m:
-            rec['meetingId'] = re.sub(r'\s', '', mid_m.group(1))
-            rec['meetingPlatform'] = (
-                '腾讯会议' if '腾讯会议' in block else
-                'Zoom' if 'zoom' in block.lower() else
-                'Webex' if 'webex' in block.lower() else '')
+            _plat = ('腾讯会议' if ('腾讯会议' in block or 'tencent' in block.lower()) else
+                     'Zoom' if 'zoom' in block.lower() else
+                     'Webex' if 'webex' in block.lower() else '')
+            _mid_val = format_meeting_location(_plat, mid_m.group(1))
         elif meeting_map:
             mid = meeting_map.get(s['_doc_no'])  # 用拆前文档顺序匹配专题序号
             if mid:
-                rec['meetingId'] = mid
-                rec['meetingPlatform'] = platform_hint
+                _mid_val = format_meeting_location(platform_hint, mid)
+        if _mid_val:
+            # 按场次覆盖：有线下会场则「会场（会议号）」，纯线上则直接会议号。
+            # 无条件替换 base 的线上会议片段，避免前一场的会议号被后一场继承。
+            rec['location'] = (_base_phys + '（' + _mid_val + '）') if _base_phys else _mid_val
+        else:
+            # 本场无独立会议号 → 沿用页面级地点（可能为纯会议号或线下会场）
+            rec['location'] = base.get('location') or ''
         # 参与者（逐块，圆桌/座谈会常见）
         participants = _extract_block_field(block, r'参与者')
         is_roundtable = bool(participants) or bool(re.search(r'圆桌|座谈', block))
