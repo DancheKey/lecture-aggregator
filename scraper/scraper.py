@@ -211,7 +211,9 @@ EXCLUDE_TITLE_KW = ['通知', '招聘', '答辩', '公示', '大赛', '初赛', 
                     '实习', '调剂', '复试', '录取', '考试', '成果获', '研究成果', '论文', '发表',
                     '论点摘编', '出版', '立项', '结项', '获批', '荣获']
 # 常见 CMS 内容页 URL 特征：/a/20260616/348.html 或 /xueshujiangzuo/2026/0628/74.html
-_CONTENT_URL_RE = re.compile(r'/((a/\d{8}/\d+\.html)|(\d{4}/\d{4}/\d+\.html)|(\d{4}/\d{2}/\d{2}/.*\.html))', re.I)
+# article-\d+-\d+-\d+\.html：华师统一内容平台 module.scnu.edu.cn 的详情页格式
+# （经管学院学术活动列表 10 条中 9 条指向该平台，缺此分支会被内容页正则整体滤掉）
+_CONTENT_URL_RE = re.compile(r'/((a/\d{8}/\d+\.html)|(\d{4}/\d{4}/\d+\.html)|(\d{4}/\d{2}/\d{2}/.*\.html)|(article-\d+-\d+-\d+\.html))', re.I)
 
 
 def _abs_url(href, page_url):

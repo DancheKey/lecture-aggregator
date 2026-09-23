@@ -205,6 +205,10 @@ _NON_NAME_TOKENS = [
     '实践', '分析', '设计', '构建', '开发', '升级', '优化', '融合', '赋能', '转型', '本科',
     '第一名', '硕士', '一等奖', '二等奖', '三等奖', '特等奖', '金奖', '银奖', '铜奖', '优胜奖',
     '优秀教师', '青年', '教师', '学生', '嘉宾', '领导', '专家',
+    # 星期几整串（2026-09-23 自 _NAME_FORBIDDEN 迁入）：原在子串黑名单会误杀真名
+    # 「周一峰」（经管101，'周一' in '周一峰' → F3 清空 speaker）。此处为整串匹配，
+    # OCR 把孤立词「周一」当讲者仍被拦（L325 s in 集合），而「周一X」真名放行。
+    '周一', '周二', '周三', '周四', '周五', '周六', '周日',
 ]
 _EN_NON_NAME = {'professor', 'dr', 'mr', 'ms', 'presenter', 'lecturer', 'speaker',
                 'university', 'college', 'institute', 'research', 'science', 'chair',
@@ -243,8 +247,9 @@ _NAME_FORBIDDEN = (
     # 「師范」子串匹配：拦住「华南師范」「北京师」「陕西师」等校名截断
     '師范', '师范',
     # --- 行知书院/汕尾 OCR 孤立词假阳性拒绝名单（2026-07-20 补充）---
-    # 星期几：周四/周五/周三/周二/周六 等（首字「周」在百家姓，孤立词路由会误抓）
-    '星期', '周一', '周二', '周三', '周四', '周五', '周六', '周日',
+    # 星期几：原含「周一」…「周日」子串——2026-09-23 移至 _NON_NAME_TOKENS（整串匹配），
+    # 因子串形式误杀真名「周一峰」（经管101 实测）；孤立词「周一」拦截改由整串名单承担。
+    '星期',
     # 常见地名（首字多在姓氏集，如「广/周」）：广州/广东/北京/上海/深圳/中国/香港/美国…
     '广州', '广东', '北京', '上海', '深圳', '中国', '香港', '美国', '广西', '杭州', '苏州',
     '成都', '武汉', '南京', '西安', '重庆', '天津', '厦门', '东莞', '佛山', '珠海', '中山',
@@ -265,7 +270,9 @@ _NAME_FORBIDDEN = (
 _SURNAME_RE = re.compile(
     # 2026-09-05 补简体大姓：刘/黄/严——此前只有繁体 劉/黃/嚴 在列，
     # 「黄佩瑶」等真实主讲人被 _looks_like_real_name 误拒（xz65 第5场 VLM 值被清）。
-    r'^[刘黄严赵钱孙李周吴郑王冯陈陳褚卫蒋沈韩杨朱秦尤许何吕施张孔曹嚴華金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黃和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍万柯卢莫房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊于惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符劉景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍卻桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广库禄阙东欧阳肖闫揭覃冼禤邝亢付仝佐佘佟俎修公兰利南占台尧岳巩弭操攸敖敬於曾朴楼海涂渠游牟琚竺简管聂芦苑苟荆蒯虞袭西訾辛逯郅鄢隋鞠饶鹿麦保姆嵩布彦楚鼻]')
+    # 2026-09-24 补经管学院实测漏抓姓：初/化/盖/骈/卿/迟/帅/代 + 简体「华」（原仅繁體「華」）
+    # ——初景利、化柏林、盖雯雯、骈文景、卿前恺、迟国泰、帅青红、代志新、华胜亚 均被误拒→清空。
+    r'^[初化盖骈卿迟帅代华刘黄严赵钱孙李周吴郑王冯陈陳褚卫蒋沈韩杨朱秦尤许何吕施张孔曹嚴華金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黃和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍万柯卢莫房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊于惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符劉景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍卻桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广库禄阙东欧阳肖闫揭覃冼禤邝亢付仝佐佘佟俎修公兰利南占台尧岳巩弭操攸敖敬於曾朴楼海涂渠游牟琚竺简管聂芦苑苟荆蒯虞袭西訾辛逯郅鄢隋鞠饶鹿麦保姆嵩布彦楚鼻]')
 # 补充常见姓氏：肖（与「萧」同音常见姓）、闫（「阎」简化常用姓）。
 # 2026-09-01 扩：① 揭（13295 揭建文，漏姓曾误杀→speaker 清空）；② 广东姓 覃/冼/禤/邝 防华南师大主讲人被拒；
 # ③ 全库扫描补真实姓：曾岳聂涂佟佘敖饶游南隋荆海简牟利辛巩公亢西逯鄢訾鞠竺蒯台（标准百家姓漏补）+
@@ -1524,7 +1531,11 @@ def _vlm_rate_limit(min_interval=6.0):
 
 
 # 文本 LLM 增强总开关（SCNU_LLM_TEXT=1：全字段双轨——规则 + 模型A 并行识别，
-# 分歧调模型B 裁决）。默认 '0' 关闭——结构字段由规则主导，避免 LLM 干扰已确认的值。
+# 分歧调模型B 裁决）。默认 '1' 开启（2026-09-23 用户裁定：LLM 不得默认关闭，
+# 须默认参与全字段双轨并发挥作用；SCNU_LLM_TEXT=0 可显式退回纯规则，
+# 零成本重放脚本即靠 import 前 setdefault('0') 走该退回路径）。
+# 降级安全：模型A 无 key → provider=None → 纯规则保底；模型B 无 key → judge=None
+# → 分歧不采纳 A 覆盖、保守偏向规则（hybrid.apply_llm_text_hybrid）。
 # 优先级：真实环境变量 > 项目根 .env > 默认（2026-09-05：开关此前只读进程环境变量，
 # .env 里的 SCNU_LLM_TEXT=1 不生效，导致本地/CI 默认 rich-only、模型B 从未进入生产链路）。
 def _text_llm_flag(name, default):
@@ -1533,7 +1544,7 @@ def _text_llm_flag(name, default):
         v = _load_dotenv().get(name)
     return (v or default) not in ('0', 'false', 'False', '')
 
-_USE_LLM_TEXT = _text_llm_flag('SCNU_LLM_TEXT', '0')
+_USE_LLM_TEXT = _text_llm_flag('SCNU_LLM_TEXT', '1')
 
 # 摘要/简介（丰富信息）独立子开关：默认开启。全字段模式（SCNU_LLM_TEXT=1）下本开关
 # 隐含开启；rich-only 模式让 abstract/speakerBio（以及规则空时的职称/单位）由模型A
@@ -2488,10 +2499,12 @@ def _strip_nav_noise(s):
     m = _NAV_NOISE_RE.search(s)
     if m:
         s = s[:m.start()]
-    s = s.strip(' —-丨|·\t')
+    # ●/•：部分栏目列表项带圆点装饰前缀（如经管学院「● 华师经英seminar第58期」），
+    # 经 _clean_title 末端走到这里，须与 · 一并剥掉，否则 title 残留装饰符。
+    s = s.strip(' —-丨|·●•\t')
     # 去掉前导孤立数字（OCR 把装饰/页码误识为 00 等，如「00 更多链接…」）。
     # 限制 1-2 位且后面必须是非数字/结束，避免把 YYYYMMDD 前缀的「20」或「202」吃掉。
-    s = re.sub(r'^\s*\d{1,2}(?=\D|$)\s*', '', s).strip(' —-丨|·\t')
+    s = re.sub(r'^\s*\d{1,2}(?=\D|$)\s*', '', s).strip(' —-丨|·●•\t')
     return s.strip()
 
 
@@ -3401,8 +3414,14 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 各切一刀，拆出"双场同主讲人"的幻影场次（physics12723/13346 实测）。判定：meta
     # 去空白后的开头 30 字已在正文中出现 → 正文已含该信息，不追加。
     if meta_parts:
-        _meta_head = re.sub(r'\s+', '', ' '.join(meta_parts))[:30]
-        if not _meta_head or _meta_head not in re.sub(r'\s+', '', body_text):
+        # 去重守卫（2026-09-23 修复）：meta_head 必须与 body_text 过**同一套**规范化
+        # （N1 全角→半角、【标签】→「标签：」）再比对——原实现拿原始「【主题】…」比对
+        # 已规范化的「主题：…」，永不相等 → 守卫恒失效 → meta 被追加到文尾，
+        # bio 提取（吃到 $）把 meta 整段吸入简介（经管101 speakerBio 实测粘连）。
+        _meta_head = _normalize_label_text(_n1_normalize(' '.join(meta_parts)))
+        _meta_head = re.sub(r'\s+', '', _meta_head)[:30]
+        _body_flat = re.sub(r'\s+', '', body_text)
+        if not _meta_head or _meta_head not in _body_flat:
             body_text = body_text + ' ' + ' '.join(meta_parts)
             body_text = re.sub(r'\s+', ' ', body_text).strip()
             body_text_llm = body_text_llm + ' ' + ' '.join(meta_parts)
@@ -4239,9 +4258,27 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                     result['speakerTitle'] = _en_title
             else:
                 # CJK：折叠空格、去尾部职称，取头部 2~4 字人名
+                # 空格边界优先（2026-09-24 修复 bug 4267「姓名 单位」吞字）：
+                # 源页常写「主讲人：杨曦 厦门大学」「主讲人：王知津 南开大学教授」，
+                # 姓名与单位之间**有空格/换行**分隔。原实现先把空格全删（re.sub(r'\s+','',sp)），
+                # 再按 4→2 字降序取姓名，于是把单位首字吞进姓名：
+                #   杨曦/厦门大学 → 杨曦厦 + 门大学；王知津/南开大学 → 王知津南 + 开大学；
+                #   周开国/中山大学 → 周开国中 + 山大学；陈硕/复旦大学 → 陈硕复旦 + 大学。
+                # 修复：优先在**保留空格**的文本上取姓名——连续 CJK 串被空格截断，
+                # 降序自然停在真实姓名长度上（「杨曦 厦门大学」4 字/3 字均因含空格失败，
+                # 落到 2 字「杨曦」，rest=「厦门大学」）。
+                # 回落：OCR 常把姓名内部误插空格（「张 三」「王 教授」），保留空格取不到，
+                # 此时切成删空格版本重跑原逻辑，行为与修复前完全一致。
+                # ⚠ 实测补充（2026-09-24）：经管等**网页源**的「姓名 单位」空格在上游
+                # N1a 规范化阶段已被折叠（CJK 间空格折叠），sp 到达此处往往已无空格，
+                # 故本分支对它们不生效——真正治好这批案例的是下方「单位关键词边界回退」
+                # 守卫。本分支主要保护**未被 N1a 折叠**的值（英文/中英混排等）。
                 if re.search(r'[\u4e00-\u9fff]', sp):
-                    sp = re.sub(r'\s+', '', sp)
+                    _sp_flat = re.sub(r'\s+', '', sp)
+                else:
+                    _sp_flat = sp
                 sp_clean = re.sub(r'\s*' + _TITLE_ALT_FULL + r'.*$', '', sp).strip()
+                sp_clean_flat = re.sub(r'\s*' + _TITLE_ALT_FULL + r'.*$', '', _sp_flat).strip()
                 # 从 4 字到 2 字降序尝试，取最长有效姓名。
                 # 原「{2,4}」贪婪匹配后只做一次守卫：当 4 字无效时无法回退到 3 字/2 字，
                 # 导致「陈玺上海大学…」被整个当成 speaker。
@@ -4252,28 +4289,58 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                     if _nm and _looks_like_real_name(_nm.group(1)):
                         nm = _nm
                         break
+                if nm is None:
+                    # 保留空格取不到（姓名内部被误插空格 / 纯粘连无空格）→ 回落删空格版
+                    sp = _sp_flat
+                    sp_clean = sp_clean_flat
+                    _max_len = min(4, len(sp_clean))
+                    for _l in range(_max_len, 1, -1):
+                        _nm = re.match(rf'^([\u4e00-\u9fff]{{{_l}}})', sp_clean)
+                        if _nm and _looks_like_real_name(_nm.group(1)):
+                            nm = _nm
+                            break
                 if nm:
                     name = nm.group(1)
                     rest = sp[nm.end():].strip()
                     # 守卫：避免把「陈玺上海大学…」中的「陈玺上」当姓名，
                     # 导致 affiliation 被截成「海大学…」。
-                    # 当姓名≥3字、且 name 末字 + rest 前字构成常见地名（省/市简称），
-                    # 同时 rest 后续紧接「大学/学院/研究院…」等单位关键词时，
-                    # 说明姓名多吞了单位首字；回退到更短的姓名（仍须通过守卫）。
-                    if len(name) >= 3 and rest and len(rest) >= 2:
-                        # 常见省/市名（双字），用于检测「姓名末字+rest首字」是否误吞了地名前缀。
-                        _CITIES = {'上海', '北京', '天津', '重庆', '黑龙江', '吉林', '辽宁', '河北', '山西',
+                    # ── 2026-09-24 通用化（原仅省市名，现覆盖校名，修 bug 4267）──
+                    # 源页写法「主讲人：杨曦 厦门大学」「主讲人：王知津 南开大学教授」中的
+                    # 空格/换行会被上游 N1a 规范化折叠掉（CJK 间空格折叠），sp 到达此处时
+                    # 已是「杨曦厦门大学」，4→2 字降序取姓名便把单位首字吞进姓名：
+                    #   杨曦厦+门大学 / 王知津南+开大学 / 周开国中+山大学 / 陈硕复旦+大学 /
+                    #   袁嘉澳门+大学（吞 2 字）。
+                    # 判据：把 name 末字还给 rest，若「末字+rest」开头是
+                    # 「1~2 字校名前缀 + 单位关键词」（厦门大学/南开大学/中山大学/复旦大学），
+                    # 或「省市名 + 单位关键词」（上海大学/黑龙江大学），则末字属单位而非姓名，
+                    # 回退 1 字。循环（上限 2 次）覆盖吞 2 字；每步要求 shorter 仍是有效人名，
+                    # 否则停在当前 name（防连锁回退过头）。
+                    if len(name) >= 3 and rest:
+                        _UNIT_KW = (r'(?:大学|学院|研究院|研究所|研究中心|实验室|学系|学校)')
+                        _UNIT_HEAD_RE = re.compile(rf'^[\u4e00-\u9fff]{{1,2}}{_UNIT_KW}')
+                        # 常见省/市名（双字/三字），用于「上海大学」「黑龙江大学」等地名前缀。
+                        _CITIES = ('上海', '北京', '天津', '重庆', '黑龙江', '吉林', '辽宁', '河北', '山西',
                                    '陕西', '甘肃', '青海', '山东', '河南', '江苏', '安徽', '浙江', '福建',
                                    '江西', '湖北', '湖南', '广东', '广西', '海南', '四川', '贵州', '云南',
-                                   '西藏', '宁夏', '新疆', '内蒙古', '香港', '澳门', '台湾'}
-                        _city_candidate = name[-1] + rest[0]
-                        if (_city_candidate in _CITIES and
-                                re.match(r'^(?:大学|学院|研究院|研究所|研究中心|实验室|学系|分校|学校)',
-                                         rest[1:])):
+                                   '西藏', '宁夏', '新疆', '内蒙古', '香港', '澳门', '台湾')
+                        _guard_n = 0
+                        while len(name) >= 3 and rest and _guard_n < 2:
+                            _cand = name[-1] + rest
+                            _hit = bool(_UNIT_HEAD_RE.match(_cand))
+                            if not _hit:
+                                for _c in _CITIES:
+                                    if (_cand.startswith(_c) and
+                                            re.match(rf'^{_UNIT_KW}', _cand[len(_c):])):
+                                        _hit = True
+                                        break
+                            if not _hit:
+                                break
                             shorter = name[:-1]
-                            if _looks_like_real_name(shorter):
-                                name = shorter
-                                rest = sp[len(name):].strip()
+                            if not _looks_like_real_name(shorter):
+                                break
+                            name = shorter
+                            rest = sp[len(name):].strip()
+                            _guard_n += 1
                     result['speaker'] = name
                     if rest and len(rest) > 2:
                         # 姓名后残文若以复合职称开头（如「中学数学高级教师(邀请人…)广州外国语学校」），
@@ -4283,8 +4350,21 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                         if _rest_stripped and _rest_stripped != rest:
                             rest = _rest_stripped
                         result['speakerAffiliation'] = _extract_affiliation(rest)
-                elif sp_clean:
-                    result['speaker'] = sp_clean
+                else:
+                    # 倒装式「单位名 + 姓名 (+职称)」（2026-09-24 新增，经管 5300 实测）：
+                    # 源页写「主讲人：澳门大学袁嘉副教授」——单位在前、姓名在后。
+                    # 原路径按「头部取姓名」取到「澳门大学」，_looks_like_real_name 判否
+                    # → 整个 speaker 被清空（该条长期无主讲人）。此处在姓名判定失败后
+                    # 反向拆：单位关键词短语 + 尾部 2~4 字姓名（须各自通过守卫）。
+                    _inv = re.match(
+                        r'^([\u4e00-\u9fff]{2,12}?(?:大学|学院|研究院|研究所|研究中心|实验室|'
+                        r'学系|学校|公司|集团|医院))([\u4e00-\u9fff]{2,4})$', sp_clean)
+                    if (_inv and _looks_like_real_name(_inv.group(2))
+                            and not _looks_like_real_name(sp_clean)):
+                        result['speaker'] = _inv.group(2)
+                        result['speakerAffiliation'] = _inv.group(1)
+                    elif sp_clean:
+                        result['speaker'] = sp_clean
     # F2-OCR-SP: OCR 海报常把标签与值之间的冒号和空格全部识丢，
     # 变成零分隔符粘连（如工学部海报「主办单位:华南师范大学工学部主讲人马於光院士」）。
     # 若上述带冒号正则未命中，尝试零宽/纯空格的「标签+姓名」格式；
@@ -5855,6 +5935,9 @@ def _split_english_speaker(sp):
         r'研讨会|分享会|座谈会|讨论会|大讲堂|开讲|讲座预告|通知|启事|预告|'
         r'教授|副教授|助理教授|研究员|博士|院士|老师|导师|先生|女士|'
         r'Professor|Associate\s+Professor|Full\s+Professor|Dr\.?|Ph\.?D\.?|'
+        # 2026-09-24 补全角/半角左括号：经管 4014「Yi Zhou（University of California,
+        # Berkeley）」姓名后紧跟「（」，原 lookahead 无括号 → 整条漏抓（speaker 空）。
+        r'[（(]|'
         r'，|,|。|;|；|\s|$))',
         s)
     if not m:
