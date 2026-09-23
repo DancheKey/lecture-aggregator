@@ -127,8 +127,18 @@ sources:
 - name: 经济与管理学院
   campus: 大学城
   base: http://em.scnu.edu.cn
-  # 等待修复：http://em.scnu.edu.cn/tongzhigonggao/ 整列失效（404 死链）
-  list_urls: []
+  # 学术活动栏目（2026-09-23 启用；旧 tongzhigonggao/ 404 死链已弃用）。
+  # 特性：页面「发布时间」被 CMS 直接写成讲座时间（与 lectureStart 同日同时，
+  # 实际预告应提前几天）——一律按讲座预告处理，不按发布时刻判回顾稿：
+  # publishTime == lectureStart 走 is_news_record 的「严格大于」分支不会命中；
+  # 另设 skip_news_filter 兜底，防 status/正文时间精度差造成的同日微小误杀。
+  # 列表 10 条中 9 条详情在 module.scnu.edu.cn（article-*.html），需 all_items
+  # + _CONTENT_URL_RE 的 article 分支才不被内容页正则滤掉；「华师经英seminar第N期」
+  # 标题不含 LECTURE_KW，auto 模式会漏，故必须 all_items。
+  skip_news_filter: true
+  list_urls:
+  - url: http://em.scnu.edu.cn/xueshuhuodong/
+    collect_mode: all_items
 - name: 法学院
   campus: 大学城
   base: http://fxy.scnu.edu.cn

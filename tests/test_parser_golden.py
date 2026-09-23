@@ -336,9 +336,10 @@ class KnownDefectTest(unittest.TestCase):
         self.assertNotIn('1400', zhou.get('speakerBio') or '')   # 1400次被引是刘勋简介特征
         self.assertEqual(zhou.get('location'), '心理学院201')
 
-    @unittest.expectedFailure
+    # 2026-09-23 转正：_NON_NAME_TOKENS 整串匹配迁移 + meta 守卫规范化修复后，
+    # 纯规则与 LLM 双轨两条路径均稳定通过（SCNU_LLM_TEXT=0/1 分别实测）。
     def test_psy127_speaker_time_pairing(self):
-        """psy127 拆分已达标，但讲者与开始时间错位（乐国安=讲座一 9:30，沈模卫=讲座二 15:30）。"""
+        """psy127 讲者与开始时间配对（乐国安=讲座一 9:30，沈模卫=讲座二 15:30）。"""
         recs = self._parse('psy127.html', 'http://psy.scnu.edu.cn/a/20130301/127.html')
         self.assertEqual(len(recs), 2)
         by = {r.get('speaker'): r for r in recs}
