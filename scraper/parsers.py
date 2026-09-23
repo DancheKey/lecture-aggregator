@@ -810,6 +810,19 @@ def _clean_location(loc, title=None):
         loc = new
     # 尾部字段标签残片剥离（系统级，2026-09-22）：见 _strip_location_label_tail。
     loc = _strip_location_label_tail(loc)
+    # 尾部孤立中文数字清理（2026-09-23）：章节号被吸入地点时，「心理学院四」
+    # 「教学楼三」等尾部单字数字残留。仅当数字前为机构/地点词、数字后无楼/室/厅/号等量词时剥除。
+    _loc_dangling_num = re.compile(
+        r'(?:学院|大学|研究院|研究所|实验室|中心|校区|校园|书院|学部|大楼|教学楼|'
+        r'行政楼|综合楼|院楼|信息楼|楼|室|厅|馆|栋|幢|广场|会议室|报告厅|礼堂|教室|'
+        r'学术厅|演讲厅|会场)\s*([一二三四五六七八九十])\s*$'
+    )
+    for _ in range(3):
+        mdn = _loc_dangling_num.search(loc)
+        if mdn:
+            loc = loc[:mdn.start(1)].strip()
+        else:
+            break
     if not loc:
         if meeting:
             return meeting

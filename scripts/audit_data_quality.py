@@ -172,6 +172,44 @@ def fixability(cat, desc, val=''):
     return 'manual', '需人工回源页核对'
 
 
+# ---------------- 缺失字段人工复核裁定（2026-09-23） ----------------
+# 依据 scripts/verify_missing_fields.py 对 335 条缺失项逐条核源页的结果，
+# 再经人工剔除假阳性（fallback 误命中页面导航栏 / 议程项、label 取到正文句子）
+# 后固化到此处。三类：
+#   fixable = 源页确有该字段、系规则漏抓，建议按 advice 补录
+#   manual  = 源页有线索但真实值需人工确认
+#   nfix    = 源页未提供该字段 / 无法确认（默认归类，保持为空即可）
+# 未在此映射中的缺失项一律视为 nfix。
+MISSING_REVIEW = {
+    ('http://psy.scnu.edu.cn/a/20181024/1598.html', 'speakerAffiliation'):
+        ('fixable', '华南师范大学心理学院',
+         '认知控制研讨会（多嘉宾大会）主办学院；源页正文明确，可补录'),
+    ('http://psy.scnu.edu.cn/a/20161019/1117.html', 'speakerAffiliation'):
+        ('fixable', '华南师范大学心理学院',
+         '第一届认知控制研讨会主办学院；源页正文明确，可补录'),
+    ('https://physics.scnu.edu.cn/a/20101118/787.html', 'speakerAffiliation'):
+        ('fixable', '华南师范大学材料物理团队',
+         '有机-无机共混太阳能电池；讲者疑为南师材料物理团队，建议核对全称后补录'),
+    ('https://physics.scnu.edu.cn/a/20211008/11723.html', 'speakerAffiliation'):
+        ('manual', '?',
+         '源页 label 命中「华南师范大学研究生会」，疑为组织方而非讲者单位，需人工确认'),
+    ('https://physics.scnu.edu.cn/a/20101124/788.html', 'speakerAffiliation'):
+        ('manual', '?',
+         '源页 label 命中「材料物理团队」，讲者具马普所背景，疑为主办方南师团队，需人工确认'),
+}
+
+
+def missing_kind(it):
+    """缺失项最终裁定：命中 MISSING_REVIEW 用裁定值，否则默认 nfix。
+    返回 (kind, advice, value)"""
+    r = it[5]
+    key = (r.get('sourceUrl') or '', it[1])
+    hit = MISSING_REVIEW.get(key)
+    if hit:
+        return hit[0], hit[2], hit[1]
+    return 'nfix', '源页未提供该字段，保持为空即可', ''
+
+
 def scan(recs):
     """返回 issues: [(分类, 字段, 严重度, 问题描述, 当前值, 记录)]"""
     issues = []
@@ -473,70 +511,97 @@ def build_html(recs, issues, out_path):
                 )
             parts.append('</table>')
 
-    # ---------- 缺失统计区（只给分布，不逐条列：缺失项无「当前值」可核对）----------
+    # ---------- 缺失统计区（人工复核裁定：需处理 vs 源页未提供） ----------
+    # 依据 scripts/verify_missing_fields.py 逐条核源页 + 人工剔除假阳性（见 MISSING_REVIEW）。
+    # 目标：让用户只聚焦真正需判断的少数条（可补录/需人工），"源页未提供"的大头折叠收起。
     if missing:
         per_field = collections.Counter(it[1] for it in missing)
-        per_college = collections.defaultdict(collections.Counter)
-        for it in missing:
-            per_college[it[5].get('college') or '(未标)'][it[1]] += 1
-        parts.append('<h2>字段缺失统计（%d 项，仅列分布）</h2>' % n_missing)
-        parts.append('<div class="note">缺失项没有「当前值」可核对，先用分布判断规模；'
-                     '下方折叠区给出逐条明细与源页链接，便于人工回源补录。'
-                     '<b>注意：若源页本身就没写该字段，则确实无法修复</b>，只能保持为空 '
-                     '（这类归为「无法修 / 无需修」）。</div>')
-        parts.append('<table><tr><th>缺失字段</th><th>缺失条数</th><th>占总记录比</th></tr>')
         FIELD_CN = {'speaker': '主讲人', 'speakerAffiliation': '主讲人单位',
                     'lectureStart': '讲座开始时间', 'location': '讲座地点'}
+        # 给每条缺失项打最终裁定，分「需处理（fixable/manual）」与「源页未提供（nfix）」
+        need_fix, nfix_items = [], []
+        for it in missing:
+            k, advice, val = missing_kind(it)
+            (need_fix if k in ('fixable', 'manual') else nfix_items).append((it, k, advice, val))
+        kind_label = {'fixable': '可补录', 'manual': '需人工', 'nfix': '无法修 / 无需修'}
+        kind_cls = {'fixable': 'fx-a', 'manual': 'fx-m', 'nfix': 'fx-n'}
+
+        parts.append('<h2>字段缺失统计（%d 项，含人工复核裁定）</h2>' % n_missing)
+        parts.append('<div class="note">缺失项没有「当前值」可核对。已对全部缺失项逐条核源页并人工剔除假阳性：'
+                     '<b>需处理的见下方「可补录 / 需人工」清单，共 %d 条</b>'
+                     '（建议补录 %d、待人工确认 %d）；'
+                     '其余 <b>%d 条经核实源页本身未提供该字段</b>（校内讲座默认主办学院、旧公告未写地点/讲者等），'
+                     '保持为空即可，不再逐条占用人工（已折叠）。</div>'
+                     % (len(need_fix),
+                        sum(1 for x in need_fix if x[1] == 'fixable'),
+                        sum(1 for x in need_fix if x[1] == 'manual'),
+                        len(nfix_items)))
+
+        # 字段分布表
+        parts.append('<table><tr><th>缺失字段</th><th>缺失条数</th><th>占总记录比</th></tr>')
         for f, n in per_field.most_common():
             parts.append('<tr><td>%s</td><td><b>%d</b></td><td>%.1f%%</td></tr>'
                          % (FIELD_CN.get(f, f), n, 100.0 * n / len(recs)))
         parts.append('</table>')
 
-        col_rank = sorted(per_college.items(),
-                          key=lambda kv: -sum(kv[1].values()))[:12]
-        parts.append('<table style="margin-top:14px"><tr><th>学院</th>' +
-                     ''.join('<th>%s</th>' % FIELD_CN.get(f, f)
-                             for f, _ in per_field.most_common()) +
-                     '<th>合计</th></tr>')
-        fields_order = [f for f, _ in per_field.most_common()]
-        for col, cc in col_rank:
-            tot = sum(cc.values())
-            parts.append('<tr><td>%s</td>' % html.escape(str(col)) +
-                         ''.join('<td>%d</td>' % cc.get(f, 0) for f in fields_order) +
-                         '<td><b>%d</b></td></tr>' % tot)
-        parts.append('</table>')
-
-        # 逐条明细（默认折叠）：缺失项虽无「当前值」，仍需给链接供人工回源补录
-        parts.append('<details><summary>展开逐条缺失明细（%d 条，含源页链接，供人工补录核对）</summary>'
-                     % n_missing)
-        for f in fields_order:
-            sub = [it for it in missing if it[1] == f]
-            if not sub:
-                continue
-            parts.append('<h3 class="fx-n">%s 缺失（%d 条）</h3>' % (FIELD_CN.get(f, f), len(sub)))
-            parts.append('<table><tr><th style="width:34px"></th><th style="width:44px">级别</th>'
-                         '<th style="width:150px">问题</th><th class="val">当前值（标题）</th>'
-                         '<th style="width:120px">学院</th><th style="width:110px">主讲人</th>'
-                         '<th style="width:100px">讲座时间</th><th style="width:60px">源页</th></tr>')
-            for _, _, sev, desc, val, r in sub:
+        # 需处理清单（fixable + manual）——重点，默认展开
+        if need_fix:
+            need_fix.sort(key=lambda x: (x[1] != 'fixable', x[0][1]))  # fixable 在前，manual 在后
+            parts.append('<h3 class="fx-m">需处理：可补录 / 需人工（%d 条）</h3>' % len(need_fix))
+            parts.append('<table><tr><th style="width:34px"></th><th style="width:80px">裁定</th>'
+                         '<th style="width:110px">缺失字段</th><th class="val">建议值 / 待确认</th>'
+                         '<th style="width:280px">裁定说明</th><th style="width:120px">学院</th>'
+                         '<th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>')
+            for it, k, advice, val in need_fix:
+                field, r = it[1], it[5]
                 url = r.get('sourceUrl') or ''
                 esc = lambda x: html.escape(str(x or ''))
                 parts.append(
-                    '<tr data-url="%s" data-cat="缺失" data-sev="低" '
-                    'data-fix="无法修 / 无需修" data-desc="%s">'
+                    '<tr data-url="%s" data-cat="缺失" data-sev="低" data-fix="%s" data-desc="%s">'
                     '<td><input type="checkbox" class="chk"></td>'
-                    '<td><span class="sev">低</span></td>'
-                    '<td>%s</td>'
-                    '<td class="val">%s</td>'
-                    '<td>%s</td><td>%s</td><td>%s</td>'
+                    '<td><span class="fxtag %s">%s</span></td>'
+                    '<td>%s<div class="mini">数据 idx %s</div></td>'
+                    '<td class="val"><b>%s</b></td>'
+                    '<td class="adv">%s</td>'
+                    '<td>%s</td><td>%s</td>'
                     '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
-                    % (esc(url), esc(desc), esc(desc),
-                       esc((r.get('title') or r.get('topic') or '')[:120]),
-                       esc(r.get('college')), esc(r.get('speaker')),
-                       esc((r.get('lectureStart') or '')[:10]), esc(url))
+                    % (esc(url), esc(kind_label[k]), '需处理',
+                       kind_cls[k], esc(kind_label[k]),
+                       esc(FIELD_CN.get(field, field)), esc(r.get('__dbg_idx', '')),
+                       esc(val if val else '(需回源页确认)'), esc(advice),
+                       esc(r.get('college')), esc((r.get('lectureStart') or '')[:10]), esc(url))
                 )
             parts.append('</table>')
-        parts.append('</details>')
+
+        # 源页未提供（nfix）——两级折叠，默认收起；保留逐条源页链接以备核对
+        if nfix_items:
+            nf_fields = [f for f, _ in collections.Counter(
+                x[0][1] for x in nfix_items).most_common()]
+            parts.append('<details><summary>源页未提供 / 无需补（%d 条，默认保持为空，已折叠）</summary>'
+                         % len(nfix_items))
+            parts.append('<div class="note">以下缺失项经核实源页本身未提供该字段，无需人工补录；'
+                         '按字段分列，展开可逐条核对源页。</div>')
+            for f in nf_fields:
+                sub = [x for x in nfix_items if x[0][1] == f]
+                parts.append('<details><summary class="fx-n">%s 缺失 · 源页未提供（%d 条）</summary>'
+                             % (FIELD_CN.get(f, f), len(sub)))
+                parts.append('<table><tr><th style="width:34px"></th><th style="width:120px">学院</th>'
+                             '<th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>')
+                for it, k, advice, val in sub:
+                    url = it[5].get('sourceUrl') or ''
+                    r = it[5]
+                    esc = lambda x: html.escape(str(x or ''))
+                    parts.append(
+                        '<tr data-url="%s" data-cat="缺失" data-sev="低" '
+                        'data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空">'
+                        '<td><input type="checkbox" class="chk"></td>'
+                        '<td>%s</td><td>%s</td>'
+                        '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
+                        % (esc(url), esc(r.get('college')),
+                           esc((r.get('lectureStart') or '')[:10]), esc(url))
+                    )
+                parts.append('</table></details>')
+            parts.append('</details>')
 
     parts.append("""
 <script>
