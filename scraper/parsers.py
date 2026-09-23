@@ -674,7 +674,7 @@ def _strip_location_label_tail(loc):
     if not isinstance(loc, str) or not loc:
         return loc
     for _ in range(3):
-        nt = re.sub(r'(?:学术报告|报告|摘要|简介|时间|地点|题目|专家|主讲人|报告人)$', '', loc).strip()
+        nt = re.sub(r'(?:学术报告|报告|摘要|简介|时间|地点|题目|专家|主讲人|报告人|组织单位)$', '', loc).strip()
         if nt == loc or len(nt) < 2:
             break
         loc = nt
@@ -3747,7 +3747,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     LABELS = (
         '教学工作坊时间|教学工作坊地点|'
         '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|报告摘要|'
-        '讲座题目|讲座时间|讲座地点|主办单位|学术主持|上一篇|下一篇|标签|Tags|'
+        '讲座题目|讲座时间|讲座地点|主办单位|组织单位|承办单位|协办单位|支持单位|指导单位|学术主持|上一篇|下一篇|标签|Tags|'
         # 「日期」作字段标签须紧跟冒号（physics 页「演讲人：朱诗亮 日期：06月30日」：
         #  无此标签时姓名正则 {2,4} 会贪婪吃成「朱诗亮日」；加 (?=[:：]) 限定为标签形态，
         #  不影响散文里偶现的「日期」二字）。
@@ -3864,7 +3864,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     if m:
         loc = m.group(1).strip()
         # 美术学院等页面：地点后常粘连「主办单位/上一篇/下一篇/Tags/版权」等噪声，优先截断
-        loc = re.split(r'(?:主办单位|协办单位|承办单位|邀请人|讲座人|主持人|上一篇|下一篇|标签|Tags|Copyright|版权所有|All Rights Reserved|SCNU)', loc)[0].strip()
+        loc = re.split(r'(?:主办单位|组织单位|协办单位|承办单位|支持单位|指导单位|邀请人|讲座人|主持人|上一篇|下一篇|标签|Tags|Copyright|版权所有|All Rights Reserved|SCNU)', loc)[0].strip()
         # 汕尾校区教学工作坊海报：地点标签常为「教学工作坊地点:」，且「教学工作坊时间:」中的
         # 「时间」二字会 premature 触发 STOP，把「教学工作坊」后缀带进地点；这里显式剔除。
         loc = re.sub(r'教学工作坊.*$', '', loc).strip()
