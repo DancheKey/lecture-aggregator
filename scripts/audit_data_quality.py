@@ -530,8 +530,8 @@ def build_html(recs, issues, out_path):
         parts.append('<div class="note">缺失项没有「当前值」可核对。已对全部缺失项逐条核源页并人工剔除假阳性：'
                      '<b>需处理的见下方「可补录 / 需人工」清单，共 %d 条</b>'
                      '（建议补录 %d、待人工确认 %d）；'
-                     '其余 <b>%d 条经核实源页本身未提供该字段</b>（校内讲座默认主办学院、旧公告未写地点/讲者等），'
-                     '保持为空即可，不再逐条占用人工（已折叠）。</div>'
+                     '其余 <b>%d 条按可信度分两层列出</b>（已扫描确认未提供 / 源页未抓取·无法判定，'
+                     '详见下方折叠区；后者可能含漏抓，需重抓源页确认）。</div>'
                      % (len(need_fix),
                         sum(1 for x in need_fix if x[1] == 'fixable'),
                         sum(1 for x in need_fix if x[1] == 'manual'),
@@ -573,34 +573,84 @@ def build_html(recs, issues, out_path):
                 )
             parts.append('</table>')
 
-        # 源页未提供（nfix）——两级折叠，默认收起；保留逐条源页链接以备核对
+        # 源页未提供（nfix）——按判定可信度分两层：
+        #   已扫描确认（源页文本已拿到且确认无字段）/ 源页未抓取（fetch_failed，无法判定，可能含漏抓）
         if nfix_items:
+            esc = lambda x: html.escape(str(x or ''))
+            # 软依赖 verify 脚本中间结果，建立 (url,field)->detect_method
+            _vm = {}
+            _vp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               '.workbuddy', 'missing_verify_result.json')
+            if os.path.exists(_vp):
+                try:
+                    for _r in json.load(open(_vp, encoding='utf-8')):
+                        _vm[(_r.get('url'), _r.get('field'))] = _r.get('detect_method')
+                except Exception:
+                    _vm = {}
+            def _nf_method(it):
+                return _vm.get((it[0][5].get('sourceUrl'), it[0][1])) or 'scan'
             nf_fields = [f for f, _ in collections.Counter(
                 x[0][1] for x in nfix_items).most_common()]
+            scanned = [x for x in nfix_items if _nf_method(x) != 'fetch_failed']
+            ungot   = [x for x in nfix_items if _nf_method(x) == 'fetch_failed']
+
             parts.append('<details><summary>源页未提供 / 无需补（%d 条，默认保持为空，已折叠）</summary>'
                          % len(nfix_items))
-            parts.append('<div class="note">以下缺失项经核实源页本身未提供该字段，无需人工补录；'
-                         '按字段分列，展开可逐条核对源页。</div>')
-            for f in nf_fields:
-                sub = [x for x in nfix_items if x[0][1] == f]
-                parts.append('<details><summary class="fx-n">%s 缺失 · 源页未提供（%d 条）</summary>'
-                             % (FIELD_CN.get(f, f), len(sub)))
-                parts.append('<table><tr><th style="width:34px"></th><th style="width:120px">学院</th>'
-                             '<th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>')
-                for it, k, advice, val in sub:
-                    url = it[5].get('sourceUrl') or ''
-                    r = it[5]
-                    esc = lambda x: html.escape(str(x or ''))
-                    parts.append(
-                        '<tr data-url="%s" data-cat="缺失" data-sev="低" '
-                        'data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空">'
-                        '<td><input type="checkbox" class="chk"></td>'
-                        '<td>%s</td><td>%s</td>'
-                        '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
-                        % (esc(url), esc(r.get('college')),
-                           esc((r.get('lectureStart') or '')[:10]), esc(url))
-                    )
-                parts.append('</table></details>')
+
+            # —— 已扫描确认组：源页文本已拿到，确实无该字段 ——
+            if scanned:
+                parts.append('<div class="note">以下缺失项已拿到源页文本并扫描确认：源页本身未提供该字段，'
+                             '无需人工补录；按字段分列，展开可逐条核对源页。</div>')
+                for f in nf_fields:
+                    sub = [x for x in scanned if x[0][1] == f]
+                    if not sub:
+                        continue
+                    parts.append('<details><summary class="fx-n">%s 缺失 · 已扫描确认未提供（%d 条）</summary>'
+                                 % (FIELD_CN.get(f, f), len(sub)))
+                    parts.append('<table><tr><th style="width:34px"></th><th style="width:120px">学院</th>'
+                                 '<th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>')
+                    for it, k, advice, val in sub:
+                        url = it[5].get('sourceUrl') or ''
+                        r = it[5]
+                        parts.append(
+                            '<tr data-url="%s" data-cat="缺失" data-sev="低" '
+                            'data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空">'
+                            '<td><input type="checkbox" class="chk"></td>'
+                            '<td>%s</td><td>%s</td>'
+                            '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
+                            % (esc(url), esc(r.get('college')),
+                               esc((r.get('lectureStart') or '')[:10]), esc(url))
+                        )
+                    parts.append('</table></details>')
+
+            # —— 源页未抓取组（盲区）：可能含漏抓，需重抓源页确认 ——
+            if ungot:
+                parts.append('<div class="note" style="background:#fff4e6;border-left:4px solid #ff9f43;">'
+                             '⚠ 以下 <b>%d 条源页未成功抓取</b>（站点反爬 / 网络拦截），'
+                             '「源页未提供」是从「未拿到文本」推得的，<b>无法判定是否真缺失，可能含漏抓</b>。'
+                             '需重新抓取源页后才能确认，暂归入此组待复核。</div>' % len(ungot))
+                for f in nf_fields:
+                    sub = [x for x in ungot if x[0][1] == f]
+                    if not sub:
+                        continue
+                    parts.append('<details><summary class="fx-n" style="color:#d97706;">%s 缺失 · 源页未抓取·无法判定（%d 条）</summary>'
+                                 % (FIELD_CN.get(f, f), len(sub)))
+                    parts.append('<table><tr><th style="width:34px"></th><th style="width:120px">学院</th>'
+                                 '<th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>')
+                    for it, k, advice, val in sub:
+                        url = it[5].get('sourceUrl') or ''
+                        r = it[5]
+                        parts.append(
+                            '<tr data-url="%s" data-cat="缺失" data-sev="低" '
+                            'data-fix="待重抓确认" data-desc="源页未抓取，无法判定">'
+                            '<td><input type="checkbox" class="chk"></td>'
+                            '<td>%s</td><td>%s</td>'
+                            '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
+                            % (esc(url), esc(r.get('college')),
+                               esc((r.get('lectureStart') or '')[:10]), esc(url))
+                        )
+                    parts.append('</table></details>')
+
             parts.append('</details>')
 
     parts.append("""
