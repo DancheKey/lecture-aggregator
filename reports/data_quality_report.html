@@ -38,34 +38,35 @@
     .adv{color:#666;font-size:12px}
     </style></head><body>
 <h1>讲座数据质量专项扫描报告</h1>
-<div class="sub">数据源 data/lectures.json · 共 2974 条记录 · 生成时间 2026-09-22 22:40</div>
+<div class="sub">数据源 data/lectures.json · 共 2975 条记录 · 生成时间 2026-09-23 08:27</div>
 <div class="cards">
 <div class="card h"><div class="n">0</div><div class="l">高优先级问题</div></div>
 <div class="card m"><div class="n">0</div><div class="l">中优先级问题</div></div>
 <div class="card k"><div class="n">0</div><div class="l">可自动修</div></div>
-<div class="card m"><div class="n">2</div><div class="l">需人工核对</div></div>
+<div class="card m"><div class="n">3</div><div class="l">需人工核对</div></div>
 <div class="card"><div class="n">0</div><div class="l">无法修/无需修</div></div>
-<div class="card"><div class="n">336</div><div class="l">字段缺失项</div></div>
+<div class="card"><div class="n">335</div><div class="l">字段缺失项</div></div>
 </div>
 <div class="note"><b>分级说明</b>：<span class="sev 高">高</span> = 值内容被明显污染（正文残段、职称混入姓名、结束时间跨天等），建议修正；<span class="sev 中">中</span> = 疑似问题或轻度不规范，需人工确认。每行「当前值」即数据库里的原始内容，点「源页」可直接打开原通知核对。</div>
 <div class="note"><b>可修性图例</b>：<span class="fxtag fx-a">可自动修</span> = 规则明确、可批量清洗，误伤风险低；<span class="fxtag fx-m">需人工核对</span> = 能修，但要回源页确认真实值，自动补全有臆造风险；<span class="fxtag fx-n">无法修 / 无需修</span> = 源页本身未提供该信息，或当前值是合规写法（并非错误）。每个类别下先给「问题类型 → 条数 → 修复建议」，再逐条列出当前值与源页链接。</div>
 <div class="bar"><button onclick="selAll(true)">全选</button><button onclick="selAll(false)">全不选</button><button onclick="expSel()">导出选中为 CSV</button><span id="cnt" class="mini"></span></div>
-<h2>时间（2 项，其中高优先级 0）</h2>
-<div class="note">本类构成：<span class="fxtag fx-m">需人工核对 2 条</span></div>
-<h3 class="fx-m">需人工核对（2 条）</h3>
+<h2>时间（3 项，其中高优先级 0）</h2>
+<div class="note">本类构成：<span class="fxtag fx-m">需人工核对 3 条</span></div>
+<h3 class="fx-m">需人工核对（3 条）</h3>
 <table><tr><th style="width:190px">问题类型</th><th style="width:56px">条数</th><th>修复建议</th></tr>
-<tr><td>时长偏长(N.N小时)，可能是全天会议或误抓</td><td><b>2</b></td><td class="adv">可能是全天会议/多日议程，回源页确认</td></tr>
+<tr><td>时长偏长(N.N小时)，可能是全天会议或误抓</td><td><b>3</b></td><td class="adv">可能是全天会议/多日议程，回源页确认</td></tr>
 </table>
 <table><tr><th style="width:34px"></th><th style="width:44px">级别</th><th style="width:150px">问题</th><th class="val">当前值</th><th style="width:120px">学院</th><th style="width:110px">主讲人</th><th style="width:100px">讲座时间</th><th style="width:60px">源页</th></tr>
 <tr data-url="http://psy.scnu.edu.cn/a/20181024/1598.html" data-cat="时间" data-sev="低" data-fix="需人工核对" data-desc="时长偏长(10.0小时)，可能是全天会议或误抓"><td><input type="checkbox" class="chk"></td><td><span class="sev 低">低</span></td><td>时长偏长(10.0小时)，可能是全天会议或误抓<div class="mini">数据 idx 2496</div></td><td class="val">2019-01-05 09:00:00 → 2019-01-05 19:00:00</td><td>心理学院</td><td></td><td>2019-01-05</td><td><a href="http://psy.scnu.edu.cn/a/20181024/1598.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://psy.scnu.edu.cn/a/20191105/1840.html" data-cat="时间" data-sev="低" data-fix="需人工核对" data-desc="时长偏长(13.0小时)，可能是全天会议或误抓"><td><input type="checkbox" class="chk"></td><td><span class="sev 低">低</span></td><td>时长偏长(13.0小时)，可能是全天会议或误抓<div class="mini">数据 idx 2281</div></td><td class="val">2019-12-27 08:30:00 → 2019-12-27 21:30:00</td><td>心理学院</td><td>胡卫平</td><td>2019-12-27</td><td><a href="http://psy.scnu.edu.cn/a/20191105/1840.html" target="_blank">源页 ↗</a></td></tr>
+<tr data-url="http://ggy.scnu.edu.cn/a/20201120/5326.html" data-cat="时间" data-sev="低" data-fix="需人工核对" data-desc="时长偏长(9.0小时)，可能是全天会议或误抓"><td><input type="checkbox" class="chk"></td><td><span class="sev 低">低</span></td><td>时长偏长(9.0小时)，可能是全天会议或误抓<div class="mini">数据 idx 2182</div></td><td class="val">2020-11-21 08:30:00 → 2020-11-21 17:30:00</td><td>政治与公共管理学院</td><td></td><td>2020-11-21</td><td><a href="http://ggy.scnu.edu.cn/a/20201120/5326.html" target="_blank">源页 ↗</a></td></tr>
 </table>
-<h2>字段缺失统计（336 项，仅列分布）</h2>
+<h2>字段缺失统计（335 项，仅列分布）</h2>
 <div class="note">缺失项没有「当前值」可核对，先用分布判断规模；下方折叠区给出逐条明细与源页链接，便于人工回源补录。<b>注意：若源页本身就没写该字段，则确实无法修复</b>，只能保持为空 （这类归为「无法修 / 无需修」）。</div>
 <table><tr><th>缺失字段</th><th>缺失条数</th><th>占总记录比</th></tr>
-<tr><td>主讲人单位</td><td><b>189</b></td><td>6.4%</td></tr>
-<tr><td>讲座地点</td><td><b>114</b></td><td>3.8%</td></tr>
-<tr><td>主讲人</td><td><b>33</b></td><td>1.1%</td></tr>
+<tr><td>主讲人单位</td><td><b>190</b></td><td>6.4%</td></tr>
+<tr><td>讲座地点</td><td><b>113</b></td><td>3.8%</td></tr>
+<tr><td>主讲人</td><td><b>32</b></td><td>1.1%</td></tr>
 </table>
 <table style="margin-top:14px"><tr><th>学院</th><th>主讲人单位</th><th>讲座地点</th><th>主讲人</th><th>合计</th></tr>
 <tr><td>教师发展中心</td><td>41</td><td>81</td><td>4</td><td><b>126</b></td></tr>
@@ -74,15 +75,15 @@
 <tr><td>物理学院</td><td>12</td><td>12</td><td>4</td><td><b>28</b></td></tr>
 <tr><td>行知书院</td><td>23</td><td>0</td><td>4</td><td><b>27</b></td></tr>
 <tr><td>数学科学学院</td><td>3</td><td>9</td><td>0</td><td><b>12</b></td></tr>
-<tr><td>政治与公共管理学院</td><td>3</td><td>1</td><td>3</td><td><b>7</b></td></tr>
-<tr><td>计算机学院</td><td>6</td><td>0</td><td>1</td><td><b>7</b></td></tr>
+<tr><td>计算机学院</td><td>7</td><td>0</td><td>0</td><td><b>7</b></td></tr>
+<tr><td>政治与公共管理学院</td><td>3</td><td>0</td><td>3</td><td><b>6</b></td></tr>
 <tr><td>文学院</td><td>2</td><td>0</td><td>2</td><td><b>4</b></td></tr>
 <tr><td>社会科学处</td><td>3</td><td>0</td><td>1</td><td><b>4</b></td></tr>
 <tr><td>历史文化学院</td><td>4</td><td>0</td><td>0</td><td><b>4</b></td></tr>
 <tr><td>人工智能学院</td><td>4</td><td>0</td><td>0</td><td><b>4</b></td></tr>
 </table>
-<details><summary>展开逐条缺失明细（336 条，含源页链接，供人工补录核对）</summary>
-<h3 class="fx-n">主讲人单位 缺失（189 条）</h3>
+<details><summary>展开逐条缺失明细（335 条，含源页链接，供人工补录核对）</summary>
+<h3 class="fx-n">主讲人单位 缺失（190 条）</h3>
 <table><tr><th style="width:34px"></th><th style="width:44px">级别</th><th style="width:150px">问题</th><th class="val">当前值（标题）</th><th style="width:120px">学院</th><th style="width:110px">主讲人</th><th style="width:100px">讲座时间</th><th style="width:60px">源页</th></tr>
 <tr data-url="http://xz.scnu.edu.cn/a/20260616/348.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">智赋运维 预见未来人工智能驱动新一代智能维护</td><td>行知书院</td><td>王婧</td><td>2026-06-23</td><td><a href="http://xz.scnu.edu.cn/a/20260616/348.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://xz.scnu.edu.cn/a/20260528/340.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">弦间诗意—吉他在多种音乐风格的探索</td><td>行知书院</td><td>黄志鸿</td><td>2026-06-03</td><td><a href="http://xz.scnu.edu.cn/a/20260528/340.html" target="_blank">源页 ↗</a></td></tr>
@@ -239,7 +240,8 @@
 <tr data-url="http://psy.scnu.edu.cn/a/20150916/763.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">第61期心理沙龙</td><td>心理学院</td><td>王瑞明</td><td>2015-09-17</td><td><a href="http://psy.scnu.edu.cn/a/20150916/763.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://psy.scnu.edu.cn/a/20150609/349.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">关于“举办全省中小学心理教师心理咨询督导”和”心理辅导技术工作坊“的通知</td><td>心理学院</td><td></td><td>2015-07-13</td><td><a href="http://psy.scnu.edu.cn/a/20150609/349.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://psy.scnu.edu.cn/a/20150612/685.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">第60期心理沙龙-聂晶鑫 副教授</td><td>心理学院</td><td>聂晶鑫</td><td>2015-06-18</td><td><a href="http://psy.scnu.edu.cn/a/20150612/685.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://cs.scnu.edu.cn/a/20150604/1932.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">计算机学院博士后出站报告会</td><td>计算机学院</td><td></td><td>2015-06-05</td><td><a href="http://cs.scnu.edu.cn/a/20150604/1932.html" target="_blank">源页 ↗</a></td></tr>
+<tr data-url="http://cs.scnu.edu.cn/a/20150604/1932.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">计算机学院博士后出站报告会</td><td>计算机学院</td><td>沈映珊</td><td>2015-06-05</td><td><a href="http://cs.scnu.edu.cn/a/20150604/1932.html" target="_blank">源页 ↗</a></td></tr>
+<tr data-url="http://cs.scnu.edu.cn/a/20150604/1932.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">计算机学院博士后出站报告会</td><td>计算机学院</td><td>李丁丁</td><td>2015-06-05</td><td><a href="http://cs.scnu.edu.cn/a/20150604/1932.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://psy.scnu.edu.cn/a/20150602/345.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">第59期心理沙龙-王才康教授</td><td>心理学院</td><td>王才康</td><td>2015-06-04</td><td><a href="http://psy.scnu.edu.cn/a/20150602/345.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://psy.scnu.edu.cn/a/20150515/336.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">第58期心理沙龙</td><td>心理学院</td><td>黄瑞旺</td><td>2015-05-21</td><td><a href="http://psy.scnu.edu.cn/a/20150515/336.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://skc.scnu.edu.cn/a/20150520/146.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">“空间经济与公共政策”跨学科学术研讨会</td><td>社会科学处</td><td></td><td>2015-05-21</td><td><a href="http://skc.scnu.edu.cn/a/20150520/146.html" target="_blank">源页 ↗</a></td></tr>
@@ -274,7 +276,7 @@
 <tr data-url="https://physics.scnu.edu.cn/a/20101124/788.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">Excitons in Single-Walled Carbon Nanotubes</td><td>物理学院</td><td>Walled Carbon Nanotubes</td><td>2010-11-25</td><td><a href="https://physics.scnu.edu.cn/a/20101124/788.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="https://physics.scnu.edu.cn/a/20101118/787.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="单位为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>单位为空</td><td class="val">[讲座]有机-无机共混太阳能电池</td><td>物理学院</td><td>吴素娟</td><td>2010-11-18</td><td><a href="https://physics.scnu.edu.cn/a/20101118/787.html" target="_blank">源页 ↗</a></td></tr>
 </table>
-<h3 class="fx-n">讲座地点 缺失（114 条）</h3>
+<h3 class="fx-n">讲座地点 缺失（113 条）</h3>
 <table><tr><th style="width:34px"></th><th style="width:44px">级别</th><th style="width:150px">问题</th><th class="val">当前值（标题）</th><th style="width:120px">学院</th><th style="width:110px">主讲人</th><th style="width:100px">讲座时间</th><th style="width:60px">源页</th></tr>
 <tr data-url="https://ose.scnu.edu.cn/a/20241122/141.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">学术报告：全谱段白光飞秒激光及其应用</td><td>光电科学与工程学院</td><td>李志远</td><td>2024-11-22</td><td><a href="https://ose.scnu.edu.cn/a/20241122/141.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://life.scnu.edu.cn/a/20240829/6261.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">学术讲座：利用不同体系理解合子基因组启动的进化保守性和调控策略</td><td>生命科学学院</td><td>陈凯</td><td>2024-09-02</td><td><a href="http://life.scnu.edu.cn/a/20240829/6261.html" target="_blank">源页 ↗</a></td></tr>
@@ -310,7 +312,6 @@
 <tr data-url="http://ctld.scnu.edu.cn/a/20210422/1342.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">【每周一课】师德之美，尽在跨界和细节之中</td><td>教师发展中心</td><td>王新农</td><td>2021-04-29</td><td><a href="http://ctld.scnu.edu.cn/a/20210422/1342.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20210408/1343.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">【每周一课】新时代思想政治教育理论创新与实践</td><td>教师发展中心</td><td>杨志成</td><td>2021-04-12</td><td><a href="http://ctld.scnu.edu.cn/a/20210408/1343.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20210325/1309.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">【每周一课】对“十四五”教育改革和规划的展望与分析：“十四五”时期建设高质量教育体系的形势和政策导向</td><td>教师发展中心</td><td>张力</td><td>2021-03-29</td><td><a href="http://ctld.scnu.edu.cn/a/20210325/1309.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://ggy.scnu.edu.cn/a/20201120/5326.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">首届“华南公共治理高峰论坛暨公共管理学科建设”研讨会</td><td>政治与公共管理学院</td><td></td><td>2020-11-21</td><td><a href="http://ggy.scnu.edu.cn/a/20201120/5326.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20201104/1246.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">【每周一课】用思维导图创新高校教学评价体系</td><td>教师发展中心</td><td>杜玉霞</td><td>2020-11-09</td><td><a href="http://ctld.scnu.edu.cn/a/20201104/1246.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20201029/1240.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">【每周一课】如何提高自信力</td><td>教师发展中心</td><td>寇彧</td><td>2020-11-05</td><td><a href="http://ctld.scnu.edu.cn/a/20201029/1240.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20201022/1237.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">【每周一课】新时期高校教师心理建设技巧与策略</td><td>教师发展中心</td><td>杜秀芳</td><td>2020-10-26</td><td><a href="http://ctld.scnu.edu.cn/a/20201022/1237.html" target="_blank">源页 ↗</a></td></tr>
@@ -391,7 +392,7 @@
 <tr data-url="http://ctld.scnu.edu.cn/a/20161023/281.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">【每周一课】“身边的李保国”</td><td>教师发展中心</td><td>武宇清</td><td>2016-10-26</td><td><a href="http://ctld.scnu.edu.cn/a/20161023/281.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://ctld.scnu.edu.cn/a/20161012/276.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="地点缺失"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>地点缺失</td><td class="val">【每周一课】“大学课堂如何活用教学法”</td><td>教师发展中心</td><td>周游</td><td>2016-10-12</td><td><a href="http://ctld.scnu.edu.cn/a/20161012/276.html" target="_blank">源页 ↗</a></td></tr>
 </table>
-<h3 class="fx-n">主讲人 缺失（33 条）</h3>
+<h3 class="fx-n">主讲人 缺失（32 条）</h3>
 <table><tr><th style="width:34px"></th><th style="width:44px">级别</th><th style="width:150px">问题</th><th class="val">当前值（标题）</th><th style="width:120px">学院</th><th style="width:110px">主讲人</th><th style="width:100px">讲座时间</th><th style="width:60px">源页</th></tr>
 <tr data-url="http://aol.scnu.edu.cn/a/20251030/1367.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="主讲人为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>主讲人为空</td><td class="val">第九届全国师范大学美术教育论坛</td><td>美术学院</td><td></td><td>2025-11-04</td><td><a href="http://aol.scnu.edu.cn/a/20251030/1367.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://xz.scnu.edu.cn/a/20250909/288.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="主讲人为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>主讲人为空</td><td class="val">世界那么大，我想去看看暨“平安留学  健康留学  文明留学  成功留学”主题交流</td><td>行知书院</td><td></td><td>2025-09-11</td><td><a href="http://xz.scnu.edu.cn/a/20250909/288.html" target="_blank">源页 ↗</a></td></tr>
@@ -423,7 +424,6 @@
 <tr data-url="http://psy.scnu.edu.cn/a/20151202/900.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="主讲人为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>主讲人为空</td><td class="val">事件相关光学成像技术研讨会</td><td>心理学院</td><td></td><td>2015-12-05</td><td><a href="http://psy.scnu.edu.cn/a/20151202/900.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="https://physics.scnu.edu.cn/a/20151117/797.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="主讲人为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>主讲人为空</td><td class="val">[讲座]第八届“勷勤论坛”之“四院联合学术报告比赛”决赛</td><td>物理学院</td><td></td><td>2015-11-20</td><td><a href="https://physics.scnu.edu.cn/a/20151117/797.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://psy.scnu.edu.cn/a/20150609/349.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="主讲人为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>主讲人为空</td><td class="val">关于“举办全省中小学心理教师心理咨询督导”和”心理辅导技术工作坊“的通知</td><td>心理学院</td><td></td><td>2015-07-13</td><td><a href="http://psy.scnu.edu.cn/a/20150609/349.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://cs.scnu.edu.cn/a/20150604/1932.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="主讲人为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>主讲人为空</td><td class="val">计算机学院博士后出站报告会</td><td>计算机学院</td><td></td><td>2015-06-05</td><td><a href="http://cs.scnu.edu.cn/a/20150604/1932.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://skc.scnu.edu.cn/a/20150520/146.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="主讲人为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>主讲人为空</td><td class="val">“空间经济与公共政策”跨学科学术研讨会</td><td>社会科学处</td><td></td><td>2015-05-21</td><td><a href="http://skc.scnu.edu.cn/a/20150520/146.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="https://physics.scnu.edu.cn/a/20090331/785.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="主讲人为空"><td><input type="checkbox" class="chk"></td><td><span class="sev">低</span></td><td>主讲人为空</td><td class="val">“在德国学习与研究”讲座通知</td><td>物理学院</td><td></td><td>2009-04-02</td><td><a href="https://physics.scnu.edu.cn/a/20090331/785.html" target="_blank">源页 ↗</a></td></tr>
 </table>
