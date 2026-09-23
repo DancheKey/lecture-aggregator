@@ -843,22 +843,24 @@ def _norm_url(u):
 
 
 def _cross_source_dup_with_existing(rec, existing_index):
-    """判断 rec 是否与基底 existing 中某条跨源重复。
+    """判断 rec 是否与基底 existing 中某条跨源重复，返回命中的基底记录（或 None）。
 
-    用于增量模式：命中则新增记录不追加（避免重复），existing 基底保持原样
-    （包括其 merged 状态不变）。判定与 cross_source_dedup 一致：
+    用于增量模式：命中后由调用方决定「同单位丢弃」还是「跨单位融合入基底」。
+    判定与 cross_source_dedup 一致：
       - 同单位（同学院）同主讲同日且 lectureIndex 相同 → 强制视为重复
         （lectureIndex 均 None 时不强制，避免误删同单位同日的两场不同讲座，
          如 bd/66 与 bd/67）；
       - 其余情形（含同单位不满足强信号的）同主讲同日 + topic/title
-        相似度 ≥ 0.25 → 视为重复。
+        相似度 ≥ 0.25 → 视为重复；
+      - 兜底层：同主讲同日 + 同开始时刻(精确到分) + 同单位 → 视为重复。
+    返回命中的基底记录引用（供调用方据同/跨单位决定丢弃或融合）；无命中返回 None。
     """
     spk = _normalize_speaker(rec.get('speaker') or '')
     if not _is_valid_speaker_name(spk):
-        return False
+        return None
     date = (rec.get('lectureStart') or '')[:10]
     if not date or date.startswith('0000'):
-        return False
+        return None
     rivals = existing_index.get((spk, date), [])
     u1 = _norm_url(rec.get('sourceUrl'))
     ti_a = rec.get('topic', '') or rec.get('title', '')
@@ -872,7 +874,7 @@ def _cross_source_dup_with_existing(rec, existing_index):
             li_a = rec.get('lectureIndex')
             li_b = r2.get('lectureIndex')
             if li_a is not None and li_a == li_b:
-                return True
+                return r2
         ti_b = r2.get('topic', '') or r2.get('title', '')
         sim = max(
             _topic_similarity(rec.get('topic', ''), r2.get('topic', '')),
@@ -882,7 +884,7 @@ def _cross_source_dup_with_existing(rec, existing_index):
             _topic_similarity(rec.get('title', ''), r2.get('topic', '')),
         )
         if sim >= 0.25:
-            return True
+            return r2
         # 兜底层（与 cross_source_dedup 的「兜底层2」保持一致）：
         # 同讲者(已在组内) + 同日期(已在组内) + 同开始时刻(精确到分) + 同单位 → 重复。
         # 覆盖两院对同一场讲座用中英文不同标题（相似度≈0）且地点写法不同的场景。
@@ -892,8 +894,45 @@ def _cross_source_dup_with_existing(rec, existing_index):
         if (t16_a and t16_a == t16_b
                 and not _is_placeholder_time(rec.get('lectureStart'))
                 and _same_org(rec, r2)):
-            return True
-    return False
+            return r2
+    return None
+
+
+def _merge_record_into(r_new, r_primary):
+    """增量模式：把跨源重复的新记录 r_new 融合进已在库的 r_primary。
+
+    语义对齐 cross_source_dedup 的跨院合并分支，但直接修改 r_primary（已入库优先，
+    不翻转 primary）：
+      - 用 r_new 的非空字段补全 r_primary 的空字段（含 location：主记录已有则不覆盖，
+        杜绝 B 的错误地点污染 A 的正确地点——用户/Mimo 铁律）；
+      - r_new 的 {sourceUrl,college,campus,title} 追加进 r_primary['sources']；
+      - 标记 merged=True, sourceCount=len(sources)+1。
+    幂等守卫：若 r_primary['sources'] 已含 r_new 的 sourceUrl，则跳过（每日增量会
+    重复抓到 B，避免重复追加 / sourceCount 虚高）。
+    仅用于跨单位命中（同单位由调用方走 skip/多轮，不调用本函数）。
+    """
+    new_url = (r_new.get('sourceUrl') or '').rstrip('/')
+    sources = r_primary.get('sources') or []
+    # 幂等守卫：sources 已含该 URL → 已融合过，跳过（不重复补全/追加）
+    if any((s.get('sourceUrl') or '').rstrip('/') == new_url for s in sources):
+        return
+    # 补全空字段（location 在主记录有值时不被覆盖）
+    for field in ['speakerTitle', 'speakerAffiliation', 'location',
+                  'speakerBio', 'organizer', 'abstract']:
+        if not r_primary.get(field):
+            val = r_new.get(field)
+            if val:
+                r_primary[field] = val
+    # 追加 sources（跨单位不会同单位，无需折叠；仅按 URL 幂等去重）
+    sources.append({
+        'sourceUrl': r_new.get('sourceUrl', ''),
+        'college': r_new.get('college', ''),
+        'campus': r_new.get('campus', ''),
+        'title': r_new.get('title', ''),
+    })
+    r_primary['sources'] = sources
+    r_primary['merged'] = True
+    r_primary['sourceCount'] = len(sources) + 1
 
 
 # 增量时间门：水位线 = since（最近一次增量抓取时间）。
@@ -1010,7 +1049,15 @@ def incremental_merge(existing, new_records):
         # 多轮通知更旧轮次：抑制追加（保留较新的旧轮，符合「只保留最新一轮」）
         if key in suppressed_new_keys:
             continue
-        if _cross_source_dup_with_existing(r, existing_index):
+        matched = _cross_source_dup_with_existing(r, existing_index)
+        if matched is not None:
+            if matched.get('college', '') == r.get('college', ''):
+                # 同单位（同学院）：维持现状不跨源融合（用户约定同单位=多轮/同讲座
+                # 重发，不融合）；仅丢弃后发避免重复，保留先入库的基底原样。
+                skip += 1
+                continue
+            # 跨单位命中：把后发的新记录 B 融合进已在库的 A（merge-into-A）
+            _merge_record_into(r, matched)
             skip += 1
             continue
         seen.add(key)
@@ -1018,7 +1065,7 @@ def incremental_merge(existing, new_records):
     if replaced_new_keys:
         print(f'[MULTI-ROUND] 共替换 {len(replaced_new_keys)} 条旧轮次（保留最新一轮）')
     if skip:
-        print(f'[INCREMENTAL] 跳过 {skip} 条与基底跨源重复的新增记录（不重复追加；基底保持原样）')
+        print(f'[INCREMENTAL] 跨源重复 {skip} 条（同单位丢弃 / 跨单位融合入基底；基底更新 merged/sources）')
     return list(base_map.values()) + final_new
 
 
