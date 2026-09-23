@@ -842,59 +842,85 @@ def _norm_url(u):
     return str(u or '').rstrip('/')
 
 
-def _cross_source_dup_with_existing(rec, existing_index):
+def _cross_source_dup_with_existing(rec, existing_index, no_speaker_index=None):
     """判断 rec 是否与基底 existing 中某条跨源重复，返回命中的基底记录（或 None）。
 
-    用于增量模式：命中后由调用方决定「同单位丢弃」还是「跨单位融合入基底」。
-    判定与 cross_source_dedup 一致：
-      - 同单位（同学院）同主讲同日且 lectureIndex 相同 → 强制视为重复
-        （lectureIndex 均 None 时不强制，避免误删同单位同日的两场不同讲座，
-         如 bd/66 与 bd/67）；
-      - 其余情形（含同单位不满足强信号的）同主讲同日 + topic/title
-        相似度 ≥ 0.25 → 视为重复；
-      - 兜底层：同主讲同日 + 同开始时刻(精确到分) + 同单位 → 视为重复。
-    返回命中的基底记录引用（供调用方据同/跨单位决定丢弃或融合）；无命中返回 None。
+    用于增量模式：命中后由调用方统一做 merge-into-A 融合（同单位/跨单位均融合，
+    因为融合不丢信息、且保留各来源溯源链接，用户约定「多轮大会通知应融合而非留新留旧」）。
+
+    判定分两路（与 cross_source_dedup 一致语义）：
+      A. rec 有有效主讲人：查 existing_index[(spk, date)]，沿用既有三层判据
+         （同单位同 lectureIndex 强信号 / 相似度≥0.25 / 同精确时刻+同单位兜底）。
+      B. rec 无有效主讲人（大会/多轮通知，speaker 留空）：查 no_speaker_index[(college, date)]，
+         覆盖「同单位、无轮次标记、可能无精确时刻」的纯粹大会多轮通知 —— 这类记录不进
+         existing_index，原逻辑完全检测不到。判据更严（无主讲人弱信号）：
+           同单位 + 标题/题目相似度 ≥ 0.6 + 排除「双方都含精确时刻且时刻不同」（不同场次）。
+    返回命中的基底记录引用；无命中返回 None。
     """
     spk = _normalize_speaker(rec.get('speaker') or '')
-    if not _is_valid_speaker_name(spk):
-        return None
     date = (rec.get('lectureStart') or '')[:10]
     if not date or date.startswith('0000'):
         return None
-    rivals = existing_index.get((spk, date), [])
-    u1 = _norm_url(rec.get('sourceUrl'))
-    ti_a = rec.get('topic', '') or rec.get('title', '')
-    for r2 in rivals:
-        if _norm_url(r2.get('sourceUrl')) == u1:
-            continue  # 同 URL 由 seen 处理，不在此判
-        if rec.get('college', '') and rec.get('college') == r2.get('college'):
-            # 同单位系列分期强信号：同主讲、同日、同 lectureIndex 才强制视为重复
-            #（与 cross_source_dedup 一致；同单位同日也可能是两场不同讲座，
-            #  如 bd/66 vs bd/67，lectureIndex 均 None 不会触发，落入下方相似度判定）。
-            li_a = rec.get('lectureIndex')
-            li_b = r2.get('lectureIndex')
-            if li_a is not None and li_a == li_b:
+    # —— 路 A：有有效主讲人 ——
+    if _is_valid_speaker_name(spk):
+        rivals = existing_index.get((spk, date), [])
+        u1 = _norm_url(rec.get('sourceUrl'))
+        ti_a = rec.get('topic', '') or rec.get('title', '')
+        for r2 in rivals:
+            if _norm_url(r2.get('sourceUrl')) == u1:
+                continue  # 同 URL 由 seen 处理，不在此判
+            if rec.get('college', '') and rec.get('college') == r2.get('college'):
+                # 同单位系列分期强信号：同主讲、同日、同 lectureIndex 才强制视为重复
+                #（与 cross_source_dedup 一致；同单位同日也可能是两场不同讲座，
+                #  如 bd/66 vs bd/67，lectureIndex 均 None 不会触发，落入下方相似度判定）。
+                li_a = rec.get('lectureIndex')
+                li_b = r2.get('lectureIndex')
+                if li_a is not None and li_a == li_b:
+                    return r2
+            ti_b = r2.get('topic', '') or r2.get('title', '')
+            sim = max(
+                _topic_similarity(rec.get('topic', ''), r2.get('topic', '')),
+                _topic_similarity(rec.get('title', ''), r2.get('title', '')),
+                _topic_similarity(ti_a, ti_b),
+                _topic_similarity(rec.get('topic', ''), r2.get('title', '')),
+                _topic_similarity(rec.get('title', ''), r2.get('topic', '')),
+            )
+            if sim >= 0.25:
                 return r2
-        ti_b = r2.get('topic', '') or r2.get('title', '')
-        sim = max(
-            _topic_similarity(rec.get('topic', ''), r2.get('topic', '')),
-            _topic_similarity(rec.get('title', ''), r2.get('title', '')),
-            _topic_similarity(ti_a, ti_b),
-            _topic_similarity(rec.get('topic', ''), r2.get('title', '')),
-            _topic_similarity(rec.get('title', ''), r2.get('topic', '')),
-        )
-        if sim >= 0.25:
-            return r2
-        # 兜底层（与 cross_source_dedup 的「兜底层2」保持一致）：
-        # 同讲者(已在组内) + 同日期(已在组内) + 同开始时刻(精确到分) + 同单位 → 重复。
-        # 覆盖两院对同一场讲座用中英文不同标题（相似度≈0）且地点写法不同的场景。
-        # 同样排除占位时刻、要求双方都有单位（防同名不同人）。
-        t16_a = (rec.get('lectureStart') or '')[:16]
-        t16_b = (r2.get('lectureStart') or '')[:16]
-        if (t16_a and t16_a == t16_b
-                and not _is_placeholder_time(rec.get('lectureStart'))
-                and _same_org(rec, r2)):
-            return r2
+            # 兜底层（与 cross_source_dedup 的「兜底层2」保持一致）：
+            # 同讲者(已在组内) + 同日期(已在组内) + 同开始时刻(精确到分) + 同单位 → 重复。
+            # 覆盖两院对同一场讲座用中英文不同标题（相似度≈0）且地点写法不同的场景。
+            # 同样排除占位时刻、要求双方都有单位（防同名不同人）。
+            t16_a = (rec.get('lectureStart') or '')[:16]
+            t16_b = (r2.get('lectureStart') or '')[:16]
+            if (t16_a and t16_a == t16_b
+                    and not _is_placeholder_time(rec.get('lectureStart'))
+                    and _same_org(rec, r2)):
+                return r2
+        return None
+    # —— 路 B：无有效主讲人（大会/多轮通知，speaker 留空）—— 查 no_speaker_index ——
+    if no_speaker_index is not None and rec.get('college'):
+        rivals = no_speaker_index.get((rec.get('college'), date), [])
+        u1 = _norm_url(rec.get('sourceUrl'))
+        for r2 in rivals:
+            if _norm_url(r2.get('sourceUrl')) == u1:
+                continue
+            # 无主讲人弱信号：要求至少一方有实质文本，避免空标题误合
+            if not (rec.get('topic') or rec.get('title')) or not (r2.get('topic') or r2.get('title')):
+                continue
+            sim = max(
+                _topic_similarity(rec.get('topic', ''), r2.get('topic', '')),
+                _topic_similarity(rec.get('title', ''), r2.get('title', '')),
+                _topic_similarity(rec.get('topic', '') or rec.get('title', ''),
+                                  r2.get('topic', '') or r2.get('title', '')),
+            )
+            if sim >= 0.6:
+                # 排除：双方都含精确时刻且时刻不同 -> 同日不同场次，非重复通知
+                t16_a = (rec.get('lectureStart') or '')[:16]
+                t16_b = (r2.get('lectureStart') or '')[:16]
+                if t16_a and t16_b and t16_a != t16_b:
+                    continue
+                return r2
     return None
 
 
@@ -909,7 +935,8 @@ def _merge_record_into(r_new, r_primary):
       - 标记 merged=True, sourceCount=len(sources)+1。
     幂等守卫：若 r_primary['sources'] 已含 r_new 的 sourceUrl，则跳过（每日增量会
     重复抓到 B，避免重复追加 / sourceCount 虚高）。
-    仅用于跨单位命中（同单位由调用方走 skip/多轮，不调用本函数）。
+    同单位/跨单位命中均调用（调用方统一命中即融合）；多轮标记分支在调用前
+    已优先处理（保留最新一轮，不进本函数）。
     """
     new_url = (r_new.get('sourceUrl') or '').rstrip('/')
     sources = r_primary.get('sources') or []
@@ -1041,15 +1068,18 @@ def incremental_merge(existing, new_records):
                 print(f'[MULTI-ROUND] 多轮通知新记录更旧，抑制追加: {new_url}（保留 {old_key}）')
 
     # 基底跨源索引：用于判断 new 是否与已有讲座跨源重复
-    existing_index = {}
+    existing_index = {}          # 有有效主讲人：(spk, date) -> [rec]
+    no_speaker_index = {}        # 无有效主讲人但有单位：(college, date) -> [rec]
+                                 #   覆盖大会/多轮通知（speaker 留空）的增量融合
     for r in existing:
         spk = _normalize_speaker(r.get('speaker') or '')
-        if not _is_valid_speaker_name(spk):
-            continue
         date = (r.get('lectureStart') or '')[:10]
         if not date or date.startswith('0000'):
             continue
-        existing_index.setdefault((spk, date), []).append(r)
+        if _is_valid_speaker_name(spk):
+            existing_index.setdefault((spk, date), []).append(r)
+        elif r.get('college'):
+            no_speaker_index.setdefault((r.get('college'), date), []).append(r)
 
     final_new = []
     skip = 0
@@ -1065,14 +1095,11 @@ def incremental_merge(existing, new_records):
         # 多轮通知更旧轮次：抑制追加（保留较新的旧轮，符合「只保留最新一轮」）
         if key in suppressed_new_keys:
             continue
-        matched = _cross_source_dup_with_existing(r, existing_index)
+        matched = _cross_source_dup_with_existing(r, existing_index, no_speaker_index)
         if matched is not None:
-            if matched.get('college', '') == r.get('college', ''):
-                # 同单位（同学院）：维持现状不跨源融合（用户约定同单位=多轮/同讲座
-                # 重发，不融合）；仅丢弃后发避免重复，保留先入库的基底原样。
-                skip += 1
-                continue
-            # 跨单位命中：把后发的新记录 B 融合进已在库的 A（merge-into-A）
+            # 命中即融合（同单位/跨单位均融合）：merge-into-A 把后发 B 补全进已在库
+            # 的 A，B 进 A.sources 保留溯源链接。信息零丢失，无需纠结留新留旧
+            # （符合用户约定：多轮大会通知应融合而非丢弃任一方）。
             _merge_record_into(r, matched)
             skip += 1
             continue
@@ -1081,7 +1108,7 @@ def incremental_merge(existing, new_records):
     if replaced_new_keys:
         print(f'[MULTI-ROUND] 共替换 {len(replaced_new_keys)} 条旧轮次（保留最新一轮）')
     if skip:
-        print(f'[INCREMENTAL] 跨源重复 {skip} 条（同单位丢弃 / 跨单位融合入基底；基底更新 merged/sources）')
+        print(f'[INCREMENTAL] 跨源重复 {skip} 条（命中即 merge-into-A 融合；基底更新 merged/sources）')
     return list(base_map.values()) + final_new
 
 
