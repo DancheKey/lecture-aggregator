@@ -181,33 +181,72 @@ def fixability(cat, desc, val=''):
 #   nfix    = 源页未提供该字段 / 无法确认（默认归类，保持为空即可）
 # 未在此映射中的缺失项一律视为 nfix。
 MISSING_REVIEW = {
+    # 已按用户确认写回 data/lectures.json，不再列入「需处理」
     ('http://psy.scnu.edu.cn/a/20181024/1598.html', 'speakerAffiliation'):
-        ('fixable', '华南师范大学心理学院',
-         '认知控制研讨会（多嘉宾大会）主办学院；源页正文明确，可补录'),
+        ('nfix', '华南师范大学心理学院',
+         '用户已确认并写回：认知控制研讨会（多嘉宾大会）主办学院'),
     ('http://psy.scnu.edu.cn/a/20161019/1117.html', 'speakerAffiliation'):
-        ('fixable', '华南师范大学心理学院',
-         '第一届认知控制研讨会主办学院；源页正文明确，可补录'),
+        ('nfix', '华南师范大学心理学院',
+         '用户已确认并写回：第一届认知控制研讨会主办学院'),
     ('https://physics.scnu.edu.cn/a/20101118/787.html', 'speakerAffiliation'):
-        ('fixable', '华南师范大学材料物理团队',
-         '有机-无机共混太阳能电池；讲者疑为南师材料物理团队，建议核对全称后补录'),
+        ('nfix', '华南师范大学材料物理团队',
+         '用户已确认并写回：讲者为南师材料物理团队'),
+    ('http://swc.scnu.edu.cn/collaborative/2023/1101/46.html', 'location'):
+        ('nfix', '华南师范大学汕尾校区',
+         '用户已确认并写回'),
+    ('http://io.scnu.edu.cn/a/20201015/1555.html', 'location'):
+        ('nfix', '华南师范大学大学城校区国际会议厅',
+         '用户已确认并写回'),
+    ('http://music.scnu.edu.cn/news/events/2020/0630/673.html', 'location'):
+        ('nfix', '',
+         '用户确认：线上音乐会，无需地点，保持为空'),
+    # 用户确认无法判断，保持为空
     ('https://physics.scnu.edu.cn/a/20211008/11723.html', 'speakerAffiliation'):
-        ('manual', '?',
-         '源页 label 命中「华南师范大学研究生会」，疑为组织方而非讲者单位，需人工确认'),
+        ('nfix', '',
+         '用户确认无法判断，保持为空（疑为组织方而非讲者单位）'),
     ('https://physics.scnu.edu.cn/a/20101124/788.html', 'speakerAffiliation'):
-        ('manual', '?',
-         '源页 label 命中「材料物理团队」，讲者具马普所背景，疑为主办方南师团队，需人工确认'),
+        ('nfix', '',
+         '用户确认无法判断，保持为空（疑为主办方南师团队）'),
 }
 
 
-def missing_kind(it):
-    """缺失项最终裁定：命中 MISSING_REVIEW 用裁定值，否则默认 nfix。
+def missing_kind(it, verify_map=None):
+    """缺失项最终裁定：优先用 verify_missing_fields.py 的逐条复核结果；
+    其次命中 MISSING_REVIEW；否则默认 nfix。
     返回 (kind, advice, value)"""
     r = it[5]
     key = (r.get('sourceUrl') or '', it[1])
+
+    # 1) 动态读取复核结果（ freshest 裁定）
+    if verify_map is None:
+        verify_map = _load_verify_map()
+    v = verify_map.get(key)
+    if v:
+        kind = v.get('fix_kind', 'nfix')
+        advice = v.get('reason') or {
+            'fixable': '源页明确包含该字段，建议按建议值补录',
+            'manual': '源页有线索但真实值需人工确认',
+            'nfix': '源页未提供该字段，保持为空即可'
+        }.get(kind, '需人工判断')
+        value = v.get('evidence') or ''
+        return kind, advice, value
+
+    # 2) fallback 到写死的 MISSING_REVIEW（复核结果文件缺失时仍可工作）
     hit = MISSING_REVIEW.get(key)
     if hit:
         return hit[0], hit[2], hit[1]
     return 'nfix', '源页未提供该字段，保持为空即可', ''
+
+
+def _load_verify_map():
+    """加载 .workbuddy/missing_verify_result.json，返回 {(url,field): record}。"""
+    vp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      '.workbuddy', 'missing_verify_result.json')
+    try:
+        data = json.load(open(vp, encoding='utf-8'))
+        return {(r.get('url'), r.get('field')): r for r in data}
+    except Exception:
+        return {}
 
 
 def scan(recs):
@@ -519,9 +558,10 @@ def build_html(recs, issues, out_path):
         FIELD_CN = {'speaker': '主讲人', 'speakerAffiliation': '主讲人单位',
                     'lectureStart': '讲座开始时间', 'location': '讲座地点'}
         # 给每条缺失项打最终裁定，分「需处理（fixable/manual）」与「源页未提供（nfix）」
+        verify_map = _load_verify_map()
         need_fix, nfix_items = [], []
         for it in missing:
-            k, advice, val = missing_kind(it)
+            k, advice, val = missing_kind(it, verify_map)
             (need_fix if k in ('fixable', 'manual') else nfix_items).append((it, k, advice, val))
         kind_label = {'fixable': '可补录', 'manual': '需人工', 'nfix': '无法修 / 无需修'}
         kind_cls = {'fixable': 'fx-a', 'manual': 'fx-m', 'nfix': 'fx-n'}
