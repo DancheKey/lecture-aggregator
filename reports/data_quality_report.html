@@ -38,37 +38,26 @@
     .adv{color:#666;font-size:12px}
     </style></head><body>
 <h1>讲座数据质量专项扫描报告</h1>
-<div class="sub">数据源 data/lectures.json · 共 2975 条记录 · 生成时间 2026-09-23 15:18</div>
+<div class="sub">数据源 data/lectures.json · 共 2975 条记录 · 生成时间 2026-09-23 15:50</div>
 <div class="cards">
 <div class="card h"><div class="n">0</div><div class="l">高优先级问题</div></div>
 <div class="card m"><div class="n">0</div><div class="l">中优先级问题</div></div>
 <div class="card k"><div class="n">0</div><div class="l">可自动修</div></div>
-<div class="card m"><div class="n">3</div><div class="l">需人工核对</div></div>
+<div class="card m"><div class="n">0</div><div class="l">需人工核对</div></div>
 <div class="card"><div class="n">0</div><div class="l">无法修/无需修</div></div>
-<div class="card"><div class="n">330</div><div class="l">字段缺失项</div></div>
+<div class="card"><div class="n">321</div><div class="l">字段缺失项</div></div>
 </div>
 <div class="note"><b>分级说明</b>：<span class="sev 高">高</span> = 值内容被明显污染（正文残段、职称混入姓名、结束时间跨天等），建议修正；<span class="sev 中">中</span> = 疑似问题或轻度不规范，需人工确认。每行「当前值」即数据库里的原始内容，点「源页」可直接打开原通知核对。</div>
 <div class="note"><b>可修性图例</b>：<span class="fxtag fx-a">可自动修</span> = 规则明确、可批量清洗，误伤风险低；<span class="fxtag fx-m">需人工核对</span> = 能修，但要回源页确认真实值，自动补全有臆造风险；<span class="fxtag fx-n">无法修 / 无需修</span> = 源页本身未提供该信息，或当前值是合规写法（并非错误）。每个类别下先给「问题类型 → 条数 → 修复建议」，再逐条列出当前值与源页链接。</div>
 <div class="bar"><button onclick="selAll(true)">全选</button><button onclick="selAll(false)">全不选</button><button onclick="expSel()">导出选中为 CSV</button><span id="cnt" class="mini"></span></div>
-<h2>时间（3 项，其中高优先级 0）</h2>
-<div class="note">本类构成：<span class="fxtag fx-m">需人工核对 3 条</span></div>
-<h3 class="fx-m">需人工核对（3 条）</h3>
-<table><tr><th style="width:190px">问题类型</th><th style="width:56px">条数</th><th>修复建议</th></tr>
-<tr><td>时长偏长(N.N小时)，可能是全天会议或误抓</td><td><b>3</b></td><td class="adv">可能是全天会议/多日议程，回源页确认</td></tr>
-</table>
-<table><tr><th style="width:34px"></th><th style="width:44px">级别</th><th style="width:150px">问题</th><th class="val">当前值</th><th style="width:120px">学院</th><th style="width:110px">主讲人</th><th style="width:100px">讲座时间</th><th style="width:60px">源页</th></tr>
-<tr data-url="http://psy.scnu.edu.cn/a/20181024/1598.html" data-cat="时间" data-sev="低" data-fix="需人工核对" data-desc="时长偏长(10.0小时)，可能是全天会议或误抓"><td><input type="checkbox" class="chk"></td><td><span class="sev 低">低</span></td><td>时长偏长(10.0小时)，可能是全天会议或误抓<div class="mini">数据 idx 2496</div></td><td class="val">2019-01-05 09:00:00 → 2019-01-05 19:00:00</td><td>心理学院</td><td></td><td>2019-01-05</td><td><a href="http://psy.scnu.edu.cn/a/20181024/1598.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://psy.scnu.edu.cn/a/20191105/1840.html" data-cat="时间" data-sev="低" data-fix="需人工核对" data-desc="时长偏长(13.0小时)，可能是全天会议或误抓"><td><input type="checkbox" class="chk"></td><td><span class="sev 低">低</span></td><td>时长偏长(13.0小时)，可能是全天会议或误抓<div class="mini">数据 idx 2281</div></td><td class="val">2019-12-27 08:30:00 → 2019-12-27 21:30:00</td><td>心理学院</td><td>胡卫平</td><td>2019-12-27</td><td><a href="http://psy.scnu.edu.cn/a/20191105/1840.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://ggy.scnu.edu.cn/a/20201120/5326.html" data-cat="时间" data-sev="低" data-fix="需人工核对" data-desc="时长偏长(9.0小时)，可能是全天会议或误抓"><td><input type="checkbox" class="chk"></td><td><span class="sev 低">低</span></td><td>时长偏长(9.0小时)，可能是全天会议或误抓<div class="mini">数据 idx 2182</div></td><td class="val">2020-11-21 08:30:00 → 2020-11-21 17:30:00</td><td>政治与公共管理学院</td><td></td><td>2020-11-21</td><td><a href="http://ggy.scnu.edu.cn/a/20201120/5326.html" target="_blank">源页 ↗</a></td></tr>
-</table>
-<h2>字段缺失统计（330 项，含人工复核裁定）</h2>
-<div class="note">缺失项没有「当前值」可核对。已对全部缺失项逐条核源页并人工剔除假阳性：<b>需处理的见下方「可补录 / 需人工」清单，共 0 条</b>（建议补录 0、待人工确认 0）；其余 <b>330 条按可信度分两层列出</b>（已扫描确认未提供 / 源页未抓取·无法判定，详见下方折叠区；后者可能含漏抓，需重抓源页确认）。</div>
+<h2>字段缺失统计（321 项，含人工复核裁定）</h2>
+<div class="note">缺失项没有「当前值」可核对。已对全部缺失项逐条核源页并人工剔除假阳性：<b>需处理的见下方「可补录 / 需人工」清单，共 0 条</b>（建议补录 0、待人工确认 0）；其余 <b>321 条按可信度分两层列出</b>（已扫描确认未提供 / 源页未抓取·无法判定，详见下方折叠区；后者可能含漏抓，需重抓源页确认）。</div>
 <table><tr><th>缺失字段</th><th>缺失条数</th><th>占总记录比</th></tr>
 <tr><td>主讲人单位</td><td><b>187</b></td><td>6.3%</td></tr>
-<tr><td>讲座地点</td><td><b>111</b></td><td>3.7%</td></tr>
+<tr><td>讲座地点</td><td><b>102</b></td><td>3.4%</td></tr>
 <tr><td>主讲人</td><td><b>32</b></td><td>1.1%</td></tr>
 </table>
-<details><summary>源页未提供 / 无需补（330 条，默认保持为空，已折叠）</summary>
+<details><summary>源页未提供 / 无需补（321 条，默认保持为空，已折叠）</summary>
 <div class="note">以下缺失项已拿到源页文本并扫描确认：源页本身未提供该字段，无需人工补录；按字段分列，展开可逐条核对源页。</div>
 <details><summary class="fx-n">主讲人单位 缺失 · 已扫描确认未提供（170 条）</summary>
 <table><tr><th style="width:34px"></th><th style="width:120px">学院</th><th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>
@@ -379,7 +368,7 @@
 <tr data-url="http://skc.scnu.edu.cn/a/20150520/146.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>社会科学处</td><td>2015-05-21</td><td><a href="http://skc.scnu.edu.cn/a/20150520/146.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="https://physics.scnu.edu.cn/a/20090331/785.html" data-cat="缺失" data-sev="低" data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空"><td><input type="checkbox" class="chk"></td><td>物理学院</td><td>2009-04-02</td><td><a href="https://physics.scnu.edu.cn/a/20090331/785.html" target="_blank">源页 ↗</a></td></tr>
 </table></details>
-<div class="note" style="background:#fff4e6;border-left:4px solid #ff9f43;">⚠ 以下 <b>30 条源页未成功抓取</b>（站点反爬 / 网络拦截），「源页未提供」是从「未拿到文本」推得的，<b>无法判定是否真缺失，可能含漏抓</b>。需重新抓取源页后才能确认，暂归入此组待复核。</div>
+<div class="note" style="background:#fff4e6;border-left:4px solid #ff9f43;">⚠ 以下 <b>21 条源页未成功抓取</b>（站点反爬 / 网络拦截），「源页未提供」是从「未拿到文本」推得的，<b>无法判定是否真缺失，可能含漏抓</b>。需重新抓取源页后才能确认，暂归入此组待复核。</div>
 <details><summary class="fx-n" style="color:#d97706;">主讲人单位 缺失 · 源页未抓取·无法判定（17 条）</summary>
 <table><tr><th style="width:34px"></th><th style="width:120px">学院</th><th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>
 <tr data-url="http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2024/0913/3553.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>文学院</td><td>2024-09-28</td><td><a href="http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2024/0913/3553.html" target="_blank">源页 ↗</a></td></tr>
@@ -400,19 +389,10 @@
 <tr data-url="http://ctld.scnu.edu.cn/a/20170922/431.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>教师发展中心</td><td>2017-09-28</td><td><a href="http://ctld.scnu.edu.cn/a/20170922/431.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://skc.scnu.edu.cn/a/20150520/146.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>社会科学处</td><td>2015-05-21</td><td><a href="http://skc.scnu.edu.cn/a/20150520/146.html" target="_blank">源页 ↗</a></td></tr>
 </table></details>
-<details><summary class="fx-n" style="color:#d97706;">讲座地点 缺失 · 源页未抓取·无法判定（13 条）</summary>
+<details><summary class="fx-n" style="color:#d97706;">讲座地点 缺失 · 源页未抓取·无法判定（4 条）</summary>
 <table><tr><th style="width:34px"></th><th style="width:120px">学院</th><th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>
-<tr data-url="http://life.scnu.edu.cn/a/20240829/6261.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>生命科学学院</td><td>2024-09-02</td><td><a href="http://life.scnu.edu.cn/a/20240829/6261.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://iqm.scnu.edu.cn/a/20240524/380.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>量子物质研究院</td><td>2024-05-27</td><td><a href="http://iqm.scnu.edu.cn/a/20240524/380.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://maths.scnu.edu.cn/a/20240319/7830.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2024-03-19</td><td><a href="http://maths.scnu.edu.cn/a/20240319/7830.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://maths.scnu.edu.cn/a/20230519/7569.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2023-05-19</td><td><a href="http://maths.scnu.edu.cn/a/20230519/7569.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://maths.scnu.edu.cn/a/20221126/7458.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2022-11-29</td><td><a href="http://maths.scnu.edu.cn/a/20221126/7458.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://maths.scnu.edu.cn/a/20221110/7433.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2022-11-10</td><td><a href="http://maths.scnu.edu.cn/a/20221110/7433.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://maths.scnu.edu.cn/a/20221107/7442.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2022-11-07</td><td><a href="http://maths.scnu.edu.cn/a/20221107/7442.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://maths.scnu.edu.cn/a/20221021/7426.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2022-10-21</td><td><a href="http://maths.scnu.edu.cn/a/20221021/7426.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://maths.scnu.edu.cn/a/20221012/7422.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2022-10-12</td><td><a href="http://maths.scnu.edu.cn/a/20221012/7422.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://swc.scnu.edu.cn/collaborative/2022/0920/29.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>汕尾校区</td><td>2022-09-20</td><td><a href="http://swc.scnu.edu.cn/collaborative/2022/0920/29.html" target="_blank">源页 ↗</a></td></tr>
-<tr data-url="http://maths.scnu.edu.cn/a/20220816/7385.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2022-08-16</td><td><a href="http://maths.scnu.edu.cn/a/20220816/7385.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://swc.scnu.edu.cn/collaborative/2022/0629/22.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>汕尾校区</td><td>2022-06-29</td><td><a href="http://swc.scnu.edu.cn/collaborative/2022/0629/22.html" target="_blank">源页 ↗</a></td></tr>
 <tr data-url="http://maths.scnu.edu.cn/a/20220513/7332.html" data-cat="缺失" data-sev="低" data-fix="待重抓确认" data-desc="源页未抓取，无法判定"><td><input type="checkbox" class="chk"></td><td>数学科学学院</td><td>2022-05-14</td><td><a href="http://maths.scnu.edu.cn/a/20220513/7332.html" target="_blank">源页 ↗</a></td></tr>
 </table></details>

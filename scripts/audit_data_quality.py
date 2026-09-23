@@ -100,6 +100,12 @@ BIO_TITLE_ONLY_RE = re.compile(
     r'Professor|Associate Professor|Assistant Professor|Prof\.?|Dr\.?|Doctor)$',
     re.I)
 
+# 全天/多日会议型标题：时长偏长多为正常议程（研讨会/论坛含签到+多场次），
+# 不再标「时长偏长」人工核对（2026-09-23 用户确认 psy/1598、psy/1840、ggy/5326 为全天会议）
+ALL_DAY_TITLE_RE = re.compile(
+    r'研讨会|论坛|峰会|年会|大会|工作坊|研修班|培训班|夏令营|'
+    r'学术会议|国际会议|交流会|报告会|系列讲座', re.I)
+
 
 def is_journal_name(a):
     """判断是否期刊/出版社误当单位。
@@ -345,9 +351,15 @@ def scan(recs):
                     elif delta_h > 8:
                         # 2026-09-10 降级「中」→「低」：同日 8~24h 基本是全天论坛/工作坊，
                         # 误抓场景（把其他日期当结束）通常 >24h，已由上一档单独报「高」。
-                        issues.append(('时间', 'lectureEnd', '低',
-                                       f'时长偏长({delta_h:.1f}小时)，可能是全天会议或误抓',
-                                       f'{st} → {en}', r))
+                        # 2026-09-23：标题含全天/多日会议型词（研讨会/论坛/大会等）视作正常
+                        # 议程，不再标人工核对（用户确认 psy/1598、psy/1840、ggy/5326 为全天会议）。
+                        _ttl = get(r, 'title') or ''
+                        if ALL_DAY_TITLE_RE.search(_ttl):
+                            pass
+                        else:
+                            issues.append(('时间', 'lectureEnd', '低',
+                                           f'时长偏长({delta_h:.1f}小时)，可能是全天会议或误抓',
+                                           f'{st} → {en}', r))
                 except Exception:
                     pass
 
