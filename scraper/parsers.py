@@ -4127,7 +4127,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 若正文存在「主讲人简介/报告人简介」标签，视为已找到主讲人标识；
     # 这样即使标准带冒号正则未提取到姓名，也不会被 narrative fallback 用前句垃圾覆盖，
     # 后续 F4 可从 speakerBio 中安全提取姓名（如 CTLD 4411）。
-    if re.search(r'(?:主讲人简介|报告人简介|主讲人介绍|报告人介绍|主讲介绍|专家介绍)\s*[：:]', text):
+    if re.search(r'(?:\[?\s*(?:主讲人简介|报告人简介|主讲人介绍|报告人介绍|主讲介绍|专家介绍)\s*\]?\s*[：:]'
+                 r'|\[\s*(?:主讲人简介|报告人简介|主讲人介绍|报告人介绍|主讲介绍|专家介绍)\s*\])', text):
         speaker_label_found = True
     # 注意：排除「主讲人/报告人」后的「简介/简历/介绍」（主讲人简介=个人简介，不是主讲人标签），
     # 否则会把简介正文误当主讲人值。也排除「主讲《…》」（动宾短语，课程名非人名）。
@@ -4750,8 +4751,14 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 英文标签 Bio 必须前后均非字母：否则会误命中摘要正文里的
     # Biological / Biomedical / Biomarkers / Biology / Biolinguistics 等词，
     # 造成「简介起点落在摘要中间 + 开头被削掉 Bio 三字符 + 摘要与简介粘连」。
-    bio_pat = (rf'(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介'
-               rf'|(?<![A-Za-z])Bio(?![A-Za-z]))[\s:：]*')
+    # 中文标签允许「[标签]」包裹形态（2026-09-25 修复）：module/em 等 CMS 用
+    # 「【主讲人简介】」标注，N1 规范化后为「[主讲人简介]」——若只匹配裸标签，
+    # 闭合的 ] 不在 [\s:：]* 内，会残留在 bio 值开头（经管 45 条实测病根）。
+    # ⭐ 标签词无法穷举（如「该校简介」不在词表、裸标签只吃到「简介」二字），
+    # 故把 ] 并入标签后的分隔符字符类（[\s\]:：]*），任何标签形态下都吞掉闭合括号。
+    bio_pat = (rf'(?:\[\s*(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介)\s*\]'
+               rf'|(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介)'
+               rf'|(?<![A-Za-z])Bio(?![A-Za-z]))[\s\]:：]*')
     m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|{BIO_STOP}|$))', body_text)
     if m:
         bio = m.group(1).strip()
@@ -4795,10 +4802,14 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                    '讲座内容提要|讲座内容摘要|内容提要|内容摘要|内容简介|报告简介|'
                    '讲座简介|讲座主题简介|报告内容|讲座概要|内容概要|主要内容|'
                    'Abstract|Synopsis')
+    # 节标题允许「[标签]」包裹形态（2026-09-25 同 bio_pat 修复）：
+    # 源页「【讲座摘要】」N1 后为「[讲座摘要]」，标签词表吃不完时（如「讲座内容简介」外的
+    # 变体）闭合 ] 会残留值首——分隔符统一并入 ]（[\]:：\s]*）。
+    _BRACKETED_SEC = rf'\[\s*(?:{_SEC_LABELS}|摘要)\s*\]'
     abs_pat = (
-        rf'(?:(?:{_SEC_LABELS})(?:[：:]\s*|\s*)'   # (1) 节标题：允许零分隔（修 ctld 空格折叠；内层 (?:…) 包裹全部标签，后缀才对每词生效）
-        rf'|讲座内容(?:[：:]\s*|\s+)'               # (2) 防散文误判
-        rf'|摘要(?:[：:]\s*|\s*))'                  # (3) 保留历史零分隔（整体包一层非捕获组，
+        rf'(?:(?:{_BRACKETED_SEC}|{_SEC_LABELS})(?:[\]:：\s]*)'   # (1) 节标题（含括号包裹）：允许零分隔（修 ctld 空格折叠；内层 (?:…) 包裹全部标签，后缀才对每词生效）
+        rf'|\[?\s*讲座内容\s*\]?(?:[\]:：][\]:：\s]*|\s+)'               # (2) 防散文误判：至少一个显式分隔符（括号/冒号/空白）
+        rf'|\[?\s*摘要\s*\]?(?:[\]:：\s]*))'                  # (3) 保留历史零分隔（整体包一层非捕获组，
                                                     #     使后续 ([\s\S]+?) 对所有分支生效）
     )
     # abstract 值应在下一个字段标签/噪声标记前停止，避免把后续主讲人介绍、时间地点等元信息吞入。
@@ -5053,6 +5064,15 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 放在通用后处理（所有赋值路径之后）统一执行，覆盖 HTML 解析与 OCR 两条路径。
     if result.get('location'):
         result['location'] = _clean_location(result['location'], result.get('title') or result.get('topic'))
+
+    # F-BRACKET: bio/abstract 开头孤立闭括号清理（2026-09-25 出口兜底）。
+    # 标签「【主讲人简介】/【该校简介】：」N1 后为「[主讲人简介]/[该校简介]:」，标签词
+    # 匹配不完备时（如「该校简介」只吃到「简介」二字）闭合 ] 残留值首（经管 45 条实测）。
+    # 提取端已修（bio_pat/abs_pat 分隔符并入 ]）；此处覆盖模型A/VLM/OCR 等不经上述正则的路径。
+    for _bf in ('speakerBio', 'abstract'):
+        _bv = (result.get(_bf) or '').strip()
+        if _bv.startswith(']'):
+            result[_bf] = re.sub(r'^\]\s*[：:]?\s*', '', _bv).strip()
 
     # F-AFF: 单位字段职称守卫（系统级，覆盖所有提取路径）。
     # speakerAffiliation 不应是纯职称（助理研究员/教授/研究员等），也不应残留悬挂括号
