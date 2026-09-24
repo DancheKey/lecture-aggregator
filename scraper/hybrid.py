@@ -549,6 +549,38 @@ def _try_fill_speaker(result, a, trace_text):
     return True
 
 
+def _fill_from_self_extract(result, se, llm_src, title_text, default_year=None,
+                            publish_time=None, title_year=None, url_year=None):
+    """分歧裁决后，用 B 的 self_extract（B 读原文独立抽取的结果）回填规则仍空字段（纯填空）。
+
+    B 的 self_extract 与 A 互补：A 漏抽、或被栅栏拒的字段，B 未必漏。复用 _merge_a_into_result
+    的「仅填空 + 同一套溯源/合法性闸门」，保证回填值的安全性与 A 一致（绝不覆盖已有值）。
+    多嘉宾/议程页（self_extract 主讲人为多人名单）按项目口径整条主讲人留空 + 标 needsHumanReview，
+    禁止机械填入（防 7542 类把 4 位嘉宾名单误填主讲人）；其余字段仍正常回填。
+    返回实际回填的字段名列表。
+    """
+    if not isinstance(se, dict) or not se:
+        return []
+    se_flat = flatten_fields(se)
+    if not se_flat:
+        return []
+    _trace_text = (llm_src or '') + ' ' + (title_text or '')
+    # 多嘉宾守卫：B 自提取的主讲人为多人名单 → 主讲人留空交人工，不机械填入
+    _se_speaker = (se_flat.get('speaker') or '').strip()
+    if _se_speaker and _is_multi_speaker_clean(_se_speaker):
+        se_flat.pop('speaker', None)
+        se_flat.pop('speakerSnippet', None)
+        _hr = set((result.get('needsHumanReview') or '').split('|')) - {''}
+        _hr.add('speaker-multi')
+        result['needsHumanReview'] = '|'.join(sorted(_hr))
+    adopted = _merge_a_into_result(result, se_flat, llm_src, default_year, publish_time,
+                                   title_year, url_year, extra_source=title_text)
+    if adopted:
+        # self_extract 实际回填了字段，等同 LLM 对结果做了增强（与 A 的 only-fill 同语义）
+        result['llmTextEnhanced'] = True
+    return adopted
+
+
 # ---------------------------------------------------------------------------
 # 规则值污染检测（audit_data_quality 核心规则子集，2026-09-09）：
 # 「仅填空」保护的是干净值，不是任何非空值。规则值被判定为形态学污染
@@ -873,4 +905,11 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
             result['llmFilled'] = 'speaker'
             result['speakerSource'] = 'llm'
         result['needsHumanReview'] = '|'.join(diffs)
+    # 分歧裁决后，用 B 的 self_extract 回填规则+A 仍空字段（纯填空，复用同一套
+    # 溯源/合法性闸门，绝不覆盖已有值）。仅 B 提供了 self_extract 才执行；多嘉宾页
+    # 主讲人按项目口径留空交人工（见 _fill_from_self_extract 内守卫，防 7542 误填）。
+    se = verdict.get('self_extract')
+    if isinstance(se, dict) and se:
+        _fill_from_self_extract(result, se, llm_src, title_text,
+                                default_year, publish_time, title_year, url_year)
     return result

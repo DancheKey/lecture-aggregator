@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>经管空 speaker 现抽验证 · B(Agnes)缓存中毒 vs 真弱</title>
+<style>
+  body { font-family: "Microsoft YaHei", sans-serif; background:#f5f6f8; margin:0; padding:24px; color:#1a1a1a; }
+  .wrap { max-width: 980px; margin: 0 auto; background:#fff; padding: 28px 32px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+  h1 { text-align:center; font-size:22px; margin:0 0 6px; }
+  .sub { text-align:center; color:#666; font-size:13px; margin-bottom:20px; }
+  h2 { font-size:16px; border-left:4px solid #2c6fbb; padding-left:10px; margin:24px 0 12px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:8px; }
+  th,td { border:1px solid #d9dde3; padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:#eef3fa; font-weight:bold; }
+  tr:nth-child(even) td { background:#fafbfc; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:bold; }
+  .t-poison { background:#fde2e2; color:#b71c1c; }
+  .t-weak { background:#fff3cd; color:#8a6d00; }
+  .t-other { background:#e2e8f0; color:#334155; }
+  .t-invalid { background:#eceff1; color:#607d8b; }
+  a { color:#2c6fbb; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .note { font-size:12px; color:#777; margin-top:6px; }
+  .concl { background:#f0f7ff; border:1px solid #cfe3ff; border-radius:8px; padding:14px 18px; font-size:14px; line-height:1.7; }
+  ul { line-height:1.8; font-size:13px; }
+  code { background:#f1f3f5; padding:1px 5px; border-radius:3px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>经管空 speaker 现抽验证</h1>
+  <div class="sub">验证 B（Agnes 文本抽取）在经管是否真弱，还是被缓存固化空值（中毒）· 2026-09-24</div>
+
+  <h2>方法</h2>
+  <ul>
+    <li>复用 <code>scraper._decode_html</code> 三级解码（meta charset → UTF-8 → GB18030），确保 re-fetch 的 HTML 与<b>生产完全一致</b>；首次裸 <code>.text</code> 抓取导致乱码、缓存键偏移，已纠偏。</li>
+    <li>monkey-patch <code>hybrid.apply_llm_text_hybrid</code> 捕获生产传入的 <code>llm_text</code>，复刻 <code>_body_text_fixed</code> 算 md5 缓存键，先读缓存判定原始状态。</li>
+    <li>备份缓存 → 删键 → 强制重跑 <code>provider.extract_text</code>（真调 Agnes）→ 恢复生产缓存（已确认 857/139 键无损）。</li>
+  </ul>
+
+  <h2>4 条样本对比</h2>
+  <table>
+    <tr><th>URL</th><th>库内<br>verdict</th><th>页面特征（body_text）</th><th>缓存原始状态</th><th>清缓存重跑<br>A(speaker)</th><th>判定</th></tr>
+    <tr>
+      <td><a href="http://em.scnu.edu.cn/a/20191206/7542.html" target="_blank">em/7542</a></td>
+      <td>unknown</td>
+      <td>年会/议程页（651字，无单主讲人，多嘉宾议程）</td>
+      <td>正常结果 speaker=None</td>
+      <td>仍 None</td>
+      <td><span class="tag t-other">议程页+A弱+融合层<br>unknown丢弃C的4人</span></td>
+    </tr>
+    <tr>
+      <td><a href="http://em.scnu.edu.cn/a/20200108/7635.html" target="_blank">em/7635</a></td>
+      <td>consistent</td>
+      <td>新年论坛·图书情报分论坛（460字）</td>
+      <td>正常结果 speaker=None</td>
+      <td><b>奉国和</b></td>
+      <td><span class="tag t-poison">缓存固化空值<br>（中毒广义）</span></td>
+    </tr>
+    <tr>
+      <td><a href="http://em.scnu.edu.cn/a/20190112/6769.html" target="_blank">em/6769</a></td>
+      <td>consistent</td>
+      <td>新年论坛·经管分论坛（1215字，含主讲关键词）</td>
+      <td>正常结果 speaker=None</td>
+      <td>仍 None</td>
+      <td><span class="tag t-weak">A 真弱</span></td>
+    </tr>
+    <tr>
+      <td><a href="http://em.scnu.edu.cn/a/20191206/7540.html" target="_blank">em/7540</a></td>
+      <td>None</td>
+      <td>论坛第二期极短通知（155字，被过滤提前 return）</td>
+      <td>未触发 hybrid</td>
+      <td>无法复现</td>
+      <td><span class="tag t-invalid">样本失效<br>（生产时亦未成功跑LLM）</span></td>
+    </tr>
+  </table>
+  <div class="note">注：7542 的 <code>llmSelfExtract</code>（来自裁决模型 C/Zhipu）此前已抽到 4 位嘉宾（顾乃华、赵细康、杨爱平、岳芳敏），但 <code>verdict=unknown</code> 被融合层丢弃；Agnes 在该议程页也抽不到单主讲人。</div>
+
+  <h2>核心结论</h2>
+  <div class="concl">
+    经管空 speaker <b>不全是 B（Agnes）真弱</b>，呈现三类问题：
+    <ul>
+      <li><b>① 正常缓存固化空值（最隐蔽，即用户担心的"中毒"）</b>：7635 生产时 A 抽到有用字段但 speaker 恰为空，被写成<b>永久缓存</b>（正常结果无 TTL，vocabVersion 不变即永久命中），导致即使现在 Agnes 能抽对"奉国和"也永不刷新。这是比硬负缓存更危险的固化——因为缓存被判定为"有用结果"，系统从不重新调用模型。</li>
+      <li><b>② A 真弱</b>：6769 清缓存后 Agnes 仍抽不到主讲人（分论坛/论坛页，主讲人深藏），属真实抽取能力不足。</li>
+      <li><b>③ 议程页 + 融合层丢弃</b>：7542 是年会议程（多嘉宾无单主讲人），A 抽不到，而 C 抽到的 4 人被 <code>verdict=unknown</code> 保守丢弃。</li>
+    </ul>
+  </div>
+
+  <h2>后续建议（待用户拍板，非本次执行）</h2>
+  <ul>
+    <li><b>回填 7635</b>：清其缓存键后重抽已得"奉国和"，建议回填并同步 site 分片（需人工确认该值在页面确有出处）。</li>
+    <li><b>排查"正常缓存固化空值"机制</b>：正常结果缓存无 TTL，单字段为空会被永久固化。建议给"部分字段为空的正常结果"加短 TTL 或字段级刷新，避免模型能力升级后旧空值锁死。</li>
+    <li><b>6769 真弱</b>：需单独分析页面结构，看规则能否补或是否属议程类。</li>
+    <li><b>7542 融合层</b>：议程页多嘉宾场景，C 抽到却 unknown 丢弃——属融合策略"保守偏向规则"过度，待融合策略改写阶段处理。</li>
+  </ul>
+</div>
+</body>
+</html>

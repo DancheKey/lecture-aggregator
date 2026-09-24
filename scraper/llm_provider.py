@@ -130,6 +130,44 @@ _VERDICT_FIELD_SEMANTICS = (
     "最终采纳以 verdict / fields 为准。"
 )
 
+# 裁决模型 B 的系统提示词（客观化版本，2026-09-24）：取代此前"若规则更准确或无法判断，
+# verdict=rule 或 unknown（fields 留空）"的保守偏向指令。核心改动：
+# - 明确 B 的职责是"判断哪方更忠实于原文"，不是保住规则也不是偏向大模型；
+# - 给出"何时判 llm"的正向客观标准（LLM 值有原文证据且规则空/错 → 判 llm）；
+# - unknown 限定为"原文信息不足、无法判断"的少数情况，禁止默认 unknown；
+# - 强制 self_extract 与 fields 一致：verdict=llm 时 fields 字段值须与 self_extract 对应字段相同，
+#   激活现成的 force_fields 通道——B 判 llm 的字段才被采纳，且仍过溯源/合法性闸门。
+# Agnes 与 Zhipu 两路裁决共用此常量，避免逐字重复与漂移。
+JUDGE_SYSTEM = (
+    "你是严格的讲座信息裁决员。工作分三步，全部只依据给定原文，禁止编造。\n"
+    "第一步【独立提取】：从原文独立提取讲座结构化信息，字段："
+    "speaker(主讲人姓名)、speakerTitle(职称)、affiliation(单位)、"
+    "lectureStart(讲座开始日期时间)、lectureEnd(讲座结束时间)、"
+    "location(地点)、topic(讲座题目)、title(通知标题)。"
+    "原文没有的字段填 null。"
+    "侧边栏「资讯及通知/通知公告/相关链接」列表里的其他讲座或新闻条目"
+    "不是本场讲座内容，严禁把其中的标题、日期、主讲人当作本场字段值。\n"
+    "第二步【对比】：把你的独立提取结果与『规则解析结果』『大模型解析结果』"
+    "逐字段对比，判断哪一方更准确，或是否都无法确定。"
+    "判定必须基于原文证据，而不是\"哪边信息更多\"或\"默认保住规则\"。\n"
+    "第三步【裁决】：输出严格 JSON：\n"
+    '{"self_extract":{第一步提取的字段},"verdict":"rule"|"llm"|"unknown",'
+    '"reason":"简述依据（须引用原文证据）","fields":{采纳方的字段}}\n'
+    "【裁决准则（客观、不偏袒任何一方）】\n"
+    "- 你的职责是判断\"哪一方的值更忠实于原文\"，不是\"保住规则\"也不是\"偏向大模型\"。\n"
+    "- 当大模型（LLM）抽取的值在原文中有明确证据（其 snippet 确为原文原句），而规则值为空或"
+    "明显与原文不符时，应判 verdict=llm，并把该字段放入 fields。\n"
+    "- 当规则值有原文证据、大模型值为空或错误时，判 verdict=rule。\n"
+    "- 当双方值都非空但都合理（如单位写法差异、标题/题目差异），按下方字段语义取\"更短更纯\"的"
+    "一方；verdict 可为 llm 或 rule，但 fields 只放你判定更准确的字段。\n"
+    "- unknown 是少数情况：仅当原文本身信息不足、无法判断哪方更准确时才使用，不要默认 unknown。"
+    "\n【self_extract 与 fields 的一致性】\n"
+    "- self_extract 是你从原文独立提取的结果，必须与你最终采纳的 fields 保持一致："
+    "若 verdict=llm，fields 中的字段值应与 self_extract 对应字段相同（不得自相矛盾）；"
+    "fields 只放你判定\"大模型更准确\"的那些字段，其余字段不要放入 fields。\n"
+    "- 若 verdict=rule，fields 放规则方更准确的字段（同样只放更准确的字段）。\n"
+    + _VERDICT_FIELD_SEMANTICS)
+
 
 def _parse_model_json(text):
     if not text:
@@ -331,6 +369,21 @@ def _throttle(channel='agnes', rpm=None):
 NEG_SOFT_TTL = int(_get_env('NEG_SOFT_TTL') or 86400)    # 软负默认 1 天
 NEG_HARD_TTL = int(_get_env('NEG_HARD_TTL') or 2592000)  # 硬负默认 30 天（误标自愈，避免永久漏抓）
 
+# 残缺结果短 TTL：文本抽取命中"有用但缺主讲人"的结果时，不再永久固化
+# （此前 speaker 空被永久锁死，模型升级/纠错后无法刷新，如 em/7635）。
+# 设短 TTL：过期后自动重抽，让模型能力升级（或提示词改进）能刷新旧空值。
+PARTIAL_TTL = int(_get_env('PARTIAL_TTL') or 604800)  # 默认 7 天
+
+
+def _speaker_present(f):
+    """判断抽取结果是否含有效主讲人（用于残缺结果识别）。"""
+    if not isinstance(f, dict):
+        return False
+    v = f.get('speaker')
+    if isinstance(v, dict):
+        v = v.get('value')
+    return bool(v) and str(v).strip() not in ('', 'null', 'None')
+
 
 def _neg_marker(hard, reason):
     return {"__neg__": True, "ts": time.time(), "hard": bool(hard), "reason": reason}
@@ -377,7 +430,7 @@ class AgnesProvider(ModelProvider):
         self.api_key = api_key or _get_env('AGNES_API_KEY')
         self.base_url = (base_url or _get_env('AGNES_BASE_URL')
                          or 'https://api.agnes-ai.cn/v1/chat/completions')
-        self.model = (model or _get_env('AGNES_MODEL') or 'agnes-2.5-flash')
+        self.model = (model or _get_env('AGNES_MODEL') or 'agnes-3.0-flash')
 
     # --- 内部：带重试的 chat 调用 ---
     def _post(self, messages, temperature):
@@ -415,7 +468,9 @@ class AgnesProvider(ModelProvider):
     def extract_text(self, body_text, *, temperature=0.0):
         if not self.api_key or not body_text or len(body_text) < 30:
             return None
-        key = 'text:' + hashlib.md5(body_text.encode('utf-8')).hexdigest()
+        # 缓存键纳入 provider+模型名：换模型（如 agnes-2.5→3.0）自动全量失效重抽，
+        # 不用手动清缓存（此前键不含模型名，模型升级后旧结果仍被命中、锁死）。
+        key = 'text:agnes:' + self.model + ':' + hashlib.md5(body_text.encode('utf-8')).hexdigest()
         cached = _cache_get(key)
         if _is_neg(cached):
             if not _neg_expired(cached):
@@ -424,7 +479,11 @@ class AgnesProvider(ModelProvider):
         elif (cached is not None
               and cached.get('_vocabVersion') == _fv.VOCAB_VERSION
               and _fields_useful(cached)):
-            return cached
+            exp = cached.get('_expires')
+            if exp and time.time() > exp:
+                pass  # 残缺结果（缺主讲人）已过期：当作未命中，重抽以刷新（见 PARTIAL_TTL）
+            else:
+                return cached
         # 词表版本不匹配的旧缓存视为未命中——词表修复后自动重提，脏值不再固化
         txt = body_text[:6000]
         messages = [
@@ -445,6 +504,9 @@ class AgnesProvider(ModelProvider):
         if fields and _fields_useful(fields):
             fields['abstract'] = _truncate_abstract(fields.get('abstract'))
             fields['_vocabVersion'] = _fv.VOCAB_VERSION
+            # 残缺结果（缺主讲人）设短 TTL：模型升级/纠错后过期自动重抽，避免永久锁死
+            if not _speaker_present(fields):
+                fields['_expires'] = time.time() + PARTIAL_TTL
             _cache_set(key, fields)
         else:
             _cache_set(key, _neg_marker(hard=got_empty,
@@ -457,28 +519,18 @@ class AgnesProvider(ModelProvider):
         txt = (body_text or '')[:6000]
         rule_s = json.dumps(rule_fields or {}, ensure_ascii=False)
         llm_s = json.dumps(llm_fields or {}, ensure_ascii=False)
-        # 方案A三步裁决（2026-09-05）：①独立提取结构字段 -> ②与双方对比 -> ③裁决。
-        # self_extract 仅作裁决依据与日志留痕，采纳逻辑不变（verdict=llm 才采用 A 的 fields）。
-        system = ("你是严格的讲座信息裁决员。工作分三步，全部只依据给定原文，禁止编造。\n"
-                  "第一步【独立提取】：从原文独立提取讲座结构化信息，字段："
-                  "speaker(主讲人姓名)、speakerTitle(职称)、affiliation(单位)、"
-                  "lectureStart(讲座开始日期时间)、lectureEnd(讲座结束时间)、"
-                  "location(地点)、topic(讲座题目)、title(通知标题)。"
-                  "原文没有的字段填 null。"
-                  "侧边栏「资讯及通知/通知公告/相关链接」列表里的其他讲座或新闻条目"
-                  "不是本场讲座内容，严禁把其中的标题、日期、主讲人当作本场字段值。\n"
-                  "第二步【对比】：把你的独立提取结果与『规则解析结果』『大模型解析结果』"
-                  "逐字段对比，判断哪一方更准确，或是否都无法确定。\n"
-                  "第三步【裁决】：输出严格 JSON：\n"
-                  '{"self_extract":{第一步提取的字段},"verdict":"rule"|"llm"|"unknown",'
-                  '"reason":"简述依据","fields":{采纳方的字段}}'
-                  + _VERDICT_FIELD_SEMANTICS)
+        # 客观化裁决提示词（JUDGE_SYSTEM，2026-09-24）：去掉"保守偏向规则/默认 unknown"硬指令，
+        # 给出"LLM 值有原文证据且优于规则→判 llm"的正向标准，并强制 self_extract 与 fields 一致
+        # （激活 force_fields 通道：B 判 llm 的字段才被采纳，且仍过溯源/合法性闸门）。
+        system = JUDGE_SYSTEM
         user = ("原文：\n" + txt +
                 "\n\n规则解析结果：\n" + rule_s +
                 "\n\n大模型解析结果：\n" + llm_s +
-                "\n\n请按三步裁决：先独立提取（self_extract），再与双方逐字段对比，最后裁决。"
-                "若大模型明显更准确且原文支持，verdict=llm 并把采纳字段放入 fields；"
-                "若规则更准确或无法判断，verdict=rule 或 unknown（fields 留空）。")
+                "\n\n请按三步裁决：①先独立提取（self_extract，严格基于原文）；②与双方逐字段对比；"
+                "③裁决。裁决必须客观基于原文证据：当大模型某字段有明确原文证据且优于规则"
+                "（或规则为空）时，应判 verdict=llm 并把该字段放入 fields；仅当原文无法确定"
+                "哪方更准确时才 unknown。不要默认偏袒规则，也不要默认 unknown。"
+                "输出严格 JSON（以 { 开头、} 结尾，不要 markdown 代码块）。")
         raw = self._post([{"role": "system", "content": system},
                           {"role": "user", "content": user}], temperature)
         parsed = _parse_verdict_json(raw) if raw else None
@@ -539,7 +591,8 @@ class ZhipuProvider(ModelProvider):
         """文本提取（备用）；默认不走此路径，但保留接口一致性。"""
         if not self.api_key or not body_text or len(body_text) < 30:
             return None
-        key = 'text:zhipu:' + hashlib.md5(body_text.encode('utf-8')).hexdigest()
+        # 缓存键纳入 provider+模型名：换模型自动全量失效重抽（同 Agnes 文本通道）。
+        key = 'text:zhipu:' + self.model + ':' + hashlib.md5(body_text.encode('utf-8')).hexdigest()
         cached = _cache_get(key)
         if _is_neg(cached):
             if not _neg_expired(cached):
@@ -548,7 +601,11 @@ class ZhipuProvider(ModelProvider):
         elif (cached is not None
               and cached.get('_vocabVersion') == _fv.VOCAB_VERSION
               and _fields_useful(cached)):
-            return cached
+            exp = cached.get('_expires')
+            if exp and time.time() > exp:
+                pass  # 残缺结果（缺主讲人）已过期：当作未命中，重抽以刷新
+            else:
+                return cached
         txt = body_text[:6000]
         messages = [
             {"role": "system", "content": EXTRACTION_ONLY_SYSTEM},
@@ -560,6 +617,9 @@ class ZhipuProvider(ModelProvider):
         if fields and _fields_useful(fields):
             fields['abstract'] = _truncate_abstract(fields.get('abstract'))
             fields['_vocabVersion'] = _fv.VOCAB_VERSION
+            # 残缺结果（缺主讲人）设短 TTL：模型升级/纠错后过期自动重抽，避免永久锁死
+            if not _speaker_present(fields):
+                fields['_expires'] = time.time() + PARTIAL_TTL
             _cache_set(key, fields)
         else:
             _cache_set(key, _neg_marker(hard=got_empty,
@@ -573,28 +633,18 @@ class ZhipuProvider(ModelProvider):
         txt = (body_text or '')[:6000]
         rule_s = json.dumps(rule_fields or {}, ensure_ascii=False)
         llm_s = json.dumps(llm_fields or {}, ensure_ascii=False)
-        # 方案A三步裁决（2026-09-05）：①独立提取结构字段 -> ②与双方对比 -> ③裁决。
-        # self_extract 仅作裁决依据与日志留痕，采纳逻辑不变（verdict=llm 才采用 A 的 fields）。
-        system = ("你是严格的讲座信息裁决员。工作分三步，全部只依据给定原文，禁止编造。\n"
-                  "第一步【独立提取】：从原文独立提取讲座结构化信息，字段："
-                  "speaker(主讲人姓名)、speakerTitle(职称)、affiliation(单位)、"
-                  "lectureStart(讲座开始日期时间)、lectureEnd(讲座结束时间)、"
-                  "location(地点)、topic(讲座题目)、title(通知标题)。"
-                  "原文没有的字段填 null。"
-                  "侧边栏「资讯及通知/通知公告/相关链接」列表里的其他讲座或新闻条目"
-                  "不是本场讲座内容，严禁把其中的标题、日期、主讲人当作本场字段值。\n"
-                  "第二步【对比】：把你的独立提取结果与『规则解析结果』『大模型解析结果』"
-                  "逐字段对比，判断哪一方更准确，或是否都无法确定。\n"
-                  "第三步【裁决】：输出严格 JSON：\n"
-                  '{"self_extract":{第一步提取的字段},"verdict":"rule"|"llm"|"unknown",'
-                  '"reason":"简述依据","fields":{采纳方的字段}}'
-                  + _VERDICT_FIELD_SEMANTICS)
+        # 客观化裁决提示词（JUDGE_SYSTEM，2026-09-24）：去掉"保守偏向规则/默认 unknown"硬指令，
+        # 给出"LLM 值有原文证据且优于规则→判 llm"的正向标准，并强制 self_extract 与 fields 一致
+        # （激活 force_fields 通道：B 判 llm 的字段才被采纳，且仍过溯源/合法性闸门）。
+        system = JUDGE_SYSTEM
         user = ("原文：\n" + txt +
                 "\n\n规则解析结果：\n" + rule_s +
                 "\n\n大模型解析结果：\n" + llm_s +
-                "\n\n请按三步裁决：先独立提取（self_extract），再与双方逐字段对比，最后裁决。"
-                "若大模型明显更准确且原文支持，verdict=llm 并把采纳字段放入 fields；"
-                "若规则更准确或无法判断，verdict=rule 或 unknown（fields 留空）。")
+                "\n\n请按三步裁决：①先独立提取（self_extract，严格基于原文）；②与双方逐字段对比；"
+                "③裁决。裁决必须客观基于原文证据：当大模型某字段有明确原文证据且优于规则"
+                "（或规则为空）时，应判 verdict=llm 并把该字段放入 fields；仅当原文无法确定"
+                "哪方更准确时才 unknown。不要默认偏袒规则，也不要默认 unknown。"
+                "输出严格 JSON（以 { 开头、} 结尾，不要 markdown 代码块）。")
         raw = self._post([{"role": "system", "content": system},
                           {"role": "user", "content": user}], temperature)
         parsed = _parse_verdict_json(raw) if raw else None

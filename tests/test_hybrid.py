@@ -389,5 +389,70 @@ class TestInferAffiliation(unittest.TestCase):
         self.assertEqual(_infer_affiliation('李博士是新加坡南洋理工大学教授'), '')
 
 
+class TestSelfExtractFill(unittest.TestCase):
+    """Step3（2026-09-24）：分歧裁决后，用 B 的 self_extract 回填规则+A 仍空字段。
+
+    纯填空、复用与 A 同一套溯源/合法性闸门，绝不覆盖已有值；多嘉宾页主讲人按
+    项目口径整条留空交人工（防 7542 类把多人名单误填主讲人）。无 self_extract
+    的既有用例不受影响（se 为空则不进入回填分支）。
+    """
+
+    def _rule(self):
+        return {'speaker': '温永立', 'topic': '规则题目',
+                'location': '理6栋302', 'speakerAffiliation': ''}
+
+    def _divergent_provider(self):
+        # A 与规则在 topic 上分歧，但 A 没提供 affiliation（制造"仍空字段"）
+        return MockProvider(text_result={
+            'topic': {'value': '深度学习前沿', 'snippet': '题目：深度学习前沿'},
+        })
+
+    def test_self_extract_fills_empty_field(self):
+        """B 独立抽取到规则+A 都漏的单位 -> 经值级溯源闸门后纯填空采纳。"""
+        rule = self._rule()
+        judge = MockProvider(verdict={
+            'verdict': 'rule', 'fields': {},
+            'self_extract': {
+                'speakerAffiliation': {
+                    'value': '清华大学计算机系',
+                    'snippet': '（清华大学计算机系）'},
+            },
+        })
+        apply_llm_text_hybrid(rule, BODY, None, self._divergent_provider(), judge)
+        self.assertEqual(rule['speakerAffiliation'], '清华大学计算机系')
+        self.assertTrue(rule.get('llmTextEnhanced'))
+        self.assertIn('speakerAffiliation', rule.get('llmAdopted', ''))
+        # 留痕：self_extract 仍原样保留供人工抽检
+        self.assertEqual(rule.get('llmSelfExtract', {}).get('speakerAffiliation'),
+                         {'value': '清华大学计算机系', 'snippet': '（清华大学计算机系）'})
+
+    def test_self_extract_unfillable_not_adopted(self):
+        """B 自提取的单位原文里不存在 -> 值级溯源拒绝，仍留空（不污染）。"""
+        rule = self._rule()
+        judge = MockProvider(verdict={
+            'verdict': 'rule', 'fields': {},
+            'self_extract': {
+                'speakerAffiliation': {'value': '北京大学', 'snippet': '（北京大学）'},
+            },
+        })
+        apply_llm_text_hybrid(rule, BODY, None, self._divergent_provider(), judge)
+        self.assertEqual(rule['speakerAffiliation'], '')  # 未采纳
+        self.assertIn('speakerAffiliation', rule.get('llmRejected', ''))
+
+    def test_self_extract_multi_speaker_guard(self):
+        """B 自提取主讲人为多人名单 -> 主讲人留空交人工，标 speaker-multi。"""
+        rule = {'speaker': '', 'topic': '规则题目', 'location': '理6栋302'}
+        judge = MockProvider(verdict={
+            'verdict': 'rule', 'fields': {},
+            'self_extract': {
+                'speaker': {'value': '张三、李四、王五、赵六',
+                            'snippet': '主讲人：张三、李四、王五、赵六'},
+            },
+        })
+        apply_llm_text_hybrid(rule, BODY, None, self._divergent_provider(), judge)
+        self.assertEqual(rule['speaker'], '')  # 多嘉宾不机械填入
+        self.assertIn('speaker-multi', rule.get('needsHumanReview', ''))
+
+
 if __name__ == '__main__':
     unittest.main()
