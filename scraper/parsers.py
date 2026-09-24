@@ -723,6 +723,39 @@ def _strip_location_label_tail(loc):
     return loc
 
 
+# ---- 地点开头冗余「学院/学部/书院/系」单位名剥离（2026-09-24 用户裁定）----
+# 仅在「可选校区前缀 + 学院名 + 栋号」结构下剥除：已有「文2栋/理3栋」等楼栋标识时，
+# 学院单位名冗余（例：经管学院文二栋301会议室 → 文二栋301会议室）。
+# 反之以下两类一律保留，剥除会丢信息：
+#   ① 学院名后只跟房间号/楼层：心理学院301会议室、生命科学学院102会议室
+#   ② 学院名本就是楼名一部分：网络教育学院楼206、心理学院大楼301会议室
+# 幂等：剥后不再命中。
+_CAMPUS_PREFIX_LOC = (
+    r'(?:大学城校园|大学城校区|大学城|石牌校园|石牌校区|石牌|'
+    r'汕尾校区|汕尾|佛山校区|佛山|南海校区|广州校区)?'
+)
+# 注：学院名前半段用 {1,14}? 而非 {2,15}?——3 字学院名（法学院/文学院/商学院）
+# 若下限为 2 则永远匹配不上，引擎会回溯把左侧校区前缀（"校区"）并进学院名一起剥掉，
+# 导致「大学城校区法学院」被误剥成「大学城」。
+_COLLEGE_LOC_RE = re.compile(
+    r'^' + _CAMPUS_PREFIX_LOC + r'([\u4e00-\u9fff]{1,14}?(?:学院|学部|书院|系))'
+    r'(?=[\u4e00-\u9fff]{1,6}[一二三四五六七八九十百\d]{1,3}栋)'
+)
+
+
+def _strip_college_name(loc):
+    """剥地点开头冗余的学院/学部/书院/系名；仅在后面已有栋号时剥，其余原样返回。"""
+    if not isinstance(loc, str) or not loc:
+        return loc
+    m = _COLLEGE_LOC_RE.match(loc)
+    if not m:
+        return loc
+    rest = loc[m.end():].lstrip('　 ')
+    if len(rest) < 4:
+        return loc
+    return loc[:m.start(1)] + rest
+
+
 def _clean_location(loc, title=None):
     if not loc:
         return ''
@@ -749,6 +782,9 @@ def _clean_location(loc, title=None):
             if len(_rest) >= 4:
                 loc = _rest
             break
+    # 剥开头冗余学院/学部/书院/系名（2026-09-24 用户裁定：已有栋号时学院单位名冗余）。
+    # 必须在校名剥离之后调用（学院名正则不含校名前缀）；不满足栋号条件时原样返回。
+    loc = _strip_college_name(loc)
     # 截断常见后缀噪声（会议号/密码/议程/报名/内容泄漏等紧跟地点之后）
     m = _LOCATION_TERM.search(loc)
     if m:
