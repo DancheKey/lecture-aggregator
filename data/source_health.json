@@ -110,9 +110,18 @@
       "suspectCount": 0,
       "unconfiguredCount": 2,
       "failedKeys": []
+    },
+    {
+      "date": "2026-09-25",
+      "checkedAt": "2026-09-25T04:33:35+08:00",
+      "totalUrls": 60,
+      "failCount": 0,
+      "suspectCount": 0,
+      "unconfiguredCount": 1,
+      "failedKeys": []
     }
   ],
-  "lastCheckedAt": "2026-09-24T14:40:59+08:00",
+  "lastCheckedAt": "2026-09-25T04:33:35+08:00",
   "lastResults": [
     {
       "source": "教育科学学院",
@@ -264,9 +273,9 @@
     {
       "source": "经济与管理学院",
       "campus": "大学城",
-      "url": "",
-      "status": "empty",
-      "detail": "未配置栏目 URL（list_urls 为空）"
+      "url": "http://em.scnu.edu.cn/xueshuhuodong/",
+      "status": "ok",
+      "detail": "HTTP 200"
     },
     {
       "source": "法学院",
