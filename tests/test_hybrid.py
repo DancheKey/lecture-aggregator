@@ -518,10 +518,23 @@ class TestFieldAdoptionGuards(unittest.TestCase):
         r = {'speakerAffiliation': '厦门大学'}
         a = {'speakerAffiliation': '厦门大学经济学院',
              'speakerAffiliationSnippet': '（厦门大学经济学院）'}
-        _merge_a_into_result(r, a, '厦门大学经济学院',
+        # body_text 不含「厦门大学经济学院」→ 子单元为 A 幻觉/过度细化 → 守卫拦截，保留规则
+        _merge_a_into_result(r, a, '厦门大学举办讲座',
                              force_fields={'speakerAffiliation'})
         self.assertEqual(r['speakerAffiliation'], '厦门大学')
         self.assertIn('speakerAffiliation', r.get('llmRejected', ''))
+
+    def test_merge_aff_over_refine_source_backed_allowed(self):
+        """② 放宽：追加的子单元整段出现在源页原文 → 属合法补全，守卫放行（采纳 A）。"""
+        r = {'speakerAffiliation': '中国科学院'}
+        a = {'speakerAffiliation': '中国科学院精密测量科学与技术创新研究院',
+             'speakerAffiliationSnippet': '中国科学院精密测量科学与技术创新研究院'}
+        _merge_a_into_result(
+            r, a, '特邀嘉宾来自中国科学院精密测量科学与技术创新研究院，长期从事…',
+            force_fields={'speakerAffiliation'})
+        self.assertEqual(
+            r['speakerAffiliation'], '中国科学院精密测量科学与技术创新研究院')
+        self.assertNotIn('speakerAffiliation', r.get('llmRejected', ''))
 
     def test_merge_topic_cn_to_en_rejected(self):
         r = {'topic': '（经济与工商管理分论坛）2020年华南师范大学经济与管理学院新年论坛'}

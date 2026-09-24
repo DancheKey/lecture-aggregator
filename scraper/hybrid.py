@@ -669,15 +669,17 @@ _AFFIL_SUBUNIT_RE = re.compile(
     r'学部|学校|分院|校区|研究所)')
 
 
-def _a_over_refines_affiliation(rule_val, a_val):
+def _a_over_refines_affiliation(rule_val, a_val, body_text=None):
     """A 的单位是对规则**合法机构**的过度细化（在机构名后追加院系/研究中心等子单元）
     -> 拒绝采纳（保留规则值）。
 
     裁决实证：厦门大学→厦门大学经济学院、复旦大学→复旦大学中国社会主义市场经济
     研究中心、新加坡南洋理工大学→经济系 等一律判错；规则本身不合法（脏值/误赋）
     或 A 是纠错/不同机构时不受影响（放行其它守卫）。
-    注：哈工大(深圳)经济管理学院 这类带校区限定且源页确有的"补全"会被一并拦下，
-    但那是安全默认（规则值已是合法机构，留待人工在 needsHumanReview 升级）。
+    放宽（2026-09-24 用户裁定）：仅当追加的子单元**不在源页原文**时才拦截——
+    源页实有的完整机构名（如「中国科学院精密测量科学与技术创新研究院」、
+    「香港教育大学文化与创意艺术学系」）属合法补全，应放行，否则线上新页会被误伤。
+    body_text 为空（如单测）时退化为旧行为（仅按子单元判定）。
     """
     if not rule_val or not a_val:
         return False
@@ -691,7 +693,25 @@ def _a_over_refines_affiliation(rule_val, a_val):
     tail_core = re.sub(r'[\s，,、。.（）()]', '', tail)
     if not tail_core:
         return False
+    # 放宽（2026-09-24）：追加的子单元若整段出现在源页原文 → 属合法补全，放行。
+    # 例如源页写「中国科学院精密测量科学与技术创新研究院」，A 整名照搬，不应被剥。
+    if body_text:
+        _a_norm = re.sub(r'[\s，,、。.（）()]', '', a)
+        if _a_norm and _a_norm in re.sub(r'[\s，,、。.（）()]', '', body_text):
+            return False
     return bool(_AFFIL_SUBUNIT_RE.search(tail_core))
+
+
+_TOPIC_SERIES_RE = re.compile(r'第\s*\d+\s*[期讲场]')
+
+
+def _topic_is_fallback(rule_topic):
+    """规则值是「系列名/活动预告」兜底（如「华师经管学术讲座第N期」「学者讲坛第7-9讲」），
+    而非真实中文题目 -> 此时 A 给出的英文/真实题应放行，不应被「中文题→英文题」误伤回退。
+    2026-09-24 加固：仅按「第N期/讲/场」系列标签判定，避免误伤 7636 这类含「论坛」字样的
+    真实中文题（「…新年论坛」不含系列编号，仍受守卫保护）。
+    """
+    return bool(_TOPIC_SERIES_RE.search(rule_topic or ''))
 
 
 def _a_replaces_cn_title_with_en(rule_val, a_val):
@@ -700,8 +720,13 @@ def _a_replaces_cn_title_with_en(rule_val, a_val):
     裁决实证（7636）：规则『（经济与工商管理分论坛）2020年…新年论坛』是合法中文
     题，A 换成英文论文题 Time-consistent strategies… 判错。反之 A 把英文括号/长尾
     去掉、提炼出真中文题（如 8522、11132）不受影响——本守卫只拦"中文题→英文题"。
+    加固（2026-09-24）：规则值本身是「第N期/讲/场」系列名兜底时不拦截——经管页面
+    parse_detail 把 topic 兜底成「华师经管学术讲座第N期（管理）」，A 给出的英文真题目
+    才是真实题目，若回退成系列名反而更差。
     """
     if not rule_val or not a_val:
+        return False
+    if _topic_is_fallback(rule_val):
         return False
     r, a = rule_val.strip(), a_val.strip()
 
@@ -800,7 +825,7 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                 continue
             # 2026-09-24 守卫：A 对合法机构过度细化（追加院系/研究中心等子单元）
             # → 拒绝（保留规则）。裁决实证 4/4 命中；规则本身不合法或 A 纠错时不拦。
-            if _a_over_refines_affiliation(cur, lv):
+            if _a_over_refines_affiliation(cur, lv, body_text):
                 rejected.append('speakerAffiliation')
                 continue
         if fld == 'topic':

@@ -5855,6 +5855,16 @@ def _extract_affiliation(rest):
         rest = _rest_cut[0]
     if not rest.strip():
         return ''
+    # 前导职称/学位/导师类残文剥离（如「博导南京大学软件学院」→「南京大学软件学院」、
+    # 「教授 博导X大学」→「X大学」、「博士，南洋理工…」→「南洋理工…」）。这类 token
+    # 绝不可能是单位开头，从起始处（可带前导标点/空格）剥离安全；不影响「工学博士西北大学」
+    # 这类单位前带非标题汉字的情形（起始非标题 token，不剥，交给下方 _UNIT_RE 命中单位）。
+    rest = re.sub(
+        r'^\s*[，、；\s]*(?:博士生导师|硕士生导师|博导|导师|特聘研究员|'
+        r'研究员|副研究员|助理研究员|教授|副教授|讲师|博士后|博士|硕士|'
+        r'学士|院士|老师|学者)\s*', '', rest).strip()
+    if not rest:
+        return ''
     # 优先匹配「完整单位名」（含前缀，如「暨南大学」「北京大学计算机学院」），避免只取
     # 关键词「大学」而漏掉前缀「暨南/北京大学」。非贪婪匹配单位关键词前的最少汉字。
     _UNIT_RE = re.compile(
@@ -5951,6 +5961,12 @@ def _split_english_speaker(sp):
     pm = re.match(r'^[，,\s]*[（(]\s*([^）)]{2,40}?)\s*[)）]', after)
     if pm:
         aff = pm.group(1).strip()
+        # 括号内是中文名音译（如 "Eric T. Chung (钟子信)"）→ 与英文名同人异写，
+        # 非单位，勿当 affiliation（否则 8056 会把「钟子信」误存为单位）。
+        # 仅当括号内容像 2–4 字中文姓名时才清空；"University of X (Department of Y)"
+        # 这类真实单位括号不受影响。
+        if re.fullmatch(r'[\u4e00-\u9fff·]{2,4}', aff) and _looks_like_real_name(aff):
+            aff = ''
     else:
         # 逗号/空格分隔的单位片段（"Yan Zhang, University of Oslo" → "University of Oslo"）。
         # 用贪婪 [^,，]{2,40} 取到下一个逗号为止（非贪婪会只咬 2 字符变成 "Un"）。
