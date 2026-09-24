@@ -1221,7 +1221,7 @@ def _load_vlm_configs():
         cfgs.append({
             'name': 'agnes',
             'api_key': akey,
-            'model': (_os.environ.get('AGNES_MODEL') or env.get('AGNES_MODEL') or 'agnes-2.5-flash'),
+            'model': (_os.environ.get('AGNES_MODEL') or env.get('AGNES_MODEL') or 'agnes-3.0-flash'),
             'base_url': (_os.environ.get('AGNES_BASE_URL') or env.get('AGNES_BASE_URL')
                          or 'https://api.agnes-ai.cn/v1/chat/completions'),
         })
@@ -1251,7 +1251,7 @@ def _load_text_llm_configs():
     return [{
         'name': 'agnes',
         'api_key': akey,
-        'model': (_os.environ.get('AGNES_MODEL') or env.get('AGNES_MODEL') or 'agnes-2.5-flash'),
+        'model': (_os.environ.get('AGNES_MODEL') or env.get('AGNES_MODEL') or 'agnes-3.0-flash'),
         'base_url': (_os.environ.get('AGNES_BASE_URL') or env.get('AGNES_BASE_URL')
                      or 'https://api.agnes-ai.cn/v1/chat/completions'),
     }]
