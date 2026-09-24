@@ -52,6 +52,36 @@ def _apply_period(hh, period):
     return hh % 24
 
 
+_CN_NUM = {'零': 0, '一': 1, '两': 2, '二': 2, '三': 3, '四': 4, '五': 5,
+            '六': 6, '七': 7, '八': 8, '九': 9}
+
+
+def _cn_to_int(s):
+    """将「三点 / 十二点 / 二十一点」等中文数字时刻转为 int（讲座时刻 ≤23）。
+
+    2026-09-24 修复：旧「X点」正则只认阿拉伯数字（\\d{1,2}点），漏抓「下午三点」这类
+    中文数字时刻，导致时间退化为 00:00 占位（em5682 实证）。支持：单字 0–9、十、
+    十一~十九、二十~九十九（讲座时刻上限 23，超界返回 None 交给 _valid 兜底）。
+    """
+    if not s:
+        return None
+    s = s.strip()
+    if s.isdigit():
+        return int(s)
+    if s in _CN_NUM:
+        return _CN_NUM[s]
+    if s == '十':
+        return 10
+    if '十' in s:
+        left, right = s.split('十', 1)
+        if left and not right:               # 「X十」= X*10
+            return _CN_NUM.get(left, 0) * 10
+        tens = _CN_NUM.get(left, 1) if left else 1   # 「十X」= 10+X；左空→10
+        ones = _CN_NUM.get(right, 0) if right else 0
+        return tens * 10 + ones
+    return None
+
+
 def _apply_ampm(hh, suffix):
     """中英混排 am/pm 后缀：pm 在 <12 时 +12；am 在 12 时归 0；否则保持。"""
     if suffix == 'pm':
@@ -104,11 +134,15 @@ def _build(m, seg, y, mo, d):
         # 冒号时间缺失时兜底（常见于海报 OCR 文本）。
         # 2026-08-05 体检修正：「半」改为仅匹配紧随「点」后的半（第 3 捕获组）。
         # 此前对整个 seg 泛搜「半」字，「半决赛」「一半」等词也会让分钟误置 30。
-        dot = re.findall(r'(\d{1,2})\s*点\s*(?:(\d{1,2})\s*分?|(半))?', seg)
+        dot = re.findall(
+            r'([0-9一二两三四五六七八九十]{1,3})\s*点\s*'
+            r'(?:([0-9一二两三四五六七八九十]{1,2})\s*分?|(半))?', seg)
         if dot:
-            hh = int(dot[0][0])
-            mm = int(dot[0][1]) if dot[0][1] else (30 if dot[0][2] else 0)
-            raw_times.append((hh, mm, ''))
+            hh = _cn_to_int(dot[0][0])
+            _mm = dot[0][1]
+            mm = _cn_to_int(_mm) if _mm else (30 if dot[0][2] else 0)
+            if hh is not None:
+                raw_times.append((hh, mm, ''))
     if not raw_times:
         return {'start': datetime(y_i, mo_i, d_i, 0, 0),
                 'end': None, 'has_time': False}
