@@ -14,7 +14,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scraper'))
 from llm_provider import MockProvider
 from hybrid import (apply_llm_text_hybrid, compare_struct, _clean_affiliation,
-                    _infer_title, _is_plausible_affiliation, _infer_affiliation)
+                    _infer_title, _is_plausible_affiliation, _infer_affiliation,
+                    _merge_a_into_result, _a_drops_location_context,
+                    _a_over_refines_affiliation, _a_replaces_cn_title_with_en)
 import field_vocab as _fv
 
 # 正文含可溯源片段，供 snippet 闸门匹配
@@ -452,6 +454,101 @@ class TestSelfExtractFill(unittest.TestCase):
         apply_llm_text_hybrid(rule, BODY, None, self._divergent_provider(), judge)
         self.assertEqual(rule['speaker'], '')  # 多嘉宾不机械填入
         self.assertIn('speaker-multi', rule.get('needsHumanReview', ''))
+
+
+class TestFieldAdoptionGuards(unittest.TestCase):
+    """2026-09-24 字段级采纳守卫：模型 A 在 location/affiliation/topic 的系统性丢信息
+    改写必须被拦截（守卫只在规则值非空且合法时生效，不误伤合法重建）。"""
+
+    # --- 守卫函数直接判定 ---
+    def test_loc_drop_meeting_blocked(self):
+        self.assertTrue(_a_drops_location_context(
+            '大学城校区文科二栋演讲厅（腾讯会议 362-688-563）', '文科二栋演讲厅'))
+
+    def test_loc_drop_campus_blocked(self):
+        self.assertTrue(_a_drops_location_context(
+            '大学城文三栋MBA中心课室501课室', '文三栋MBA中心课室501课室'))
+
+    def test_loc_trailing_junk_allowed(self):
+        self.assertFalse(_a_drops_location_context(
+            '大学城文科2栋学院301会议室开幕式(一起在5楼会议室)董志强',
+            '大学城文科2栋学院301会议室'))
+
+    def test_loc_more_complete_allowed(self):
+        self.assertFalse(_a_drops_location_context(
+            '大学城文3栋415室', 'MBA教育中心U形教室(大学城文3栋415室)'))
+
+    def test_aff_over_refine_blocked(self):
+        self.assertTrue(_a_over_refines_affiliation('厦门大学', '厦门大学经济学院'))
+        self.assertTrue(_a_over_refines_affiliation(
+            '复旦大学', '复旦大学中国社会主义市场经济研究中心'))
+        self.assertTrue(_a_over_refines_affiliation(
+            '新加坡南洋理工大学', '新加坡南洋理工大学经济系'))
+
+    def test_aff_cleaning_not_blocked(self):
+        # 规则值本身不合法（脏尾/误赋）→ 守卫放行（由溯源闸门决定采纳）
+        self.assertFalse(_a_over_refines_affiliation(
+            '/亚洲开发银行经济学家', '亚洲开发银行'))
+        self.assertFalse(_a_over_refines_affiliation(
+            'Chew Soo Hong', '新加坡国立大学'))
+
+    def test_topic_cn_to_en_blocked(self):
+        self.assertTrue(_a_replaces_cn_title_with_en(
+            '（经济与工商管理分论坛）2020年华南师范大学经济与管理学院新年论坛',
+            'Time-consistent strategies for multiperiod mean–VaR portfolio selection'))
+
+    def test_topic_en_parenthetical_allowed(self):
+        self.assertFalse(_a_replaces_cn_title_with_en(
+            '户籍门槛,劳动力再流动与劳动力资源错配 (The Hukou registration constraints, '
+            'remigration intentions, and the misallocation of the labor force)',
+            '户籍门槛,劳动力再流动与劳动力资源错配'))
+
+    # --- _merge_a_into_result 强制覆盖路径（B 判 llm + force_fields）---
+    def test_merge_loc_drop_meeting_rejected(self):
+        r = {'location': '大学城校区文科二栋演讲厅（腾讯会议 362-688-563）'}
+        a = {'location': '文科二栋演讲厅', 'locationSnippet': '地点：文科二栋演讲厅'}
+        _merge_a_into_result(r, a, '地点：文科二栋演讲厅',
+                             force_fields={'location'})
+        self.assertEqual(
+            r['location'],
+            '大学城校区文科二栋演讲厅（腾讯会议 362-688-563）')
+        self.assertIn('location', r.get('llmRejected', ''))
+
+    def test_merge_aff_over_refine_rejected(self):
+        r = {'speakerAffiliation': '厦门大学'}
+        a = {'speakerAffiliation': '厦门大学经济学院',
+             'speakerAffiliationSnippet': '（厦门大学经济学院）'}
+        _merge_a_into_result(r, a, '厦门大学经济学院',
+                             force_fields={'speakerAffiliation'})
+        self.assertEqual(r['speakerAffiliation'], '厦门大学')
+        self.assertIn('speakerAffiliation', r.get('llmRejected', ''))
+
+    def test_merge_topic_cn_to_en_rejected(self):
+        r = {'topic': '（经济与工商管理分论坛）2020年华南师范大学经济与管理学院新年论坛'}
+        a = {'topic': 'Time-consistent strategies for multiperiod mean–VaR portfolio selection',
+             'topicSnippet': 'Time-consistent strategies'}
+        _merge_a_into_result(r, a, 'Time-consistent strategies',
+                             force_fields={'topic'})
+        self.assertEqual(
+            r['topic'],
+            '（经济与工商管理分论坛）2020年华南师范大学经济与管理学院新年论坛')
+        self.assertIn('topic', r.get('llmRejected', ''))
+
+    # --- 端到端（apply_llm_text_hybrid + B 判 llm）---
+    def test_e2e_loc_drop_meeting_blocked(self):
+        """B 判 llm+location，但 A 丢会议号 → force 仍被守卫拦截，规则保留。"""
+        rule = {'location': '大学城校区文科二栋演讲厅（腾讯会议 362-688-563）'}
+        provider = MockProvider(text_result={
+            'location': {'value': '文科二栋演讲厅', 'snippet': '地点：文科二栋演讲厅'},
+        })
+        judge = MockProvider(verdict={
+            'verdict': 'llm', 'fields': {'location': '文科二栋演讲厅'},
+        })
+        apply_llm_text_hybrid(rule, '地点：文科二栋演讲厅', None, provider, judge)
+        self.assertEqual(
+            rule['location'],
+            '大学城校区文科二栋演讲厅（腾讯会议 362-688-563）')
+        self.assertIn('location', rule.get('llmRejected', ''))
 
 
 if __name__ == '__main__':
