@@ -631,6 +631,88 @@ def _is_dirty_value(fld, v):
     return False
 
 
+# ---------------------------------------------------------------------------
+# 字段级 A 值采纳守卫（2026-09-24 人工裁决沉淀）
+# Step4 全量对照 + 33 条人工裁决（改对 21 / 改错 12）揭示：模型 A 在某些字段会
+# 系统性产出"看似更干净、实则丢信息"的值，必须按字段差异化拦截，不能一律照单全收。
+# 守卫只在"规则值非空且合法"时生效——规则本身脏/空或 A 为纠错时不受影响，避免
+# 误伤合法重建。详见 MEMORY.md「融合层字段采纳原则」。
+# ---------------------------------------------------------------------------
+_MEETING_RE = re.compile(r'(腾讯会议|zoom|会议号|会议\s*id|会议\s*链接|线上会议)', re.I)
+_LOC_CONTEXT_KW = ('大学城', '石牌', '汕尾', '佛山', '校区', '学院', '文科', '教')
+
+
+def _a_drops_location_context(rule_val, a_val):
+    """A 的地点比规则更短且丢掉了关键上下文 -> 拒绝采纳（保留规则值）。
+
+    拒绝情形（裁决 12 处改错中的 7 处 location 全部命中）：
+    - 丢线上会议号/平台：『腾讯会议 362-688-563』→『文科二栋演讲厅』；
+    - 丢校区/学院前缀：『大学城教5栋505』→『教5栋505』（丢"大学城"）。
+    放行情形（5 处 location 改对）：A 仅去除尾部噪声（人名/注/开幕式/简介尾巴）
+    或 A 更长更完整（补全上下文）。规则值本身形态学污染时也不拦截（走脏值重建）。
+    """
+    if not rule_val or not a_val:
+        return False
+    r, a = rule_val.strip(), a_val.strip()
+    if len(a) >= len(r):
+        return False  # A 不更短 → 不是"压缩丢信息"，放行其它守卫判定
+    if _MEETING_RE.search(r) and not _MEETING_RE.search(a):
+        return True   # 规则有会议号而 A 没有 → 丢关键信息
+    for kw in _LOC_CONTEXT_KW:
+        if kw in r and kw not in a:
+            return True  # 规则含校区/学院前缀而 A 丢掉了
+    return False
+
+
+_AFFIL_SUBUNIT_RE = re.compile(
+    r'(经济学院|经济系|学院|学系|系|研究中心|研究部|中心|研究院|实验室|'
+    r'学部|学校|分院|校区|研究所)')
+
+
+def _a_over_refines_affiliation(rule_val, a_val):
+    """A 的单位是对规则**合法机构**的过度细化（在机构名后追加院系/研究中心等子单元）
+    -> 拒绝采纳（保留规则值）。
+
+    裁决实证：厦门大学→厦门大学经济学院、复旦大学→复旦大学中国社会主义市场经济
+    研究中心、新加坡南洋理工大学→经济系 等一律判错；规则本身不合法（脏值/误赋）
+    或 A 是纠错/不同机构时不受影响（放行其它守卫）。
+    注：哈工大(深圳)经济管理学院 这类带校区限定且源页确有的"补全"会被一并拦下，
+    但那是安全默认（规则值已是合法机构，留待人工在 needsHumanReview 升级）。
+    """
+    if not rule_val or not a_val:
+        return False
+    if not _is_valid_affiliation(rule_val):
+        return False  # 规则值本身不合法才允许 A 修正
+    r, a = rule_val.strip(), a_val.strip()
+    if not a.startswith(r):
+        return False  # 不是"同机构追加子单元"（可能是纠错/不同机构），不在此拦截
+    tail = a[len(r):]
+    tail = re.sub(r'^（[^）]*）|^\([^)]*\)', '', tail)  # 剥离校区限定括号如 (深圳)
+    tail_core = re.sub(r'[\s，,、。.（）()]', '', tail)
+    if not tail_core:
+        return False
+    return bool(_AFFIL_SUBUNIT_RE.search(tail_core))
+
+
+def _a_replaces_cn_title_with_en(rule_val, a_val):
+    """A 用外文/英文论文题替换了源页本就正确的中文题目 -> 拒绝采纳。
+
+    裁决实证（7636）：规则『（经济与工商管理分论坛）2020年…新年论坛』是合法中文
+    题，A 换成英文论文题 Time-consistent strategies… 判错。反之 A 把英文括号/长尾
+    去掉、提炼出真中文题（如 8522、11132）不受影响——本守卫只拦"中文题→英文题"。
+    """
+    if not rule_val or not a_val:
+        return False
+    r, a = rule_val.strip(), a_val.strip()
+
+    def _cn_ratio(s):
+        if not s:
+            return 0.0
+        cn = sum(1 for c in s if '一' <= c <= '鿿')
+        return cn / len(s)
+    return _cn_ratio(r) > 0.3 and _cn_ratio(a) < 0.2
+
+
 def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=None,
                          title_year=None, url_year=None, rich_only=False,
                          extra_source='', force_fields=None):
@@ -697,6 +779,13 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                 pass
             if not lv or lv in _NOISE or lv == cur:
                 continue
+            # 2026-09-24 守卫：A 地点更短且丢了会议号或校区/学院前缀 → 拒绝
+            # （保留规则）。裁决实证 7/7 命中；仅去尾部噪声或 A 更完整的情形不在此列。
+            # 注意：不叠加「规则非脏」前提——含会议号的合法地点会被 _is_dirty_value
+            # 误判为脏（标签噪声正则命中"会议"），那反而会放过错剥会议号的 A 值。
+            if _a_drops_location_context(cur, lv):
+                rejected.append('location')
+                continue
             if not _snippet_ok(a.get(fld + 'Snippet'), body_text):
                 rejected.append(fld)
                 continue
@@ -708,6 +797,17 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             if not lv or not _is_valid_affiliation(lv) or _is_host_affiliation(lv):
                 if lv:
                     rejected.append(fld)
+                continue
+            # 2026-09-24 守卫：A 对合法机构过度细化（追加院系/研究中心等子单元）
+            # → 拒绝（保留规则）。裁决实证 4/4 命中；规则本身不合法或 A 纠错时不拦。
+            if _a_over_refines_affiliation(cur, lv):
+                rejected.append('speakerAffiliation')
+                continue
+        if fld == 'topic':
+            # 2026-09-24 守卫：A 用英文论文题替换源页本就正确的中文题目 → 拒绝
+            # （保留规则）。裁决实证 7636 判错；A 提炼真中文题/去英文括号/去长尾不受影响。
+            if _a_replaces_cn_title_with_en(cur, lv):
+                rejected.append('topic')
                 continue
         if fld == 'speaker':
             # speaker 采用「值级溯源」而非 snippet 级：A 常从标题读到姓名却编造一段
