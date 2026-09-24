@@ -740,6 +740,15 @@ def _clean_location(loc, title=None):
     loc = loc.strip()
     if not loc:
         return ''
+    # 剥开头校名前缀（2026-09-24 用户裁定：全站均为华师讲座，校名冗余）。
+    # 长前缀优先匹配；「华师大厦」为酒店专名非校名前缀，绝不剥；
+    # 剥后须仍有实质信息（≥4 字符），纯校名值原样保留。幂等：剥后不再以校名开头。
+    for _pre in ('华南师范大学', '华南师大', '华师'):
+        if loc.startswith(_pre) and not loc.startswith('华师大厦'):
+            _rest = loc[len(_pre):].lstrip('　 ')
+            if len(_rest) >= 4:
+                loc = _rest
+            break
     # 截断常见后缀噪声（会议号/密码/议程/报名/内容泄漏等紧跟地点之后）
     m = _LOCATION_TERM.search(loc)
     if m:
