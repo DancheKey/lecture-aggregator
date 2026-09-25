@@ -6006,8 +6006,10 @@ def _derive_affiliation_from_bio(bio, speaker):
             break
     if not _ok:
         return ''
-    # 取首句（首个句号/分号前）
-    _head = re.split(r'[。；]', bio, 1)[0]
+    # 取首句（首个句号/分号前）——同时兼容半角 ; 与全角 ；（CMS 输出两种分号混用，
+    # 仅匹配一种会导致首句不切分、整段 bio 被扫描，误把后文的「X大学金牌讲师」提为单位，
+    # 饶明亮 em/9717 实测：bio 用半角 ;，源码原只认全角 ；→ 整段扫描 → 误提「华为大学」）
+    _head = re.split(r'[。.;；]', bio, 1)[0]
     if not _head.strip():
         return ''
     # 履历/学位型引导 → 不反推（单位往往不是现任主单位）
@@ -6018,6 +6020,17 @@ def _derive_affiliation_from_bio(bio, speaker):
         return ''
     # 必须含明确机构后缀
     if not re.search(r'(大学|学院|研究院|研究所|学系|实验室|学校)', _aff):
+        return ''
+    # 讲师身份排除：提取到的单位后紧跟「金牌讲师/特聘讲师/讲师资格」等讲师身份词时，
+    # 该「大学/学院」是讲师身份的场所而非任职单位（如「华为大学金牌讲师」「XX学院特聘讲师」），
+    # 降级处理——尝试从单位之前的主单位部分提取，否则返回空（饶明亮 em/9717 实测）。
+    # 注意：不排单纯的「讲师」（「X大学讲师」是真任职），只排带身份修饰的「金牌/特聘/资格」讲师。
+    _aff_tail = _head[_head.find(_aff) + len(_aff):]
+    if re.match(r'^[\s，,：:（(]*((金牌)?讲师|特聘讲师|讲师资格)', _aff_tail):
+        _before = _head[:_head.find(_aff)]
+        _main = _extract_affiliation(_before)
+        if _main and re.search(r'(大学|学院|研究院|研究所|学系|实验室|学校)', _main):
+            return _main
         return ''
     # 单位后紧跟 毕业/学位/学士/硕士/博士/就读 → 学位单位，排除
     if re.search(re.escape(_aff) + r'.{0,6}(毕业|学位|学士|硕士|博士|就读)', _head):
