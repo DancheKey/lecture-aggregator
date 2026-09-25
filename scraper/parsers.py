@@ -5477,6 +5477,17 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             if _v:
                 result[_field] = _v
 
+    # ---- bio 反推单位（保底，2026-09-25 经管 530 期实测）----
+    # 规则/模型均未提取到单位、但 speakerBio 以「姓名，」开头且首句含现任机构时，
+    # 从 bio 首句反推 speakerAffiliation。仅填空、不覆盖已有干净值；多主讲人不触发。
+    if not (result.get('speakerAffiliation') or '').strip() and \
+            (result.get('speakerBio') or '').strip() and \
+            (result.get('speaker') or '').strip():
+        _bio_aff = _derive_affiliation_from_bio(
+            result['speakerBio'], result['speaker'])
+        if _bio_aff:
+            result['speakerAffiliation'] = _bio_aff
+
     return result
 
 
@@ -5961,6 +5972,68 @@ def _extract_affiliation(rest):
         if len(aff) < 6:
             return ''
     return aff
+
+
+def _derive_affiliation_from_bio(bio, speaker):
+    """当规则/模型均未提取到主讲人单位，而 speakerBio 以「姓名，」开头、且首句内含
+    现任机构（大学/学院/研究院/研究所/学系/实验室/学校）时，从首句反推单位。
+
+    适用场景（经管 530 期实测）：页面用【个人简介】包裹简介、无结构化「主讲人单位」
+    字段，单位只出现在 bio 首句（如「周忠宝，湖南大学"岳麓学者"特聘教授…」→ 湖南大学）。
+    规则/模型只在「主讲人/报告人」*标签值*里提单位，从不从 bio 正文反推，故此前
+    speakerAffiliation 长期为空。
+
+    安全性：
+    - 必须以「姓名 + 分隔符」开头，且 speaker 为单主讲人（不含 、，），避免把非开头片段
+      或合讲人当单位；
+    - 仅取首句（首个 。/； 前），排除「毕业于/就读于/获得/历任/曾任/客座/兼职」等
+      学位/履历型片段，避免把学位单位或过往任职当现任单位；
+    - 单位须含明确机构后缀（大学/学院/研究院/研究所/学系/实验室/学校），排除
+      「广发期货合规与法律事务部」等职务片段（部/公司/协会等不在后缀白名单内）。
+    返回值必为 bio 原文子串（值级溯源，非编造）。无可靠单位返回 ''。
+    """
+    if not bio or not speaker:
+        return ''
+    sp = speaker.strip()
+    if not sp or re.search(r'[、，,]', sp):
+        return ''
+    # 必须以「姓名 + 分隔符」开头
+    _ok = False
+    for _sep in ('，', ',', '、', ' '):
+        if bio.startswith(sp + _sep):
+            bio = bio[len(sp) + len(_sep):]
+            _ok = True
+            break
+    if not _ok:
+        return ''
+    # 取首句（首个句号/分号前）
+    _head = re.split(r'[。；]', bio, 1)[0]
+    if not _head.strip():
+        return ''
+    # 履历/学位型引导 → 不反推（单位往往不是现任主单位）
+    if re.search(r'(毕业于|就读于|获得|历任|曾任|曾相继|曾任职|先后|主要研究方向|主要从事|研究方向)', _head):
+        return ''
+    _aff = _extract_affiliation(_head)
+    if not _aff:
+        return ''
+    # 必须含明确机构后缀
+    if not re.search(r'(大学|学院|研究院|研究所|学系|实验室|学校)', _aff):
+        return ''
+    # 单位后紧跟 毕业/学位/学士/硕士/博士/就读 → 学位单位，排除
+    if re.search(re.escape(_aff) + r'.{0,6}(毕业|学位|学士|硕士|博士|就读)', _head):
+        return ''
+    # 单位后紧跟 客座/兼职 → 非现任主单位（如「南昌大学客座教授」），排除
+    if re.search(re.escape(_aff) + r'.{0,6}(客座|兼职)', _head):
+        return ''
+    # 单位后紧跟机构续词构成更长机构名（如「广东省大学」+「计算机课程教学指导委员会」），
+    # 说明 _UNIT_RE 只吃到残缺片段，排除（杜炫杰 实测：广东省大学计算机课程教学指导委员会秘书长）
+    _tail = _head[_head.find(_aff) + len(_aff):].lstrip('"\'“”')
+    if re.match(r'^[\u4e00-\u9fff]{1,10}(?:计算机|课程|教学指导)', _tail):
+        return ''
+    # 单位上下文含 历任/曾任/客座/兼职 → 非现任主单位，排除
+    if re.search(r'(历任|曾任|曾相继|客座|兼职).{0,12}' + re.escape(_aff), _head):
+        return ''
+    return _aff
 
 
 def _split_english_speaker(sp):
