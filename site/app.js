@@ -766,7 +766,7 @@ const app = createApp({
     },
 
     loadLectures() {
-      fetch('/api/lectures', { cache: 'default' })
+      fetch('/api/lectures', { cache: 'no-store' })
         .then(r => {
           if (!r.ok) throw new Error('api-unavailable');
           return r.json();
@@ -800,7 +800,7 @@ const app = createApp({
 
     _loadStaticLatest() {
       // 先加载 latest.json：仅 50 条，用于首屏秒开；cache:default 让浏览器复用 600s 缓存
-      fetch('lectures/latest.json', { cache: 'default' })
+      fetch('lectures/latest.json', { cache: 'no-store' })
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
@@ -823,7 +823,7 @@ const app = createApp({
     async _loadChunks() {
       let manifest;
       try {
-        const mres = await fetch('lectures/chunks.json', { cache: 'default' });
+        const mres = await fetch('lectures/chunks.json', { cache: 'no-store' });
         if (!mres.ok) throw new Error('no-manifest');
         manifest = await mres.json();
       } catch (e) {
@@ -838,7 +838,7 @@ const app = createApp({
         let ok = false;
         for (let attempt = 0; attempt < 3 && !ok; attempt++) {
           try {
-            const cres = await fetch(chunks[i], { cache: 'default' });
+            const cres = await fetch(chunks[i], { cache: 'no-store' });
             if (!cres.ok) throw new Error('chunk-' + cres.status);
             const cj = await cres.json();
             this._mergeChunk((cj && cj.data) || []);
@@ -865,7 +865,7 @@ const app = createApp({
     },
 
     _loadFullSingle() {
-      fetch('lectures.json', { cache: 'default' })
+      fetch('lectures.json', { cache: 'no-store' })
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
