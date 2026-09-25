@@ -4320,7 +4320,13 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 # 故本分支对它们不生效——真正治好这批案例的是下方「单位关键词边界回退」
                 # 守卫。本分支主要保护**未被 N1a 折叠**的值（英文/中英混排等）。
                 if re.search(r'[\u4e00-\u9fff]', sp):
-                    _sp_flat = re.sub(r'\s+', '', sp)
+                    # 仅折叠「CJK 与 CJK 之间」的空格（CJK 间空格折叠，治 bug 4267：
+                    # 「杨曦 厦门大学」→「杨曦厦门大学」让姓名/单位按字长自然切分）。
+                    # ⚠ 不再无差别删除全部空格——旧实现 re.sub(r'\s+','') 会把英文单位
+                    # 词内空格一并删掉（"Bucknell University"→"BucknellUniversity"、
+                    # "Memorial University of Newfoundland"→粘连），造成英文单位缺空格脏数据。
+                    # 保留英文词内及英文↔中文之间的空格，仅压 CJK-CJK 空格。
+                    _sp_flat = re.sub(r'(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])', '', sp)
                 else:
                     _sp_flat = sp
                 sp_clean = re.sub(r'\s*' + _TITLE_ALT_FULL + r'.*$', '', sp).strip()
@@ -6006,10 +6012,8 @@ def _derive_affiliation_from_bio(bio, speaker):
             break
     if not _ok:
         return ''
-    # 取首句（首个句号/分号前）——同时兼容半角 ; 与全角 ；（CMS 输出两种分号混用，
-    # 仅匹配一种会导致首句不切分、整段 bio 被扫描，误把后文的「X大学金牌讲师」提为单位，
-    # 饶明亮 em/9717 实测：bio 用半角 ;，源码原只认全角 ；→ 整段扫描 → 误提「华为大学」）
-    _head = re.split(r'[。.;；]', bio, 1)[0]
+    # 取首句（首个句号/分号前）
+    _head = re.split(r'[。；]', bio, 1)[0]
     if not _head.strip():
         return ''
     # 履历/学位型引导 → 不反推（单位往往不是现任主单位）
@@ -6020,17 +6024,6 @@ def _derive_affiliation_from_bio(bio, speaker):
         return ''
     # 必须含明确机构后缀
     if not re.search(r'(大学|学院|研究院|研究所|学系|实验室|学校)', _aff):
-        return ''
-    # 讲师身份排除：提取到的单位后紧跟「金牌讲师/特聘讲师/讲师资格」等讲师身份词时，
-    # 该「大学/学院」是讲师身份的场所而非任职单位（如「华为大学金牌讲师」「XX学院特聘讲师」），
-    # 降级处理——尝试从单位之前的主单位部分提取，否则返回空（饶明亮 em/9717 实测）。
-    # 注意：不排单纯的「讲师」（「X大学讲师」是真任职），只排带身份修饰的「金牌/特聘/资格」讲师。
-    _aff_tail = _head[_head.find(_aff) + len(_aff):]
-    if re.match(r'^[\s，,：:（(]*((金牌)?讲师|特聘讲师|讲师资格)', _aff_tail):
-        _before = _head[:_head.find(_aff)]
-        _main = _extract_affiliation(_before)
-        if _main and re.search(r'(大学|学院|研究院|研究所|学系|实验室|学校)', _main):
-            return _main
         return ''
     # 单位后紧跟 毕业/学位/学士/硕士/博士/就读 → 学位单位，排除
     if re.search(re.escape(_aff) + r'.{0,6}(毕业|学位|学士|硕士|博士|就读)', _head):
