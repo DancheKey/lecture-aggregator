@@ -692,15 +692,31 @@ def get_text_provider():
 
 
 def get_judge_provider():
-    """分歧裁决模型 B（当前智谱 GLM，可经 JUDGE_PROVIDER 覆盖为 agnes/zhipu/mock）。"""
+    """分歧裁决模型 B（当前智谱 GLM，可经 JUDGE_PROVIDER 覆盖为 agnes/zhipu/mock）。
+
+    2026-09-25 起默认包装为「引证裁决」CitedJudgeProvider（v2 值级终审，由
+    tmp/cite_pilot.py 试点合入生产）：B 不再二选一站队，而是基于原文给出每个
+    争议字段的正确值 + 逐字引证，过值级闸门才采纳，否则保留规则值。
+    回退开关 SCNU_JUDGE_MODE=legacy 可恢复旧选边裁决；mock provider 无原始
+    chat 接口，不包装。
+    """
     provider_type = (_get_env('JUDGE_PROVIDER') or 'zhipu').lower()
     if provider_type == 'agnes':
         judge_model = _get_env('AGNES_JUDGE_MODEL')
         p = AgnesProvider(model=judge_model) if judge_model else AgnesProvider()
-        return p if p.api_key else None
-    if provider_type == 'mock':
-        from llm_provider import MockProvider
+        base = p if p.api_key else None
+    elif provider_type == 'mock':
+        # mock 仅用于离线测试，不做引证包装
         return MockProvider(verdict={'verdict': 'unknown', 'fields': {}})
-    # 默认：智谱 GLM（ZHIPU_API_KEY 已在 .env 中配置）
-    p = ZhipuProvider()
-    return p if p.api_key else None
+    else:
+        # 默认：智谱 GLM（ZHIPU_API_KEY 已在 .env 中配置）
+        p = ZhipuProvider()
+        base = p if p.api_key else None
+    if base is None:
+        return None
+    mode = (_get_env('SCNU_JUDGE_MODE') or 'cited').strip().lower()
+    if mode in ('legacy', 'old', 'classic'):
+        return base
+    # 延迟导入：避免 llm_provider -> cited_judge -> hybrid -> llm_provider 循环
+    from cited_judge import CitedJudgeProvider
+    return CitedJudgeProvider(base)
