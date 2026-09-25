@@ -716,7 +716,7 @@ def _strip_location_label_tail(loc):
     if not isinstance(loc, str) or not loc:
         return loc
     for _ in range(3):
-        nt = re.sub(r'(?:学术报告|报告|摘要|简介|时间|地点|题目|专家|主讲人|报告人|组织单位)$', '', loc).strip()
+        nt = re.sub(r'(?:学术报告|讲座|报告|摘要|简介|时间|地点|题目|专家|主讲人|报告人|组织单位)$', '', loc).strip()
         if nt == loc or len(nt) < 2:
             break
         loc = nt
@@ -3860,7 +3860,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # N1e/英文标签：补充 Time/Venue/Speaker/Topic/Abstract/Bio 等英文同义词，使海报双语标签可匹配。
     LABELS = (
         '教学工作坊时间|教学工作坊地点|'
-        '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|报告摘要|'
+        '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|报告摘要|讲座摘要|报告简介|'
         '讲座题目|讲座时间|讲座地点|主办单位|组织单位|承办单位|协办单位|支持单位|指导单位|学术主持|上一篇|下一篇|标签|Tags|'
         # 「日期」作字段标签须紧跟冒号（physics 页「演讲人：朱诗亮 日期：06月30日」：
         #  无此标签时姓名正则 {2,4} 会贪婪吃成「朱诗亮日」；加 (?=[:：]) 限定为标签形态，
