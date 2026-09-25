@@ -250,6 +250,20 @@ for _i, _c in enumerate(CASES):
     setattr(GoldenTest, f'test_{_i:02d}_{_slug}', _make_test(_c))
 
 
+def _judge_available():
+    """B 模型（裁决）是否可用。
+
+    CI 不注入密钥 → None → 纯规则基线；本地 .env 有 key → 双轨 + 引证裁决，
+    部分已知缺陷会被 B 修正（如 psy961 的 location 尾串「讲座一」）。
+    与 parse_detail 内部走同一个 get_judge_provider()，判定必然一致。
+    """
+    try:
+        from llm_provider import get_judge_provider
+        return get_judge_provider() is not None
+    except Exception:
+        return False
+
+
 class KnownDefectTest(unittest.TestCase):
     """2026-09-10 round-16 已知解析缺陷清单（源页锚点均已实证）——期望行为用 @expectedFailure 锁定。
 
@@ -278,9 +292,7 @@ class KnownDefectTest(unittest.TestCase):
         self.assertIn('ecological', by['郑东萍'].get('abstract') or '')
         self.assertIn('friendship and morality', by['林安迪'].get('abstract') or '')
 
-    @unittest.expectedFailure
-    def test_psy961_should_split_two_speaker_not_garbage(self):
-        """psy961 张喜淋/张洳源应拆 2 条；speaker 不得取成 'Cognitive Sciences' 垃圾值。当前未拆。"""
+    def _psy961_body(self):
         recs = self._parse('psy961.html', 'http://psy.scnu.edu.cn/a/20160113/961.html')
         self.assertEqual(len(recs), 2)
         spk = [r.get('speaker') for r in recs]
@@ -288,6 +300,24 @@ class KnownDefectTest(unittest.TestCase):
         for r in recs:
             self.assertNotIn('Cognitive Sciences', r.get('speaker') or '')
             self.assertNotIn('讲座一', r.get('location') or '')
+
+    @unittest.skipIf(_judge_available(),
+                     'B 可用时该缺陷已被引证裁决修复，见 test_psy961_llm_cited_fix')
+    @unittest.expectedFailure
+    def test_psy961_should_split_two_speaker_not_garbage(self):
+        """psy961 张喜淋/张洳源应拆 2 条；speaker 不得取成 'Cognitive Sciences' 垃圾值。当前未拆。
+
+        纯规则基线（CI 无密钥）下 location 尾串「讲座一」→ xfail。
+        本地带 B（引证裁决）时 B 给出 location='心理学院201室' 并通过值级闸门，
+        缺陷已修复，故此时跳过本条、改由 llm 版本用例断言通过。
+        """
+        self._psy961_body()
+
+    def test_psy961_llm_cited_fix(self):
+        """psy961 在 B（引证裁决）可用时：location 尾串「讲座一」被 B 的原文值清除。"""
+        if not _judge_available():
+            self.skipTest('无 B 模型可用（纯规则基线）')
+        self._psy961_body()
 
     @unittest.expectedFailure
     def test_psy940_fields_clean(self):
