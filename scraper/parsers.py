@@ -2570,6 +2570,11 @@ def _clean_session_topic(t):
     t = re.sub(r'\s*\d{1,2}月\d{1,2}日.*$', '', t).strip(' —-丨|·\t')
     t = re.sub(r'\s*月\d{1,2}日.*$', '', t).strip(' —-丨|·\t')
     t = re.sub(r'\s*时间\s*$', '', t).strip(' —-丨|·\t')
+    # 去尾部粘连的时段/时钟残片（em/5983「…地位与作用 12:30-13:30」「…出路 17:10-17:20」
+    # ——下一行的时段窗被编号行 topic 截取时拖尾；真实题目极少以时刻收尾）
+    t = re.sub(r'\s*\d{1,2}\s*[:：]\s*\d{2}\s*[-—–~至]\s*\d{1,2}\s*[:：]\s*\d{2}\s*$',
+               '', t).strip(' —-丨|·\t')
+    t = re.sub(r'\s*\d{1,2}\s*[:：]\s*\d{2}\s*$', '', t).strip(' —-丨|·\t')
     # 去页面交互噪声（OCR 把「点击：00」「00 点击」「点击」等按钮/计数文字误识为主题）
     t = re.sub(r'^(?:点击[:：]?\s*)?\d+\s*点击.*$', '', t).strip(' —-丨|·\t')
     t = re.sub(r'\s*点击[:：]?\s*\d*\s*$', '', t).strip(' —-丨|·\t')
@@ -2615,6 +2620,137 @@ def _is_noise_session_topic(topic):
     # 误拦会把真实多期讲座合并回单条，造成数据丢失。候选1 的 topic 值在「第N期」前已终止，
     # 不会产出此类主题，故该分支既无必要又有风险，已删除。
     return False
+
+
+# ── 多场候选质量闸门（2026-09-26）───────────────────────────────────────────
+# 议程页的「伪场次」特征：把节次/报到/茶歇/页眉议程行当成了独立讲座。
+# 实证：em/5983 候选1 拆出的两条（首条=「会议议程 12月2日上午 08:30--09:20 报到…」、
+# 次条=「…地位与作用 12:30-13:30 午餐 (」）；ctld/1280 候选7 拆出的
+# 「前置会议:」「会议报到:」。此类劣质候选结果必须在瀑布各接受点整体拦下、
+# 让位给下游候选，而不是占住瀑布产出垃圾场次（em/5983 曾因此使候选10 永无机会）。
+_MS_SCAFFOLD_PREFIX = re.compile(
+    r'^(?:报到|签到|注册|前置会议|会议报到|开幕式|闭幕式|大会开幕式|'
+    r'茶歇|午[餐饭]|晚[餐饭]|早[餐饭]|休息|合影|合影留念|颁奖|颁奖仪式|'
+    r'总结发言|会议总结|代表发言|致辞|欢迎辞|开幕词|闭幕词|自由讨论|提问|互动)')
+# 议程后勤词：仅当 topic 内同时出现时钟/时段时才据此判伪
+# （真实讲座题目极少内嵌时钟，单含「席/宴」等字无害，避免误伤）。
+_MS_LOGISTICS = re.compile(
+    r'议程|日程|报到|签到|茶歇|午[餐饭]|晚[餐饭]|早[餐饭]|合影|开幕|闭幕|'
+    r'致辞|欢迎辞|开幕词|闭幕词|颁奖|总结发言|会议总结|代表发言')
+_MS_CLOCK_RE = re.compile(r'\d{1,2}\s*[:：]\s*\d{2}|\d{1,2}\s*点\s*\d{1,2}')
+
+
+def _is_junk_session_topic(topic):
+    """True = 该场次主题是议程脚手架/后勤行残片，不是真实讲座题目。"""
+    t = re.sub(r'\s+', '', str(topic or ''))
+    if not t or t.strip('：:') == '':
+        return True
+    if _is_noise_session_topic(t):
+        return True
+    if _MS_SCAFFOLD_PREFIX.match(t):
+        return True
+    # 时钟/时段 + 后勤词（em/5983 两条垃圾的联合特征）
+    if _MS_CLOCK_RE.search(t) and _MS_LOGISTICS.search(t):
+        return True
+    # 地点开括号被拽进题目末尾的残片（「…午餐 (」）
+    if t.endswith(('(', '（')):
+        return True
+    return False
+
+
+def _ms_gate_filter(sessions):
+    """候选结果质量闸门：剔除伪场次后不足 2 场、真场次不足 2 个互异主题，
+    或跨场日期自相矛盾（同一 (月,日) 出现在不同年份——ctld/1280 实测
+    2020-01-08 与 2021-01-08 并存，必有一场取错年）→ 返回 []，
+    表示该候选放弃，瀑布落至下一候选。"""
+    if not sessions:
+        return []
+    kept = [s for s in sessions if not _is_junk_session_topic(s.get('topic'))]
+    if len(kept) < 2:
+        return []
+    starts = [s.get('start') for s in kept]
+    if all(starts):
+        try:
+            _md = {(d.month, d.day) for d in starts}
+            _full = {(d.year, d.month, d.day) for d in starts}
+            if len(_md) < len(_full) and len({d.year for d in starts}) >= 2:
+                return []
+        except AttributeError:
+            pass
+    if len({re.sub(r'\s+', '', str(s.get('topic') or '')) for s in kept}) < 2:
+        return []
+    return kept
+
+
+def _clean_aff_token(aff):
+    """括号内单位串 → 干净单位名：取含机构关键词的首个顿号/逗号分段，
+    剥尾部职务词（「华侨大学经济与金融学院院长」「中国社科院研究员」型）。"""
+    aff = (aff or '').strip(' \u3000，,、;；')
+    if not aff:
+        return ''
+    _INST_KW = re.compile(
+        r'大学|学院|研究院|研究所|研究中心|社科院|科学院|学会|经济系|金融系|'
+        r'商学院|党校|实验室|教研室|编辑部|智库|公司|银行')
+    _ROLE_TAIL = re.compile(
+        r'(?:常务副|副)?(?:校长|书记|院长|所长|主任|处长|部长|教授|副教授|'
+        r'研究员|副研究员|助理研究员|讲师|博导|博士生导师|硕导|硕士生导师|'
+        r'经济学家|经济学者|学者|专家|会长|理事长|常务理事|理事|监事|秘书长|'
+        r'副秘书长|主编|编辑|记者|院士|博士)$')
+    parts = [p.strip() for p in re.split(r'[、，,;；]', aff) if p.strip()]
+    pick = ''
+    for p in parts:
+        if _INST_KW.search(p):
+            pick = p
+            break
+    if not pick and parts:
+        pick = parts[0]
+    prev = None
+    while prev != pick and pick:
+        prev = pick
+        pick = _ROLE_TAIL.sub('', pick).strip(' \u3000，,、;·-—')
+    return pick
+
+
+def _loose_name_like(s):
+    """宽松人名判定——仅用于「主讲人/报告人：」**显式标签值**：标签字段本身就是
+    强先验，_looks_like_real_name 的常见姓氏集会误杀罕姓（em/3769「主讲人：奉国和」
+    实测，奉姓不在姓氏集导致回退取到上一行主讲人）。拦机构词/禁词即可。"""
+    s = (s or '').strip()
+    if not s or len(s) > 4 or not re.fullmatch(r'[\u4e00-\u9fff·]+', s):
+        return False
+    if any(bad in s for bad in _NAME_FORBIDDEN):
+        return False
+    if any(kw in s for kw in ('研究院', '研究所', '中心', '团队', '单位', '部门',
+                              '大学', '学院', '系', '编辑')):
+        return False
+    # 节次/后勤残字（「光第二组」「国第三组」型：姓名与下一节次头胶连后的尾部截取）
+    if any(ch in s for ch in '第组节场室楼栋'):
+        return False
+    return True
+
+
+def _speaker_from_label_value(raw):
+    """「主讲人/报告人：」标签值 → (姓名, 单位)。支持三种形态：
+    ① 「李增福」直接人名；② 「南开大学李建标」单位前缀+姓名连写（末尾 2-4 字
+    须像真实姓名、余下须含机构关键词才拆）；③ 「朱琪、吴雪萍」多人合报原样保留。
+    人名判定用 _loose_name_like（罕姓友好，见其 docstring）。"""
+    raw = (raw or '').strip(' \u3000，,、;；()（）')
+    if not raw or len(raw) > 24:
+        return '', ''
+    parts = [p for p in (x.strip() for x in re.split(r'[、,，/]|和|与', raw)) if p]
+    if len(parts) > 1 and all(_loose_name_like(p) for p in parts):
+        return raw, ''
+    if _loose_name_like(raw):
+        return raw, ''
+    for _l in (4, 3, 2):
+        if len(raw) <= _l:
+            break
+        tail = raw[-_l:]
+        if _loose_name_like(tail):
+            aff = _clean_aff_token(raw[:-_l])
+            if aff:
+                return tail, aff
+    return '', ''
 
 
 def _abstract_is_nav_noise(ab):
@@ -3063,31 +3199,66 @@ def _replace_schedule_tables_with_text(soup):
        「主题：」的块内能解析到**本场**时间（时间位于主题之后），正确拆出多期。
 
     仅激活于明确的讲座日程表（表头含≥2个核心字段标签 + ≥2数据行 + 多行主题/主讲人相异），
-    避免误伤导航/页脚/说明类表格。返回是否发生过替换。"""
+    避免误伤导航/页脚/说明类表格。返回是否发生过替换。
+
+    2026-09-26 增强（em/3769/4169/5983 议程表实测）：
+    1) 真表头扫描——部分议程表首行是合并的环节行（「开幕式…」）或节次行（「上午
+       Workshop（9:00-12:30）」），真正的字段表头（主讲人|题目|主持人|评议人|时间）在第
+       2~3 行；改为在前 3 行中找首个含 ≥2 核心字段的行作表头。
+    2) 主讲人系表头词扩充「发言人|汇报人」（em/5983 分组讨论表「发言人|题目」仅
+       2 列，靠发言人+题目即达 2 核心字段；「姓名|单位」名单表因单位非核心字段仍被排除）。"""
     replaced = False
     for tb in soup.find_all('table'):
         rows = tb.find_all('tr')
         if len(rows) < 3:  # 表头 + ≥2 数据行
             continue
-        header_cells = [c.get_text(' ', strip=True) for c in rows[0].find_all(['th', 'td'])]
-        field_map = {}
-        for idx, h in enumerate(header_cells):
-            hh = _n1_normalize(h)
-            if re.search(r'时间|日期', hh):
-                field_map[idx] = '时间'
-            elif re.search(r'主题|题目|报告题目|讲座题目|讲题|报告内容|课程内容|专题内容|内容', hh):
-                field_map[idx] = '主题'
-            elif re.search(r'主讲|报告人|演讲人', hh):
-                field_map[idx] = '主讲人'
-            elif re.search(r'地点|场所|教室|会议室|报告地点', hh):
-                field_map[idx] = '地点'
+        # 真表头扫描：首行可能是合并环节行/节次行，在前 3 行中找首个
+        # 含 ≥2 核心字段标签的行作表头；找不到再退回首行。
+        header_idx, field_map = 0, {}
+        for hri in range(min(3, len(rows) - 1)):
+            fm_try = {}
+            for idx, h in enumerate(
+                    c.get_text(' ', strip=True) for c in rows[hri].find_all(['th', 'td'])):
+                hh = _n1_normalize(h)
+                if re.search(r'时间|日期', hh):
+                    fm_try[idx] = '时间'
+                elif re.search(r'主题|题目|报告题目|讲座题目|讲题|报告内容|课程内容|专题内容|内容', hh):
+                    fm_try[idx] = '主题'
+                elif re.search(r'主讲|报告人|演讲人|发言人|汇报人', hh):
+                    fm_try[idx] = '主讲人'
+                elif re.search(r'地点|场所|教室|会议室|报告地点', hh):
+                    fm_try[idx] = '地点'
+            if sum(1 for v in fm_try.values()
+                   if v in ('时间', '主题', '主讲人', '地点')) >= 2:
+                header_idx, field_map = hri, fm_try
+                break
+        header_cells = [c.get_text(' ', strip=True)
+                        for c in rows[header_idx].find_all(['th', 'td'])]
+        if not field_map:
+            for idx, h in enumerate(header_cells):
+                hh = _n1_normalize(h)
+                if re.search(r'时间|日期', hh):
+                    field_map[idx] = '时间'
+                elif re.search(r'主题|题目|报告题目|讲座题目|讲题|报告内容|课程内容|专题内容|内容', hh):
+                    field_map[idx] = '主题'
+                elif re.search(r'主讲|报告人|演讲人|发言人|汇报人', hh):
+                    field_map[idx] = '主讲人'
+                elif re.search(r'地点|场所|教室|会议室|报告地点', hh):
+                    field_map[idx] = '地点'
         # 至少 2 个讲座核心字段才视为日程表
         if sum(1 for v in field_map.values() if v in ('时间', '主题', '主讲人', '地点')) < 2:
             continue
         data_rows = []
-        for r in rows[1:]:
+        for r in rows[header_idx + 1:]:
             cells = [c.get_text(' ', strip=True) for c in r.find_all(['td', 'th'])]
             if len(cells) < len(header_cells):
+                continue
+            # 同表内重复表头（香樟论坛 4169：同一张表上下午各一节、各带一次
+            # 「报告人|单位|题目」表头行）——与表头逐格相同/为其子集的行跳过，
+            # 否则会产出「主题：题目 主讲人：报告人」这类标签回声行。
+            if cells == header_cells or all(
+                    c and _n1_normalize(c) in _n1_normalize(' '.join(header_cells))
+                    for c in cells):
                 continue
             parts = {}
             for idx, fname in field_map.items():
@@ -6044,29 +6215,93 @@ def _agenda_slot_speaker(seg):
     return None
 
 
+# 议程行 V2：「时段 人名（单位） 题目：X」——em/7264「8:30-9:00 郭克莎(华侨大学
+# 经济与金融学院院长) 题目:推动制造业高质量发展的战略思考」型。人名须紧跟括号单位
+# 且括号后出现题目标签，误命中风险低。
+_AGENDA_V2_RE = re.compile(
+    r'^\s*(?P<name>[\u4e00-\u9fff·]{2,4}|[A-Za-z][A-Za-z\.\-\' ]{1,30}?)\s*'
+    r'[（(](?P<aff>[^）)]{0,60})[）)]\s*'
+    r'(?:题目|主题|报告题目|讲题|演讲题目)\s*[:：]\s*')
+# 议程行 V4：「时段 [环节] 主持人:名 主题演讲N/题目: X 演讲专家/报告人: 名（单位）」
+# ——em/5949 大会主题演讲型。行内同时含题目标签与主讲人系标签（主持人除外）。
+_AGENDA_V4_TOPIC_RE = re.compile(
+    r'(?:主题演讲\s*[0-9一二三四五六七八九十]*\s*[:：]|题目\s*[:：])\s*(.+?)'
+    r'(?=\s*(?:演讲专家|报告人|主讲人|演讲人|点评人|评论人)\s*[:：]|$)')
+_AGENDA_V4_SPK_RE = re.compile(
+    r'(?:演讲专家|报告人|主讲人|演讲人)\s*[:：]\s*'
+    r'(?P<name>[\u4e00-\u9fff·]{2,4}|[A-Za-z][A-Za-z\.\-\' ]{1,30}?)'
+    r'(?:\s*[（(](?P<aff>[^）)]{0,60})[）)])?')
+# 行内题目截止词：后勤/节次/下一行引导词紧随题目时截断
+_AGENDA_TOPIC_CUT = re.compile(
+    r'\s{0,2}(?:茶歇|午[餐饭]|晚[餐饭]|早[餐饭]|报到|签到|合影|颁奖|开幕|闭幕|'
+    r'致辞|总结发言|会议总结|代表发言|主持人|第[一二三四五六七八九十]+\s*节|'
+    r'第[一二三四五六七八九十]+\s*组|[ABC]\s*组|分会场)')
+
+
+def _agenda_row_session(seg):
+    """从时段后的行文本解出 (speaker, affiliation, topic)；三种行形态依次尝试：
+    V1「名:题目」→ V2「名(单位) 题目：X」→ V4「…题目:X 演讲专家:名(单位)」。
+    主持人/茶歇/致辞等非报告行返回 None。"""
+    seg = seg.strip()
+    if not seg:
+        return None
+    # V1：段首「名、名: 题目」
+    spk = _agenda_slot_speaker(seg)
+    if spk:
+        topic = seg.split(':', 1)[-1].split('：', 1)[-1].strip()
+        topic = _AGENDA_TOPIC_CUT.split(topic)[0].strip()
+        topic = _clean_session_topic(topic)
+        if topic and len(topic) >= 2:
+            return spk, '', topic
+    # V2：段首「名(单位) 题目：X」
+    m2 = _AGENDA_V2_RE.match(seg)
+    if m2 and _looks_like_real_name(m2.group('name').strip()):
+        topic = seg[m2.end():]
+        topic = _AGENDA_TOPIC_CUT.split(topic)[0].strip()
+        topic = _clean_session_topic(topic)
+        if topic and len(topic) >= 2:
+            return m2.group('name').strip(), _clean_aff_token(m2.group('aff')), topic
+    # V4：行内「题目/主题演讲N: X … 演讲专家/报告人: 名(单位)」
+    if re.search(r'(?:演讲专家|报告人|主讲人|演讲人)\s*[:：]', seg):
+        mt = _AGENDA_V4_TOPIC_RE.search(seg)
+        ms = _AGENDA_V4_SPK_RE.search(seg)
+        if mt and ms:
+            topic = mt.group(1).strip()
+            topic = _AGENDA_TOPIC_CUT.split(topic)[0].strip()
+            topic = _clean_session_topic(topic)
+            name = ms.group('name').strip()
+            if topic and len(topic) >= 2 and _looks_like_real_name(name):
+                return name, _clean_aff_token(ms.group('aff') or ''), topic
+    return None
+
+
 def _detect_agenda_slot_sessions(text, default_year=None, publish_time=None,
                                  title_year=None, url_year=None, title='',
                                  base_start=None, base_end=None):
-    """候选10（兜底，新年论坛/研讨会议程表）：逐条「时段 姓名：题目」列表。
+    """候选10（兜底，新年论坛/研讨会议程表）：逐条「时段 + 报告行」列表。
 
     正文形如（em/7636）：
       第一节: 13:30-15:30
       13:30-14:10 张鹏: Time-consistent strategies for multiperiod mean–VaR portfolio selection
       14:10-14:50 刘愿、张磊:星星之火,可以燎原——洋务企业与近代中国民族工业发展
       …
-    「时段 + 姓名 + 冒号 + 题目」是强结构，但页面同时存在**节次区间行**（第一节 13:30-15:30，
+    「时段 + 报告行」是强结构，但页面同时存在**节次区间行**（第一节 13:30-15:30，
     时长 120 分钟）、茶歇/午餐/晚餐行，必须过滤，否则会把一节当成一场。
+    2026-09-26 泛化：报告行支持三种形态（_agenda_row_session）——
+      V1「名:题目」（em/7636）；V2「名(单位) 题目：X」（em/7264/7542 议程）；
+      V4「…题目:X 演讲专家:名(单位)」（em/5949 大会主题演讲）。
 
     守卫（三重，避免把节次/休息/主持人行当成报告）：
       ① 时段时长 ≤ 60 分钟（节次区间通常 ≥80 分钟，报告为 20/40 分钟）；
-      ② 段首须能取到 2-16 字人名串且以冒号收尾（茶歇/午餐无姓名）；
+      ② 行须能解出姓名+题目（V2/V4 内置真实姓名校验）；
       ③ topic 不得命中休息/主持类噪声词（茶歇/午餐/晚餐/休息/开幕/闭幕/致辞/合影）。
     触发需 ≥2 场，且排在瀑布最末（仅候选1-9 全落空时启用）。
     """
     _SLOT = re.compile(
         r'(?P<s>\d{1,2}\s*[:：]\s*\d{2})\s*[-—–~至]\s*(?P<e>\d{1,2}\s*[:：]\s*\d{2})')
     _NOISE = re.compile(r'^(?:茶歇|午[餐饭]|晚[餐饭]|早[餐饭]|休息|开幕|闭幕|致辞|'
-                        r'合影|签到|自由讨论|提问|互动|总结|合影留念)')
+                        r'合影|签到|报到|自由讨论|提问|互动|总结|合影留念|颁奖|'
+                        r'开幕式|代表发言|会议总结)')
     marks = list(_SLOT.finditer(text))
     if len(marks) < 2:
         return []
@@ -6093,15 +6328,11 @@ def _detect_agenda_slot_sessions(text, default_year=None, publish_time=None,
         seg = text[mk.end():
                    marks[i + 1].start() if i + 1 < len(marks) else len(text)]
         seg = seg.strip()
-        spk = _agenda_slot_speaker(seg)   # ② 段首须为姓名+冒号
-        if not spk:
+        row = _agenda_row_session(seg)      # ② 行须解出姓名+题目（V1/V2/V4）
+        if not row:
             continue
-        topic = seg.split(':', 1)[-1].split('：', 1)[-1].strip()
-        # 剥尾部噪声（下一节标题/茶歇等常紧随报告题目）
-        topic = re.split(r'\s{0,2}(?:茶歇|午餐|晚餐|第二节|第三节|第四节|第一节)',
-                         topic)[0].strip()
-        topic = _clean_session_topic(topic)
-        if not topic or len(topic) < 2 or _NOISE.match(topic):   # ③
+        spk, aff, topic = row
+        if _NOISE.match(topic):   # ③
             continue
         dt = parse_cn_time(_page_date_str + mk.group('s') + '-' + mk.group('e'),
                            default_year=default_year, publish_time=publish_time,
@@ -6112,10 +6343,99 @@ def _detect_agenda_slot_sessions(text, default_year=None, publish_time=None,
         # 逐块解析取不到姓名，必须由候选显式给出；多人合报保留「刘愿、张磊」原样）。
         cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
                      'block': mk.group() + ' ' + seg, '_no': mk.group(),
-                     'speaker': spk, 'splitMode': 'agenda-slot'})
+                     'speaker': spk, 'affiliation': aff, 'splitMode': 'agenda-slot'})
     if len(cand) < 2:
         return []
     # 同 (topic,start) 去重
+    seen = set()
+    out = []
+    for s in cand:
+        k = (re.sub(r'\s+', '', s['topic']), s['start'])
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(s)
+    return out if len(out) >= 2 else []
+
+
+def _detect_numbered_agenda_sessions(text, default_year=None, publish_time=None,
+                                     title_year=None, url_year=None, title='',
+                                     base_start=None, base_end=None):
+    """候选11（兜底，岭南经济论坛等大型会议议程）：编号行「N. 人名（单位） 题目：X」。
+
+    正文形如（em/5983）：
+      10:10-12:00 大会主题报告 1. 张曙光 (著名经济学家、中国社科院研究员) 题目:新经济
+      对经济学理论的挑战 2. 晏智杰 (著名经济学家、北京大学经济学院前院长) 题目:…
+      16:25-17:10 获奖作者代表主题发言:(每人 15 分钟) 1. 王鹏 (暨南大学…) 题目:…
+    各场无独立时刻（共享所在环节的时段窗），与候选10 的「时段开头行」互补；
+    与候选7（纯「1. 题目」编号列表）的分工：此处编号后必须紧跟「人名(单位)+题目标签」。
+
+    守卫：
+      ① 人名须像真实姓名（2-4 汉字/外文名），且紧跟括号单位与题目标签；
+      ② ≥2 场且人名互异（纯「1.题目A 2.题目B」单人场外清单不会触发）；
+      ③ 时间取各场编号之前最近时段（回看 ≤200 字，如「10:10-12:00 大会主题报告 1.」），
+        页眉日期兜底；取不到时段的场跳过；
+      ④ 题目截止于后勤/节次词（茶歇/午餐/第N组/主持人…）。
+    各场共享环节时段（同簇同刻）→ 打 _numbered=True 豁免末尾 distinct-time 检查。
+    """
+    _ROW_RE = re.compile(
+        r'(?P<no>\d{1,2})\s*[.、．]\s*'
+        r'(?P<name>[\u4e00-\u9fff·]{2,4}|[A-Za-z][A-Za-z\.\-\' ]{1,30}?)\s*'
+        r'[（(](?P<aff>[^）)]{0,60})[）)]\s*'
+        r'(?P<lb>题目|主题|报告题目|讲题|演讲题目)\s*[:：]\s*')
+    _CUT = re.compile(
+        r'\s{0,2}(?:茶歇|午[餐饭]|晚[餐饭]|早[餐饭]|报到|签到|合影|颁奖|开幕|闭幕|'
+        r'致辞|总结发言|会议总结|代表发言|主持人|第[一二三四五六七八九十]+\s*节|'
+        r'第[一二三四五六七八九十]+\s*组|[ABC]\s*组|分会场)')
+    _BACK_SLOT = re.compile(
+        r'(\d{1,2})\s*[:：]\s*(\d{2})\s*[-—–~至]\s*\d{1,2}\s*[:：]\s*\d{2}')
+    marks = list(_ROW_RE.finditer(text))
+    if len(marks) < 2:
+        return []
+    _page_dt = parse_cn_time(text, default_year=default_year,
+                             publish_time=publish_time,
+                             title_year=title_year, url_year=url_year)
+    _page_date_str = ''
+    if _page_dt and _page_dt.get('start'):
+        _d = _page_dt['start']
+        _page_date_str = f'{_d.year}年{_d.month}月{_d.day}日 '
+
+    cand = []
+    for i, mk in enumerate(marks):
+        name = mk.group('name').strip()
+        if not _looks_like_real_name(name):
+            continue
+        seg_end = marks[i + 1].start() if i + 1 < len(marks) \
+            else min(len(text), mk.end() + 500)
+        topic = text[mk.end():seg_end]
+        topic = _CUT.split(topic)[0].strip()
+        topic = _clean_session_topic(topic)
+        if not topic or len(topic) < 2:
+            continue
+        # 时间：本场编号之前最近的「时段区间」行（大会主题报告/获奖发言的环节窗）
+        back = text[max(0, mk.start() - 200):mk.start()]
+        slots = list(_BACK_SLOT.finditer(back))
+        if not slots:
+            continue
+        _s = slots[-1]
+        hh, mm = int(_s.group(1)), int(_s.group(2))
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            continue
+        dt = parse_cn_time(f'{_page_date_str}{hh:02d}:{mm:02d}',
+                           default_year=default_year, publish_time=publish_time,
+                           title_year=title_year, url_year=url_year)
+        if not dt or not dt.get('start'):
+            continue
+        cand.append({'topic': topic, 'start': dt['start'], 'end': None,
+                     'block': text[mk.start():seg_end], '_no': mk.group('no'),
+                     'speaker': name, 'affiliation': _clean_aff_token(mk.group('aff')),
+                     '_numbered': True, 'splitMode': 'numbered-agenda'})
+    if len(cand) < 2:
+        return []
+    # 人名须互异（同一编号块被页眉与正文重复命中时同号去重由 (topic,start) 处理）
+    if len({s['speaker'] for s in cand}) < len(cand):
+        # 允许同名多场？议程编号行同人两报极罕见——直接要求互异更稳
+        return []
     seen = set()
     out = []
     for s in cand:
@@ -6665,15 +6985,23 @@ def _ms_dedup_guard(sessions):
         return sessions
     # 垃圾场过滤：页头/导航切块的特征是栏目导航词连串；『…的通知』是同页行政通知
     # 标题（gxb125 工作坊页实测：通知行+介绍段被各当一场）。
+    # 2026-09-26 收窄：原「^关于」前缀过滤会误杀以「关于」开头的真实讲座题目
+    # （em/7542「关于广东产业高质量发展的几点思考」顾乃华场被剔，且剔除发生在
+    # impl 编号之后导致 lectureIndex 与 lectureCount 失配 2/3,3/3,4/3）——改为仅拦
+    # 「的通知」结尾的行政通知行；过滤后重排序号保持编号连续。
     _NAV_CHAIN = re.compile(
         r'(?:学术活动|科研项目|科研成果|科研平台|研究方向|重大项目|学科方向|'
         r'人才招聘|本科生教育|研究生教育|党建工作|学院概况|学院简介|合作交流){2,}')
-    _NOTICE_TOPIC = re.compile(r'的通知$|^关于')
+    _NOTICE_TOPIC = re.compile(r'的通知$')
     sessions = [s for s in sessions
                 if not _NAV_CHAIN.search(str(s.get('topic') or ''))
                 and not _NOTICE_TOPIC.search(str(s.get('topic') or '').strip())]
     if len(sessions) < 2:
         return []
+    for _i, _s in enumerate(sessions):
+        _s['no'] = str(_i + 1)
+        if _s.get('_doc_no') is not None:
+            _s['_doc_no'] = _i + 1
 
     def _topic_key(t):
         """topic 比较键：去空白 + 全角转半角 + 去标点——『量子动力学：从皮秒到阿秒』
@@ -6699,8 +7027,12 @@ def _ms_dedup_guard(sessions):
         return []
     spk = [re.sub(r'\s+', '', str(s.get('speaker') or '')) for s in sessions]
     st = [str(s.get('start') or '') for s in sessions]
-    if all(spk) and len(set(spk)) < len(spk) and len(set(st)) <= 1:
-        return []
+    # 编号型/共享页眉时间型（_numbered/_same_time_ok）豁免「speaker 有重复且时间
+    # 全同」规则：此类候选本就同刻多场（同一人可在不同分会场各报一场，em/4169
+    # 实测），其结构信号（编号/逐行主讲人标签）已证明是多场。
+    if not all(s.get('_numbered') or s.get('_same_time_ok') for s in sessions):
+        if all(spk) and len(set(spk)) < len(spk) and len(set(st)) <= 1:
+            return []
     return sessions
 
 
@@ -6741,9 +7073,9 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
     多讲座拆分路径末尾还有「空场次丢弃」闸6（无 speaker 且无 topic 的退化场次丢弃）。
     """
     # 候选0：主题段落内直接并列「第一讲：A 第二讲：B」（文学院 2979 等）
-    sessions = _detect_inline_topic_sessions(
+    sessions = _ms_gate_filter(_detect_inline_topic_sessions(
         text, default_year=default_year, publish_time=publish_time,
-        title_year=title_year, url_year=url_year)
+        title_year=title_year, url_year=url_year))
     if sessions:
         return sessions
 
@@ -6786,12 +7118,15 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 _book_sessions.append({'no': _i + 1, 'topic': _tp, 'start': _bs,
                                        'end': None, 'block': _m.group(0),
                                        'splitMode': 'book-title', 'speaker': _nm})
+            _book_sessions = _ms_gate_filter(_book_sessions)
             if len(_book_sessions) >= 2:
                 return _book_sessions
 
     labels = list(_TOPIC_DELIM_RE.finditer(text))
     sessions = []
     sessions_raw = []
+    _label_blocks = []      # 有效 topic 但无可信时间的块：多人异名兜底材料
+    _page_dt1 = None        # 惰性解析的页眉时间（回填/兜底共用）
     if len(labels) < 2:
         # 候选1 分块标记不足（如纯「题目N：」编号型、单场页）：不在此早退，
         # 交由后续候选2/3/4 兜底，避免阻断多报告页拆分（见 cs 4268）。
@@ -6809,9 +7144,27 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         # 会被截到下一个「题目」而误得「时间: 地点: 一、」这类垃圾；仅当像真实姓名才采用。
         if speaker and not _looks_like_real_name(speaker):
             speaker = ''
+        # speaker 识别次序（2026-09-26 调整）：**先块内后前置**。表格展平行
+        # （「主题：X 主讲人：Y」逐行相连）里，前置 250 字窗口装着**上一行**的
+        # 「主讲人：Z」，先取前置会把上一行的主讲人串到本场（em/3769 盛小平→
+        # 奉国和场实测）；块内标签才是本场归属。physics807 的「嘉宾：X 主题：Y」
+        # 前置形态在块内无标签时仍生效。
         blk_start = lab.end()
         blk_end = labels[i + 1].start() if i + 1 < len(labels) else len(text)
         block = text[blk_start:blk_end]
+        _aff_inblk = ''
+        _inblk = re.search(
+            r'(?:主讲人|报告人|演讲人|发言人)\s*[:：]\s*([^\n：:\d]{2,24}?)'
+            r'\s*(?=\s*(?:时间|日期|地点|主持人|评议人|评论人|题目|主题|摘要|'
+            r'简介|内容|第[一二三四五六七八九十]|\d|$))', block)
+        if _inblk:
+            speaker, _aff_inblk = _speaker_from_label_value(_inblk.group(1))
+        if not speaker:
+            speaker = _sp_list[-1].group(1).strip() if _sp_list else ''
+            # 净化：页眉空「主讲人/嘉宾」字段（形如「主讲人: 时间: 地点: 一、 题目:」）
+            # 会被截到下一个「题目」而误得「时间: 地点: 一、」这类垃圾；仅当像真实姓名才采用。
+            if speaker and not _looks_like_real_name(speaker):
+                speaker = ''
         tv = re.match(r'\s*(.+?)\s*' + _TOPIC_VAL_STOP, block)
         if not tv:
             continue
@@ -6820,13 +7173,35 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         topic = re.sub(r'\s*(?:主讲人|报告人|预告)\s*[:：]?.*$', '', topic).strip()
         # 清除「形式：圆桌论坛」式尾部噪声（专题块标签值常粘连活动形式说明）
         topic = re.sub(r'形式[:：].*$', '', topic).strip()
+        # 表格展平行可能把「主题：题目：X」双层标签拆进块首，剥引导标签
+        topic = re.sub(r'^(?:讲座题目|报告题目|演讲题目|讲题|题目|主题)\s*[:：]\s*', '', topic)
         topic = _clean_session_topic(topic)
         if not topic or len(topic) < 2:
             continue
         dt = parse_cn_time(block, default_year=default_year, publish_time=publish_time,
                             title_year=title_year, url_year=url_year)
         if not dt or not dt.get('start'):
-            continue
+            # 窄口径页眉日期回填（2026-09-26）：块内含「时间：HH:MM」**标签**（表格
+            # 展平行「主题：X 主讲人：Y 时间：9:25-9:45」——时钟与主题同块自带对齐）
+            # 而缺日期时，用页眉日期补全重试。裸时钟不回填：em/7264 型议程块
+            # 「推动制造业… 9:00-9:30 黄少安(…)」里的时段属于**下一场**，回填会把
+            # 时间配错位——该格式交由候选10 的「时段 人名(单位) 题目：」行解析处理。
+            if re.search(r'(?:时间|日期|开始时间)\s*[:：]\s*\d{1,2}\s*[:：]\s*\d{2}', block):
+                if _page_dt1 is None:
+                    _page_dt1 = parse_cn_time(text, default_year=default_year,
+                                              publish_time=publish_time,
+                                              title_year=title_year,
+                                              url_year=url_year)
+                if _page_dt1 and _page_dt1.get('start'):
+                    _d1 = _page_dt1['start']
+                    dt = parse_cn_time(f'{_d1.year}年{_d1.month}月{_d1.day}日 ' + block,
+                                       default_year=default_year,
+                                       publish_time=publish_time,
+                                       title_year=title_year, url_year=url_year)
+            if not dt or not dt.get('start'):
+                _label_blocks.append({'topic': topic, 'block': block,
+                                      'speaker': speaker, 'affiliation': _aff_inblk})
+                continue
         # 块内完整性（MS1）：须能区分不同场次。原守卫仅认「带时钟或含结束时间」，
         # 会误杀论坛日程表等「每行仅给日期、无时刻」的多场（如 ai/163 六行仅有日期）。
         # 修订：仅当「全部候选都无时钟 且 日期全部相同」时才视为共享页日期/通知日、
@@ -6835,11 +7210,18 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         _has_clock = not (st.hour == 0 and st.minute == 0 and dt.get('end') is None)
         sessions_raw.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
                              'block': block, 'splitMode': 'repeated-label',
-                             'speaker': speaker, '_has_clock': _has_clock})
+                             'speaker': speaker, '_has_clock': _has_clock,
+                             'affiliation': _aff_inblk})
     # 候选1 收尾：按修订后的 MS1 守卫决定保留哪些场次
     if sessions_raw:
+        # 混合页剔除（2026-09-26）：部分块带时钟时，无时钟块是页眉/论坛主题行
+        # （em/3769 分会场主题「公共信息服务与社会发展」@00:00 混入首场实测），
+        # 先剔除再判定；全无时钟页（ai/163 六行仅日期型）不受影响。
+        if any(r['_has_clock'] for r in sessions_raw):
+            sessions_raw = [r for r in sessions_raw if r['_has_clock']]
         _distinct_dates = {r['start'].date() for r in sessions_raw}
-        if any(r['_has_clock'] for r in sessions_raw) or len(_distinct_dates) >= 2:
+        if sessions_raw and (any(r['_has_clock'] for r in sessions_raw)
+                             or len(_distinct_dates) >= 2):
             # 守卫（防 meta+正文双份误拆，physics13346 实测）：全部场次 topic 去空格后
             # 互为重复 → 是同一讲座的两份文本（div.content 正文一份、meta description
             # 一份），不是多场。与既有"同主题多时段不拆"（MS3-2）同源：真实多场页的
@@ -6850,8 +7232,59 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             else:
                 for _r in sessions_raw:
                     _r.pop('_has_clock', None)
-                sessions = sessions_raw
+                sessions = _ms_gate_filter(sessions_raw)
         # 否则（全部无时钟且日期相同）→ 视为共享页日期，不拆分（维持原守卫语义）
+    # 多人异名兜底（2026-09-26，em/3771「主题：X 主讲人：Y 时间：30分钟」、
+    # em/4169 香樟论坛表格「主题：X 主讲人：Y」型）：主题值无时钟也无「时间：」
+    # 标签时钟的表格展平行——每块含互异真实姓名的主讲人标签 → 仍为 N 场独立讲座，
+    # 共享页眉时间（须带时钟），打 _same_time_ok 豁免末尾 distinct-time 检查。
+    # 守卫：① 每块须取到真实姓名（含多人合报）；② 姓名两两互异、主题互异；
+    # ③ ≥2 场；④ 页眉时间带时钟，否则宁可不拆。
+    if len(sessions) < 2 and len(_label_blocks) >= 2:
+        _sp_cand = []
+        for _lb in _label_blocks:
+            _nm = _lb.get('speaker') or ''
+            _af = _lb.get('affiliation') or ''
+            if not _nm or not _looks_like_real_name(_nm):
+                _inblk = re.search(
+                    r'(?:主讲人|报告人|演讲人|发言人)\s*[:：]\s*([^\n：:\d]{2,24}?)'
+                    r'\s*(?=\s*(?:时间|日期|地点|主持人|评议人|评论人|题目|主题|'
+                    r'摘要|简介|内容|第[一二三四五六七八九十]|\d|$))', _lb['block'])
+                if _inblk:
+                    _nm, _af = _speaker_from_label_value(_inblk.group(1))
+            if not _nm:
+                continue
+            # 多人合报（「朱琪、吴雪萍」）：逐个人名判真；单人名判真
+            # （标签值先验下罕姓走 _loose_name_like，见 _speaker_from_label_value）
+            _parts = [p for p in re.split(r'[、,，]', _nm) if p.strip()]
+            if not (_looks_like_real_name(_nm) or _loose_name_like(_nm)
+                    or (len(_parts) > 1
+                        and all(_looks_like_real_name(p.strip())
+                                or _loose_name_like(p.strip()) for p in _parts))):
+                continue
+            _sp_cand.append({'topic': _lb['topic'], 'block': _lb['block'],
+                             'speaker': _nm, 'affiliation': _af})
+        # 姓名互异守卫（2026-09-26 放宽）：同一人在大型论坛可在不同分会场各有报告
+        # （em/4169 香樟论坛 24 行仅约 20 个互异姓名，两两互异要求会整体误杀），
+        # 收敛为「≥2 个互异姓名且互异率 ≥50%」——既拦「主讲人：张三」单人多题清单，
+        # 又容忍真实的多场重复报告人；主题互异仍是主守卫。
+        _n_distinct_spk = len({s['speaker'] for s in _sp_cand})
+        if (len(_sp_cand) >= 2
+                and _n_distinct_spk >= 2
+                and _n_distinct_spk * 2 >= len(_sp_cand)
+                and len({re.sub(r'\s+', '', s['topic'])
+                         for s in _sp_cand}) >= len(_sp_cand)):
+            if _page_dt1 is None:
+                _page_dt1 = parse_cn_time(text, default_year=default_year,
+                                          publish_time=publish_time,
+                                          title_year=title_year, url_year=url_year)
+            _st1 = _page_dt1['start'] if _page_dt1 and _page_dt1.get('start') else None
+            if _st1 and not (_st1.hour == 0 and _st1.minute == 0):
+                sessions = [{'topic': s['topic'], 'start': _st1, 'end': None,
+                             'block': s['block'], 'speaker': s['speaker'],
+                             'affiliation': s['affiliation'],
+                             'splitMode': 'label-speakers', '_same_time_ok': True}
+                            for s in _sp_cand]
     # 候选2（新增，CS / 心理学院等源）：离散「报告N/讲座N/学术讲座N」分场标记——
     # 正文形如「报告一\n时间：9:00\n题目：X\n摘要：…\n报告二\n时间：10:00\n题目：Y…」，
     # 或 psy 站点「学术讲座一\n时间：…\n地点：…\n题目：…\n主讲人：…\n学术讲座二\n…」。
@@ -6916,7 +7349,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             cand2.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
                           'block': seg, 'splitMode': 'report-n'})
         if len(cand2) >= 2:
-            sessions = cand2
+            sessions = _ms_gate_filter(cand2)
     # 候选3（兜底）：字段列表型多报告（cs 5400 等）。候选1 按「报告题目」分块、候选2 按
     # 「报告N」分块均失败（前者逐块取不到本场时间、后者无离散报告N标记）时，用字段锚点聚合。
     if len(sessions) < 2:
@@ -6924,7 +7357,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             text, default_year=default_year, publish_time=publish_time,
             title_year=title_year, url_year=url_year)
         if len(cand3) >= 2:
-            sessions = cand3
+            sessions = _ms_gate_filter(cand3)
     # 候选4（兜底）：阿拉伯数字编号的「题目N：/报告题目N：」型多报告（cs 4268 等）。
     # 候选1/2/3 均无法处理：候选1 的 _TOPIC_DELIM_RE 不支持「题目N：」编号格式、
     # 且分块后块内无时间（共用页眉）会全部跳过；候选2 靠「报告N」离散标记（此页为「题目N」）；
@@ -6935,7 +7368,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             title_year=title_year, url_year=url_year,
             base_start=base_start, base_end=base_end)
         if len(cand4) >= 2:
-            sessions = cand4
+            sessions = _ms_gate_filter(cand4)
     # 候选5（兜底，abdn / 系列讲坛等）：用「第N讲/第N场」做分段标记。
     # 页面正文可能以 第7讲\n时间：…\n主讲：…\n\n第8讲\n… 形式排列，
     # 通用候选1-4（按题目/主题标签）抓不到这类无结构化标签的系列页。
@@ -7000,7 +7433,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                               'end': dt5.get('end'), 'block': seg,
                               '_no': mk.group(), 'splitMode': 'nth-session'})
             if len(cand5) >= 2:
-                sessions = cand5
+                sessions = _ms_gate_filter(cand5)
     # 候选5b：英文「TalkN: / TalkN：」分场标记（seri23 环境研究院双报告）。
     # 页眉共享 报告人/地点/时间，两场同刻开场 → 打 _numbered=True 豁免
     # 末尾 distinct-time 检查；topic 取标记后到「报告人」之间的英文题目。
@@ -7031,6 +7464,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 cand_t.append({'topic': _tp, 'start': _page_dt_t, 'end': None,
                                'block': _seg, '_numbered': True,
                                '_no': _mk.group(), 'splitMode': 'talk-n'})
+            cand_t = _ms_gate_filter(cand_t)
             if len(cand_t) >= 2 and all(c['start'] for c in cand_t):
                 sessions = cand_t
     # 候选6（兜底，CTLD「智能升级」系列通识课等）：正文以「专题一：…专题二：…」式
@@ -7074,7 +7508,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                               '_numbered': True, '_no': mk.group(),
                               'splitMode': 'bare-topic'})
             if len(cand6) >= 2:
-                sessions = cand6
+                sessions = _ms_gate_filter(cand6)
     # 候选7（兜底）：纯阿拉伯数字编号列表（「1. 题目 时间：…」型，ibc/2779 等）。
     # 每项自带独立时间/地点，与候选4（题目N：前缀）分工：此处编号是裸「数字+点/顿号」、
     # 题目紧跟编号。触发：≥2 个「数字[.．、]」编号标记，且 ≥2 段含独立时间。
@@ -7083,7 +7517,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             text, default_year=default_year, publish_time=publish_time,
             title_year=title_year, url_year=url_year)
         if len(cand7) >= 2:
-            sessions = cand7
+            sessions = _ms_gate_filter(cand7)
     # 候选8（兜底）：编号挂在「报告人」上的多报告（cs 1932）。
     # 候选1-7 均落空：候选1 按「报告题目」分块后块内取不到时间（时间在页尾），
     # 候选4/7 要求编号直接挂在题目标签上（此页「报告题目」无编号）。放在最后，
@@ -7095,7 +7529,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             title_year=title_year, url_year=url_year,
             base_start=base_start, base_end=base_end)
         if len(cand8) >= 2:
-            sessions = cand8
+            sessions = _ms_gate_filter(cand8)
     # 候选9（兜底，em 经管「华南经济论坛」等）：「第N场」后紧跟「题目:/主讲人:」字段块。
     # 候选5 的 marker 负向预查 (?![题主报人目介摘]) 会拦掉「第一场题目:」，且 topic
     # 只取 3-40 字导致长英文题目失败；本候选以「marker+字段标签」为强特征补齐。
@@ -7105,7 +7539,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             title_year=title_year, url_year=url_year, title=title,
             base_start=base_start, base_end=base_end)
         if len(cand9) >= 2:
-            sessions = cand9
+            sessions = _ms_gate_filter(cand9)
     # 候选10（兜底，新年论坛/研讨会议程表）：逐条「时段 姓名：题目」列表（em/7636）。
     # 位于瀑布最末，仅候选1-9 全落空时启用；靠时长≤60分钟 + 段首姓名冒号 + 噪声词
     # 三重守卫过滤节次区间行与茶歇/午餐/主持人行。
@@ -7114,8 +7548,20 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             text, default_year=default_year, publish_time=publish_time,
             title_year=title_year, url_year=url_year, title=title,
             base_start=base_start, base_end=base_end)
+        cand10 = _ms_gate_filter(cand10)
         if len(cand10) >= 2:
             sessions = cand10
+    # 候选11（兜底，岭南经济论坛等大型会议议程）：编号行「N. 人名（单位） 题目：X」。
+    # 大会主题报告/获奖发言各场无独立时刻（共享所在环节的时段窗），与候选10 的
+    # 「时段开头行」互补（em/5983：上午 4 场主报告 + 下午 3 场获奖发言均此形态）。
+    if len(sessions) < 2:
+        cand11 = _detect_numbered_agenda_sessions(
+            text, default_year=default_year, publish_time=publish_time,
+            title_year=title_year, url_year=url_year, title=title,
+            base_start=base_start, base_end=base_end)
+        cand11 = _ms_gate_filter(cand11)
+        if len(cand11) >= 2:
+            sessions = cand11
     # 去重：同 (topic, start) 视为同一场（顶部「题目」常与首期「主题/报告N题目」重复出现）。
     # topic 比较前去掉所有空白，避免正文数学符号/排版导致的「ℤ_{2^k}」与「ℤ _{2^k}」式微差误判为不同场。
     # 同 key 的多块中保留「信息更完整」者（含主讲人/报告人/摘要/参与者等子字段的块优先），
@@ -7192,7 +7638,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
     # 均「上午9:00-12:00」），若僵化要求时间互异会把真实多场误并。故在此按正文编号
     # marker 二次判定并补打 _numbered：要求正文存在 ≥2 个不同编号、且编号数不少于
     # 场次数（场次与编号一一对应），号出现在 title 中的按模板重复剔除（MS5-GUARD 同口径）。
-    if not all(s.get('_numbered') for s in sessions):
+    if not all(s.get('_numbered') or s.get('_same_time_ok') for s in sessions):
         _NTH_MARK = re.compile(r'第\s*([一二三四五六七八九十百零两0-9]+)\s*(?:场|讲|期)')
         _t_nums = {m.group(1) for m in _NTH_MARK.finditer(title or '')}
         _b_nums = {m.group(1) for m in _NTH_MARK.finditer(text)} - _t_nums
@@ -7210,7 +7656,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             else:
                 for s in sessions:
                     s['_numbered'] = True
-    if not all(s.get('_numbered') for s in sessions):
+    if not all(s.get('_numbered') or s.get('_same_time_ok') for s in sessions):
         distinct = {(s['start'].year, s['start'].month, s['start'].day,
                      s['start'].hour, s['start'].minute) for s in sessions}
         if len(distinct) < 2:
