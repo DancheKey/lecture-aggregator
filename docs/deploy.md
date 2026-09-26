@@ -14,6 +14,12 @@ site/                 ← 前端（Vue3 + Tailwind CDN，纯静态）
   stats.html          学院/部处 × 年份 统计表
   app.js / style.css
   lectures.json       ← 静态数据源（切片脚本生成：排除名单过滤 + unitType 标注，勿用 cp 覆盖）
+  lectures/           ← 分片目录（公网前端实际加载路径）
+    chunks.json         分片清单（total/chunkSize/文件名列表）
+    chunk_0001..N.json  每片 500 条，首页按清单渐进加载
+    latest.json         最新 50 条（首屏秒开）
+    stats.json          统计页专用（学院-年份矩阵 + 最小讲座索引）
+    visits.json         站点访问量快照
   scnu-emblem.png / motto.png / site-title.png
 data/lectures.json    ← 爬虫产出的唯一数据源
 scraper/               ← Python 爬虫（requests + bs4 + RapidOCR）

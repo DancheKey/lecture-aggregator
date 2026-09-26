@@ -50,3 +50,5 @@ jobs:
         run: python tests/test_bio_bracket.py
       - name: Run location-prefix tests
         run: python tests/test_location_prefix.py
+      - name: Run frontend schema guard tests
+        run: python tests/test_frontend_schema.py
