@@ -2691,11 +2691,9 @@ def _clean_aff_token(aff):
     _INST_KW = re.compile(
         r'大学|学院|研究院|研究所|研究中心|社科院|科学院|学会|经济系|金融系|'
         r'商学院|党校|实验室|教研室|编辑部|智库|公司|银行')
-    _ROLE_TAIL = re.compile(
-        r'(?:常务副|副)?(?:校长|书记|院长|所长|主任|处长|部长|教授|副教授|'
-        r'研究员|副研究员|助理研究员|讲师|博导|博士生导师|硕导|硕士生导师|'
-        r'经济学家|经济学者|学者|专家|会长|理事长|常务理事|理事|监事|秘书长|'
-        r'副秘书长|主编|编辑|记者|院士|博士)$')
+    # 2026-09-26 审计收敛（G4）：原手抄职务表（私有词 经济学家/理事长/监事/记者 等
+    # 已并入 field_vocab.ORG_TITLE_SUFFIXES）改引主表 TAIL_TITLE_RE（长词优先、$ 锚定）。
+    _ROLE_TAIL = _fv.TAIL_TITLE_RE
     parts = [p.strip() for p in re.split(r'[、，,;；]', aff) if p.strip()]
     pick = ''
     for p in parts:
@@ -3379,10 +3377,11 @@ def _strip_affil_country_tail(value):
 
 # 主讲人姓名尾部的职称/修饰词残片（LLM 富化路径常产出「孙开佳 青年」——源页
 # 「报告人：孙开佳 / 青年研究员（复旦大学）」被模型拼接时把修饰词留在姓名后）。
+# 职称部分取自 field_vocab 主表（2026-09-26 审计收敛 G4），修饰词为本处私有词干
+# （青年/资深等是前缀修饰而非职称，不进主表，避免影响 strip_name_title_suffix）。
 _SPK_TAIL_TITLE_RE = re.compile(
-    r'\s*(?:青年|资深|特聘|长聘|客座|兼职|访问|荣誉|杰出|首席|优秀'
-    r'|特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|'
-    r'博士后|博士|院士|老师|导师|先生|女士)$')
+    r'\s*(?:' + _fv.NAME_TITLE_SUFFIX_RE.pattern
+    + r'|青年|资深|特聘|长聘|客座|兼职|访问|荣誉|杰出|首席|优秀)$')
 
 
 # 英文职务/头衔词：用于剥离「英文姓名 + 连写英文职务串」形态（physics 12246 实测——
@@ -5258,10 +5257,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 导致 affiliation 残留「助理研究员 (」）。若去噪后纯为职称词则清空；否则清理悬挂括号与空格。
     if result.get('speakerAffiliation'):
         _aff_dn = re.sub(r'[\s（(）)]', '', result['speakerAffiliation'])
-        _TITLE_ONLY = re.compile(
-            r'^(?:特聘教授|特任教授|助理教授|副教授|副研究员|助理研究员|研究员|教授|讲师|'
-            r'博士后|博士|院士|老师|导师|先生|女士|主任|院长|所长|秘书长)+$')
-        if _TITLE_ONLY.fullmatch(_aff_dn):
+        # 2026-09-26 审计收敛（G4）：原 20 词手抄副本与 field_vocab 分叉
+        # （「秘书长」此处放行、hybrid 判脏），改引主表 TITLE_ONLY_RE。
+        if _fv.TITLE_ONLY_RE.fullmatch(_aff_dn):
             result['speakerAffiliation'] = ''
         else:
             # 悬挂括号按「配平」判定清理（单一事实源 field_vocab.trim_dangling_brackets）：
@@ -6744,7 +6742,7 @@ _HONORIFICS = (
 _SPEAKER_SEG_RE = re.compile(
     rf'(?:({_HONORIFICS}))?\s*'
     rf'([\u4e00-\u9fff·]{{2,3}})\s*'
-    rf'(教授|研究员|副教授|助理教授|副研究员|助理研究员|讲师|院士|博士)'
+    rf'({_fv.NAME_TITLE_SUFFIX_RE.pattern})'
 )
 
 
@@ -7778,9 +7776,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
         _blk = s.get('block', '') or ''
         _spm = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*)\s*[：:]\s*(.+?){_BLOCK_FIELD_STOP}', _blk)
         if _spm:
-            _cand = re.sub(
-                r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-                r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', _spm.group(1)).strip()
+            _cand = re.sub(r'\s*' + _TITLE_ALT_FULL + r'.*$', '', _spm.group(1)).strip()
             _nm = _SPEAKER_NAME_RE.match(_cand)
             if _nm:
                 _all_speakers.append(_nm.group(1))
@@ -7881,15 +7877,12 @@ def split_record_by_sessions(base, sessions, full_text=''):
             else:
                 cand = sp_m.group(1).strip()
                 # 提取职称（用于 speakerTitle）
-                title_m = re.search(
-                    r'(特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-                    r'研究员|教授|讲师|博士后|博士|院士)', cand)
+                title_m = re.search('(' + '|'.join(
+                    sorted(_fv.NAME_TITLE_SUFFIXES, key=len, reverse=True)) + ')', cand)
                 speaker_title = title_m.group(1) if title_m else ''
                 # 先去掉尾部职称/单位后缀，再取姓名（避免「徐湘林教授」被截成「徐湘林教」，
                 # 也避免「穆肃教授」连写被 {2,3} 正则吞掉「教」字成「穆肃教」）
-                cand_core = re.sub(
-                    r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-                    r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', cand).strip()
+                cand_core = re.sub(r'\s*' + _TITLE_ALT_FULL + r'.*$', '', cand).strip()
                 # 从 3 字到 2 字降序取最长有效姓名；避免「陈玺上海大学…」被贪婪匹配成「陈玺上」。
                 # 块内英文姓名优先（seri23 Talk1/Talk2）：cand 为「报告人: <单位>」型时
                 # （可跨行吞入下一行的「Silvia Lacorte教授」），中文启发式仍从开头取
