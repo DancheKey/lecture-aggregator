@@ -5520,6 +5520,22 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             kept.append(r)
         if not kept:
             return None
+        # 编号重算（2026-09-26，幽灵计数修复）：MS5 逐条剔除后，lectureIndex/lectureCount
+        # 仍是拆分时按全量场次赋的 1..N——库里只剩 M(<N) 条却标着「第K期/共N期」，
+        # 前端与统计口径随之失配（xz/252 存量 1 条标 5/5、ibc/2779 标 2/2 实测）。
+        # 按剩余场次重排 1..M 并同步 count；仅剩 1 条时视为单场（isMultiLecture=False、
+        # 编号清空）——系列位次信息已保留在 title/topic 文本（如「第5讲丨…」），不丢失。
+        # 注意：重排只影响「本页入库条数」，不触碰 title/topic 原文。
+        if len(kept) != len(split_recs):
+            m = len(kept)
+            for i, r in enumerate(kept, 1):
+                r['lectureIndex'] = i
+                r['lectureCount'] = m
+            if m == 1:
+                kept[0]['isMultiLecture'] = False
+                kept[0].pop('lectureIndex', None)
+                kept[0].pop('lectureCount', None)
+                kept[0].pop('sessionNumber', None)
         return kept
 
     # ---- 多主讲人连写拆分（同一公告含多位主讲人，报告人字段以「[头衔]姓名职称」拼接）----
