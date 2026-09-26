@@ -338,7 +338,75 @@
                 <span class="w-1 h-5 rounded-full bg-blue-500"></span>
                 {{ g.key }}
               </div>
-              <article v-for="l in g.items" :key="l.sourceUrl + (l.lectureIndex ? '#' + l.lectureIndex : '')"
+              <template v-for="u in g.items" :key="u.key">
+              <!-- 论坛卡（2026-09-26 方案B）：同源页场次 ≥4 合并为一张卡，展开可看逐场清单；
+                   点赞/想听按键为 sourceUrl 级（全体场次共享同一计数），点标题进源页看完整议程 -->
+              <article v-if="u.type === 'forum'" class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
+                <div class="flex items-center gap-2 text-11pt mb-1.5">
+                  <span class="hidden sm:inline font-medium text-slate-600 truncate min-w-0 max-w-college">{{ u.head.college }}</span>
+                  <span class="hidden sm:inline text-slate-300 shrink-0">·</span>
+                  <span class="whitespace-nowrap inline-flex items-center gap-1 text-slate-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="font-medium">{{ u.dateLabel }}</span>
+                  </span>
+                  <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap', statusInfo(u.head).cls]">
+                    <span class="hidden sm:inline">{{ statusInfo(u.head).label }}</span>
+                    <span class="sm:hidden">{{ statusInfo(u.head).labelShort }}</span>
+                  </span>
+                </div>
+                <h2 class="text-15pt font-semibold leading-snug mb-2">
+                  <a :href="safeUrl(u.url)" target="_blank" rel="noopener noreferrer" @click="recordVisit(u.url)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ u.head.title }}</a>
+                </h2>
+                <div class="text-12pt text-slate-600 space-y-1 mb-2">
+                  <div v-if="u.head.location" class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                    </svg>
+                    <span class="shrink-0 text-slate-900 font-semibold">地点</span>
+                    <span class="text-slate-700 min-w-0">{{ u.head.location }}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                    </svg>
+                    <span class="text-slate-700">系列会议 · 共 <span class="font-bold text-slate-900">{{ u.total }}</span> 场报告，点标题可查看源页完整议程</span>
+                  </div>
+                  <div v-if="u.recs.length < u.total" class="text-amber-600 text-11pt">⚠ 当前筛选命中 {{ u.recs.length }} / {{ u.total }} 场</div>
+                </div>
+                <button @click="toggleForum(u)"
+                  class="text-11pt text-blue-600 hover:text-blue-800 hover:underline mb-1">
+                  {{ isForumOpen(u) ? '收起场次清单 ▲' : '展开场次清单 ▼' }}
+                </button>
+                <div v-if="isForumOpen(u)" class="mt-1 border-t border-slate-100 pt-2 space-y-1">
+                  <div v-for="r in u.recs" :key="r.lectureIndex ?? (r.topic || '').slice(0, 16)" class="flex items-baseline gap-2 text-11pt min-w-0">
+                    <span class="shrink-0 text-slate-400 tabular-nums w-[86px]">{{ (r.lectureStart || '').slice(5, 16) }}</span>
+                    <span class="min-w-0 text-slate-700 truncate" :title="r.topic">{{ r.topic || r.title }}</span>
+                    <span class="shrink-0 text-slate-500">{{ r.speaker }}</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center mt-2">
+                  <button @click="onTagClick('college', u.head.college)"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.college }}</button>
+                  <div class="card-actions flex items-center gap-2 shrink-0">
+                    <button @click="toggleWant(u.url, $event)"
+                      :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.url) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
+                      title="想听就点^_^">
+                      <span class="min-w-badge text-center">{{ capDisplay(wantCount(u.url)) }}</span>
+                    </button>
+                    <button @click="toggleLike(u.url, $event)"
+                      :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(u.url) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
+                      title="喜欢就赞^_^">
+                      <span class="min-w-badge text-center">{{ capDisplay(likeCount(u.url)) }}</span>
+                    </button>
+                  </div>
+                </div>
+              </article>
+              <!-- 普通单场卡：原卡片标记零改动（l 为单元内唯一记录的别名） -->
+              <template v-else>
+              <article v-for="l in u.recs" :key="l.sourceUrl + (l.lectureIndex ? '#' + l.lectureIndex : '')"
                 class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
                 <!-- 元信息行：单位 · 时间（🕒 图标化）+ 右侧状态徽章（四态：进行中/即将开始/未开始/已结束） -->
                 <div class="flex items-center gap-2 text-11pt mb-1.5 flex-nowrap">
@@ -483,13 +551,15 @@
                   </a>
                 </div>
               </article>
+              </template>
+              </template>
             </div>
           </div>
 
           <div v-else class="text-center text-slate-400 py-16 text-12pt">没有匹配的讲座。</div>
 
           <!-- 分页导航 -->
-          <nav v-if="filtered.length > pageSize" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-12pt">
+          <nav v-if="units.length > pageSize" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-12pt">
             <button @click="prevPage" :disabled="currentPage === 1"
               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
             <template v-for="p in pageNumbers" :key="p">
@@ -595,7 +665,7 @@
     </transition>
   </div>
 
-  <script defer src="app.js?v=315dca2c59"></script>
+  <script defer src="app.js?v=5e2254a08d"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
