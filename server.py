@@ -15,6 +15,7 @@ import re
 import sys
 import json
 import time
+import secrets
 import threading
 import subprocess
 import yaml
@@ -57,6 +58,46 @@ _recent_want_action = {}               # (ip, url) -> (时间戳, 'want'|'unwant
 VISIT_THROTTLE = 180                   # 同一 IP / 同一讲座 3 分钟内只计 1 次
 LIKE_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同点赞动作只接受一次（允许 like↔unlike 交替）
 WANT_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同想听动作只接受一次（允许 want↔unwant 交替）
+LIKE_CAP = 999                         # 单条讲座点赞数上限（防慢速刷高；unlike 仍可继续减）
+MAX_BODY_BYTES = 1_000_000             # 请求体上限 1MB（本地 API 的 body 都是几十字节的小 JSON）
+
+# ---- 写接口管理凭证（2026-09-26 审计 P1-2）----
+# 此前 sources CRUD 与 /api/scrape 的唯一防线是 _is_local_origin——而它对
+# 「Origin/Referer 缺失」放行，curl 从局域网直连即可绕过；HOST=0.0.0.0 时即裸奔。
+# 现改为：启动时加载/生成随机 token（持久化 data/admin_token.json，不入库），
+# 所有写接口须带 X-Admin-Token 头。token 的发放端点 /api/admin/token 仅接受
+# 回环地址直连（client IP 为 127.0.0.1/[::1]），局域网/公网拿不到 token 即无法写。
+# 本机浏览器（前端「手动抓取」按钮）经 /api/admin/token 自动取 token，无需人工粘贴。
+_ADMIN_TOKEN_PATH = os.path.join(DATA_DIR, 'admin_token.json')
+
+
+def _load_or_create_admin_token():
+    try:
+        with open(_ADMIN_TOKEN_PATH, 'r', encoding='utf-8') as f:
+            tok = (json.load(f) or {}).get('token')
+            if tok:
+                return tok
+    except (OSError, ValueError):
+        pass
+    tok = secrets.token_urlsafe(24)
+    try:
+        import tempfile
+        fd, tmp = tempfile.mkstemp(dir=DATA_DIR, suffix='.tmp')
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump({'token': tok}, f)
+        os.replace(tmp, _ADMIN_TOKEN_PATH)
+    except OSError as e:
+        print(f'[WARN] admin_token 写盘失败（token 仅本进程内存有效）: {e!r}', file=sys.stderr)
+    return tok
+
+
+_ADMIN_TOKEN = _load_or_create_admin_token()
+_IS_LOOPBACK_RE = re.compile(r'^127\.0\.0\.1$|^::1$|^\[::1\]$')
+
+
+def _check_admin(self):
+    # 写接口凭证校验：X-Admin-Token 必须与启动时生成的 token 一致。
+    return (self.headers.get('X-Admin-Token') or '') == _ADMIN_TOKEN
 
 
 def _speaker_keys(name):
@@ -223,6 +264,10 @@ class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         # 禁用缓存：每次刷新都拿到最新数据
         self.send_header('Cache-Control', 'no-store')
+        # 2026-09-26 审计 P3：基础安全响应头（页面自身已有 CSP meta，此处不重复下发）
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
         # gzip 协商：若浏览器声明支持，则对响应体做 gzip 压缩
         if getattr(self, '_gz', False):
             self.send_header('Content-Encoding', 'gzip')
@@ -374,6 +419,10 @@ class Handler(SimpleHTTPRequestHandler):
         by_day 按本地日期累计，供生成「每年每月访问量」报告；
         完全本地（data/visits.json），不依赖任何外部计数服务（busuanzi / countapi 等）。
         """
+        # 2026-09-26 审计 P3：GET 改状态且此前无 Origin 校验——外站 <img> 可借
+        # 访客浏览器刷计数（Referer 为外站会被下方校验拒绝）。
+        if not self._is_local_origin():
+            return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         ip = self._client_ip()
         now = time.time()
         # 2026-08-05 体检修正（中等-16）：锁内只改状态，锁外发响应。
@@ -399,8 +448,24 @@ class Handler(SimpleHTTPRequestHandler):
         return self._send_json({'ok': True, 'stats': snapshot})
 
     def _read_body_json(self):
-        length = int(self.headers.get('Content-Length', 0) or 0)
+        # 2026-09-26 审计 P3：Content-Length 非数字不再抛未捕获异常；超过
+        # MAX_BODY_BYTES 的请求读入后丢弃（保持连接流一致）并按空 body 处理。
+        raw_len = (self.headers.get('Content-Length') or '').strip()
+        try:
+            length = int(raw_len or 0)
+        except ValueError:
+            return {}
         if length <= 0:
+            return {}
+        if length > MAX_BODY_BYTES:
+            print(f'[API-WARN] 请求体过大已忽略: {length} bytes > {MAX_BODY_BYTES}',
+                  file=sys.stderr)
+            remaining = length
+            while remaining > 0:
+                chunk = self.rfile.read(min(remaining, 65536))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
             return {}
         try:
             return json.loads(self.rfile.read(length))
@@ -452,10 +517,15 @@ class Handler(SimpleHTTPRequestHandler):
                 payload = {'ok': True, 'likes': cur.get('likes', 0), 'throttled': True}
             else:
                 st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
-                st['likes'] = st.get('likes', 0) + 1
-                _recent_like_action[key] = (now, 'like')
-                _save_lecture_stats()
-                payload = {'ok': True, 'likes': st.get('likes', 0)}
+                if st.get('likes', 0) >= LIKE_CAP:
+                    # 2026-09-26 审计 P3：单条讲座点赞封顶（返回 ok 保持前端 toggle
+                    # 状态机不被打断，capped 标志供前端未来感知）
+                    payload = {'ok': True, 'likes': st.get('likes', 0), 'capped': True}
+                else:
+                    st['likes'] = st.get('likes', 0) + 1
+                    _recent_like_action[key] = (now, 'like')
+                    _save_lecture_stats()
+                    payload = {'ok': True, 'likes': st.get('likes', 0)}
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_unlike_post(self):
@@ -580,9 +650,23 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path.split('?')[0] == '/api/sources':
             return self._api_sources_get()
+        # 写接口管理凭证发放（2026-09-26 审计 P1-2）：仅接受回环地址直连，
+        # 局域网/公网拿不到 token 即无法调用任何写接口。
+        if self.path.split('?')[0] == '/api/admin/token':
+            if not _IS_LOOPBACK_RE.match(self.client_address[0] or ''):
+                return self._send_json({'ok': False,
+                                        'message': '管理凭证仅限本机获取'}, 403)
+            return self._send_json({'ok': True, 'token': _ADMIN_TOKEN})
         # 屏蔽切片原子写留下的 *.tmp（写入窗口内可被读到半份 JSON）
         if self.path.split('?')[0].endswith('.tmp'):
-            self.send_error(404, '临时文件不可访问')
+            # 状态行仅 latin-1 安全，中文消息会 UnicodeEncodeError 断连（2026-09-26 修复）
+            self.send_error(404, 'Temporary file not accessible')
+            return
+        # 目录列表禁用（2026-09-26 审计 P3）：无 index.html 的目录（如 lectures/）
+        # 不再渲染文件清单；带 index.html 的根目录照常服务。
+        _dir = self.translate_path(self.path.split('?')[0])
+        if os.path.isdir(_dir) and not os.path.exists(os.path.join(_dir, 'index.html')):
+            self.send_error(404, 'Directory listing not available')
             return
         super().do_GET()
 
@@ -590,6 +674,11 @@ class Handler(SimpleHTTPRequestHandler):
         if not self._is_local_origin():
             return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         base = self.path.split('?')[0]
+        # 写接口凭证校验（2026-09-26 审计 P1-2）：sources 写入与抓取触发需带 token
+        if base in ('/api/scrape', '/api/sources') and not _check_admin(self):
+            return self._send_json({'ok': False,
+                                    'message': '缺少管理凭证（X-Admin-Token）；'
+                                               '本机浏览器会自动获取，脚本请读 data/admin_token.json'}, 401)
         if base == '/api/scrape':
             if not _scrape_lock.acquire(blocking=False):
                 self._send_json({'ok': False, 'message': '已有抓取任务在运行中，请稍候'}, 409)
@@ -655,6 +744,9 @@ class Handler(SimpleHTTPRequestHandler):
         if not self._is_local_origin():
             return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         base = self.path.split('?')[0]
+        if base.startswith('/api/sources/') and not _check_admin(self):
+            return self._send_json({'ok': False,
+                                    'message': '缺少管理凭证（X-Admin-Token）'}, 401)
         m = self._match_sources_index(base)
         if isinstance(m, int) and m >= 0:
             return self._api_sources_put(m)
@@ -664,6 +756,9 @@ class Handler(SimpleHTTPRequestHandler):
         if not self._is_local_origin():
             return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         base = self.path.split('?')[0]
+        if base.startswith('/api/sources/') and not _check_admin(self):
+            return self._send_json({'ok': False,
+                                    'message': '缺少管理凭证（X-Admin-Token）'}, 401)
         m = self._match_sources_index(base)
         if isinstance(m, int) and m >= 0:
             return self._api_sources_delete(m)

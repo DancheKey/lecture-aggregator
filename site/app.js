@@ -947,10 +947,29 @@ const app = createApp({
     },
 
     /* ---------- 触发后端抓取 ---------- */
+    // 管理凭证（2026-09-26 审计 P1-2）：写接口需带 X-Admin-Token。凭证仅本机
+    // （回环直连）可从 /api/admin/token 获取：403=服务端在但非本机（token-denied），
+    // 404/网络错误=无后端（静态托管）→ 走下方降级链。进程内缓存一次。
+    adminToken() {
+      if (this._adminToken) return Promise.resolve(this._adminToken);
+      return fetch('/api/admin/token', { cache: 'no-store' })
+        .then(r => {
+          if (r.status === 403) throw new Error('token-denied');
+          if (!r.ok) throw new Error('no-backend');
+          return r.json();
+        })
+        .then(j => { this._adminToken = j.token; return j.token; });
+    },
+
     scrape() {
       this.scraping = true;
-      fetch('/api/scrape', { method: 'POST', cache: 'no-store' })
-        .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      let tokErr = '';
+      this.adminToken()
+        .catch(e => { tokErr = e.message; throw e; })
+        .then(tok => fetch('/api/scrape', {
+          method: 'POST', cache: 'no-store',
+          headers: { 'X-Admin-Token': tok },
+        }).then(r => r.json().then(j => ({ ok: r.ok, j }))))
         .then(({ ok, j }) => {
           if (ok && j.ok) {
             // 修复（2026-08-05 体检 严重-5）：此前先把 mtime 更新为抓取后的新值，
@@ -964,6 +983,10 @@ const app = createApp({
           }
         })
         .catch(() => {
+          if (tokErr === 'token-denied') {
+            this.showToast('手动抓取仅限本机使用（管理凭证只发给 127.0.0.1）');
+            return;
+          }
           // 静态托管（无后端）时的降级处理
           if (WORKFLOW_DISPATCH_URL) {
             fetch(WORKFLOW_DISPATCH_URL, { method: 'POST', cache: 'no-store' })
