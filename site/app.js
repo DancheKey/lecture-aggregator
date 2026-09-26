@@ -215,7 +215,7 @@ const app = createApp({
     // 渲染单元（2026-09-26 方案B）：同 sourceUrl 且场次数 ≥ 阈值 → 一个论坛单元；
     // 其余逐条单条单元。保持 filtered 的既有排序（论坛单元落在其最新场次的位置）。
     units() {
-      const MIN = 4; // 论坛折叠阈值：≥4 场合并为一张卡（2-3 场的系列公告逐场展示更有用）
+      const MIN = 3; // 论坛折叠阈值：≥3 场合并为一张卡（2026-09-26 用户定；2 场的系列公告逐场展示更有用）
       const bySrc = new Map();
       this.filtered.forEach(l => {
         const u = l.sourceUrl || '';
