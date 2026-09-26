@@ -37,3 +37,16 @@ jobs:
         run: python tests/test_hallucination_guard.py
       - name: Run data-quality tests
         run: python tests/test_data_quality.py
+      # 以下五项 2026-09-26 纳入：多场拆分候选9/10/11与质量闸门（2026-09-25/26 两次
+      # 解析器大改的行为锁定）、模型A融合、引证裁决、简介括号、地点前缀——此前均不在
+      # 任何 workflow 中，解析器再改动时 CI 全绿也可能已回归。均纯离线、秒级完成。
+      - name: Run multi-session split tests
+        run: python tests/test_multi_session_split.py
+      - name: Run hybrid tests
+        run: python tests/test_hybrid.py
+      - name: Run cited-judge tests
+        run: python tests/test_cited_judge.py
+      - name: Run bio-bracket tests
+        run: python tests/test_bio_bracket.py
+      - name: Run location-prefix tests
+        run: python tests/test_location_prefix.py
