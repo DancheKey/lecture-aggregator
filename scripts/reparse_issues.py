@@ -22,13 +22,11 @@ import shutil
 import argparse
 import datetime
 import requests
-import urllib3
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys_path_ok = False
 import sys
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 载入 .env（模型 A/B 需要 key）
 for _line in open(os.path.join(ROOT, '.env'), encoding='utf-8'):
@@ -187,13 +185,31 @@ def anchor_window_ok(rec, html_text, new_val):
 
 # ============ 抓取（bytes 落盘，避免编码误判） ============
 SESSION = requests.Session()
+
+def _trusted_host(url):
+    """仅 scnu.edu.cn 边界内域名允许证书校验失败时降级（校内旧服务器证书链残缺）。"""
+    import urllib.parse
+    h = urllib.parse.urlparse(url).hostname or ''
+    return h == 'scnu.edu.cn' or h.endswith('.scnu.edu.cn')
+
+
+def _fetch(url):
+    """默认全程校验证书；仅校内域名在 SSLError 时降级重试一次（verify=False）。
+    此前全局 verify=False 会把中间人替换的页面写进主库（数据投毒通道），
+    2026-09-26 审计后收敛为按域名一次性降级，口径与 parsers._safe_fetch 一致。"""
+    try:
+        return SESSION.get(url, timeout=20)
+    except requests.exceptions.SSLError:
+        if not _trusted_host(url):
+            raise
+        return SESSION.get(url, timeout=20, verify=False)
 SESSION.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                   '(KHTML, like Gecko) Chrome/120.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
 })
-SESSION.verify = False
+
 
 
 def fetch_html(idx, url):
@@ -202,7 +218,7 @@ def fetch_html(idx, url):
     if os.path.exists(dst) and os.path.getsize(dst) > 500:
         return load_html(dst)
     try:
-        resp = SESSION.get(url, timeout=20)
+        resp = _fetch(url)
         open(dst, 'wb').write(resp.content)
         time.sleep(1.0)
         return load_html(dst)

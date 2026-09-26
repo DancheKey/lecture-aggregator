@@ -25,8 +25,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 
 import requests
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from parsers import parse_detail  # noqa: E402
 
@@ -34,8 +32,26 @@ DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
 CACHE = os.path.join(ROOT, 'tmp', 'conf_split_html')
 
 SESSION = requests.Session()
-SESSION.verify = False
 SESSION.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+
+def _trusted_host(url):
+    """仅 scnu.edu.cn 边界内域名允许证书校验失败时降级（校内旧服务器证书链残缺）。"""
+    import urllib.parse
+    h = urllib.parse.urlparse(url).hostname or ''
+    return h == 'scnu.edu.cn' or h.endswith('.scnu.edu.cn')
+
+
+def _fetch(url):
+    """默认全程校验证书；仅校内域名在 SSLError 时降级重试一次（verify=False）。
+    此前全局 verify=False 会把中间人替换的页面写进主库（数据投毒通道），
+    2026-09-26 审计后收敛为按域名一次性降级，口径与 parsers._safe_fetch 一致。"""
+    try:
+        return SESSION.get(url, timeout=20)
+    except requests.exceptions.SSLError:
+        if not _trusted_host(url):
+            raise
+        return SESSION.get(url, timeout=20, verify=False)
+
 
 # ── AUTO：重解析替换 ──────────────────────────────────────────────
 AUTO_URLS = [
@@ -112,7 +128,7 @@ def fetch(url):
     dst = os.path.join(CACHE, re.sub(r'[^0-9A-Za-z]', '_', url) + '.html')
     if os.path.exists(dst) and os.path.getsize(dst) > 500:
         return open(dst, 'rb').read()
-    resp = SESSION.get(url, timeout=20)
+    resp = _fetch(url)
     open(dst, 'wb').write(resp.content)
     return resp.content
 

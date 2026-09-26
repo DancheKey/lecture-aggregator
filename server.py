@@ -559,7 +559,10 @@ class Handler(SimpleHTTPRequestHandler):
                 except (json.JSONDecodeError, ValueError, OSError) as e:
                     # 2026-08-05 体检修正（中等-17）：数据文件损坏/读取失败时
                     # 返回明确的 500 与原因，而不是未捕获异常导致裸 traceback。
-                    return self._send_json({'ok': False, 'message': f'lectures.json 读取失败：{e}'}, 500)
+                    # 2026-09-26 审计脱敏：异常文本含绝对路径等本机信息，不再回传客户端，
+                    # 仅落服务端日志。
+                    print(f'[API-ERR] /api/lectures 读取失败: {e!r}', file=sys.stderr)
+                    return self._send_json({'ok': False, 'message': 'lectures.json 读取失败（详见服务端日志）'}, 500)
                 # 兼容包裹格式 {updatedAt, data} 与旧版纯数组
                 if isinstance(raw, dict) and 'data' in raw:
                     data = raw.get('data', []) or []
@@ -608,8 +611,14 @@ class Handler(SimpleHTTPRequestHandler):
                     capture_output=True, text=True, timeout=600,
                 )
                 if proc.returncode != 0:
-                    tail = (proc.stderr or proc.stdout or '')[-400:]
-                    self._send_json({'ok': False, 'message': '采集失败（请确认运行 server.py 的 Python 已安装 requests/bs4/rapidocr 等依赖）：' + tail}, 500)
+                    # 2026-09-26 审计脱敏：stderr 可能含绝对路径/环境信息，不再回传客户端，
+                    # 完整输出落服务端日志（server.py 本就运行在前台，stderr 可见）。
+                    tail = (proc.stderr or proc.stdout or '')[-2000:]
+                    print(f'[API-ERR] /api/scrape 采集失败 returncode={proc.returncode}')
+                    print(tail, file=sys.stderr)
+                    self._send_json({'ok': False,
+                                     'message': '采集失败（请确认运行 server.py 的 Python 已安装 '
+                                                'requests/bs4/rapidocr 等依赖，详见服务端日志）'}, 500)
                     return
                 path = os.path.join(DATA_DIR, 'lectures.json')
                 count = 0
@@ -622,7 +631,9 @@ class Handler(SimpleHTTPRequestHandler):
             except subprocess.TimeoutExpired:
                 self._send_json({'ok': False, 'message': '抓取超时（>10 分钟）'}, 500)
             except Exception as e:
-                self._send_json({'ok': False, 'message': str(e)}, 500)
+                # 2026-09-26 审计脱敏：异常文本可能含本机路径，仅落日志。
+                print(f'[API-ERR] /api/scrape 异常: {e!r}', file=sys.stderr)
+                self._send_json({'ok': False, 'message': '抓取失败（详见服务端日志）'}, 500)
             finally:
                 _scrape_lock.release()
             return
