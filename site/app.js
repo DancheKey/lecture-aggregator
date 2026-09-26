@@ -63,6 +63,7 @@ const app = createApp({
       expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
       expandedAbstract: {}, // 卡片摘要的展开状态：sourceUrl -> bool（默认 3 行截断）
       expandedBio: {},      // 主讲简介的展开状态：sourceUrl -> bool（长文默认折叠）
+      expandedForums: {},   // 论坛卡的展开状态：sourceUrl -> bool（缺省=筛选子集自动展开，2026-09-26 方案B）
       tick: Date.now(),     // 秒级心跳（响应式依赖）：statusInfo 内的「即将开始」倒计时读它触发每秒重渲染
       // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
       displayTotal: 1,
@@ -211,9 +212,52 @@ const app = createApp({
       return list;
     },
 
-    // 总页数
+    // 渲染单元（2026-09-26 方案B）：同 sourceUrl 且场次数 ≥ 阈值 → 一个论坛单元；
+    // 其余逐条单条单元。保持 filtered 的既有排序（论坛单元落在其最新场次的位置）。
+    units() {
+      const MIN = 4; // 论坛折叠阈值：≥4 场合并为一张卡（2-3 场的系列公告逐场展示更有用）
+      const bySrc = new Map();
+      this.filtered.forEach(l => {
+        const u = l.sourceUrl || '';
+        if (!u) return;
+        if (!bySrc.has(u)) bySrc.set(u, []);
+        bySrc.get(u).push(l);
+      });
+      const units = [];
+      const seen = new Set();
+      let solo = 0;
+      this.filtered.forEach(l => {
+        const u = l.sourceUrl || '';
+        if (!u) {
+          units.push({ type: 'single', recs: [l], key: 'x|' + (solo++) });
+          return;
+        }
+        if (seen.has(u)) return;
+        seen.add(u);
+        const recs = bySrc.get(u);
+        if (recs.length >= MIN) {
+          const head = recs[0];
+          const dates = recs.map(r => (r.lectureStart || '').slice(0, 10)).filter(Boolean).sort();
+          const d0 = dates[0] || '', d1 = dates[dates.length - 1] || '';
+          units.push({
+            type: 'forum', url: u, recs, head,
+            total: head.lectureCount || recs.length,
+            dateLabel: d0 === d1 ? d0 : `${d0} ~ ${d1.slice(5)}`,
+            key: 'f|' + u,
+          });
+        } else {
+          recs.forEach(r => units.push({
+            type: 'single', recs: [r],
+            key: 's|' + (r.lectureIndex ?? 'x') + '|' + r.sourceUrl,
+          }));
+        }
+      });
+      return units;
+    },
+
+    // 总页数（按渲染单元计：论坛折成 1 个卡片位）
     totalPages() {
-      return Math.max(1, Math.ceil(this.filtered.length / this.pageSize));
+      return Math.max(1, Math.ceil(this.units.length / this.pageSize));
     },
 
     // 智能分页页码：当前页前后各 2 页 + 首尾，省略号占位（边界平滑过渡）
@@ -238,18 +282,19 @@ const app = createApp({
       return pages;
     },
 
-    // 当前页对应的扁平列表（已筛选 + 按时间倒序）
-    pagedItems() {
+    // 当前页对应的单元列表（已筛选 + 按时间倒序 + 论坛折叠）
+    pagedUnits() {
       const start = (this.currentPage - 1) * this.pageSize;
-      return this.filtered.slice(start, start + this.pageSize);
+      return this.units.slice(start, start + this.pageSize);
     },
 
-    // 当前页再按天分组，保持时间线视觉风格
+    // 当前页再按天分组（单元的日：论坛取最新场次日、单条取本场日），保持时间线视觉风格
     pagedGroups() {
       const groups = {};
-      this.pagedItems.forEach(l => {
-        const k = this.dayKey(l.lectureStart);
-        (groups[k] = groups[k] || []).push(l);
+      this.pagedUnits.forEach(u => {
+        const headDate = u.type === 'forum' ? (u.head.lectureStart || '') : (u.recs[0].lectureStart || '');
+        const k = this.dayKey(headDate);
+        (groups[k] = groups[k] || []).push(u);
       });
       const keys = Object.keys(groups).sort((a, b) => {
         if (a === '时间待定') return 1;
@@ -261,6 +306,16 @@ const app = createApp({
   },
 
   methods: {
+    // 论坛卡展开状态：未显式操作过时，「筛选/搜索命中子集」自动展开（2026-09-26 方案B）
+    isForumOpen(u) {
+      const v = this.expandedForums[u.url];
+      if (v !== undefined) return v;
+      return u.recs.length < u.total;
+    },
+    toggleForum(u) {
+      this.expandedForums[u.url] = !this.isForumOpen(u);
+    },
+
     /* ---------- 讲者视图 ---------- */
     pickSpeaker(l) {
       // 进入讲者视图：按该记录的归一化键筛选，滚回顶部
