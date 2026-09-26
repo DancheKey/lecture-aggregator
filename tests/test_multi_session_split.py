@@ -280,3 +280,38 @@ class DedupGuardExemptionTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+
+class Ms5RenumberTest(unittest.TestCase):
+    """MS5 逐条剔除后 index/count 重算（2026-09-26 幽灵计数修复）。"""
+
+    HTML = (
+        '<html><head><title>系列讲座通知</title></head><body>'
+        '<div class="wp_articlecontent">'
+        '发布时间：2024-06-01 10:00'
+        '第一场题目:Past Session Topic 主讲人:张三教授北京大学 '
+        '时间:2024年5月1日(周三)上午9:00-12:00 地点:文二栋五楼会议室'
+        '第二场题目:Future Session Topic 主讲人:李四教授清华大学 '
+        '时间:2024年7月1日(周一)上午9:00-12:00 地点:文二栋五楼会议室'
+        '</div></body></html>'
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        parsers.parse_detail.cache_clear() if hasattr(parsers.parse_detail, 'cache_clear') else None
+        out = parsers.parse_detail(
+            cls.HTML, 'http://em.scnu.edu.cn/a/20240601/9000.html',
+            '经济与管理学院', None)
+        cls.recs = out if isinstance(out, list) else [out] if out else []
+
+    def test_retro_session_dropped(self):
+        """过期场次被 MS5 剔除，仅剩未来场次。"""
+        self.assertEqual(len(self.recs), 1)
+        self.assertEqual(self.recs[0].get('topic'), 'Future Session Topic')
+
+    def test_single_remaining_cleared(self):
+        """仅剩 1 条时编号清空、isMultiLecture=False（幽灵计数不再出现）。"""
+        r = self.recs[0]
+        self.assertIsNone(r.get('lectureIndex'))
+        self.assertIsNone(r.get('lectureCount'))
+        self.assertFalse(r.get('isMultiLecture'))
