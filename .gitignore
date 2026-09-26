@@ -127,3 +127,4 @@ _scraped/
 docs/code-review-2026-*.html
 docs/_data_cleanup_review.html
 docs/feedback-analysis-plan.html
+data/admin_token.json
