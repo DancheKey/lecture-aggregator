@@ -3246,10 +3246,29 @@ def _replace_schedule_tables_with_text(soup):
         # 至少 2 个讲座核心字段才视为日程表
         if sum(1 for v in field_map.values() if v in ('时间', '主题', '主讲人', '地点')) < 2:
             continue
-        data_rows = []
-        for r in rows[header_idx + 1:]:
+        # 行序感知收集（2026-09-26 议程时刻修复）：数据行走字段映射；节次/环节行
+        # （单格「上午 Workshop（9:00-12:30）」「9:00-10:20 主持人:吴要武」、茶歇行等）
+        # 不再丢弃——其原文按行序插入替换流，使候选1 的多人异名兜底能回看继承
+        # 环节窗时钟（源页无每场独立时刻时，全场共用页眉时刻且常混入发布钟点，
+        # em/4169 24 场全标 11:33 实测）。
+        row_entries = []   # ('data', parts) | ('ctx', raw_text)
+        n_data = 0
+        # 表头**之前**的节次/环节行也要收进 ctx（香樟论坛 4169：「上午 Workshop
+        # （9:00-12:30）」「9:00-10:20 主持人:吴要武」都在真表头之前，从
+        # header_idx+1 起遍历会整段丢掉其时钟，导致首节报告回退页眉时刻 08:55）
+        for _ri, r in enumerate(rows):
+            if _ri == header_idx:
+                continue
             cells = [c.get_text(' ', strip=True) for c in r.find_all(['td', 'th'])]
+            if _ri < header_idx:
+                raw = ' '.join(c for c in cells if c).strip()
+                if 4 <= len(raw) <= 80:
+                    row_entries.append(('ctx', raw))
+                continue
             if len(cells) < len(header_cells):
+                raw = ' '.join(c for c in cells if c).strip()
+                if 4 <= len(raw) <= 80:
+                    row_entries.append(('ctx', raw))
                 continue
             # 同表内重复表头（香樟论坛 4169：同一张表上下午各一节、各带一次
             # 「报告人|单位|题目」表头行）——与表头逐格相同/为其子集的行跳过，
@@ -3266,18 +3285,24 @@ def _replace_schedule_tables_with_text(soup):
                 if val:
                     parts[fname] = f'{fname}：{val}'
             if parts:
-                data_rows.append(parts)
-        if len(data_rows) < 2:
+                row_entries.append(('data', parts))
+                n_data += 1
+        data_rows = [p for kind, p in row_entries if kind == 'data']
+        if n_data < 2:
             continue
         # 多行主题或主讲人相异，确认是多场独立讲座而非单事件重复行
         _topics = {d['主题'] for d in data_rows if '主题' in d}
         _speakers = {d['主讲人'] for d in data_rows if '主讲人' in d}
         if len(_topics) < 2 and len(_speakers) < 2:
             continue
-        # 构造有序文本（主题→主讲人→时间→地点），主题块内含本场时间
+        # 构造有序文本（主题→主讲人→时间→地点），主题块内含本场时间；
+        # 节次/环节原文按行序夹在数据行之间
         lines = []
-        for d in data_rows:
-            seq = [d[k] for k in ('主题', '主讲人', '时间', '地点') if k in d]
+        for kind, p in row_entries:
+            if kind == 'ctx':
+                lines.append(p)
+                continue
+            seq = [p[k] for k in ('主题', '主讲人', '时间', '地点') if k in p]
             lines.append(' '.join(seq))
         new_div = soup.new_tag('div')
         new_div.string = ' ' + ' '.join(lines) + ' '
@@ -7214,7 +7239,8 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                                        title_year=title_year, url_year=url_year)
             if not dt or not dt.get('start'):
                 _label_blocks.append({'topic': topic, 'block': block,
-                                      'speaker': speaker, 'affiliation': _aff_inblk})
+                                      'speaker': speaker, 'affiliation': _aff_inblk,
+                                      'pos': blk_start})
                 continue
         # 块内完整性（MS1）：须能区分不同场次。原守卫仅认「带时钟或含结束时间」，
         # 会误杀论坛日程表等「每行仅给日期、无时刻」的多场（如 ai/163 六行仅有日期）。
@@ -7277,7 +7303,8 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                                 or _loose_name_like(p.strip()) for p in _parts))):
                 continue
             _sp_cand.append({'topic': _lb['topic'], 'block': _lb['block'],
-                             'speaker': _nm, 'affiliation': _af})
+                             'speaker': _nm, 'affiliation': _af,
+                             'pos': _lb.get('pos', 0)})
         # 姓名互异守卫（2026-09-26 放宽）：同一人在大型论坛可在不同分会场各有报告
         # （em/4169 香樟论坛 24 行仅约 20 个互异姓名，两两互异要求会整体误杀），
         # 收敛为「≥2 个互异姓名且互异率 ≥50%」——既拦「主讲人：张三」单人多题清单，
@@ -7292,13 +7319,53 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 _page_dt1 = parse_cn_time(text, default_year=default_year,
                                           publish_time=publish_time,
                                           title_year=title_year, url_year=url_year)
-            _st1 = _page_dt1['start'] if _page_dt1 and _page_dt1.get('start') else None
-            if _st1 and not (_st1.hour == 0 and _st1.minute == 0):
-                sessions = [{'topic': s['topic'], 'start': _st1, 'end': None,
-                             'block': s['block'], 'speaker': s['speaker'],
-                             'affiliation': s['affiliation'],
-                             'splitMode': 'label-speakers', '_same_time_ok': True}
-                            for s in _sp_cand]
+            _d1 = _page_dt1['start'] if _page_dt1 and _page_dt1.get('start') else None
+            # 逐场时刻（2026-09-26 议程时刻修复）：源页无每场独立时刻时继承
+            # 「环节窗」而非全场共用页眉时间（em/4169 曾 24 场全标发布钟点 11:33）。
+            # 环节锚点 = 时段区间行（「9:00-10:20」「15:30-17:30」，含茶歇行）或
+            # 带环节词的钟点（「第三节 14:00」）；每场取其位置之前最近的锚点。
+            # 逐块回看窗口法在长英文题目下会漏掉节次行、误抓合影/发布钟点
+            # （08:55/23:33 实测），故改为全文锚点 + 位置就近。
+            _SEC_ANCHOR_RE = re.compile(
+                r'(\d{1,2})\s*[:：]\s*(\d{2})'
+                r'(?:\s*[-—–~至]\s*\d{1,2}\s*[:：]\s*\d{2})?'
+                r'\s*(?:主持人|第[一二三四五六七八九十]+\s*[节组]|Workshop|workshop|分会场|上\s*午|下\s*午)')
+            _sec_clocks = []
+            for _m in re.finditer(
+                    r'(\d{1,2})\s*[:：]\s*(\d{2})\s*[-—–~至]\s*\d{1,2}\s*[:：]\s*\d{2}', text):
+                _sec_clocks.append((_m.start(), int(_m.group(1)), int(_m.group(2))))
+            for _m in _SEC_ANCHOR_RE.finditer(text):
+                _sec_clocks.append((_m.start(), int(_m.group(1)), int(_m.group(2))))
+            _sec_clocks.sort()
+            _sess = []
+            for s in _sp_cand:
+                st = None
+                if _d1 is not None:
+                    _prev = None
+                    for _p, _hh, _mm in _sec_clocks:
+                        if _p >= s['pos']:
+                            break
+                        if 0 <= _hh <= 23 and 0 <= _mm <= 59:
+                            _prev = (_hh, _mm)
+                    if _prev:
+                        _hh, _mm = _prev
+                        _dt = parse_cn_time(
+                            f'{_d1.year}年{_d1.month}月{_d1.day}日 {_hh:02d}:{_mm:02d}',
+                            default_year=default_year, publish_time=publish_time,
+                            title_year=title_year, url_year=url_year)
+                        if _dt and _dt.get('start'):
+                            st = _dt['start']
+                if st is None:
+                    st = _d1
+                _sess.append({'topic': s['topic'], 'start': st, 'end': None,
+                              'block': s['block'], 'speaker': s['speaker'],
+                              'affiliation': s['affiliation'],
+                              'splitMode': 'label-speakers', '_same_time_ok': True})
+            # 时钟守卫（口径同旧逻辑）：无任何时钟的场剔除；剩 ≥2 场才拆
+            _sess = [s for s in _sess
+                     if s['start'] and not (s['start'].hour == 0 and s['start'].minute == 0)]
+            if len(_sess) >= 2:
+                sessions = _sess
     # 候选2（新增，CS / 心理学院等源）：离散「报告N/讲座N/学术讲座N」分场标记——
     # 正文形如「报告一\n时间：9:00\n题目：X\n摘要：…\n报告二\n时间：10:00\n题目：Y…」，
     # 或 psy 站点「学术讲座一\n时间：…\n地点：…\n题目：…\n主讲人：…\n学术讲座二\n…」。
