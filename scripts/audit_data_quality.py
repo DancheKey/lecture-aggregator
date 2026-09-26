@@ -94,10 +94,12 @@ LOC_BLD_RE = re.compile(r'栋|楼|室|厅|馆|校区|校园|会议室|报告厅|
                         r'Hall|Floor|Building|Auditorium|Room', re.I)
 # 纯头衔占位简介（2026-09-10）：speakerBio 整体只是头衔词（如 idx171 旧值「教授」——
 # 把 Professor 头衔误当简介填入），无信息量，视为占位坏值
+# 2026-09-26 审计收敛（G4）：职称部分取 field_vocab 主表（原手抄副本缺主表的
+# 长聘教授/特任教授等），前缀型客座/讲座/兼职教授与英文头衔为本处私有补充。
 BIO_TITLE_ONLY_RE = re.compile(
-    r'^(教授|副教授|助理教授|研究员|副研究员|助理研究员|讲师|博士后|博士|院士|'
-    r'博导|博士生导师|硕导|硕士生导师|客座教授|特聘教授|讲座教授|兼职教授|'
-    r'Professor|Associate Professor|Assistant Professor|Prof\.?|Dr\.?|Doctor)$',
+    r'^(?:' + _fv.NAME_TITLE_SUFFIX_RE.pattern
+    + r'|客座教授|讲座教授|兼职教授'
+    + r'|Professor|Associate Professor|Assistant Professor|Prof\.?|Dr\.?|Doctor)$',
     re.I)
 
 # 全天/多日会议型标题：时长偏长多为正常议程（研讨会/论坛含签到+多场次），

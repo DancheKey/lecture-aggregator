@@ -273,7 +273,8 @@ _AFFIL_RE = re.compile(
     r'|([\u4e00-\u9fff]{2,10}?(?:大学|研究院|研究所|实验室)(?:[\u4e00-\u9fff]{0,6}?(?:分校|校区|学部|学院|系|中心))?)'
     r'|([A-Za-z][A-Za-z\s]*(?:University|College|Institute|School|Department|Centre|Center|Laboratory|Lab)(?:\s+(?:of|and|&|at|in|[A-Za-z]+)){0,8})'
 )
-# 从正文抽职称用：词表取自 field_vocab，另补两个医学职称（不在主表，仅此处抽职称用）。
+# 从正文抽职称用：词表取自 field_vocab。主任医师/副主任医师已入主表 ORG_TITLE_SUFFIXES
+# （2026-09-26 核对），此处模式串保留冗余分支无害。
 _TITLE_RE = re.compile(_fv.NAME_TITLE_SUFFIX_RE.pattern + r'|主任医师|副主任医师')
 
 
