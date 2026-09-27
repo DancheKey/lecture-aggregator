@@ -1,10 +1,15 @@
 # 华师讲座采集器依赖（用于本地运行 / GitHub Actions CI）
 # 2026-08-05 体检修复（中等-21）：固定版本，保证构建可复现——
 # 上游一次破坏性/被污染的发布即可让每日 CI 变行为。升级请整体评估后同步改这里。
-requests==2.33.0
+# 2026-09-27 审计排期项 patch 跟进（requests 2.33.0→2.34.2 / charset-normalizer
+# 3.4.2→3.5.1 / pyyaml 6.0.2→6.0.3）：首轮审计未发现受影响的 CVE，属版本跟进
+# 而非补漏洞，故只升 patch/minor、不动 beautifulsoup4 / Pillow / numpy / OCR 引擎。
+# 升级前已在本地实装验证：10 个测试文件全绿、test_invariants PASS（3804 条）、
+# sources.yaml 解析正常、scraper._decode_html 解码链路正常。
+requests==2.34.2
 beautifulsoup4==4.14.2
-charset-normalizer==3.4.2
-pyyaml==6.0.2
+charset-normalizer==3.5.1
+pyyaml==6.0.3
 Pillow==12.3.0
 numpy==2.3.4
 # OCR 引擎：RapidOCR（ONNXRuntime 后端，替代原 easyocr；中文海报更准确、更轻量）

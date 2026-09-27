@@ -1,3 +1,12 @@
+# 本工作流分三个 job，逐级收窄权限（2026-09-27 审计排期项：拆 job 降爆炸半径）：
+#   scrape    —— 抓取+校验+体检+告警+提交推送。持有 contents:write / issues:write，
+#                但**不持有 pages / id-token**：即使爬虫脚本被注入或 sources.yaml
+#                引入恶意内容，也无法发布站点、无法申请 OIDC token。
+#   deploy    —— 只做 Pages 发布，需要 pages:write + id-token:write，
+#                但**不需要 contents:write**（数据已由 scrape 推上远端）。
+#   gate      —— 失败源告警，只读数据，绝不参与写操作。
+# 旧版把三件事串在单个 job：爬虫一旦异常，整班（含 Pages 发布）一起失败，
+# 且爬虫 job 握有发布权限，爆炸半径过大。
 name: 每日自动拉取讲座数据
 
 # 触发条件：
@@ -13,13 +22,11 @@ on:
     - cron: '0 16 * * *'
   workflow_dispatch: {}
 
-# 本工作流需要写回仓库（提交更新后的数据），并发布 Pages；
-# issues: write 供「信息源健康检查」在发现失效栏目时自动创建/更新告警 Issue。
+# 工作流级只给最小集合；各 job 再在 jobs.<id>.permissions 收窄。
+# ⚠️ GitHub 语义：job 级 permissions 一旦声明，就**完全覆盖**这里的列表
+# （不是叠加），所以 scrape job 必须显式写全它需要的 contents:write + issues:write。
 permissions:
-  contents: write
-  pages: write
-  id-token: write
-  issues: write
+  contents: read
 
 # 同一时间只跑一个抓取任务；新触发排队（不取消正在跑的），避免并发写冲突
 concurrency:
@@ -30,6 +37,11 @@ jobs:
   scrape:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    # job 级 permissions 覆盖工作流级设置：只给写回数据与告警 Issue 所需权限，
+    # 刻意**不给 pages: write / id-token: write**——发布权限隔离到 deploy job。
+    permissions:
+      contents: write   # 提交并推送更新后的 data/ 与 site/
+      issues: write     # 信息源健康检查自动创建/更新告警 Issue
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -203,9 +215,34 @@ jobs:
             echo "推送成功"
           fi
 
-      # 下面步骤将 site/ 发布为 GitHub Pages。
-      # 注意：本工作流用 GITHUB_TOKEN 推送的数据提交不会触发 deploy.yml，
-      # 因此由本工作流直接完成部署，保证每日新数据即时上线。
+      # 失败源告警（2026-08-05 体检修复 严重-3）：爬虫在有源失败时不推进增量水位，
+      # 并把 failed_sources 写入 data/last_scrape.json（下次运行同区间自动补回）。
+      # 此步放在提交/部署之后：成功抓到的数据照常上线，但工作流以红色结束，
+      # 通过 GitHub 通知提醒维护者关注持续失败的源。
+      # 已知设计权衡（2026-08-05 复查确认）：
+      #   - 前序步骤因其它原因失败时，本步读到的旧 last_scrape 可能无 failed_sources
+      #     而不额外告警——但此时工作流本就因前序失败而红，GitHub 通知仍会送达；
+      #   - 存在失败源时页面其实已部署成功，Pages 状态却显示"失败"，
+      #     这是「宁可误报不漏报」的有意取舍。
+
+  # ---------------------------------------------------------------------
+  # deploy：只做 Pages 发布。数据已由 scrape 推上 origin/main，此处重新检出
+  # 即可拿到本轮产物，因此不需要 contents: write。
+  # 说明：本工作流用 GITHUB_TOKEN 推送的数据提交**不会**触发 deploy.yml，
+  # 故仍需在此直接部署，保证每日新数据即时上线。
+  # ---------------------------------------------------------------------
+  deploy:
+    needs: scrape        # 爬虫/护栏失败时不发布（宁可不发，不发半成品）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read     # 仅检出已推送的产物
+      pages: write       # 上传 Pages 产物
+      id-token: write    # deploy-pages 的 OIDC 换取部署令牌
+    steps:
+      - name: 检出已推送的数据产物
+        uses: actions/checkout@v4
+
       - name: 配置 Pages
         uses: actions/configure-pages@v5
 
@@ -218,17 +255,31 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # 失败源告警（2026-08-05 体检修复 严重-3）：爬虫在有源失败时不推进增量水位，
-      # 并把 failed_sources 写入 data/last_scrape.json（下次运行同区间自动补回）。
-      # 此步放在提交/部署之后：成功抓到的数据照常上线，但工作流以红色结束，
-      # 通过 GitHub 通知提醒维护者关注持续失败的源。
-      # 已知设计权衡（2026-08-05 复查确认）：
-      #   - 前序步骤因其它原因失败时，本步读到的旧 last_scrape 可能无 failed_sources
-      #     而不额外告警——但此时工作流本就因前序失败而红，GitHub 通知仍会送达；
-      #   - 存在失败源时页面其实已部署成功，Pages 状态却显示"失败"，
-      #     这是「宁可误报不漏报」的有意取舍。
+  # ---------------------------------------------------------------------
+  # gate：失败源告警。只读 data/last_scrape.json，不做任何写操作。
+  # 独立成 job 的意义——即使 scrape 挂了，本班仍会跑它并以红色结束提醒维护者；
+  # 放在 scrape job 内则会被前序失败掩盖（若失败源恰是导致本班失败的原因）。
+  # ⚠️ 语义变化（拆 job 的已知代价，2026-09-27 记录）：
+  #   旧版该步在 scrape job 内，读的是**本班工作区**的 last_scrape.json；
+  #   拆出后重新 checkout，读的是**远端 main 上上一班提交**的版本。
+  #   故当本班因源失败而在「提交并推送」之前就中断时，本班新增的 failed_sources
+  #   尚未入库，gate 读到的是上一班的旧表 → 不会额外列出本班失败源。
+  #   这与旧版注释里已承认的「前序失败时可能无 failed_sources 而不额外告警」同源，
+  #   且不降低告警强度：本班失败本身仍使工作流变红，GitHub 通知照常送达。
+  #   下一班水位未推进、会重抓同区间，失败源届时会正常累积入库并被 gate 报出。
+  # ---------------------------------------------------------------------
+  gate:
+    needs: scrape
+    if: always()        # 关键：scrape 失败时仍要执行告警检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: 检出数据
+        uses: actions/checkout@v4
+
       - name: 检查失败信息源（告警）
-        if: always()
         run: |
           python - <<'EOF'
           import json, os, sys
