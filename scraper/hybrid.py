@@ -29,6 +29,7 @@ VLM 路线（VLM 主 + 第二 VLM 备份 + RapidOCR 兜底）。
 
 import datetime
 import re
+import unicodedata
 
 import field_vocab as _fv
 from llm_provider import _unwrap
@@ -643,6 +644,17 @@ _MEETING_RE = re.compile(r'(腾讯会议|zoom|会议号|会议\s*id|会议\s*链
 _LOC_CONTEXT_KW = ('大学城', '石牌', '汕尾', '佛山', '校区', '学院', '文科', '教')
 
 
+def _value_verbatim_in_text(val, text):
+    # 值级溯源（2026-09-27 二轮审计 P1-7 + 用户口径）：topic/location 的 A/B 值
+    # 必须（NFKC 归一 + 空白折叠后）在源文本中逐字出现。翻译/提炼/改写一律不过；
+    # 去括号/去长尾类修剪保留逐字子串性质，不受影响。康熙部首经 NFKC 归一。
+    def _ws(s):
+        return re.sub(r'\s+', ' ',
+                      unicodedata.normalize('NFKC', str(s or '')))
+    nv, nt = _ws(val), _ws(text)
+    return bool(nv) and nv in nt
+
+
 def _a_drops_location_context(rule_val, a_val):
     """A 的地点比规则更短且丢掉了关键上下文 -> 拒绝采纳（保留规则值）。
 
@@ -805,6 +817,11 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                 pass
             if not lv or lv in _NOISE or lv == cur:
                 continue
+            # 2026-09-27 二轮审计 P1-7：location 值级溯源（用户口径逐字）——
+            # A 给的译名/改写（源页不存在的「文英楼D404报告厅」类）在此拦截。
+            if not _value_verbatim_in_text(lv, _trace_text):
+                rejected.append('location')
+                continue
             # 2026-09-24 守卫：A 地点更短且丢了会议号或校区/学院前缀 → 拒绝
             # （保留规则）。裁决实证 7/7 命中；仅去尾部噪声或 A 更完整的情形不在此列。
             # 注意：不叠加「规则非脏」前提——含会议号的合法地点会被 _is_dirty_value
@@ -831,8 +848,13 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                 continue
         if fld == 'topic':
             # 2026-09-24 守卫：A 用英文论文题替换源页本就正确的中文题目 → 拒绝
-            # （保留规则）。裁决实证 7636 判错；A 提炼真中文题/去英文括号/去长尾不受影响。
+            # （保留规则）。裁决实证 7636 判错。⚠ 2026-09-27 用户口径（二轮审计
+            # P1-7）更新：原「A 提炼真中文题不受影响」已废止——topic 逐字溯源后，
+            # 翻译/提炼/改写一律拒绝（下闸门），仅去括号/去长尾类逐字修剪可过。
             if _a_replaces_cn_title_with_en(cur, lv):
+                rejected.append('topic')
+                continue
+            if not _value_verbatim_in_text(lv, _trace_text):
                 rejected.append('topic')
                 continue
         if fld == 'speaker':
@@ -1030,7 +1052,11 @@ def apply_llm_text_hybrid(result, body_text, url, provider, judge,
         if _try_fill_speaker(result, a, _trace):
             result['llmFilled'] = 'speaker'
             result['speakerSource'] = 'llm'
-        result['needsHumanReview'] = '|'.join(diffs)
+        # 2026-09-27 二轮审计 P1-8：直接覆盖会丢掉此前已打的人工复核标记，
+        # 改为与 574-576 行相同的集合并口径。
+        _hr = set((result.get('needsHumanReview') or '').split('|')) - {''}
+        _hr.update(d for d in diffs if d)
+        result['needsHumanReview'] = '|'.join(sorted(_hr))
     # 分歧裁决后，用 B 的 self_extract 回填规则+A 仍空字段（纯填空，复用同一套
     # 溯源/合法性闸门，绝不覆盖已有值）。仅 B 提供了 self_extract 才执行；多嘉宾页
     # 主讲人按项目口径留空交人工（见 _fill_from_self_extract 内守卫，防 7542 误填）。

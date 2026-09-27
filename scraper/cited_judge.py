@@ -39,6 +39,7 @@ import unicodedata
 import hybrid
 import llm_provider
 import timeparse
+import field_vocab as _fv
 
 # 康煕部首还原：延迟从 parsers 取（单一事实源），避免顶层引入 parsers
 # 重依赖（459KB）与潜在循环导入（parsers -> llm_provider -> 本模块）。
@@ -108,9 +109,11 @@ def _word_char(ch):
 
 # ---- 值级 suspect（对 B 给的 value 用）----
 _LATIN_RE = re.compile(r'[A-Za-z]')
+# 2026-09-27 二轮审计 P1-6：原私表与 field_vocab.ORG_TITLE_SUFFIXES 分叉
+# （缺「秘书长/理事长/记者」等，主表有的主任医师等也不全）——改由主表派生，
+# 长度降序拼接防复合词截断（「副秘书长」被「秘书长」截成「副」）。
 _JOB_TITLE_TAIL = re.compile(
-    '(所长|副所长|馆长|副馆长|院长|副院长|主任|副主任|总经理|副总经理|'
-    '董事长|总裁|副总裁|总监|经理|教授|副教授|研究员|副研究员|博士|硕士)$')
+    '(?:' + '|'.join(sorted(_fv.ORG_TITLE_SUFFIXES, key=len, reverse=True)) + ')$')
 
 # 职务尾剥离路径的 right 边界放行字符（职务词首字）：源页「单位+职务+姓名」
 # 连写形态（如"东莞市图书馆馆长李东来"）中，单位值后紧跟职务词首字是正常的。
@@ -198,7 +201,15 @@ def _vf_suspect(field, val, body_text):
         if not hybrid._is_valid_affiliation(hybrid._clean_affiliation(val)):
             return True
         return False
-    return None  # location/topic/lectureStart 只做 info-loss 保底
+    if field in ('location', 'topic'):
+        # 2026-09-27 二轮审计 P1-7 + 用户口径：topic/location 逐字溯源——B 给的
+        # 值必须（_cite_norm 归一化后）在源页原文中逐字出现。翻译/提炼/改写一律
+        # 判疑回退规则值（topic 中文译名属改写，收紧以杜绝杜撰幻觉；去括号/去
+        # 长尾类修剪保留逐字子串性质，不受影响）。
+        if not val or len(val) < 2:
+            return True
+        return _cite_norm(val) not in _cite_norm(body_text or '')
+    return None  # lectureStart 只做 info-loss 保底
 
 
 # ---- 输出格式归一 + 防信息丢失 ----
