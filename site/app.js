@@ -1,6 +1,17 @@
 /* 木铎金声 · 华南师范大学学术讲座聚合前端（Vue 3，免构建，配合 Tailwind CDN）
  * 功能：讲座总数显示、校区/学院/年份/关键词 多维筛选、可点击 Tag 直达筛选、本地点赞去重。
  */
+// 防点击劫持（2026-09-27 二轮审计 S-2）：公网 GitHub Pages 无法下发
+// X-Frame-Options / CSP frame-ancestors 响应头（meta 里的 frame-ancestors
+// 会被浏览器忽略），用 JS 兜底禁止被第三方页面嵌套；若对方沙箱化导航则
+// 隐藏本页内容。
+(function () {
+  try {
+    if (window.top !== window.self) window.top.location.replace(window.self.location);
+  } catch (e) {
+    document.documentElement.style.display = 'none';
+  }
+})();
 const { createApp } = Vue;
 
 const LIKED_KEY = 'lecture_liked_urls_v1';

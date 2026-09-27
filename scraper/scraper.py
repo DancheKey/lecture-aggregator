@@ -666,6 +666,16 @@ def cross_source_dedup(records):
                 loc_a = (ri.get('location') or '').strip()
                 loc_b = (rj.get('location') or '').strip()
                 if loc_a and loc_a == loc_b:
+                    # 2026-09-27 二轮审计排期项修复：同地点兜底的误并排除——
+                    # 双方 topic 均为实质性题目（≥6 字）且相似度 <0.25 时，更像
+                    # 「同讲者同日同址的两场不同讲座」，不按同地点强并（误并=丢
+                    # 一场的题目/时间）。量子物质研究院/物理学院的中英文异题场景
+                    # 不受影响：其一方为「学术报告」类泛称短题（<6 字），不满足
+                    # 双侧实质性条件，照常合并。
+                    ta = (ri.get('topic') or ri.get('title') or '').strip()
+                    tb = (rj.get('topic') or rj.get('title') or '').strip()
+                    if len(ta) >= 6 and len(tb) >= 6 and _topic_similarity(ta, tb) < 0.25:
+                        continue
                     union(i, j)
                     continue
                 # 兜底层2（2026-09-08）：同讲者(组内) + 同日期(组内) + 同「开始时刻精确到分」

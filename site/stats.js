@@ -1,3 +1,14 @@
+// 防点击劫持（2026-09-27 二轮审计 S-2）：公网 GitHub Pages 无法下发
+// X-Frame-Options / CSP frame-ancestors 响应头（meta 里的 frame-ancestors
+// 会被浏览器忽略），用 JS 兜底禁止被第三方页面嵌套；若对方沙箱化导航则
+// 隐藏本页内容。
+(function () {
+  try {
+    if (window.top !== window.self) window.top.location.replace(window.self.location);
+  } catch (e) {
+    document.documentElement.style.display = 'none';
+  }
+})();
 /* 木铎金声 · 讲座统计页（Vue 3）
  * 从 stats.html 外部化，避免内联脚本在 file:// 或严格 CSP 下被拦截。
  *

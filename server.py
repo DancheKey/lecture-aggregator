@@ -15,6 +15,7 @@ import re
 import sys
 import json
 import time
+import hmac
 import secrets
 import threading
 import subprocess
@@ -97,7 +98,11 @@ _IS_LOOPBACK_RE = re.compile(r'^127\.0\.0\.1$|^::1$|^\[::1\]$')
 
 def _check_admin(self):
     # 写接口凭证校验：X-Admin-Token 必须与启动时生成的 token 一致。
-    return (self.headers.get('X-Admin-Token') or '') == _ADMIN_TOKEN
+    # 2026-09-27 二轮审计：改常量时间比较（防计时侧信道；编码为 bytes 以
+    # 容忍请求头里的非 ASCII 字符而不抛 TypeError）。
+    return hmac.compare_digest(
+        (self.headers.get('X-Admin-Token') or '').encode('utf-8'),
+        _ADMIN_TOKEN.encode('utf-8'))
 
 
 def _speaker_keys(name):
