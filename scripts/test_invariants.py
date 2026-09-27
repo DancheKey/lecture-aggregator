@@ -18,9 +18,8 @@
 说明：title 与 topic 内容相同**不再**视为违规（2026-09-04 决策）——两者是卡片上的
 独立元素，均需保留；topic 承载讲座题目，即使与 title 重复也不应被清空。
 
-说明：clean_title / _strip_nav_noise 为 scraper/parsers.py 的**镜像副本**，
-仅用于校验「已提交数据」是否与生成逻辑一致。若 parsers.py 改动标题清洗逻辑，
-须同步更新本文件（否则会触发失败，提示做一次全量重新生成 / 复核）。
+说明：标题清洗校验直接引用 scraper/parsers._clean_title（2026-09-27 二轮
+审计 P1-2：镜像副本已漂移删除，改为单一事实源引用）。
 """
 import json
 import os
@@ -33,70 +32,17 @@ DATA = os.path.join(ROOT, "data", "lectures.json")
 # ---------------------------------------------------------------------------
 # 镜像：scraper/parsers.py 的标题清洗逻辑（保持与生成数据一致）
 # ---------------------------------------------------------------------------
-_NAV_NOISE_RE = re.compile(
-    r"(更多链接|友情链接|快速链接|相关链接|站点导航|"
-    r"教育涉外监管信息网|教育涉外监管|涉外监管信息网|"
-    r"教育部留学服务中心|教育部留学|中国教育国际交流|中国教育部|"
-    r"学术讲座\s*[-—]|通知公告\s*[-—]|新闻动态\s*[-—]|"
-    r"首页|»\s*正文|»)"
-)
-
-
-def _strip_nav_noise(s):
-    """截断标题/主题中混入的站点导航链接噪声（如「更多链接中国教育部…」）。"""
-    if not s:
-        return s
-    m = _NAV_NOISE_RE.search(s)
-    if m:
-        s = s[:m.start()]
-    s = s.strip(" —-丨|·\t")
-    s = re.sub(r"^\s*\d{1,2}(?=\D|$)\s*", "", s).strip(" —-丨|·\t")
-    return s.strip()
-
-
-def clean_title(t):
-    t = t.strip()
-    if " - " in t:
-        t = t.split(" - ")[0].strip()
-    if "｜" in t:
-        t = t.split("｜")[0].strip()
-    t = re.sub(r"^[\s【\[]*讲座通知[\s】]", "", t).strip()
-    t = re.sub(r"^[\s｜|：:]*", "", t).strip()
-    t = re.sub(r"^讲座通知[｜|（(]", "", t).strip()
-    if len(t) > 4 and t.startswith('"') and t.endswith('"'):
-        t = t[1:-1].strip()
-    if len(t) > 4 and t.startswith('"') and t.endswith('"'):
-        t = t[1:-1].strip()
-    t = re.sub(r"^[｜|\s]+", "", t).strip()
-    if t.endswith(")") and t.count("(") < t.count(")"):
-        t = t[:-1].strip()
-    if t.endswith("）") and t.count("（") < t.count("）"):
-        t = t[:-1].strip()
-    if (t.count("(") > t.count(")")) or (t.count("（") > t.count("）")):
-        _idx = max(t.rfind("("), t.rfind("（"))
-        if _idx != -1:
-            t = t[:_idx].strip()
-    t = re.sub(
-        r"^\s*(?:19|20)\d{2}\s*[-/年\.]\s*\d{1,2}\s*[-/月\.]\s*\d{1,2}\s*[日号]?\s*", "", t
-    ).strip()
-    t = re.sub(
-        r"^\s*(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s+", "", t
-    ).strip()
-    t = re.sub(r"^\s*\d{1,2}\s*月\s*\d{1,2}\s*日\s*", "", t).strip()
-    t = re.sub(
-        r"\s*[—\-－]\s*一、[一二三四五六七八九十百零0-9]*期?\s*"
-        r"(?:工作坊|培训|沙龙|讲坛|报告|讲座)?安排\s*$",
-        "",
-        t,
-    ).strip()
-    t = re.sub(
-        r"\s*一、[一二三四五六七八九十百零0-9]*期?\s*"
-        r"(?:工作坊|培训|沙龙|讲坛|报告|讲座)?安排\s*$",
-        "",
-        t,
-    ).strip()
-    t = _strip_nav_noise(t)
-    return t
+# ---------------------------------------------------------------------------
+# 标题清洗单一事实源（2026-09-27 二轮审计 P1-2）：此处原维护 clean_title /
+# _strip_nav_noise 的镜像副本，已与 parsers.py 实际实现漂移——缺 _nfkc_radicals
+# （康熙部首还原）与日期前缀剥离，「[2023年4月6日] X」「从微观量⼦…」类污染
+# 恰好蒙混过栏。镜像删除，校验时直接引用 parsers._clean_title（护栏校验的
+# 就是生成端同一份逻辑，永不再漂移）。
+# ---------------------------------------------------------------------------
+def _parsers_clean_title(t):
+    sys.path.insert(0, os.path.join(ROOT, "scraper"))
+    import parsers
+    return parsers._clean_title(t or "")
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +101,7 @@ def check_skc_title_integrity(recs, errors):
         lt = r.get("listTitle")
         if not lt or not _SERIES_RE.search(lt):
             continue
-        expected = clean_title(lt)
+        expected = _parsers_clean_title(lt)
         actual = (r.get("title") or "").strip()
         if actual != expected:
             errors.append(
@@ -193,6 +139,13 @@ def test_incremental_merge_unit(errors):
 def main():
     recs = load_records()
     errors = []
+    # 2026-09-27 二轮审计 P1-3：空库/截断防护——此前 {'data': []} 会打出
+    # 「PASS（共 0 条记录）」退出 0，抓取脚本写坏主库时护栏无感、空库直接上公网。
+    # 下限取 3000：当前 3804 条，留出正常清理余量，只拦「数量级塌方」。
+    if len(recs) < 3000:
+        errors.append(
+            f'记录数异常: {len(recs)} 条 < 3000 下限——疑似主库被清空/截断，'
+            '拒绝通过（防止空库静默部署）')
     check_composite_key_unique(recs, errors)
     check_skc_title_integrity(recs, errors)
     check_images_no_local_path(recs, errors)

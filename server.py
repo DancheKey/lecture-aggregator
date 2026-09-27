@@ -308,11 +308,10 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_json({'ok': True, 'sources': data.get('sources', [])})
 
     def _api_sources_post(self):
-        length = int(self.headers.get('Content-Length', 0))
-        raw = self.rfile.read(length)
-        try:
-            body = json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
+        # 2026-09-27 二轮审计 S-4：改走 _read_body_json（非法 Content-Length 不再
+        # 抛 500、超 1MB 请求体按空处理），与 /api/lecture/* 端点同一守卫。
+        body = self._read_body_json()
+        if not body:
             self._send_json({'ok': False, 'message': '无效的 JSON'}, 400)
             return
         # 类型校验：与 PUT /api/sources/<i> 一致，防止把非预期类型写进
@@ -347,11 +346,9 @@ class Handler(SimpleHTTPRequestHandler):
         if idx < 0 or idx >= len(data['sources']):
             self._send_json({'ok': False, 'message': f'索引 {idx} 超出范围（共 {len(data["sources"])} 条）'}, 404)
             return
-        length = int(self.headers.get('Content-Length', 0))
-        raw = self.rfile.read(length)
-        try:
-            body = json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
+        # 2026-09-27 二轮审计 S-4：同 POST，改走 _read_body_json 统一守卫。
+        body = self._read_body_json()
+        if not body:
             self._send_json({'ok': False, 'message': '无效的 JSON'}, 400)
             return
         # 类型校验：防止把 list_urls 写成字符串等非预期类型导致 scraper 读取 sources.yaml 崩溃
