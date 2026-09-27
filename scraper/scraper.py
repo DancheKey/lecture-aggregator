@@ -1014,12 +1014,23 @@ def incremental_merge(existing, new_records):
     这样未来增量不再产生重复，且存量数据由人工/--full 清理统一处理。
     """
     base_map = {}
+    # 空 sourceUrl 的记录此前被静默丢弃（二轮审计 P0-1 实证）：单独保存，随输出
+    # 返回，让 invariant 可见，而不是无声消失。
+    no_url_recs = []
     for r in existing:
         u = _norm_url(r.get('sourceUrl'))
         if not u:
+            no_url_recs.append(r)
             continue
         li = r.get('lectureIndex')
         key = u + ('#' + str(li) if li is not None else '')
+        if key in base_map:
+            # 2026-09-27 二轮审计 P0-1：dict 覆盖语义会静默吞掉前一条记录、
+            # 日志无痕且护栏不可见——改为显式失败（每日任务红、数据不丢）。
+            raise ValueError(
+                f'incremental_merge 基底键冲突: {key}——'
+                'existing 中存在复合键重复的记录，拒绝静默合并；'
+                '请先运行 scripts/fix_ghost_counts.py 或人工核查 data/lectures.json')
         base_map[key] = r
     seen = set(base_map.keys())
 
@@ -1111,7 +1122,7 @@ def incremental_merge(existing, new_records):
         print(f'[MULTI-ROUND] 共替换 {len(replaced_new_keys)} 条旧轮次（保留最新一轮）')
     if skip:
         print(f'[INCREMENTAL] 跨源重复 {skip} 条（命中即 merge-into-A 融合；基底更新 merged/sources）')
-    return list(base_map.values()) + final_new
+    return no_url_recs + list(base_map.values()) + final_new
 
 
 def _process_source(src, year, existing_urls, is_incremental, global_exclude=None):
@@ -1319,13 +1330,24 @@ def main():
 
     # 同源去重：同一学院标题相似的只保留一条
     raw = list(lectures.values())
-    # 局部修复模式（--source，且无 --out）：保留其他学院已有记录，仅替换指定学院的记录
-    if args.source and not args.out:
+    # 局部修复模式（--full --source，且无 --out）：保留其他学院已有记录，仅替换指定学院的记录。
+    # 2026-09-27 二轮审计 P0-2：增量模式 1268 行 prefill 已把全部 existing 预填进
+    # lectures，此处再叠加 other_existing 会双份（后续靠 dedup 自愈，但整库
+    # cross_source_dedup/_multi_round_replace 会违反「增量不对全量重跑」承诺）——
+    # 故本块仅在 --full --source（非增量）时生效；增量 + --source 走下方
+    # incremental_merge 分支（语义=只对该源检查新页）。
+    if args.source and not args.out and not is_incremental:
         other_existing = [r for r in existing if r.get('college') != args.source]
         # 按源安全保护：列表页抓取失败/网络超时会使本源新结果骤减甚至为空，
         # 此时不应清掉该源已有数据。新产出 < 旧产出 50% 时保留旧该源数据，避免误删。
         old_src = [r for r in existing if r.get('college') == args.source]
         new_src = [r for r in raw if r.get('college') == args.source]
+        # 2026-09-27 二轮审计 P0-3：新产出为 0 条（列表页 404/改版）时，按源维度
+        # 直接中止——50% 总量闸门对「单源清空」无感（其余源条数不变）。
+        if old_src and not new_src:
+            print(f'[ABORT] --source {args.source} 新产出 0 条（旧 {len(old_src)} 条），'
+                  f'疑似列表页失效或抓取失败，拒绝覆盖以保全该源历史数据。', file=sys.stderr)
+            return
         if old_src and len(new_src) < len(old_src) * 0.5:
             print(f'[WARN] --source {args.source} 新产出 {len(new_src)} 条 < 旧 {len(old_src)} 条的 50%，'
                   f'疑似列表页抓取失败，保留该源旧数据不覆盖。', file=sys.stderr)
@@ -1338,7 +1360,10 @@ def main():
             print(f'[ABORT] --source 模式产出 {len(raw)} 条 < 现有 {len(existing)} 条的 50%，'
                   f'疑似现有数据未正确合并，拒绝覆盖 data/lectures.json。', file=sys.stderr)
             return
-    if is_incremental and not args.source and not args.out:
+    # 2026-09-27 二轮审计 P0-2：增量（含 --source 局部增量）一律走
+    # incremental_merge——prefill 已含全部 existing，--source 只是缩小抓取范围；
+    # 走全量分支会对整库跑 cross_source_dedup/_multi_round_replace，违反承诺。
+    if is_incremental:
         # 增量时间门（2026-08-01 全局修复）：
         # 此前 `since` 只用于设置 is_incremental 布尔，从未过滤讲座，导致增量退化成
         # 「URL 不在 existing 就抓」的全量追加——列表页新翻到的任何历史 URL（含 2014/

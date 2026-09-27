@@ -818,10 +818,15 @@ def _clean_location(loc, title=None):
         loc = loc[:m4.start()].strip()
     # location 后吸入大段英文摘要（BS4 把地点与正文英文段粘在同一行，且中间无换行）
     # 特征：连续多个英文单词（>=4 个）+ 常见英文虚词（the/is/of/...），起点前为中文地点
+    # 2026-09-27 二轮审计 P1-5：原嵌套量词 [a-z]+(?:\s+|\,\s*){4,} 存在灾难性
+    # 回溯（实测每翻倍 ×4，2000 词 13.8s）。重写为前瞻结构：词切分用占有量词
+    # 确定化（词内字符与分隔符不重叠，最大 munch 唯一切分）、结构判断全部放
+    # 零宽前瞻——语义与原版逐样本一致（5/5），对抗输入 13.8s → 1ms。
     _loc_en_leak = re.compile(
-        r'(?i)(?=[a-z][a-z\s,]{25,})(?:[a-z]+(?:\s+|\,\s*)){4,}'
+        r'(?i)(?=[a-z][a-z\s,]{25,}+)'
+        r'(?=(?:[a-z]++[,\s]+){3,}[a-z]++[\s,]+'
         r'(?:the|is|are|of|in|to|and|or|with|for|from|that|this|we|our|it|its|'
-        r'be|have|has|will|would|can|could)\b'
+        r'be|have|has|will|would|can|could)\b)'
     )
     m5 = _loc_en_leak.search(loc)
     if m5 and m5.start() > 3:
@@ -7429,8 +7434,12 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 continue
             cand2.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
                           'block': seg, 'splitMode': 'report-n'})
-        if len(cand2) >= 2:
-            sessions = _ms_gate_filter(cand2)
+        # 2026-09-27 二轮审计 P0-4：候选2 是唯一「替换型」候选（标记存在即覆盖上游），
+        # 原写法 `sessions = _ms_gate_filter(cand2)` 在闸门判死时会把上游已正确拆出的
+        # 场次整体覆盖为空——改为闸门后仍 ≥2 场才接受，否则维持上游结果。
+        _g2 = _ms_gate_filter(cand2)
+        if len(_g2) >= 2:
+            sessions = _g2
     # 候选3（兜底）：字段列表型多报告（cs 5400 等）。候选1 按「报告题目」分块、候选2 按
     # 「报告N」分块均失败（前者逐块取不到本场时间、后者无离散报告N标记）时，用字段锚点聚合。
     if len(sessions) < 2:
@@ -7732,6 +7741,9 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 text, default_year=default_year, publish_time=publish_time,
                 title_year=title_year, url_year=url_year, title=title,
                 base_start=base_start, base_end=base_end)
+            # 2026-09-27 二轮审计 P0-5：此处是第 15 个接受点，原样换用会绕过
+            # _ms_gate_filter/噪声过滤/MS3 守卫（「合影留念」类垃圾场次曾借此入终稿）。
+            _c9 = _ms_gate_filter(_c9)
             if len(_c9) >= 2:
                 sessions = _c9
             else:
