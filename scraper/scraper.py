@@ -1531,7 +1531,11 @@ def main():
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str, src_latest_date): src for src in sources}
+        # ⚠ 第 8 个实参必须是**本源自己**的最晚条目日期（字符串），不是整张
+        # {源名: 日期} 字典。传错类型会让 _process_source 里的
+        # `max(_page_dates) < src_latest_date` 抛「str < dict」TypeError，
+        # 被外层 except 吞成「本源抓取失败」→ 48 个源全废且水位不推进（2026-09-28 实测）。
+        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str, src_latest_date.get(src.get('name', ''), '')): src for src in sources}
         for future in as_completed(future_to_src):
             src_name = future_to_src[future].get('name')
             try:
