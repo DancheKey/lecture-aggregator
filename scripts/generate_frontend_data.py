@@ -126,6 +126,8 @@ def load_lectures():
 
 # load_excluded 已迁移至 scripts/excluded_urls.py（scraper / generate / server 三点共用）
 from excluded_urls import load_excluded  # noqa: E402,F811
+# 前端下发字段白名单（generate / server 两点共用，见 frontend_fields.py 顶部决策记录）
+from frontend_fields import strip_frontend_fields  # noqa: E402
 
 
 def sort_for_latest(data):
@@ -237,23 +239,25 @@ def with_unit(item, url_dates):
       -> 'issue'（第x期，不同日期的若干期）
 
     仅对含 lectureIndex 的记录附加该字段；其它记录原样透传，不污染主数据。
+
+    末步 strip_frontend_fields()：按白名单裁掉前端无消费者的内部字段
+    （llmSelfExtract / qaRepaired / timeConfidence / speakerTitle 等，共约 5.9% 原始体积）。
+    白名单与「勿删项」的决策记录见 scripts/frontend_fields.py 顶部注释。
     """
     it = dict(item)
-    # 剥离内部索引字段（2026-09-10）：全仓无任何代码生成或消费它，属孤儿字段，
-    # 无需随每份前端产物下发；源数据 data/lectures.json 中保留不动。
-    it.pop('__idx', None)
     # ⚠ 以下字段**有意保留下发，勿剥离**（2026-09-10 决策，非疏漏）：
     #   images / hasPosterImage / imageParseMethod
     # 它们是「哪些讲座是海报图、用的哪种解析方式」的重处理索引——日后要
     # 针对海报类讲座重跑 OCR/VLM 时，靠这三个字段就能精准筛出目标集合，
     # 不必再回头全量重抓。体积占比很小（约 2.2%，见 code-review 报告 G3），
-    # 前端虽不渲染，但作为处理台账随产物携带是刻意的取舍。
+    # 前端虽不渲染，但作为处理台账随产物携带是刻意的取舍
+    # （已登记进 scripts/frontend_fields.py 的 FRONTEND_KEEP 白名单）。
     if item.get('lectureIndex') is not None:
         dates = url_dates.get(item.get('sourceUrl') or '', set())
         it['unitType'] = 'session' if len(dates) == 1 else 'issue'
     # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
     it['speakerKeys'] = speaker_keys(item.get('speaker'))
-    return it
+    return strip_frontend_fields(it)
 
 
 def write_chunks(data, updated_at):

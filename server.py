@@ -31,6 +31,7 @@ SOURCES_PATH = os.path.join(ROOT, 'scraper', 'sources.yaml')
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 from excluded_urls import load_excluded
+from frontend_fields import strip_frontend_fields
 import field_vocab as _fv
 
 
@@ -137,14 +138,15 @@ def _attach_unit_types(data):
     out = []
     for item in data:
         it = dict(item)
-        # 剥离内部索引字段（2026-09-10）：与 generate 端一致，属无消费者的孤儿字段，不下发
-        it.pop('__idx', None)
         if item.get('lectureIndex') is not None:
             dates = url_dates.get(item.get('sourceUrl') or '', set())
             it['unitType'] = 'session' if len(dates) == 1 else 'issue'
         # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
         it['speakerKeys'] = _speaker_keys(item.get('speaker'))
-        out.append(it)
+        # 按白名单裁掉前端无消费者的内部字段（llmSelfExtract/qaRepaired 等）。
+        # 必须与 generate_frontend_data.with_unit() 用同一份白名单，
+        # 否则本地下发与公网静态切片字段集分叉，test_frontend_consistency 会失败。
+        out.append(strip_frontend_fields(it))
     return out
 
 
