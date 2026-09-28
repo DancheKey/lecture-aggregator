@@ -240,8 +240,15 @@ jobs:
       pages: write       # 上传 Pages 产物
       id-token: write    # deploy-pages 的 OIDC 换取部署令牌
     steps:
+      # 2026-09-28 修复：checkout 默认检出**触发本 run 时的 commit**（github.sha），
+      # 而 scrape job 刚推送的新提交不在其中——当本轮触发后 main 有推进（尤其
+      # workflow_dispatch 由旧 SHA 触发时），deploy 会把上一班的旧 last_run.json
+      # /旧切片发上线（实测：官网「更新于」停在 9-25，仓库里已是 9-28）。
+      # 显式检出 main 才能拿到 scrape job 刚推送的产物。
       - name: 检出已推送的数据产物
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: 配置 Pages
         uses: actions/configure-pages@v5
@@ -276,8 +283,12 @@ jobs:
     permissions:
       contents: read
     steps:
+      # 同 deploy：显式检出 main，读到 scrape job 刚推送的本班 last_scrape.json
+      # （默认 github.sha 是触发时的旧 commit，本班失败源会被漏看）。
       - name: 检出数据
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: 检查失败信息源（告警）
         run: |
