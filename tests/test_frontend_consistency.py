@@ -167,6 +167,58 @@ class ConsistencyTest(unittest.TestCase):
         for i, (e, a) in enumerate(zip(got_gen, got_srv)):
             self.assertEqual(e, a, f'data/lectures.json 第 {i} 条两条路径输出不一致')
 
+    def test_public_split_vs_local_inline(self):
+        """刻意差异的锁定：公网切片剥离长文本并带桶号，本地 /api/lectures 保持内联。
+
+        2026-09-28 长文本按需加载：公网首屏主分片剥离 speakerBio/abstract
+        （这两项占前端 JSON 的 68%），改由 lectures/detail/detail_XX.json 按需取。
+        server.py 是本地开发服务器、直连本机无带宽成本，**有意**保持内联
+        （少一次请求、调试时能直接看到全文）。
+
+        上面 test_real_data_pipelines_equal 比的是 with_unit / _attach_unit_types
+        这一层，够不到 main() 里的长文本分离——若不另立本用例，两端在
+        「长文本怎么下发」上分叉将完全无人察觉。故显式锁定：
+        差异存在可以，差异漂移不行。
+        """
+        if not os.path.exists(DATA_PATH):
+            self.fail('缺少 data/lectures.json——本测试要求仓库内存在主数据')
+        with open(DATA_PATH, encoding='utf-8') as f:
+            raw = json.load(f)
+        data = raw.get('data', []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
+        excluded = gen.load_excluded()
+        rows = [r for r in data if (r.get('sourceUrl') or '') not in excluded]
+
+        # 本地（server.py）路径：长文本内联，且不带桶号 b
+        local = _pipeline_srv([dict(r) for r in rows], set())
+        self.assertTrue(any(r.get('speakerBio') or r.get('abstract') for r in local),
+                        '本地路径已无内联长文本——若是有意改为分离，请同步前端按需加载与本用例')
+        self.assertFalse(any('b' in r for r in local), '本地路径不应带桶号 b（本地无 detail 分片可取）')
+
+        # 公网（generate main）路径：长文本被剥离，桶号 b 可回指到 detail 桶
+        public, buckets = gen.split_long_text(_pipeline_gen([dict(r) for r in rows], set()))
+        with_text = [r for r in public if 'b' in r]
+        self.assertTrue(with_text, '公网路径无任何条目带桶号 b——长文本分离疑似失效')
+        for r in public:
+            self.assertNotIn('speakerBio', r, '公网主分片仍内联 speakerBio，未剥离')
+            self.assertNotIn('abstract', r, '公网主分片仍内联 abstract，未剥离')
+        # 每条带 b 的记录，在其指向的桶里必须能按同一 key 取回原文（防键口径分叉）
+        by_key = {}
+        for b, bucket_rows in enumerate(buckets):
+            for row in bucket_rows:
+                by_key[row['key']] = (b, row)
+        checked = 0
+        for r in with_text:
+            key = gen.lt_key(r)
+            self.assertIn(key, by_key, f'桶号 b={r["b"]} 的条目在 detail 分片里查不到：{key}')
+            b, row = by_key[key]
+            self.assertEqual(b, r['b'], f'桶号不一致：条目标 {r["b"]}，实存 {b}（{key}）')
+            checked += 1
+        self.assertEqual(checked, len(by_key),
+                         'detail 桶里有主分片不存在的孤儿条目（键口径与 generate/app.js 分叉）')
+        # 桶号须与前端 _ltKey 口径一致：lt_key 是唯一实现，app.js 逐字对照
+        self.assertEqual(gen.lt_key({'sourceUrl': 'u', 'lectureIndex': 3}), 'u#3')
+        self.assertEqual(gen.lt_key({'sourceUrl': 'u'}), 'u#')
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

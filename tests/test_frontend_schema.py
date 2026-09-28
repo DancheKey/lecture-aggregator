@@ -19,7 +19,7 @@ import unittest
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, 'scraper'))
 
-DERIVED_KEYS = {'unitType', 'speakerKeys'}
+DERIVED_KEYS = {'unitType', 'speakerKeys', 'b'}
 _FRONTEND_FILES = ('site/index.html', 'site/app.js')
 _LREF_RE = re.compile(r'\bl\.([A-Za-z_][A-Za-z0-9_]*)')
 
@@ -53,10 +53,10 @@ class FrontendSchemaGuardTest(unittest.TestCase):
             self.assertIn(core, self.refs)
 
     def test_derived_keys_still_derived(self):
-        """派生键（unitType/speakerKeys）不得变成解析器直接产出——
+        """派生键（unitType/speakerKeys/b）不得变成解析器直接产出——
         若 parsers 开始直出，generate/server 的加工就不再单一。"""
-        self.assertNotIn('unitType', self.produced)
-        self.assertNotIn('speakerKeys', self.produced)
+        for k in DERIVED_KEYS:
+            self.assertNotIn(k, self.produced)
 
 
 if __name__ == '__main__':

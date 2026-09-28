@@ -126,8 +126,9 @@ def load_lectures():
 
 # load_excluded 已迁移至 scripts/excluded_urls.py（scraper / generate / server 三点共用）
 from excluded_urls import load_excluded  # noqa: E402,F811
-# 前端下发字段白名单（generate / server 两点共用，见 frontend_fields.py 顶部决策记录）
-from frontend_fields import strip_frontend_fields  # noqa: E402
+# 前端下发字段白名单 + 长文本分离（generate / server 两点共用，见 frontend_fields.py 顶部决策记录）
+from frontend_fields import (  # noqa: E402
+    strip_frontend_fields, split_long_text, lt_bucket, lt_key, DETAIL_BUCKETS)
 
 
 def sort_for_latest(data):
@@ -260,6 +261,30 @@ def with_unit(item, url_dates):
     return strip_frontend_fields(it)
 
 
+def write_detail_chunks(buckets, updated_at):
+    """写出长文本分片与清单。空桶不产出文件（省请求）。"""
+    import glob
+    detail_dir = os.path.join(SITE_DIR, 'detail')
+    for old in glob.glob(os.path.join(detail_dir, 'detail_*.json')):
+        os.remove(old)
+    os.makedirs(detail_dir, exist_ok=True)
+    files = []
+    total = 0
+    for i, rows in enumerate(buckets):
+        if not rows:
+            continue
+        fname = 'detail_%02d.json' % i
+        atomic_write_json(os.path.join(detail_dir, fname),
+                          {'updatedAt': updated_at, 'data': rows})
+        files.append('lectures/detail/' + fname)
+        total += len(rows)
+    manifest = {'updatedAt': updated_at, 'buckets': DETAIL_BUCKETS, 'files': files}
+    atomic_write_json(os.path.join(detail_dir, 'manifest.json'), manifest)
+    print(f'[done] 长文本分片 {len(files)}/{DETAIL_BUCKETS} 桶 (共 {total} 条, '
+          f'{os.path.getsize(os.path.join(detail_dir, "manifest.json"))} B 清单)')
+    return files
+
+
 def write_chunks(data, updated_at):
     """将全量数据切片为 chunk_NNNN.json，并写入 chunks.json 清单。
 
@@ -376,15 +401,27 @@ def main():
             url_dates[u].add(d)
 
     sorted_data = sort_for_latest(data)
-    latest = [latest_preview(with_unit(item, url_dates)) for item in sorted_data[:LATEST_SIZE]]
-    stats = build_stats(data, updated_at)
+    # 长文本（简介/摘要）先剥离到独立分片，主分片因此只带结构化字段。
+    # latest.json 例外：首屏 50 条的简介/摘要就地内联（本来就是截断预览），
+    # 让「不点展开、只看首屏」的场景零额外请求；但仍须标出桶号 b，
+    # 否则用户在这 50 条上点「展开更多」时前端不知道去哪一桶取全文。
     full_data = [with_unit(item, url_dates) for item in data]
+    full_data, detail_buckets = split_long_text(full_data)
+    latest_src = [with_unit(item, url_dates) for item in sorted_data[:LATEST_SIZE]]
+    latest = []
+    for it in latest_src:
+        b = lt_bucket(it)
+        if b is not None:
+            it['b'] = b
+        latest.append(latest_preview(it))
+    stats = build_stats(data, updated_at)
 
     # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
     atomic_write_json(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': full_data})
     atomic_write_json(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
     atomic_write_json(os.path.join(SITE_DIR, 'stats.json'), stats)
     write_chunks(full_data, updated_at)
+    write_detail_chunks(detail_buckets, updated_at)
 
     latest_bytes = os.path.getsize(os.path.join(SITE_DIR, 'latest.json'))
     stats_bytes = os.path.getsize(os.path.join(SITE_DIR, 'stats.json'))

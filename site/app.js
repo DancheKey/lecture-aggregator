@@ -80,6 +80,16 @@ const app = createApp({
       displayTotal: 1,
       displaySource: 1,
       loadedChunks: 0,   // 分片加载断点续传：已成功加载的分片数
+      // ---- 长文本（简介/摘要）按需加载，2026-09-28 ----
+      // 主分片只带结构化字段：bio+abstract 占 68% 体积，而列表默认只显示 2~3 行 clamp。
+      // 策略：展开某条 -> 拉该条所在的 1 桶；搜索 -> 预取全量（能力不丢，只是延后加载）。
+      _longText: {},      // key -> {speakerBio, abstract}
+      _ltFull: {},        // key -> true：已拿到全文（区别于 latest.json 的截断预览）
+      _ltPending: {},     // key -> true：该桶正在加载
+      _ltLoaded: {},      // 桶号 -> true
+      _ltManifest: null,  // detail 清单
+      _ltAllLoaded: false,
+      _ltSearching: false // 搜索触发的后台预取进行中
     };
   },
 
@@ -166,8 +176,8 @@ const app = createApp({
             // 题目：标题 + 题目字段 + 主讲人（与占位提示「搜索题目 / 主讲…」对齐）
             hay = [l.title, l.topic, l.listTitle, l.speaker].filter(Boolean).join(' ').toLowerCase();
           } else if (this.searchField === 'abstract') {
-            // 摘要：仅按讲座摘要匹配
-            hay = [l.abstract].filter(Boolean).join(' ').toLowerCase();
+            // 摘要：仅按讲座摘要匹配（长文本已从主分片剥离，走 _longText 旁路）
+            hay = [this.absRaw(l)].filter(Boolean).join(' ').toLowerCase();
           } else if (this.searchField === 'college') {
             // 单位：仅按主办单位匹配，避免场地在某单位的讲座被误配
             hay = [l.college, ...(l.sources || []).map(s => s.college)]
@@ -175,7 +185,8 @@ const app = createApp({
           } else {
             // 全部（默认）：在所有常见字段中匹配
             hay = [l.title, l.topic, l.speaker, l.speakerAffiliation,
-              l.speakerBio, l.listTitle, l.college, l.location, l.campus, l.organizer, l.abstract]
+              this.bioRaw(l), l.listTitle, l.college, l.location, l.campus, l.organizer,
+              this.absRaw(l)]
               .filter(Boolean).join(' ').toLowerCase();
           }
           if (!hay.includes(q)) return false;
@@ -464,7 +475,7 @@ const app = createApp({
     },
     // 安全渲染 abstract 字段（已将内部技术标记过滤，可安全展示）
     abstractOf(l) {
-      const ab = String(l.abstract || '').trim();
+      const ab = String(this.absRaw(l) || '').trim();
       if (!ab) return '';
       // 过滤：abstract 实际是主讲人简介（解析器常见误抽）则视为无摘要
       // 检测依据：(a) 以「主讲人简介/报告人简介/嘉宾介绍」等前缀开头；
@@ -474,7 +485,7 @@ const app = createApp({
       for (const p of bioPrefixes) {
         if (ab.startsWith(p)) return '';
       }
-      const sb = (l.speakerBio || '').replace(/\s/g, '');
+      const sb = (this.bioRaw(l) || '').replace(/\s/g, '');
       if (sb.length > 10 && sb.includes(ab.replace(/\s/g, ''))) return '';
       // 过滤：abstract 是站点侧边栏「资讯及通知」模块的行政通知列表
       // （如"关于征集国家社科基金...关于申报教育部..."），不是讲座摘要。
@@ -491,19 +502,23 @@ const app = createApp({
     // 主讲简介全文（放宽到 2000：全库 >400 字简介有数百条，原 400 字上限会把
     // 头衔/单位/邮箱在截断处丢失；仍保留防超长脏数据底线）
     bioText(l) {
-      return this.truncate(this.cleanFooter(l.speakerBio), 2000);
+      return this.truncate(this.cleanFooter(this.bioRaw(l)), 2000);
     },
     // 简介是否需要折叠：超过约两行（80 字）时默认截为两行并提供展开按钮；
     // 不超两行则直接完整显示（不出现按钮）
     bioLong(l) {
       return this.bioText(l).length > 80;
     },
-    toggleAbstract(url) {
+    async toggleAbstract(url) {
       if (!url) return;
+      const l = this.all.find(x => (x.sourceUrl || '') === url);
+      if (l) await this._ensureLongText(l);   // 展开前按需拉该条全文
       this.expandedAbstract = { ...this.expandedAbstract, [url]: !this.expandedAbstract[url] };
     },
-    toggleBio(url) {
+    async toggleBio(url) {
       if (!url) return;
+      const l = this.all.find(x => (x.sourceUrl || '') === url);
+      if (l) await this._ensureLongText(l);
       this.expandedBio = { ...this.expandedBio, [url]: !this.expandedBio[url] };
     },
     // 安全链接：仅放行 http/https，阻断 javascript:/data: 等可执行协议，防止 XSS
@@ -852,16 +867,24 @@ const app = createApp({
       // 兼容多种后端返回：
       //  - {data:[...], updatedAt, mtime}            （新版 server.py，已解包）
       //  - {data:{updatedAt,data:[...]}, updatedAt}  （旧版 server.py，未解包）
-      if (Array.isArray(resp)) { this.all = resp; this.mtime = 0; this.updatedAt = ''; return; }
+      if (Array.isArray(resp)) { this._absorbAll(resp); this.mtime = 0; this.updatedAt = ''; return; }
       let arr = resp.data;
       let updatedAt = resp.updatedAt || '';
       if (arr && typeof arr === 'object' && !Array.isArray(arr) && Array.isArray(arr.data)) {
         if (!updatedAt) updatedAt = arr.updatedAt || '';
         arr = arr.data;
       }
-      this.all = Array.isArray(arr) ? arr : [];
+      this._absorbAll(Array.isArray(arr) ? arr : []);
       this.mtime = resp.mtime || 0;
       this.updatedAt = updatedAt || (resp.mtime ? new Date(resp.mtime * 1000).toISOString() : '');
+    },
+
+    // 整批收编长文本：本地 /api/lectures 与静态 latest.json 的条目都**内联**简介/摘要
+    // （本地后端不做长文本分离，公网 latest.json 内联的是截断预览），必须收进旁路，
+    // 否则 hasBio/absRaw 恒空 → 简介与摘要整行不显示。
+    _absorbAll(arr) {
+      for (const it of arr) this._absorbLongText(it);
+      this.all = arr;
     },
 
     _loadStaticLatest() {
@@ -974,17 +997,111 @@ const app = createApp({
       const idxMap = new Map();
       this.all.forEach((it, idx) => idxMap.set(keyOf(it), idx));
       for (const it of arr) {
-        const k = keyOf(it);
+        // 长文本收进旁路存储 _longText，条目只留结构化字段
+        this._absorbLongText(it);
+        const clean = it;
+        if (clean.speakerBio !== undefined) delete clean.speakerBio;
+        if (clean.abstract !== undefined) delete clean.abstract;
+        const k = keyOf(clean);
         if (idxMap.has(k)) {
-          this.all[idxMap.get(k)] = it;   // 完整数据覆盖首屏预览
+          this.all[idxMap.get(k)] = clean;   // 完整数据覆盖首屏预览
         } else {
           idxMap.set(k, this.all.length);
-          this.all.push(it);
+          this.all.push(clean);
         }
       }
     },
 
     _sleep(ms) { return new Promise(res => setTimeout(res, ms)); },
+
+    /* ---------- 长文本（简介/摘要）按需加载 ---------- */
+    // 键必须与 generate_frontend_data._lt_key() 逐字一致
+    _ltKey(l) {
+      return (l.sourceUrl || '') + '#' + (l.lectureIndex != null ? l.lectureIndex : '');
+    },
+    _ltOf(l) { return this._longText[this._ltKey(l)] || null; },
+    // 条目自身已不含长文本，模板/搜索统一走这里取
+    hasBio(l) { const t = this._ltOf(l); return !!(t && t.speakerBio); },
+    bioRaw(l) { const t = this._ltOf(l); return (t && t.speakerBio) || ''; },
+    absRaw(l) { const t = this._ltOf(l); return (t && t.abstract) || ''; },
+
+    _absorbLongText(l) {
+      // latest.json 的 50 条内联了截断预览，这里收进 _longText（_ltFull 不置位，
+      // 展开时仍会拉全文覆盖它）
+      const bio = l.speakerBio, abs = l.abstract;
+      if (bio || abs) {
+        const k = this._ltKey(l);
+        this._longText = { ...this._longText, [k]: { speakerBio: bio || '', abstract: abs || '' } };
+      }
+    },
+    _absorbDetailRows(rows) {
+      if (!rows || !rows.length) return;
+      const patch = {};
+      for (const r of rows) {
+        patch[r.key] = { speakerBio: r.speakerBio || '', abstract: r.abstract || '' };
+        this._ltFull = { ...this._ltFull, [r.key]: true };
+      }
+      this._longText = { ...this._longText, ...patch };
+    },
+
+    async _ltManifestJson() {
+      if (this._ltManifest) return this._ltManifest;
+      const r = await fetch('lectures/detail/manifest.json', { cache: 'default' });
+      if (!r.ok) throw new Error('detail-manifest-' + r.status);
+      this._ltManifest = await r.json();
+      return this._ltManifest;
+    },
+
+    async _loadDetailBucket(idx) {
+      if (idx == null || this._ltLoaded[idx]) return;
+      this._ltPending = { ...this._ltPending, [idx]: true };
+      try {
+        const man = await this._ltManifestJson();
+        const file = (man.files || []).find(f => f.endsWith('detail_' + String(idx).padStart(2, '0') + '.json'));
+        if (!file) return;
+        const r = await fetch(file, { cache: 'default' });
+        if (!r.ok) throw new Error('detail-' + r.status);
+        const j = await r.json();
+        this._absorbDetailRows(j.data);
+        this._ltLoaded = { ...this._ltLoaded, [idx]: true };
+      } catch (e) {
+        console.warn('长文本桶 ' + idx + ' 加载失败', e);
+      } finally {
+        const p = { ...this._ltPending }; delete p[idx];
+        this._ltPending = p;
+      }
+    },
+
+    // 展开某条前确保其全文到手（只拉它所在的 1 桶，16 桶之一）
+    async _ensureLongText(l) {
+      const k = this._ltKey(l);
+      if (this._ltFull[k]) return;
+      const idx = l && l.b != null ? l.b : null;
+      if (idx == null) return;
+      await this._loadDetailBucket(idx);
+    },
+
+    // 搜索需要简介/摘要正文才能命中：后台预取全量，完成后 computed 自动重算
+    async _prefetchLongText() {
+      if (this._ltAllLoaded || !this.query || this._ltSearching) return;
+      this._ltSearching = true;
+      try {
+        const man = await this._ltManifestJson();
+        const files = man.files || [];
+        const CONC = 4;
+        let cur = 0;
+        const idxs = files.map(f => parseInt((f.match(/detail_(\d+)\.json/) || [])[1], 10));
+        const worker = async () => {
+          while (cur < idxs.length) await this._loadDetailBucket(idxs[cur++]);
+        };
+        await Promise.all(Array.from({ length: Math.min(CONC, idxs.length) }, worker));
+        this._ltAllLoaded = true;
+      } catch (e) {
+        console.warn('长文本预取失败，搜索将只覆盖已加载部分', e);
+      } finally {
+        this._ltSearching = false;
+      }
+    },
 
     /* ---------- 顶部数字滚动动画（目标驱动）----------
      * displayTotal 始终向 this._countTarget 平滑靠拢；每加载一片数据就调用 bumpCount()，
@@ -1265,8 +1382,16 @@ const app = createApp({
 
   watch: {
     // 任一筛选条件变化，回到第一页
-    query() { this.currentPage = 1; },
-    searchField() { this.currentPage = 1; },
+    query() {
+      this.currentPage = 1;
+      // 简介/摘要已从主分片剥离（按需加载），搜索需要它们才能命中长文本。
+      // 输入停顿后后台预取全量，_longText 更新会让 computed 自动重算。
+      if (this.query) this._prefetchLongText();
+    },
+    searchField() {
+      this.currentPage = 1;
+      if (this.query) this._prefetchLongText();
+    },
     campus() { this.currentPage = 1; },
     college() { this.currentPage = 1; },
     year() { this.currentPage = 1; },

@@ -35,6 +35,8 @@ tools/
 # 本地预览启动/停止脚本，公网不需要
 start_local.bat
 stop_local.bat
+# Playwright MCP 工具产物（快照/控制台日志），仅本地调试用
+.playwright-cli/
 
 # ===== 截图 =====
 site/screenshots/

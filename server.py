@@ -146,6 +146,10 @@ def _attach_unit_types(data):
         # 按白名单裁掉前端无消费者的内部字段（llmSelfExtract/qaRepaired 等）。
         # 必须与 generate_frontend_data.with_unit() 用同一份白名单，
         # 否则本地下发与公网静态切片字段集分叉，test_frontend_consistency 会失败。
+        # ⚠ 这里**有意不调** frontend_fields.split_long_text()：本地开发服务器
+        # 直连本机、无带宽成本，长文本内联可少一次请求、调试时直接看到全文。
+        # 公网侧剥离长文本改走 lectures/detail/ 分片（2026-09-28 首屏体积优化）。
+        # 该刻意差异由 test_public_split_vs_local_inline 锁定，两端都别默默改。
         out.append(strip_frontend_fields(it))
     return out
 
