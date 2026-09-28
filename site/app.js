@@ -900,25 +900,45 @@ const app = createApp({
       if (!chunks.length) return this._loadFullSingle();
       this.dataStage = 'partial';
       const failed = [];
-      for (let i = 0; i < chunks.length; i++) {
-        let ok = false;
-        for (let attempt = 0; attempt < 3 && !ok; attempt++) {
-          try {
-            const cres = await fetch(chunks[i], { cache: 'no-store' });
-            if (!cres.ok) throw new Error('chunk-' + cres.status);
-            const cj = await cres.json();
-            this._mergeChunk((cj && cj.data) || []);
-            this.bumpCount();
-            ok = true;
-          } catch (err) {
-            console.warn(`讲座分片 ${chunks[i]} 第 ${attempt + 1} 次加载失败`, err);
-            if (attempt < 2) await this._sleep(800 * Math.pow(2, attempt));
+      // 2026-09-28 性能修复：分片由严格串行改为并发池（默认 4 路）。
+      // 诊断：公网 8 片 gzip 后合计约 2.4MB，单片实测 1.8~18s（链路速度 80~540KB/s
+      // 波动极大）；串行把每片 RTT 逐段累加，全量首屏要 30~40s，弱网直逼几分钟。
+      // 并发后只剩 2 轮 RTT。合并是同步调用（JS 单线程），先到先合并，
+      // 顶部数字仍随每片到达向上滚动。
+      // 顺序影响：列表由 list.sort() 按日期倒序 + 同日系列编号倒序决定，
+      // 不依赖数组原始顺序，故并发完成顺序不影响展示。
+      const CONCURRENCY = 4;
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < chunks.length) {
+          const i = cursor++;
+          const url = chunks[i];
+          let ok = false;
+          for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+            try {
+              // cache:'default' —— GitHub Pages 对静态文件发 Cache-Control:max-age=600，
+              // 走协商缓存后二次进入命中本地副本（数据每天只更新一次，10 分钟窗口可接受）。
+              // 原先这里是 no-store，等于每次访问都强制重下全部 2.4MB，这正是
+              // 「以前很快、现在一直没加载出来」的主因。分片清单 chunks.json 仍保持
+              // no-store（仅 297B），保证分片清单第一时间拿到。
+              const cres = await fetch(url, { cache: 'default' });
+              if (!cres.ok) throw new Error('chunk-' + cres.status);
+              const cj = await cres.json();
+              this._mergeChunk((cj && cj.data) || []);
+              this.bumpCount();
+              ok = true;
+            } catch (err) {
+              console.warn(`讲座分片 ${url} 第 ${attempt + 1} 次加载失败`, err);
+              if (attempt < 2) await this._sleep(800 * Math.pow(2, attempt));
+            }
           }
+          // 单片最终失败不再中止：记录后继续加载后续分片。
+          // 弱网下把损失从「此后所有分片全部缺失」压到「仅缺失该片」。
+          if (!ok) failed.push(url);
         }
-        // 单片最终失败不再中止：记录后继续加载后续分片。
-        // 弱网下把损失从「此后所有分片全部缺失」压到「仅缺失该片」。
-        if (!ok) failed.push(chunks[i]);
-      }
+      };
+      const pool = Math.min(CONCURRENCY, chunks.length);
+      await Promise.all(Array.from({ length: pool }, () => worker()));
       this.loadedChunks = 0;
       if (failed.length) {
         // 仍有分片失败：保留已加载的真实条数并暴露重试入口；
