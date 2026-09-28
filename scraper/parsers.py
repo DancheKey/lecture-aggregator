@@ -2236,6 +2236,68 @@ def is_admin_notice(title, body=''):
     return False
 
 
+# ---- AD3 学术事务/会务类通知识别（2026-09-28）----
+# 覆盖两类此前漏网的通知类内容，**都不是公开学术讲座**：
+#   ① 学位答辩/开题/考核的**安排表**（非讲学活动）：哲社 zhx2415/2381/2358/2465、
+#      icc 1072 等。标题落 list_title 分支时拿到的是栏目名「学术科研」，
+#      关键词匹配对 title 完全失效（真标题在 <h2>），故须同时查 topic/正文。
+#   ② 会议/研习的**会务通知**（预通知/补报/第N号通知/组织参加）：cic 1069/1066/1061。
+# 全库存量审计：这些词在 3804 条现有title/topic 上**零命中**（既没漏进来过，
+# 加词也不会误伤存量），属纯增量防护。
+_AD3_KW = (
+    # ① 学位事务**安排表**：只认事务性名词「安排表」，不收裸动词短语。
+    #    - 裸「答辩」已在 _ADMIN_NOTICE_TITLE_KW，不重复（避免误伤
+    #      「答辩委员会」「答辩会」）；
+    #    - 裸「学位论文答辩」会误杀「我国学位论文答辩制度的改革」这类
+    #      **真学术报告**（实测），故不收；
+    #    - 裸「答辩安排」同样会误杀「从答辩安排看高校研究生教育管理」，
+    #      故只认带「表」的固定事务名（zhx 2381「…硕士学位论文答辩安排表」）。
+    '答辩安排表', '开题安排', '中期考核安排',
+    # ② 会务/事务性通知（「第N号通知」由 _AD3_RE 兜住，不在此列）
+    '预通知', '补报', '会务通知', '组织参加',
+    # ③ 教务系统公告页（zhx 2465）：正文只有一堆教务系统外链，
+    #    标题行「…研究生学位论文答辩安排表（一直更新）」落在 <title>/<h2>，
+    #    列表页 title 却是栏目名「学术科研」、topic 为空 → 须认「…答辩公告」形态。
+    '预答辩公告', '答辩公告',
+)
+# 「一号通知/二号通知…」是学会年会系列通知的固定后缀（cic 1066「…年会第一号通知」
+# 1061「…海上论坛一号通知」）。须带「通知」才算，避免裸「第一号」误伤期次讲座。
+_AD3_RE = re.compile(r'[一二三四五六七八九十\d]+号(?:通知|通告|函)')
+# 正文兜底只在**正文本身就是那行公告标题**时才采信。实测（2026-09-28 spy 探针）：
+# zhx 2415/2358/2381/2465 的正文长 157~250 字，事务词落在第 0/75/77/79 字——
+# 这类页面只挂了一个事务性标题 + 教务系统外链；真讲座正文动辄上千字，
+# 顺带提一句「硕士学位论文答辩安排见附件」并不代表本页是通知。
+# 长度门把误伤面从「所有长正文」压到「短公告页」，代价是长正文的纯外链公告页
+# 会漏过——按「宁留不误杀」铁律，这是正确取舍。
+_AD3_BODY_MAX = 300
+
+
+def is_academic_admin_notice(title, topic='', body=''):
+    """AD3：学位答辩安排表 / 会务通知类非讲座内容（不入聚合页）。
+
+    与 AD1/AD2 的分工：AD1 要求「关于(举办|开展|组织)…通知」框架，
+    这类通知**没有**该框架（直接以「XX学院2025年夏季硕士学位论文答辩安排表」
+    命题），故须独立成规则。
+
+    三处都查，缺一不可漏（实测 2026-09-28）：
+      · title 可能只是栏目名「学术科研」——zhx 列表页 list_title 即如此，
+        关键词匹配对 title 完全失效；
+      · topic 有时能救（cic 1072/1069/1066/1061 全部由title/topic 命中）；
+      · 真信号有时只在**正文首行**（zhx 2415/2358/2381/2465 全部只有 body 命中，
+        故 8 条目标里4 条是topic 为空 + title 为栏目名的组合）。
+    body 只取前 _AD3_BODY_MAX 字（够覆盖整段公告标题），避免长正文顺带
+    提及事务词被误杀；标题与 topic 全空且正文过长时不判（宁留不误杀）。
+    """
+    hay = '%s %s' % (title or '', topic or '')
+    if any(k in hay for k in _AD3_KW) or _AD3_RE.search(hay):
+        return True
+    # 正文兜底：仅短正文（整段就是那行事务性公告标题）才采信
+    head = (body or '')[:_AD3_BODY_MAX]
+    if head and (any(k in head for k in _AD3_KW) or _AD3_RE.search(head)):
+        return True
+    return False
+
+
 # ---- 新闻/活动回顾稿识别（与 is_news_record 互补）----
 # is_news_record 依赖「发布时间 > 讲座时间」，但 IBC 等站点的回顾稿往往没有
 # 显式「发布」时间戳（publishTime 为空），无法触发。这里用语义特征识别：
@@ -5451,9 +5513,10 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
     if (is_non_lecture_title(title) or is_admin_notice(title, body_text)
+            or is_academic_admin_notice(title, result.get('topic', ''), body_text)
             or _is_empty_notice(result, title)
             or (not skip_news_filter and is_news_article(title, body_text, result.get('lectureStart')))):
-        return None  # [SKIP-NEWS] / [SKIP-ADMIN] / [SKIP-EMPTY]
+        return None  # [SKIP-NEWS] / [SKIP-ADMIN] / [SKIP-AD3] / [SKIP-EMPTY]
     if skip_news_filter:
         # 来源被显式标记为「跳过新闻过滤」（如整栏为讲座海报预告、发布晚于讲座时间），
         # 记录标记以便后续清理脚本（clean_public.py）也不会误删。
