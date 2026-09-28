@@ -854,6 +854,48 @@ def _norm_url(u):
     return str(u or '').rstrip('/')
 
 
+# VSB 系站点同一篇文章存在两个 URL 形态（经管学院实证）：
+#   旧形态 http://em.scnu.edu.cn/a/20260924/11175.html
+#   新形态 https://module.scnu.edu.cn/article-3685-11175-1.html
+# 二者文章数字 ID 一致，指同一篇。仅 URL 字符串比对时互相认不出 → 增量轮
+# 每轮把已入库的老文章当新页面重抓重解析（实测 621 页，占单轮 1734 页的 36%）。
+#
+# ⛔ 归一化**必须限定站点组**：VSB 的文章 ID 是「每站独立编号」而非全局唯一，
+#   实测全库 352 个 ID 跨站重复（如 ID 22 同时是 lswh / geography 的两篇不同文章），
+#   故只有同一站点组内的两个域名才允许互相归一，跨站绝不合并。
+# 归一化仅用于「是否已抓」的跳过判定，**不改写 sourceUrl 原值**（溯源必须指回真实页面）。
+_VSB_ID_PATTERNS = (
+    re.compile(r'^https?://([a-z0-9.-]+)/a/\d{8}/(\d+)\.html$'),
+    re.compile(r'^https?://([a-z0-9.-]+)/article-\d+-(\d+)-1\.html$'),
+)
+# 同一内容站的不同域名（归一化后视为同一篇）。保守白名单，逐条实测添加。
+_VSB_SITE_GROUPS = (
+    frozenset(('em.scnu.edu.cn', 'module.scnu.edu.cn')),
+)
+
+
+def _canon_url_key(u):
+    """返回用于「是否已抓」比对的归一化键；无法归一时回退去尾斜杠的原 URL。
+
+    仅同站点组内的等价形态才折叠为同一键，跨站 ID 相同仍是不同键（见 _VSB_SITE_GROUPS 注释）。
+    """
+    s = str(u or '').rstrip('/')
+    if not s:
+        return s
+    low = s.lower()
+    for pat in _VSB_ID_PATTERNS:
+        m = pat.match(low)
+        if not m:
+            continue
+        host, art_id = m.group(1), m.group(2)
+        for grp in _VSB_SITE_GROUPS:
+            if host in grp:
+                # 用组内字典序最小域名作代表，保证两种形态算出同一个 key
+                return 'vsb::%s::%s' % (sorted(grp)[0], art_id)
+        break
+    return s
+
+
 def _cross_source_dup_with_existing(rec, existing_index, no_speaker_index=None):
     """判断 rec 是否与基底 existing 中某条跨源重复，返回命中的基底记录（或 None）。
 
@@ -1169,7 +1211,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     seen.add(href_norm)
                     new_count += 1
-                    if is_incremental and (href_norm, None) in existing_urls:
+                    if is_incremental and (_canon_url_key(href_norm), None) in existing_urls:
                         continue
                     if href_norm in exclude_urls or (global_exclude and href_norm in global_exclude):
                         print(f'[SKIP] {name} exclude {href}')
@@ -1266,12 +1308,16 @@ def main():
             print(f'[ABORT] 读取 data/lectures.json 失败：{e}。为避免覆盖丢失数据，已中止。', file=sys.stderr)
             return
     # 已抓 URL 集合：(sourceUrl, lectureIndex) 元组。
+    # ⚠ 第一项存的是 **归一化键**（_canon_url_key），不是原 URL：同一篇文章的
+    #   两种 URL 形态（em 旧 / module 新）须命中同一键，否则增量轮会把已入库的
+    #   老文章当新页面重抓重解析（2026-09-28 实测单轮多抓 621 页，白花 LLM 费用）。
+    #   原 URL 仍完整保存在 sourceUrl 字段，溯源不受影响。
     # 多讲座记录（isMultiLecture=True 且有 lectureIndex）只加入 (url, li) 而不加 (url, None)；
     # 非多讲座记录加入 (url, None)。增量模式下只检查 (url, None) 是否在集合中，
     # 这样多讲座页面不会被跳过，允许解析器改进后重新检测补拆漏期。
     existing_urls = set()
     for r in existing:
-        u = str(r.get('sourceUrl', '')).rstrip('/')
+        u = _canon_url_key(r.get('sourceUrl', ''))
         if not u:
             continue
         if r.get('isMultiLecture') and r.get('lectureIndex') is not None:
@@ -1282,7 +1328,7 @@ def main():
         # 来源页面重新抓成一条新记录，使合并白做（旧讲座目前只靠时间门侥幸挡住，
         # 未来讲座就会重复复活）。
         for s in (r.get('sources') or []):
-            su = str(s.get('sourceUrl', '')).rstrip('/')
+            su = _canon_url_key(s.get('sourceUrl', ''))
             if su:
                 existing_urls.add((su, None))
 
