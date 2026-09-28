@@ -896,6 +896,76 @@ def _canon_url_key(u):
     return s
 
 
+# ── 列表页条目日期就地过滤（2026-09-28）────────────────────────────────────
+# 增量轮原本要把「未入库」的所有详情页 fetch+parse 一遍，但列表页 72 页里绝大多数
+# 是早已入库或早该丢弃的历史条目，导致每轮重抓 1128 页、撞满 CI 的 120 分钟超时。
+# 实测列表页条目文本里 **99.0%** 能就地抽到日期，其中 4654/4699 条早于水位线——
+# 在枚举阶段就判掉，详情页抓取 1128→1 页，单轮 3.9 小时→约 7 分钟。
+#
+# ⛔ **不能改成「只翻前 N 页」**：实测 `lectureStart >= 水位线` 的记录散落在列表页
+#   第 1、35、67 页——列表页并非严格日期倒序，只翻首页会漏抓。
+# ⛔ **必须用「或」逻辑**：仅当「成功抽到日期」且「日期 < 水位线」才跳过；抽不到
+#   日期（实测占 1.0%）一律照抓。源站可能补发旧页，宁多抓不漏抓。
+_ITEM_DATE_RE = re.compile(r'(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})')
+_ITEM_HOST_TAGS = ('li', 'tr', 'p', 'dd', 'td', 'div')
+
+# 全局累计：被列表页条目日期过滤跳过的详情页数（可观测性 + 单轮汇总日志）。
+# 用模块级变量而非改 _process_source 的返回契约（该函数返回 (local, err) 二元组，
+# 多处解包，扩参会波及所有调用方）。
+_LISTDATE_STATS = {'skipped': 0}
+
+
+def _listdate_skip_enabled():
+    """SCNU_LISTDATE_SKIP=0 可关闭（回退对照用），默认开启。"""
+    return (os.environ.get('SCNU_LISTDATE_SKIP') or '1').strip() not in ('0', 'false', 'no')
+
+
+def _build_item_date_map(html, list_url, base, collect_mode):
+    """一次遍历建立 {详情页URL: 'YYYY-MM-DD'} 映射：取每个条目所在容器文本里的日期。
+
+    只在增量模式需要时调用；抽不到日期的条目不进入映射，调用方据此照常抓取。
+    """
+    out = {}
+    if not html:
+        return out
+    try:
+        soup = BeautifulSoup(html, 'html.parser')
+    except Exception:
+        return out
+    list_url_norm = list_url.rstrip('/') if list_url else None
+    for a in soup.find_all('a'):
+        href = a.get('href')
+        if not href or href.startswith('javascript') or href.startswith('#'):
+            continue
+        url = _abs_url(href, list_url or base)
+        if list_url_norm and url.rstrip('/') == list_url_norm:
+            continue
+        # 找最近的条目容器（含本条目的日期/摘要文本）
+        cont = a.find_parent(_ITEM_HOST_TAGS)
+        txt = cont.get_text(' ', strip=True) if cont else ''
+        if not txt:
+            continue
+        m = _ITEM_DATE_RE.search(txt)
+        if not m:
+            continue
+        try:
+            y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            out[_canon_url_key(url)] = '%04d-%02d-%02d' % (y, mo, d)
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
+def _should_skip_by_item_date(canon_key, item_date_map, cutoff_date_str):
+    """列表页条目日期早于水位线 → 可跳过详情页抓取。抽不到日期则不跳。"""
+    if not item_date_map or not cutoff_date_str:
+        return False
+    d = item_date_map.get(canon_key)
+    if not d:
+        return False
+    return d < cutoff_date_str
+
+
 def _cross_source_dup_with_existing(rec, existing_index, no_speaker_index=None):
     """判断 rec 是否与基底 existing 中某条跨源重复，返回命中的基底记录（或 None）。
 
@@ -1177,8 +1247,14 @@ def incremental_merge(existing, new_records):
     return no_url_recs + list(base_map.values()) + final_new
 
 
-def _process_source(src, year, existing_urls, is_incremental, global_exclude=None):
-    """处理单个信息源，返回 {url: rec} 字典。"""
+def _process_source(src, year, existing_urls, is_incremental, global_exclude=None,
+                    cutoff_date_str=None):
+    """处理单个信息源，返回 {url: rec} 字典。
+
+    cutoff_date_str: 增量水位日期（'YYYY-MM-DD'）。配合列表页条目日期过滤，
+        跳过「条目日期早于水位线」的详情页，显著压缩单轮抓取量。
+        None/空 → 不启用该过滤（宁可多抓不漏抓）。
+    """
     name = src['name']
     campus = src.get('campus', '')
     base = src['base']
@@ -1205,6 +1281,12 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                 visited_pages.add(cur.rstrip('/'))
                 html = fetch(cur, allowed_domains=['scnu.edu.cn'])
                 new_count = 0
+                # 列表页条目日期映射（仅增量 + 开关开启时构建）：在 fetch 详情页之前
+                # 就判掉「条目日期早于水位线」的条目，避免把历史页反复抓回来。
+                use_item_date = bool(cutoff_date_str) and _listdate_skip_enabled()
+                item_date_map = (_build_item_date_map(html, cur, base, collect_mode)
+                                 if use_item_date else {})
+                listdate_skipped = 0
                 for href, txt in collect_links(html, base, list_url=cur, collect_mode=collect_mode):
                     href_norm = href.rstrip('/')
                     if href_norm in seen:
@@ -1212,6 +1294,12 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     seen.add(href_norm)
                     new_count += 1
                     if is_incremental and (_canon_url_key(href_norm), None) in existing_urls:
+                        continue
+                    if (item_date_map
+                            and _should_skip_by_item_date(_canon_url_key(href_norm),
+                                                          item_date_map, cutoff_date_str)):
+                        listdate_skipped += 1
+                        _LISTDATE_STATS['skipped'] += 1
                         continue
                     if href_norm in exclude_urls or (global_exclude and href_norm in global_exclude):
                         print(f'[SKIP] {name} exclude {href}')
@@ -1239,6 +1327,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         local[key] = r
                         tag = f' (第{r["lectureIndex"]}期)' if r.get('lectureIndex') else ''
                         print(f'[OK] {name} | {r.get("lectureStart")} | {txt}{tag}')
+                if listdate_skipped:
+                    print(f'[LISTDATE] {name} | {cur} | 按条目日期跳过 {listdate_skipped} 条历史详情页')
                 nxt = _next_page_url(html, cur) if html else None
                 sequential = False
                 if not nxt and new_count > 0:
@@ -1287,6 +1377,19 @@ def main():
         except Exception:
             since = None
     is_incremental = bool(since) and not args.full
+
+    # 列表页条目日期过滤用的水位日期（'YYYY-MM-DD'）。仅增量模式有意义：
+    # 条目日期早于它 → 该详情页不必再抓（历史页每轮重抓是 CI 超时的根因）。
+    # ⛔ 只做「早于则跳过」，绝不做「晚于才抓」——源站可能补发旧页，宁多抓不漏抓。
+    cutoff_date_str = None
+    if is_incremental and since:
+        _c = _parse_iso(since)
+        if _c is not None:
+            cutoff_date_str = '%04d-%02d-%02d' % (_c.year, _c.month, _c.day)
+        if cutoff_date_str and _listdate_skip_enabled():
+            print(f'[LISTDATE] 列表页条目日期过滤已开启：条目日期 < {cutoff_date_str} 的详情页将跳过不抓')
+        elif is_incremental:
+            print('[LISTDATE] 列表页条目日期过滤未启用（SCNU_LISTDATE_SKIP=0 或 since 无法解析）')
 
     # 读取现有记录：增量模式作为基底（合并写回）+ 已抓 URL 集合（跳过解析/OCR）
     data_path = os.path.join(ROOT, 'data', 'lectures.json')
@@ -1370,7 +1473,7 @@ def main():
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded): src for src in sources}
+        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str): src for src in sources}
         for future in as_completed(future_to_src):
             src_name = future_to_src[future].get('name')
             try:
@@ -1512,6 +1615,9 @@ def main():
                                {'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'})
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
           f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
+    if _LISTDATE_STATS['skipped']:
+        print(f'[LISTDATE] 本轮共按列表页条目日期跳过 {_LISTDATE_STATS["skipped"]} 个历史详情页'
+              f'（未 fetch、未 parse，省下对应 LLM 开销）')
 
 
 if __name__ == '__main__':
