@@ -4029,6 +4029,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 发布时刻（页眉元信息），晚于讲座开始（09:30），应保留并判事后。
     # 仅当候选时刻不晚于讲座开始时（等于或早于，属正常「同天发布」或与讲座时间混淆）才作废，
     # 避免误删正常预告（正常预告的发布时刻必早于讲座开始，不触发此例外）。
+    # _pub_year_hint：被 R3 作废的候选里提取出的年份线索，供下方多场拆分路径补全年份
+    # （作废只针对落库字段，不应连带抹掉解析线索，见 4043 行注释）。
+    _pub_year_hint = None
     if (publish_time and publish_level in (2, 3) and t
             and t['start'].strftime('%Y-%m-%d') == publish_time[:10]):
         _pub_dt = None
@@ -4040,6 +4043,12 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             except (ValueError, TypeError):
                 pass
         if not (_pub_dt and _pub_dt > t['start']):
+            # 作废的只是「不该作为落库 publishTime 字段」，年份线索须另存（2026-09-28）。
+            # 本条的作废条件是「候选日期 == 讲座日」，故该候选年份与刚解析出的 t 同年，
+            # 可安全充当后续多场拆分的年份补全线索。缺失场景（VSB 站 URL 无日期、
+            # 正文只有「12月5日」）下若无此线索，detect_multi_session 会把各场次
+            # 全部回退到 default_year=当前年 → 2014/2019 的历史讲座被识别为 2026。
+            _pub_year_hint = publish_time
             publish_time = None
     # R3 发布时间来源标记（publishTimeSource）：标签/伴生/class/位置兜底 + URL 日期代理
     # 同步回写 result['publishTime']：若上面 R3 本质条款已将 publish_time 作废（置 None），
@@ -5429,8 +5438,13 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             _base_dt_end = datetime.datetime.fromisoformat(_le)
         except Exception:
             _base_dt_end = None
+    # R3 作废后 publish_time 已为 None，但作废候选的年份仍是可靠线索（作废条件含
+    # 「候选日期 == 讲座日」→ 年份与 t 同年）。拆分路径各场次要独立再跑一次
+    # parse_cn_time，无此线索时会全部回退 default_year=当前年（module/3762 2014 年、
+    # module/7542 2019 年的历史讲座曾因此被识别为 2026）。仅补线索，不改落库字段。
     _sessions_pre = detect_multi_session(
-        body_text, title=title, default_year=default_year, publish_time=publish_time,
+        body_text, title=title, default_year=default_year,
+        publish_time=(publish_time or _pub_year_hint),
         title_year=title_year, url_year=url_year, soup=soup, url=url,
         base_start=_base_dt, base_end=_base_dt_end)
     if not _sessions_pre and not skip_news_filter and is_news_record(result, poster_page=poster_only):
