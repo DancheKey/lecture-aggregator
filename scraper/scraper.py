@@ -966,6 +966,33 @@ def _should_skip_by_item_date(canon_key, item_date_map, cutoff_date_str):
     return d < cutoff_date_str
 
 
+def _build_source_latest_date(existing):
+    """建 {源名: 该源已入库的最晚条目日期 'YYYY-MM-DD'}。
+
+    翻页停止判据用：列表页严格时间倒序时，若某页**整页**条目日期都早于该源
+    已入库的最新条目日期，说明这一页往后全是早已入库的历史内容，继续翻是纯
+    重复枚举（每轮 70+ 列表页，白跑网络与枚举开销）。
+
+    刻意**不用**全局水位线（last_scrape）：全局水位一旦被其它源的更新拉高，
+    就会把本源还没抓到的旧页整片跳过，代价是漏抓；用「本源自己的最新数据」作
+    基准则天然自限——本源没新数据时只翻到遇见存量为止，有新数据时自动多翻。
+
+    源名归一与 _process_source 的 name 保持一致（含跨子域归并：经管学院的详情页
+    大量托管在 module.scnu.edu.cn，按域名分别统计会低估水位，故按 sources.yaml
+    的 name 归并而非按 URL 域名）。
+    """
+    out = {}
+    for r in (existing or []):
+        name = r.get('college') or ''
+        if not name:
+            continue
+        for fld in ('lectureStart', 'publishTime'):
+            v = (r.get(fld) or '')[:10]
+            if len(v) == 10 and v > out.get(name, ''):
+                out[name] = v
+    return out
+
+
 def _cross_source_dup_with_existing(rec, existing_index, no_speaker_index=None):
     """判断 rec 是否与基底 existing 中某条跨源重复，返回命中的基底记录（或 None）。
 
@@ -1248,12 +1275,15 @@ def incremental_merge(existing, new_records):
 
 
 def _process_source(src, year, existing_urls, is_incremental, global_exclude=None,
-                    cutoff_date_str=None):
+                    cutoff_date_str=None, src_latest_date=None):
     """处理单个信息源，返回 {url: rec} 字典。
 
     cutoff_date_str: 增量水位日期（'YYYY-MM-DD'）。配合列表页条目日期过滤，
         跳过「条目日期早于水位线」的详情页，显著压缩单轮抓取量。
         None/空 → 不启用该过滤（宁可多抓不漏抓）。
+    src_latest_date: 该源已入库的最晚条目日期（'YYYY-MM-DD'），来自
+        _build_source_latest_date。用于翻页停止判据：整页条目日期都早于它
+        → 该页往后全是存量，停止翻页（仅增量生效，见循环内守卫）。
     """
     name = src['name']
     campus = src.get('campus', '')
@@ -1281,9 +1311,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                 visited_pages.add(cur.rstrip('/'))
                 html = fetch(cur, allowed_domains=['scnu.edu.cn'])
                 new_count = 0
-                # 列表页条目日期映射（仅增量 + 开关开启时构建）：在 fetch 详情页之前
-                # 就判掉「条目日期早于水位线」的条目，避免把历史页反复抓回来。
-                use_item_date = bool(cutoff_date_str) and _listdate_skip_enabled()
+                # 列表页条目日期映射。两种用途，故与 LISTDATE 开关解耦：
+                #   ① 条目级跳过（仅 cutoff_date_str 非空且开关开启时生效）；
+                #   ② 翻页停止判据（下方循环尾部，仅增量 + src_latest_date 时生效）。
+                use_item_date = bool(cutoff_date_str) or bool(
+                    is_incremental and src_latest_date)
                 item_date_map = (_build_item_date_map(html, cur, base, collect_mode)
                                  if use_item_date else {})
                 listdate_skipped = 0
@@ -1329,6 +1361,24 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         print(f'[OK] {name} | {r.get("lectureStart")} | {txt}{tag}')
                 if listdate_skipped:
                     print(f'[LISTDATE] {name} | {cur} | 按条目日期跳过 {listdate_skipped} 条历史详情页')
+                # 翻页停止判据（2026-09-28）：仅增量生效。列表页严格时间倒序时，
+                # 若本页**整页**条目日期都早于该源已入库的最晚条目日期，说明本页
+                # 及其之后所有页全是早已入库的存量，继续翻纯属每轮重复枚举
+                # （经管学院实测 72 页，其中 ~69 页是 2013~2025 的存量）。
+                # ⛔ 刻意不用全局水位线（last_scrape）：全局水位会被其它源的更新
+                # 拉高，把本源尚未抓到的旧页整片跳过 → 漏抓。用本源自己的最新数据
+                # 作基准则天然自限——没新数据时只翻到遇见存量为止。
+                # ⛔ 必须「整页」都早于基准才停：只跳过部分老条目会漏掉夹在中间的
+                # 新条目。抽不到任何条目日期时不停（宁可多翻不漏抓）。
+                # ⛔ 全量模式（--full）不启用：首次建库/重修必须翻到底补全历史。
+                _stop_paging = False
+                if (is_incremental and src_latest_date and item_date_map):
+                    _page_dates = list(item_date_map.values())
+                    if _page_dates and max(_page_dates) < src_latest_date:
+                        _stop_paging = True
+                        print(f'[PAGESTOP] {name} | {cur} | 整页条目日期'
+                              f'(最晚 {max(_page_dates)}) 均早于本源已入库最新'
+                              f'({src_latest_date})，停止翻页')
                 nxt = _next_page_url(html, cur) if html else None
                 sequential = False
                 if not nxt and new_count > 0:
@@ -1338,6 +1388,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         sequential = True
                 if (not nxt or nxt.rstrip('/') in visited_pages
                         or nxt.rstrip('/') == cur.rstrip('/')):
+                    break
+                if _stop_paging:
                     break
                 cur = nxt
                 if len(visited_pages) > 300:
@@ -1435,6 +1487,12 @@ def main():
             if su:
                 existing_urls.add((su, None))
 
+    # 翻页停止判据的数据源：{源名: 该源已入库的最晚条目日期}。见 _build_source_latest_date。
+    src_latest_date = _build_source_latest_date(existing)
+    if src_latest_date:
+        print('[PAGESTOP] 各源已入库最晚条目日期（翻页停止基线）: %s'
+              % ', '.join('%s=%s' % (k, v) for k, v in sorted(src_latest_date.items())))
+
     lectures = {}
     if is_incremental:
         # 增量：以已有记录为基底，只补充新 URL（不重新解析旧条目）
@@ -1473,7 +1531,7 @@ def main():
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str): src for src in sources}
+        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str, src_latest_date): src for src in sources}
         for future in as_completed(future_to_src):
             src_name = future_to_src[future].get('name')
             try:
