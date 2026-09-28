@@ -966,6 +966,20 @@ def _should_skip_by_item_date(canon_key, item_date_map, cutoff_date_str):
     return d < cutoff_date_str
 
 
+def _effective_listdate_cutoff(cutoff_date_str, src_latest_date):
+    """列表页条目级跳过判据：取「全局水位」与「本源基线」的更早者。
+
+    背景（2026-09-28 gap 审计）：原实现只用全局水位（since=last_scrape），
+    会被其它源的更新拉高；本源严重滞后（哲社落后 4876 天、国际文化 4543 天）
+    时若只用全局水位，会把本源 2024~2026 的新公告也一并挡在 fetch 之前
+    → 漏抓。改 min 后判据更宽松，只跳过比本源已入库数据还旧的存量，
+    本源期间新公告不再被误挡。全量 / 本源无数据 → 退化为 cutoff_date_str（现状）。
+    """
+    if cutoff_date_str and src_latest_date:
+        return min(cutoff_date_str, src_latest_date)
+    return cutoff_date_str or ''
+
+
 def _build_source_latest_date(existing):
     """建 {源名: 该源已入库的最晚条目日期 'YYYY-MM-DD'}。
 
@@ -1318,6 +1332,10 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     is_incremental and src_latest_date)
                 item_date_map = (_build_item_date_map(html, cur, base, collect_mode)
                                  if use_item_date else {})
+                # 条目级跳过判据取「全局水位」与「本源基线」的更早者（见
+                # _effective_listdate_cutoff 注释），避免本源严重滞后时被全局
+                # 水位误挡新公告。
+                eff_cutoff = _effective_listdate_cutoff(cutoff_date_str, src_latest_date)
                 listdate_skipped = 0
                 for href, txt in collect_links(html, base, list_url=cur, collect_mode=collect_mode):
                     href_norm = href.rstrip('/')
@@ -1329,7 +1347,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     if (item_date_map
                             and _should_skip_by_item_date(_canon_url_key(href_norm),
-                                                          item_date_map, cutoff_date_str)):
+                                                          item_date_map, eff_cutoff)):
                         listdate_skipped += 1
                         _LISTDATE_STATS['skipped'] += 1
                         continue
