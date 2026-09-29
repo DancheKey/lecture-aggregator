@@ -6,8 +6,24 @@ const path = require('path');
 
 // 用法：node tests/js/app_bundle_smoke.js（CI 与本地通用）
 const SITE = path.join(__dirname, '..', '..', 'site');
-const PARTS = ['app.core.js', 'app.state.js', 'app.computed.js', 'app.display.js',
-  'app.social.js', 'app.data.js', 'app.admin.js', 'app.js'];
+// 分片顺序不写死，直接取 index.html 里的实际加载顺序：
+// 既验证「文件都在」，也验证「index.html 没漏挂」（漏挂时方法集合会缺，随后报错）。
+const INDEX_HTML = fs.readFileSync(path.join(SITE, 'index.html'), 'utf-8');
+const PARTS = (INDEX_HTML.match(/<script[^>]*\ssrc=["'](app[^"']*?\.js)(?:\?[^"']*)?["']/g) || [])
+  .map(tag => tag.match(/src=["'](app[^"']*?\.js)/)[1]);
+
+const onDisk = fs.readdirSync(SITE).filter(f => /^app.*\.js$/.test(f)).sort();
+const errsEarly = [];
+if (!PARTS.length) errsEarly.push('index.html 里没有解析到任何 app*.js 引用');
+const notReferenced = onDisk.filter(f => !PARTS.includes(f));
+if (notReferenced.length) {
+  errsEarly.push(`磁盘上有分片未被 index.html 引用（会整体失效）：${notReferenced.join(', ')}`);
+}
+if (errsEarly.length) {
+  console.log('[FAIL]');
+  errsEarly.forEach(e => console.log(' -', e));
+  process.exit(1);
+}
 
 const noop = () => {};
 const store = {};
