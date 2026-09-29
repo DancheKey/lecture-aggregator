@@ -3634,7 +3634,7 @@ class _OcrSt:
       外层变量而 _st.text 永久陈旧 → 下游读 _st.text 拿到旧值，且 OCR 文字被拼到
       「未移除邀请人标签」的正文上。故 store 必须逐点改为写属性。
     """
-    __slots__ = ('body_text_llm', 'ocr_text')
+    __slots__ = ('body_text_llm', 'ocr_text', 'body_text')
 
 
 def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
@@ -3726,16 +3726,16 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 _best, _best_len = _el, len(_t)
     if _first is not None:
         content_div = _first if _first_len >= 80 else _best
-    body_text = content_div.get_text(' ') if content_div else text
-    body_text = re.sub(r'\s+', ' ', body_text).strip()
+    _st.body_text = content_div.get_text(' ') if content_div else text
+    _st.body_text = re.sub(r'\s+', ' ', _st.body_text).strip()
     # LLM 证据旁路：保留 CJK 间原始空格的版本，专供模型 A/B 与溯源闸门使用。
     # 折叠版 body_text 仍服务纯规则正则（「张三 教授」→「张三教授」剥离依赖），
     # 但把折叠版喂给 A/B 会灭失姓名/职称边界证据，使 B 的「原文支持」判定失效
     # （idx772「彭斌 中学数学高级教师」实测教训，2026-09-09）。
-    _st.body_text_llm = _n1_normalize(body_text, collapse_cjk_spaces=False)
-    body_text = _n1_normalize(body_text)  # N1：全角标点统一为半角
-    body_text = _normalize_label_text(body_text)
-    body_text = _strip_footer(body_text)
+    _st.body_text_llm = _n1_normalize(_st.body_text, collapse_cjk_spaces=False)
+    _st.body_text = _n1_normalize(_st.body_text)  # N1：全角标点统一为半角
+    _st.body_text = _normalize_label_text(_st.body_text)
+    _st.body_text = _strip_footer(_st.body_text)
     _st.body_text_llm = _normalize_label_text(_st.body_text_llm)
     _st.body_text_llm = _strip_footer(_st.body_text_llm)
     # JS 渲染站点（如 maths/physics）的正文容器可能只含导航骨架，但 meta description
@@ -3752,10 +3752,10 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         # bio 提取（吃到 $）把 meta 整段吸入简介（经管101 speakerBio 实测粘连）。
         _meta_head = _normalize_label_text(_n1_normalize(' '.join(meta_parts)))
         _meta_head = re.sub(r'\s+', '', _meta_head)[:30]
-        _body_flat = re.sub(r'\s+', '', body_text)
+        _body_flat = re.sub(r'\s+', '', _st.body_text)
         if not _meta_head or _meta_head not in _body_flat:
-            body_text = body_text + ' ' + ' '.join(meta_parts)
-            body_text = re.sub(r'\s+', ' ', body_text).strip()
+            _st.body_text = _st.body_text + ' ' + ' '.join(meta_parts)
+            _st.body_text = re.sub(r'\s+', ' ', _st.body_text).strip()
             _st.body_text_llm = _st.body_text_llm + ' ' + ' '.join(meta_parts)
             _st.body_text_llm = re.sub(r'\s+', ' ', _st.body_text_llm).strip()
     _st.ocr_text = ''
@@ -3837,7 +3837,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # （防本地路径落库——该 bug 曾触发 test_invariants.check_images_no_local_path
     #  拦截导致公网部署连续失败）
     _pdf_local_imgs = []
-    if len(body_text.strip()) < 150:
+    if len(_st.body_text.strip()) < 150:
         _pdf_url = None
         # 策略1：从 iframe src 中提取 PDF URL（工学部用 viewer2.html#URL 格式）
         for iframe in (content_div or soup).find_all('iframe'):
@@ -3886,12 +3886,12 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                                 _pages_text.append(_t)
                         _pdf_text = '\n'.join(_pages_text)
                         if _pdf_text:
-                            body_text = body_text + '\n' + _pdf_text
+                            _st.body_text = _st.body_text + '\n' + _pdf_text
                             _st.body_text_llm = _st.body_text_llm + '\n' + _pdf_text
                             text = text + '\n' + _pdf_text
                         # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
                         # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
-                        _is_poster_pdf = ('海报' in (_abs_pdf or '')) or (len(body_text.strip()) < 150) or (content_div and bool(content_div.find('iframe')))
+                        _is_poster_pdf = ('海报' in (_abs_pdf or '')) or (len(_st.body_text.strip()) < 150) or (content_div and bool(content_div.find('iframe')))
                         if _is_poster_pdf and _doc.page_count > 0:
                             try:
                                 from PIL import Image as _Image
@@ -3921,7 +3921,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
-        nonlocal body_text, text
+        nonlocal text
         candidates = imgs[:3] + _pdf_local_imgs
         if _st.ocr_text or not candidates:
             return
@@ -3936,7 +3936,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             # N1d：仅对 OCR 文本在三类数字上下文内纠正易混字符（O/o→0、l/I/|→1、;→:、〇→0）
             _st.ocr_text = _ocr_char_fix(_st.ocr_text)
             # 重新归一化标签（N1/N1e），使 OCR 文本里的中英文标签也能被正确扫描
-            body_text = _normalize_label_text((body_text + ' ' + _st.ocr_text).strip())
+            _st.body_text = _normalize_label_text((_st.body_text + ' ' + _st.ocr_text).strip())
             _st.body_text_llm = _normalize_label_text((_st.body_text_llm + ' ' + _st.ocr_text).strip())
             text = _normalize_label_text((text + ' ' + _st.ocr_text).strip())
 
@@ -3948,10 +3948,10 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     vlm_fields = None
     _t_vlm = None
     _vlm_sessions = None
-    poster_only = ((len(body_text) < 150
-                    and not re.search(r'(?:时间|地点|主讲[人师]|报告人)[：:]', body_text))
-                   or (bool(imgs) and (_is_meta_skeleton(body_text)
-                                        or _is_column_intro(body_text)))
+    poster_only = ((len(_st.body_text) < 150
+                    and not re.search(r'(?:时间|地点|主讲[人师]|报告人)[：:]', _st.body_text))
+                   or (bool(imgs) and (_is_meta_skeleton(_st.body_text)
+                                       or _is_column_intro(_st.body_text)))
                    or _pdf_poster_converted)
     if poster_only:
         # 优先用多模态 LLM 结构化提取海报；无 key / 失败则降级回 rapidocr。
@@ -3969,7 +3969,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             _do_ocr()
 
     # R3 发布时间定位（标签 > 伴生词/class > 位置兜底）
-    publish_time, publish_level = _locate_publish_time(soup, content_div, body_text, text)
+    publish_time, publish_level = _locate_publish_time(soup, content_div, _st.body_text, text)
 
     # 从标题提取显式年份（标题兼容紧凑格式 20251204）；URL 年份/日期已在上方提前计算
     title_year = _year_from_text(title) if title else None
@@ -4016,7 +4016,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     t = None
     t_untrusted = False
     rt = resolve_lecture_time(
-        body_text=body_text,
+        body_text=_st.body_text,
         title=title,
         url_year=url_year,
         title_year=title_year,
@@ -5061,7 +5061,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     bio_pat = (rf'(?:\[\s*(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介)\s*\]'
                rf'|(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介)'
                rf'|(?<![A-Za-z])Bio(?![A-Za-z]))[\s\]:：]*')
-    m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|{BIO_STOP}|$))', body_text)
+    m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|{BIO_STOP}|$))', _st.body_text)
     if m:
         bio = m.group(1).strip()
         # 清理版权声明等尾部噪声
@@ -5126,7 +5126,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         r'时间|地点|题目[：:]|主题[：:]|'
         r'(?:组织单位|主办单位|承办单位|协办单位|支持单位|指导单位|单位)[：:]|'
         r'主讲人介绍|报告人简介|主讲人简历|专家简介|主讲人简介|专家介绍|$))',
-        body_text)
+        _st.body_text)
     if m:
         abstract = (m.group(1) or '').strip()
         # 清理版权噪声和图片
@@ -5247,7 +5247,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 
     # 兜底：无结构化标签的叙事体文章（如人工智能学院）
     if not result['topic'] or not result['location'] or not result['speaker'] or not result.get('abstract'):
-        narrative = _extract_narrative(body_text, title)
+        narrative = _extract_narrative(_st.body_text, title)
         if not result['topic'] and narrative.get('topic'):
             result['topic'] = narrative['topic']
         if not result['location'] and narrative.get('location'):
@@ -5530,17 +5530,17 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # parse_cn_time，无此线索时会全部回退 default_year=当前年（module/3762 2014 年、
     # module/7542 2019 年的历史讲座曾因此被识别为 2026）。仅补线索，不改落库字段。
     _sessions_pre = detect_multi_session(
-        body_text, title=title, default_year=default_year,
+        _st.body_text, title=title, default_year=default_year,
         publish_time=(publish_time or _pub_year_hint),
         title_year=title_year, url_year=url_year, soup=soup, url=url,
         base_start=_base_dt, base_end=_base_dt_end)
     if not _sessions_pre and not skip_news_filter and is_news_record(result, poster_page=poster_only):
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
-    if (is_non_lecture_title(title) or is_admin_notice(title, body_text)
-            or is_academic_admin_notice(title, result.get('topic', ''), body_text)
+    if (is_non_lecture_title(title) or is_admin_notice(title, _st.body_text)
+            or is_academic_admin_notice(title, result.get('topic', ''), _st.body_text)
             or _is_empty_notice(result, title)
-            or (not skip_news_filter and is_news_article(title, body_text, result.get('lectureStart')))):
+            or (not skip_news_filter and is_news_article(title, _st.body_text, result.get('lectureStart')))):
         return None  # [SKIP-NEWS] / [SKIP-ADMIN] / [SKIP-AD3] / [SKIP-EMPTY]
     if skip_news_filter:
         # 来源被显式标记为「跳过新闻过滤」（如整栏为讲座海报预告、发布晚于讲座时间），
@@ -5601,7 +5601,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # parse_detail 内已先行算出，本块异常或模型失效都只回落规则，绝不空库/阻塞。
     # 海报页不走此路径（VLM 路线独立，见 _vlm_extract_fields）。
     # 触发条件：总开关（全字段）或 rich 子开关（仅摘要/简介）开启，且非海报页、正文足够长、文本模型可用。
-    if (_USE_LLM_TEXT or _USE_LLM_RICH) and not poster_only and len(body_text) >= 80:
+    if (_USE_LLM_TEXT or _USE_LLM_RICH) and not poster_only and len(_st.body_text) >= 80:
         try:
             from llm_provider import get_text_provider, get_judge_provider
             from hybrid import apply_llm_text_hybrid
@@ -5612,7 +5612,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 # 不干预结构字段（speaker/time/location/topic），由规则主导。
                 _pre_llm_abs = result.get('abstract')
                 _pre_llm_bio = result.get('speakerBio')
-                apply_llm_text_hybrid(result, body_text, url, _provider, _judge,
+                apply_llm_text_hybrid(result, _st.body_text, url, _provider, _judge,
                                       default_year, publish_time, title_year, url_year,
                                       rich_only=not _USE_LLM_TEXT,
                                       llm_text=_st.body_text_llm,
@@ -5633,7 +5633,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 「第N讲/第N期/第N场」重复标记误当成分段锚点（汕尾教学工作坊、abdn357等）。
     sessions = _sessions_pre
     if sessions:
-        split_recs = split_record_by_sessions(result, sessions, full_text=body_text)
+        split_recs = split_record_by_sessions(result, sessions, full_text=_st.body_text)
         kept = []
         for r in split_recs:
             # MS5：拆分后每条独立过回顾判定（某期日期早于发布日→剔除该期，不影响其他期）
@@ -5803,7 +5803,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     for _role, _field in (('host', 'host'), ('reviewer', 'reviewer'),
                           ('discussant', 'discussant'), ('guest', 'guest')):
         if not result.get(_field):
-            _v = _extract_role(body_text, _role)
+            _v = _extract_role(_st.body_text, _role)
             if _v:
                 result[_field] = _v
 
