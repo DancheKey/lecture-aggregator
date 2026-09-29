@@ -33,9 +33,13 @@ SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
 LATEST_SIZE = 50
 CHUNK_SIZE = 500        # 公网分片加载：每片 500 条，失败可单独重试，数字渐进滚动
 UNKNOWN_YEAR = '其他'
-# 首页首屏（latest.json）只需要列表卡片展示字段，长文本按首页 truncate 长度截断，
-# 让首屏秒开；详情字段在 site/lectures.json 中仍完整保留，确保展开/查看时信息齐全。
-LATEST_PREVIEW_LEN = 220
+# 首页首屏（latest.json）长文本截断长度：0 = 不截断（2026-09-29 起）。
+# 历史做法是按 220 字符截断 abstract/speakerBio「让首屏秒开」，但首屏 50 条正是用户
+# 第一眼看到的全部内容，截断点在宽屏下恰好排满 3 行 → 表现为「摘要写到一半、末尾无
+# 省略号、以半个单词收尾」，只能被解读为数据缺失（实测被误认成 bug）。
+# 实测代价（50 条带全量长文本）：raw 70KB→~128KB、gzip 23KB→~40KB，可忽略。
+# 需要恢复截断时把该值改回正数即可（latest_preview 内分支保留）。
+LATEST_PREVIEW_LEN = 0
 
 
 def atomic_write_text(path, content):
@@ -92,13 +96,15 @@ def stamp_script_version(html_name, js_name):
 
 
 def latest_preview(item):
-    """生成首屏 latest.json 的轻量条目：保留列表必要字段，长文本截断。
-    与 site/lectures.json 字段完全一致，只是 abstract/speakerBio 被截断，不损失功能只损失未展开长度。"""
+    """生成首屏 latest.json 的条目：保留列表必要字段。
+    LATEST_PREVIEW_LEN > 0 时才截断 abstract/speakerBio（默认 0 = 原样保留全文），
+    因为截断点会以「无省略号的硬切」直接暴露给用户（见常量处说明）。"""
     preview = dict(item)
-    for key in ('abstract', 'speakerBio'):
-        val = preview.get(key)
-        if val and len(val) > LATEST_PREVIEW_LEN:
-            preview[key] = val[:LATEST_PREVIEW_LEN]
+    if LATEST_PREVIEW_LEN > 0:
+        for key in ('abstract', 'speakerBio'):
+            val = preview.get(key)
+            if val and len(val) > LATEST_PREVIEW_LEN:
+                preview[key] = val[:LATEST_PREVIEW_LEN]
     return preview
 
 

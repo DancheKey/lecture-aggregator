@@ -75,13 +75,23 @@ const app = createApp({
       expandedAbstract: {}, // 卡片摘要的展开状态：sourceUrl -> bool（默认 3 行截断）
       expandedBio: {},      // 主讲简介的展开状态：sourceUrl -> bool（长文默认折叠）
       expandedForums: {},   // 论坛卡的展开状态：sourceUrl -> bool（缺省=筛选子集自动展开，2026-09-26 方案B）
+      // ---- clamp 溢出实测（2026-09-29）----
+      // 「展开简介/摘要」按钮是否出现，改由 DOM 实测决定（内容真的被 clamp 裁掉才给按钮），
+      // 取代原「按字符数估行数」的阈值：同一段文字在 375px 与 1440px 下行数差 3~4 倍，
+      // 任何字符阈值在某一端必然误判（宽屏下多余按钮 / 窄屏下按钮缺失）。
+      // 键：'abs|sourceUrl' / 'bio|sourceUrl'；每次变化重算（仅展开中的条目沿用旧值），
+      // 避免字体加载替换造成的瞬时溢出被永久记住。
+      _clampOverflow: {},
+      _clampSig: '',           // 上次测量的状态签名（页码/筛选/展开态/视口宽），未变则跳过
+      _clampTimer: null,
+      _clampMeasured: false,   // 首次 DOM 测量是否已完成（兜底阈值在此之前生效）
       tick: Date.now(),     // 秒级心跳（响应式依赖）：statusInfo 内的「即将开始」倒计时读它触发每秒重渲染
       // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
       displayTotal: 1,
       displaySource: 1,
       loadedChunks: 0,   // 分片加载断点续传：已成功加载的分片数
       // ---- 长文本（简介/摘要）按需加载，2026-09-28 ----
-      // 主分片只带结构化字段：bio+abstract 占 68% 体积，而列表默认只显示 2~3 行 clamp。
+      // 主分片只带结构化字段：bio+abstract 占 68% 体积，而列表默认只显示 2~6 行 clamp。
       // 策略：展开某条 -> 拉该条所在的 1 桶；搜索 -> 预取全量（能力不丢，只是延后加载）。
       _longText: {},      // key -> {speakerBio, abstract}
       _ltFull: {},        // key -> true：已拿到全文（区别于 latest.json 的截断预览）
@@ -504,23 +514,58 @@ const app = createApp({
       // 特征：含"资讯及通知"栏目标题，或 ≥2 条"关于…通知/公告/申报/征集"短语。
       if (/资讯及通知|(?:关于.{2,40}(?:通知|公告|申报|征集|转发|招标|遴选).*){2,}/.test(ab)) return '';
       // 上限 5000 字防超长脏数据（全库现有摘要最长约 4100 字，均不受影响）；
-      // 展示层默认 3 行截断 + 展开按钮（见 abstractLong / expandedAbstract）
+      // 展示层默认 6 行截断 + 展开按钮（见 abstractLong / expandedAbstract）
       return this.truncate(ab, 5000);
     },
-    // 摘要是否超长（超过约 3 行时提供展开按钮；130 字 ≈ 12pt 字号下 3 行的阅读量）
+    // 摘要是否被裁（需要「展开摘要」按钮）：由 DOM 实测（absOverflow）决定；
+    // 字符数仅作首次测量前的兜底（300 字，纯过渡，测量完成后不再参考）
     abstractLong(l) {
-      return this.abstractOf(l).length > 130;
+      return this.absOverflow(l) || (!this._clampMeasured && this.abstractOf(l).length > 300);
     },
     // 主讲简介全文（放宽到 2000：全库 >400 字简介有数百条，原 400 字上限会把
     // 头衔/单位/邮箱在截断处丢失；仍保留防超长脏数据底线）
     bioText(l) {
       return this.truncate(this.cleanFooter(this.bioRaw(l)), 2000);
     },
-    // 简介是否需要折叠：超过约两行（80 字）时默认截为两行并提供展开按钮；
-    // 不超两行则直接完整显示（不出现按钮）
+    // 简介是否需要折叠：由 DOM 实测（bioOverflow）决定；字符数仅作首次测量前的兜底
+    // （200 字 ≈ 宽屏 2 行边界，纯过渡用，测量完成后不再参考）
     bioLong(l) {
-      return this.bioText(l).length > 80;
+      return this.bioOverflow(l) || (!this._clampMeasured && this.bioText(l).length > 200);
     },
+
+    /* ---------- clamp 溢出实测（决定「展开简介/摘要」按钮显隐） ---------- */
+    _measureClamp() {
+      if (typeof document === 'undefined') return;
+      // 签名守卫：只在本页内容/筛选/展开态/视口宽度变化时重测。
+      // 必须要有——页面有秒级 tick（倒计时）会每秒触发 updated，否则每秒重排测量。
+      const sig = [this.currentPage, this.query, this.campus, this.college, this.year,
+        this.all.length, this.dataStage, window.innerWidth,
+        JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio)].join('|');
+      if (sig === this._clampSig) return;
+      this._clampSig = sig;
+      const next = {};
+      document.querySelectorAll('[data-clamp-key]').forEach(el => {
+        const k = el.getAttribute('data-clamp-key');
+        if (!k) return;
+        // 处于展开态（clamp 类已被移除）的元素测不到溢出，沿用上次判定，
+        // 否则按钮会在展开瞬间消失、用户无法收起。
+        const clamped = el.classList.contains('line-clamp-2') || el.classList.contains('line-clamp-6');
+        if (!clamped) { if (this._clampOverflow[k]) next[k] = true; return; }
+        if (el.scrollHeight - el.clientHeight > 1) next[k] = true;
+      });
+      this._clampMeasured = true;
+      // 每次重算（而非只增不减）：字体加载完成/换行重排造成的瞬时溢出会被自动纠正，
+      // 不会留下「内容其实没被裁却挂着展开按钮」的假阳性。
+      if (JSON.stringify(next) !== JSON.stringify(this._clampOverflow)) this._clampOverflow = next;
+    },
+    // 渲染后测量：updated 每次都会调，用 setTimeout(0) 合并同帧内的多次调用并
+    // 避开「在 updated 中同步改 state」的递归；resize 亦复用（行数随宽度变化）
+    _measureSoon() {
+      if (this._clampTimer) clearTimeout(this._clampTimer);
+      this._clampTimer = setTimeout(() => { this._clampTimer = null; this._measureClamp(); }, 0);
+    },
+    absOverflow(l) { return !!this._clampOverflow['abs|' + (l.sourceUrl || '')]; },
+    bioOverflow(l) { return !!this._clampOverflow['bio|' + (l.sourceUrl || '')]; },
     async toggleAbstract(url) {
       if (!url) return;
       const l = this.all.find(x => (x.sourceUrl || '') === url);
@@ -1371,10 +1416,21 @@ const app = createApp({
       }
     };
     document.addEventListener('click', this._closeMenuHandler);
+    // clamp 溢出实测：首帧后测一次，窗口尺寸变化（行数随之变化）后再测
+    this._measureSoon();
+    this._resizeHandler = () => this._measureSoon();
+    window.addEventListener('resize', this._resizeHandler);
+  },
+
+  // 渲染完成后重测 clamp（翻页/筛选/展开/收起都会改变 DOM 中的实际行数）
+  updated() {
+    this._measureSoon();
   },
 
   beforeUnmount() {
     window.removeEventListener('scroll', this.onScroll);
+    if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
+    if (this._clampTimer) clearTimeout(this._clampTimer);
     if (this._closeMenuHandler) {
       document.removeEventListener('click', this._closeMenuHandler);
     }
