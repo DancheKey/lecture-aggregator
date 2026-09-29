@@ -52,3 +52,12 @@ jobs:
         run: python tests/test_location_prefix.py
       - name: Run frontend schema guard tests
         run: python tests/test_frontend_schema.py
+      # 2026-09-29 纳入：全字段行为快照（渐进重构第 2 步）。
+      # golden 是抽查（每页仅 4~6 项断言），location/lectureStart/abstract 等 20+ 字段
+      # 全未锁定；本套件按记录全字段比对基线 parser_snapshot.json，锁「纯规则基线」
+      # （模块内强制关 LLM A/B，与 CI 无密钥环境一致），使拆 _parse_detail_impl
+      # 期间任何字段的意外变化都立即变红。基线含已知缺陷，由 KnownDefectTest
+      # 的 xfail 台账背书——重构中禁止用 --bless 抹平意外失败。
+      # 纯离线、约 15 秒。
+      - name: Run parser behavior snapshot tests
+        run: python tests/test_parser_snapshot.py
