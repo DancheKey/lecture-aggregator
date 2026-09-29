@@ -48,24 +48,9 @@ docs/SECURITY.md
 代码审查报告*.html
 
 # ===== docs/ 个人学习/测试/评审产物（不公开，避免推到公网仓库） =====
-# 注意：deploy.md 与 PARSING_RULES.md 是项目核心文档，刻意保留在仓库，不在此列
-docs/从零搭建讲座聚合网站.md
-docs/OCR_RULES_CURRENT.md
-docs/lecture_split_rules_review.html
-docs/rules_docx*_review.html
-docs/*需求规格*.html
-docs/*audit*.html
-# 以下为游离未跟踪的内部文档，补覆盖以杜绝误 git add 入库：
-# 00~10 规则文档系列（内部梳理，不公开）
-docs/[0-9][0-9]-*.md
-# 两轮代码体检报告
-docs/代码体检报告-*.md
-# 代码评审报告（过程文档，不公开，避免推到公网仓库）
-docs/code-review-*/
-# 早期评审稿
-docs/讲座拆分规则-综合修订版.html
-# 需求规格说明书（md 版，注意非 .html）
-docs/需求规格说明书-*.md
+# 2026-09-29 起全部 docs/ 均不入库（含解析规则/踩坑 SOP 等内部资料），
+# 公网仓库只保留 Pages + Action 必需文件；文档仅在本地维护。
+docs/
 
 # ===== 运行时 / 增量状态 =====
 # 注意：data/last_scrape.json 必须入库！GitHub Actions 每日定时抓取依赖它在
@@ -79,12 +64,31 @@ data/lecture_stats.json
 # VLM（智谱等）海报结构化提取结果缓存：按图片 URL 哈希存，重跑幂等、省额度，不入库
 data/.vlm_cache.json
 
-# 访问量「每年每月」报告：由 scripts/gen_visits_report.py 生成的产物，
-# 随时可重跑得到，不入库（数据来源 data/visits.json 本身已 gitignore）。
-# 2026-09-10：改为只忽略这一个旧产物，reports/ 目录本身放开——新的
-# 「站点访问趋势」报告需要入库，才能在任意机器 pull 后直接查看。
-# 它不会出现在公网页面上（Pages 只发布 site/ 目录），仅在仓库中可见。
-reports/visits-by-month.html
+# 访问量报告：均为 scripts/gen_visits_trend.py / gen_visits_report.py 的生成产物，
+# 随时可重跑得到，不入库（2026-09-29 起整个 reports/ 都不再入库——过程性审计/验证
+# 报告属内部资料，公网仓库只保留 Pages + Action 必需文件）。数据来源 data/visits.json 本身已 gitignore。
+reports/
+
+# ===== scripts/ 一次性修复/审计脚本（内部资料，不入库） =====
+# 2026-09-29 起公网仓库只保留 CI 依赖的 8 个核心脚本 + tailwind 配置；
+# 以下均为历史数据修复/排查用过的一次性脚本，本地保留、不再跟踪。
+# 注意：此处是刻意忽略 scripts/ 下的 fix_*（与根目录 /fix_*.py 规则不同，那是防误伤）。
+scripts/fix_*.py
+scripts/probe_*.py
+scripts/find_*.py
+scripts/backfill_*.py
+scripts/reparse_*.py
+scripts/repair_*.py
+scripts/reverify_*.py
+scripts/purge_*.py
+scripts/verify_*.py
+scripts/audit_data_quality.py
+scripts/clean_data_issues.py
+scripts/dedup_existing.py
+scripts/demo_sameunit_fusion.py
+scripts/gen_visits_report.py
+scripts/lectures_writer.py
+scripts/merge_remote.py
 
 # ===== 本地开发记忆与内部资料（不公开，避免推到公网仓库） =====
 .workbuddy/

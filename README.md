@@ -3,6 +3,4 @@
 
 目前仅支持网站发布的可以公开访问的信息，公众号信息暂无法获取。
 
-## 文档导航
-- **部署与运维**：[`docs/deploy.md`](docs/deploy.md)（架构、纯静态/全栈部署、GitHub Actions 每日更新、**增量陷阱**）
-- **解析规则 · 踩坑 · 运维约定**：[`docs/PARSING_RULES.md`](docs/PARSING_RULES.md)（OCR 决策、时间解析、新闻过滤、字段清洗、16 条真实踩坑、增量陷阱修复 SOP）
+在线访问：<https://danchekey.github.io/lecture-aggregator/>
