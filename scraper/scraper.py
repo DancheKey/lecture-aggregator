@@ -937,8 +937,14 @@ def _listdate_skip_enabled():
 # ⚠ 条目 180 天后自动作废并重判一次，避免一次误判被永久固化（源站也可能换掉旧 URL 的内容）。
 # ⚠ 全量模式（--full）只写不读，保证「宁多抓不漏抓」；台账只服务增量轮。
 _LEDGER_TTL_DAYS = 180
-_LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0}
+_LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0, 'dirty': 0}
 _LEDGER = {}  # {canon_url_key: {'v': 'rejected'|'old', 'd': 条目日期, 't': 首次记录日}}
+
+# 键形态白名单：必须是 _canon_url_key 的两种产出之一——普通 URL，或 vsb 站点组的
+# `vsb::代表域名::文章ID`。加这道闸是因为台账键一旦带杂质（空白、方括号、=），
+# 运行时算出的干净键永远命中不了它，条目静默失效且从日志看不出来
+# （2026-09-29 实测：日志解析误把「URL[SKIP-RETRO]」整段当键写入 3 条）。
+_LEDGER_KEY_RE = re.compile(r'^(?:https?://[^\s\[\]=<>]+|vsb::[A-Za-z0-9.\-]+::\d+)$')
 
 
 def _ledger_enabled():
@@ -965,15 +971,24 @@ def load_ledger(path=None):
     except Exception as e:
         print(f'[LEDGER] 台账读取失败，按空台账继续：{e}', file=sys.stderr)
     limit = (datetime.date.today() - datetime.timedelta(days=_LEDGER_TTL_DAYS)).isoformat()
-    kept, expired = {}, 0
+    kept, expired, dirty = {}, 0, 0
     for k, v in entries.items():
+        # 键形态净化：盘上若混入脏键（外部脚本/手工编辑写坏），读入即剔除，
+        # 下次落盘自然清掉——否则它会一直占位却永不命中。
+        if not _LEDGER_KEY_RE.match(str(k)):
+            dirty += 1
+            continue
         t = (v or {}).get('t') or ''
         if t and t < limit:          # 缺 t 的异常条目保守保留，不静默丢弃
             expired += 1
             continue
         kept[k] = v
     _LEDGER_STATS['expired'] = expired
+    _LEDGER_STATS['dirty'] = dirty
     _LEDGER = kept
+    if dirty:
+        print(f'[LEDGER] 台账中剔除 {dirty} 条形态异常的键'
+              f'（含空白/方括号/等号，运行时永不命中）', file=sys.stderr)
     return _LEDGER
 
 
@@ -1016,8 +1031,14 @@ def ledger_hit(canon_key):
 
 
 def ledger_add(canon_key, verdict, item_date=''):
-    """登记一条被拒 URL。已存在的不刷新时间戳：TTL 从首次记录起算，保证会周期性重判。"""
+    """登记一条被拒 URL。已存在的不刷新时间戳：TTL 从首次记录起算，保证会周期性重判。
+
+    键形态不符（含空白/方括号/等号的脏 URL）一律不写：这类键运行时永远命中不了，
+    写进去只会让「已判定」的条目静默失效（见 _LEDGER_KEY_RE 注释）。
+    """
     if not canon_key or not _ledger_enabled() or canon_key in _LEDGER:
+        return
+    if not _LEDGER_KEY_RE.match(canon_key):
         return
     _LEDGER[canon_key] = {'v': verdict, 'd': item_date or '',
                           't': datetime.date.today().isoformat()}

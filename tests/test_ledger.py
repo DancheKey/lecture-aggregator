@@ -32,11 +32,15 @@ def _load_scraper():
 S = _load_scraper()
 TTL = S._LEDGER_TTL_DAYS
 
+# 测试用合法台账键（必须是 _canon_url_key 的输出形态：URL 或 vsb::组::ID）
+U = 'http://ggy.scnu.edu.cn/a/20211221/5701.html'
+U2 = 'http://ggy.scnu.edu.cn/a/20230516/5991.html'
+
 
 def _reset(entries=None):
     """把模块级台账恢复到已知状态（模块级可变状态，测试间必须重置）。"""
     S._LEDGER = dict(entries or {})
-    S._LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0}
+    S._LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0, 'dirty': 0}
 
 
 class LedgerBasicsTest(unittest.TestCase):
@@ -56,16 +60,55 @@ class LedgerBasicsTest(unittest.TestCase):
     def test_existing_entry_keeps_first_timestamp(self):
         # 已存在条目不刷新 t：TTL 从首次记录起算，保证会周期性重判
         old = (datetime.date.today() - datetime.timedelta(days=10)).isoformat()
-        _reset({'k': {'v': 'rejected', 'd': '', 't': old}})
-        S.ledger_add('k', 'rejected')
-        self.assertEqual(S._LEDGER['k']['t'], old)
+        _reset({U: {'v': 'rejected', 'd': '', 't': old}})
+        S.ledger_add(U, 'rejected')
+        self.assertEqual(S._LEDGER[U]['t'], old)
         self.assertEqual(S._LEDGER_STATS['added'], 0)
 
     def test_add_records_verdict_and_date(self):
-        S.ledger_add('k', 'old', '2024-11-01')
-        self.assertEqual(S._LEDGER['k']['v'], 'old')
-        self.assertEqual(S._LEDGER['k']['d'], '2024-11-01')
+        S.ledger_add(U, 'old', '2024-11-01')
+        self.assertEqual(S._LEDGER[U]['v'], 'old')
+        self.assertEqual(S._LEDGER[U]['d'], '2024-11-01')
         self.assertEqual(S._LEDGER_STATS['added'], 1)
+
+
+class LedgerKeyShapeTest(unittest.TestCase):
+    """键形态闸门：脏键写入无效、读入即剔除。
+
+    背景（2026-09-29 实测）：用日志构造首轮台账时，正则误把「URL[SKIP-RETRO]」
+    整段当成 URL 写进台账 3 条。这类键运行时永远命中不了（运行时键来自
+    _canon_url_key 的干净 URL），条目静默失效且日志里看不出来。
+    """
+
+    def setUp(self):
+        _reset()
+
+    def test_add_rejects_dirty_keys(self):
+        for bad in ['http://ggy.scnu.edu.cn/a/20211221/5701.html[SKIP-RETRO]',
+                    'http://a.com/x.html publishTime=2024',
+                    'http://a.com/x.html=1',
+                    '不是URL']:
+            S.ledger_add(bad, 'rejected')
+        self.assertEqual(S._LEDGER, {})
+        self.assertEqual(S._LEDGER_STATS['added'], 0)
+
+    def test_add_accepts_plain_and_vsb_keys(self):
+        S.ledger_add('http://ggy.scnu.edu.cn/a/20211221/5701.html', 'rejected')
+        S.ledger_add('vsb::em.scnu.edu.cn::12345', 'old')
+        self.assertEqual(len(S._LEDGER), 2)
+        self.assertTrue(S.ledger_hit('vsb::em.scnu.edu.cn::12345'))
+
+    def test_load_drops_dirty_keys(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            with open(p, 'w', encoding='utf-8') as f:
+                json.dump({'entries': {
+                    'http://good.com/a.html': {'v': 'rejected', 'd': '', 't': '2026-09-29'},
+                    'http://good.com/a.html[SKIP-RETRO]': {'v': 'rejected', 'd': '', 't': '2026-09-29'},
+                }}, f, ensure_ascii=False)
+            S.load_ledger(p)
+        self.assertEqual(list(S._LEDGER), ['http://good.com/a.html'])
+        self.assertEqual(S._LEDGER_STATS['dirty'], 1)
 
 
 class LedgerTtlTest(unittest.TestCase):
@@ -79,14 +122,14 @@ class LedgerTtlTest(unittest.TestCase):
             p = os.path.join(d, 'scrape_ledger.json')
             with open(p, 'w', encoding='utf-8') as f:
                 json.dump({'version': 1, 'entries': {
-                    'stale': {'v': 'rejected', 'd': '', 't': stale},
-                    'fresh': {'v': 'rejected', 'd': '', 't': fresh}}}, f)
+                    U: {'v': 'rejected', 'd': '', 't': stale},
+                    U2: {'v': 'rejected', 'd': '', 't': fresh}}}, f)
             S.load_ledger(p)
-        self.assertNotIn('stale', S._LEDGER)
-        self.assertIn('fresh', S._LEDGER)
+        self.assertNotIn(U, S._LEDGER)
+        self.assertIn(U2, S._LEDGER)
         self.assertEqual(S._LEDGER_STATS['expired'], 1)
-        self.assertFalse(S.ledger_hit('stale'))
-        self.assertTrue(S.ledger_hit('fresh'))
+        self.assertFalse(S.ledger_hit(U))
+        self.assertTrue(S.ledger_hit(U2))
 
     def test_boundary_ttl_minus_one_kept(self):
         # 恰好 TTL-1 天的条目仍在有效期内（边界不提前失效）
@@ -94,18 +137,18 @@ class LedgerTtlTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, 'scrape_ledger.json')
             with open(p, 'w', encoding='utf-8') as f:
-                json.dump({'entries': {'edge': {'v': 'old', 'd': '', 't': edge}}}, f)
+                json.dump({'entries': {U: {'v': 'old', 'd': '', 't': edge}}}, f)
             S.load_ledger(p)
-        self.assertIn('edge', S._LEDGER)
+        self.assertIn(U, S._LEDGER)
 
     def test_entry_without_timestamp_kept(self):
         # 缺 t 的异常条目保守保留，不静默丢弃（宁可多抓也不静默漏判据）
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, 'scrape_ledger.json')
             with open(p, 'w', encoding='utf-8') as f:
-                json.dump({'entries': {'nots': {'v': 'rejected', 'd': ''}}}, f)
+                json.dump({'entries': {U: {'v': 'rejected', 'd': ''}}}, f)
             S.load_ledger(p)
-        self.assertIn('nots', S._LEDGER)
+        self.assertIn(U, S._LEDGER)
 
 
 class LedgerIoTest(unittest.TestCase):
@@ -113,25 +156,25 @@ class LedgerIoTest(unittest.TestCase):
         _reset()
 
     def test_roundtrip_through_disk(self):
-        S.ledger_add('b-key', 'old', '2024-01-01')
-        S.ledger_add('a-key', 'rejected', '2023-02-02')
+        S.ledger_add(U2, 'old', '2024-01-01')
+        S.ledger_add(U, 'rejected', '2023-02-02')
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, 'scrape_ledger.json')
             S.save_ledger(p)
             _reset()
             S.load_ledger(p)
-        self.assertEqual(set(S._LEDGER), {'a-key', 'b-key'})
-        self.assertEqual(S._LEDGER['a-key']['v'], 'rejected')
+        self.assertEqual(set(S._LEDGER), {U, U2})
+        self.assertEqual(S._LEDGER[U]['v'], 'rejected')
 
     def test_saved_entries_are_sorted(self):
         # 条目按 key 排序写盘 → 相同集合产出相同字节，避免 CI 无谓提交
-        S.ledger_add('z-key', 'old')
-        S.ledger_add('a-key', 'old')
+        S.ledger_add(U2, 'old')
+        S.ledger_add(U, 'old')
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, 'scrape_ledger.json')
             S.save_ledger(p)
             raw = json.load(open(p, encoding='utf-8'))
-        self.assertEqual(list(raw['entries']), ['a-key', 'z-key'])
+        self.assertEqual(list(raw['entries']), sorted([U, U2]))
         self.assertEqual(raw['ttlDays'], TTL)
         self.assertIn('updatedAt', raw)
 
@@ -170,15 +213,15 @@ class LedgerSwitchTest(unittest.TestCase):
 
     def test_disabled_switch_blocks_hit_and_add(self):
         os.environ['SCNU_LEDGER_SKIP'] = '0'
-        S.ledger_add('k', 'rejected')
+        S.ledger_add(U, 'rejected')
         self.assertEqual(S._LEDGER, {})           # 不写入
-        _reset({'k': {'v': 'rejected', 'd': '', 't': '2026-01-01'}})
-        self.assertFalse(S.ledger_hit('k'))       # 不命中（等价于台账失效）
+        _reset({U: {'v': 'rejected', 'd': '', 't': '2026-01-01'}})
+        self.assertFalse(S.ledger_hit(U))         # 不命中（等价于台账失效）
 
     def test_enabled_by_default(self):
         os.environ.pop('SCNU_LEDGER_SKIP', None)
-        S.ledger_add('k', 'rejected')
-        self.assertTrue(S.ledger_hit('k'))
+        S.ledger_add(U, 'rejected')
+        self.assertTrue(S.ledger_hit(U))
 
 
 class CutoffStillUnchangedTest(unittest.TestCase):
