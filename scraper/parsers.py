@@ -4197,63 +4197,10 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
     }
 
 
-def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
-    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
-    _st = _OcrSt()
-    soup = BeautifulSoup(html, 'html.parser')
-    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
-    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
-    _st.ocr_text = ''
-    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
-    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
-
-    # 阶段 4（时间解析+result 初始化）：海报判定/VLM/时间回退链/R3 门控（原 L3973-4182 拆出）
-    _t4 = _resolve_time_init_result(soup, content_div, url, title, list_title,
-                                    college, campus, default_year, url_year,
-                                    imgs, _pdf_local_imgs, _pdf_poster_converted,
-                                    _do_ocr, _st)
-    result = _t4['result']
-    poster_only = _t4['poster_only']
-    vlm_fields = _t4['vlm_fields']
-    _vlm_sessions = _t4['vlm_sessions']
-    publish_time = _t4['publish_time']
-    title_year = _t4['title_year']
-    loc_times = _t4['loc_times']
-    t_untrusted = _t4['t_untrusted']
-    _pub_year_hint = _t4['pub_year_hint']
-
-    # 字段标签前瞻——每个字段只取到下一个标签为止
-    # 美术学院常见标签：讲座题目、主讲嘉宾、学术主持、主办单位、上一篇/下一篇
-    # N1e/英文标签：补充 Time/Venue/Speaker/Topic/Abstract/Bio 等英文同义词，使海报双语标签可匹配。
-    LABELS = (
-        '教学工作坊时间|教学工作坊地点|'
-        '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|报告摘要|讲座摘要|报告简介|'
-        '讲座题目|讲座时间|讲座地点|主办单位|组织单位|承办单位|协办单位|支持单位|指导单位|学术主持|上一篇|下一篇|标签|Tags|'
-        # 「日期」作字段标签须紧跟冒号（physics 页「演讲人：朱诗亮 日期：06月30日」：
-        #  无此标签时姓名正则 {2,4} 会贪婪吃成「朱诗亮日」；加 (?=[:：]) 限定为标签形态，
-        #  不影响散文里偶现的「日期」二字）。
-        '日期(?=[:：])|'
-        '地点|题目|主题|讲座主题|演讲题目|报告主题|'
-        '时间|主讲[人师]|讲座人|主持人|主讲|报告人|主讲嘉宾|讲座嘉宾|演讲人|邀请人|'
-        'Speaker|Presenter|Lecturer|'
-        # 「主要内容」须紧跟冒号才算字段标签（2026-09-10 io1563 实测：摘要散文
-        # 「以《联合国海洋法公约》为主要内容的…」被裸词截断在「为」）
-        '主要内容(?=[:：])|摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
-        '讲座内容|讲座简介|报告内容|讲座概要|内容概要|'
-        '简历|主讲人简介|主讲人简历|简介|专家介绍|专家简介|面向对象|'
-        # 会议通知类页面（如 psy 研讨会）：「地点：…」后常紧跟「会议目的/会议形式/会议组织者」
-        # 等小标签。这些词不在词表时，地点值会一路吃到下一个已知标签（主办单位）才停，
-        # 产出「华南师范大学心理学院会议目的」这类污染值（2026-09-10 psy1117 实测）。
-        '会议目的|会议形式|会议组织者|会议内容|会议日程|会议议程|会议规模|会议主席|'
-        '会议主题|会议报到|参会人员|报到地点|报到时间|'
-        '会议报名截止日期|报名截止日期|截止日期|截止时间|发布|来源'
-        '|Topic|Title|Venue|Location|Abstract|Bio|Synopsis'
-    )
-    # STOP 终止符：字段标签、伴随噪声词（点击/浏览/评论/供稿，常出现在发布时间行尾）、
-    # 以及方括号（【/ [ 多为栏目/来源标记）；'$' 兼容文末。
-    # STOP 终止符：字段标签、伴随噪声词、方括号栏目标记、无序列表符号「*」
-    # （seri 页面用 "*" 开启主讲人简介列表）、以及 bio/介绍类关键词。
-    STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|[*＊•·]|主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))'
+def _extract_topic_location(_st, result, title, loc_times):
+    """阶段 5a：从正文抽取 topic 与 location（含 OCR/FB1-FB4 兜底），
+    并把地点里分离出的时间区间回填 lectureStart/End。纯写入 result 与 loc_times。
+    """
     # LOC-STOP：PDF/海报内文本常含换行，地点值独占一行（如「课程地点：…\n面向对象：…」）。
     # 通用 STOP 的 `$` 在「值行末到文末之间存在换行」时无法命中，且 `.` 不跨换行，
     # 导致 (.+?) 永远到不了下一行的终止标签。故 location 专用终止符在 STOP 基础上
@@ -4485,6 +4432,68 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         except (ValueError, TypeError):
             pass
 
+
+# 字段标签前瞻——每个字段只取到下一个标签为止
+# 美术学院常见标签：讲座题目、主讲嘉宾、学术主持、主办单位、上一篇/下一篇
+# N1e/英文标签：补充 Time/Venue/Speaker/Topic/Abstract/Bio 等英文同义词，使海报双语标签可匹配。
+LABELS = (
+    '教学工作坊时间|教学工作坊地点|'
+    '报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|报告摘要|讲座摘要|报告简介|'
+    '讲座题目|讲座时间|讲座地点|主办单位|组织单位|承办单位|协办单位|支持单位|指导单位|学术主持|上一篇|下一篇|标签|Tags|'
+    # 「日期」作字段标签须紧跟冒号（physics 页「演讲人：朱诗亮 日期：06月30日」：
+    #  无此标签时姓名正则 {2,4} 会贪婪吃成「朱诗亮日」；加 (?=[:：]) 限定为标签形态，
+    #  不影响散文里偶现的「日期」二字）。
+    '日期(?=[:：])|'
+    '地点|题目|主题|讲座主题|演讲题目|报告主题|'
+    '时间|主讲[人师]|讲座人|主持人|主讲|报告人|主讲嘉宾|讲座嘉宾|演讲人|邀请人|'
+    'Speaker|Presenter|Lecturer|'
+    # 「主要内容」须紧跟冒号才算字段标签（2026-09-10 io1563 实测：摘要散文
+    # 「以《联合国海洋法公约》为主要内容的…」被裸词截断在「为」）
+    '主要内容(?=[:：])|摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
+    '讲座内容|讲座简介|报告内容|讲座概要|内容概要|'
+    '简历|主讲人简介|主讲人简历|简介|专家介绍|专家简介|面向对象|'
+    # 会议通知类页面（如 psy 研讨会）：「地点：…」后常紧跟「会议目的/会议形式/会议组织者」
+    # 等小标签。这些词不在词表时，地点值会一路吃到下一个已知标签（主办单位）才停，
+    # 产出「华南师范大学心理学院会议目的」这类污染值（2026-09-10 psy1117 实测）。
+    '会议目的|会议形式|会议组织者|会议内容|会议日程|会议议程|会议规模|会议主席|'
+    '会议主题|会议报到|参会人员|报到地点|报到时间|'
+    '会议报名截止日期|报名截止日期|截止日期|截止时间|发布|来源'
+    '|Topic|Title|Venue|Location|Abstract|Bio|Synopsis'
+)
+# STOP 终止符：字段标签、伴随噪声词（点击/浏览/评论/供稿，常出现在发布时间行尾）、
+# 以及方括号（【/ [ 多为栏目/来源标记）；'$' 兼容文末。
+# STOP 终止符：字段标签、伴随噪声词、方括号栏目标记、无序列表符号「*」
+# （seri 页面用 "*" 开启主讲人简介列表）、以及 bio/介绍类关键词。
+STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|[*＊•·]|主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))'
+
+
+def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
+    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
+    _st = _OcrSt()
+    soup = BeautifulSoup(html, 'html.parser')
+    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
+    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
+    _st.ocr_text = ''
+    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
+    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
+
+    # 阶段 4（时间解析+result 初始化）：海报判定/VLM/时间回退链/R3 门控（原 L3973-4182 拆出）
+    _t4 = _resolve_time_init_result(soup, content_div, url, title, list_title,
+                                    college, campus, default_year, url_year,
+                                    imgs, _pdf_local_imgs, _pdf_poster_converted,
+                                    _do_ocr, _st)
+    result = _t4['result']
+    poster_only = _t4['poster_only']
+    vlm_fields = _t4['vlm_fields']
+    _vlm_sessions = _t4['vlm_sessions']
+    publish_time = _t4['publish_time']
+    title_year = _t4['title_year']
+    loc_times = _t4['loc_times']
+    t_untrusted = _t4['t_untrusted']
+    _pub_year_hint = _t4['pub_year_hint']
+
+    # 阶段 5a：题目/主题 + 地点（含 FB 兜底与 OCR 兜底）
+    _extract_topic_location(_st, result, title, loc_times)
     # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
     # 注意：排除「主讲《…》」（正文里「主讲《课程名》」是动宾短语，不是主讲人标签），
     # 否则会把书名号后的课程名误当主讲人（如汕尾校区海报 bio 中的「主讲《动物组织学与胚胎学》」）。
