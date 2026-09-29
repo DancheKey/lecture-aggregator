@@ -5081,46 +5081,12 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t_untrusted,
     return speaker_label_found, multi_speakers
 
 
-def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
-    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
-    _st = _OcrSt()
-    soup = BeautifulSoup(html, 'html.parser')
-    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
-    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
-    _st.ocr_text = ''
-    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
-    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
-
-    # 阶段 4（时间解析+result 初始化）：海报判定/VLM/时间回退链/R3 门控（原 L3973-4182 拆出）
-    _t4 = _resolve_time_init_result(soup, content_div, url, title, list_title,
-                                    college, campus, default_year, url_year,
-                                    imgs, _pdf_local_imgs, _pdf_poster_converted,
-                                    _do_ocr, _st)
-    result = _t4['result']
-    poster_only = _t4['poster_only']
-    vlm_fields = _t4['vlm_fields']
-    _vlm_sessions = _t4['vlm_sessions']
-    publish_time = _t4['publish_time']
-    title_year = _t4['title_year']
-    loc_times = _t4['loc_times']
-    t_untrusted = _t4['t_untrusted']
-    _pub_year_hint = _t4['pub_year_hint']
-
-    # 阶段 5a：题目/主题 + 地点（含 FB 兜底与 OCR 兜底）
-    _extract_topic_location(_st, result, title, loc_times)
-    # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
-    # 注意：排除「主讲《…》」（正文里「主讲《课程名》」是动宾短语，不是主讲人标签），
-    # 否则会把书名号后的课程名误当主讲人（如汕尾校区海报 bio 中的「主讲《动物组织学与胚胎学》」）。
-    # 汕尾校区教学工作坊海报用「主讲专家:」「专家姓名:」标注主讲人，一并纳入。
-    speaker_label_found, multi_speakers = _extract_speaker(
-        _st, result, title, imgs, vlm_fields, t_untrusted,
-        title_year, url_year, publish_time, default_year,
-        _do_ocr, college)
-    # --- 简历/简介（优先在文章正文区域内搜索）---
-    # body_text 已在函数开头构建（含可能的 OCR 文本）
-
-    # 内容摘要类标签：出现这些说明主讲人简介已结束、讲座内容介绍开始
-    # N1e/英文：补充 Abstract/Synopsis。
+def _extract_abstract_bio(_st, result, title, content_div, college,
+                                     list_title, speaker_label_found):
+    """阶段 5c：speakerBio/abstract/narrative 抽取与守卫清洗。
+    bio 正则/正文兜底/摘要标签链/OCR 兜底/叙事兜底/CTLD 专用/单位混入守卫/
+    bio-abstract 迁移等。无返回值，纯写入 result 与 _st。
+    """
     SUMMARY_LABELS = (
         '讲座内容简介|课程内容简介|培训内容简介|工作坊内容简介|'
         '讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|报告简介|讲座简介|'
@@ -5593,6 +5559,49 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         else:
             result['abstract'] = ''
 
+
+def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
+    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
+    _st = _OcrSt()
+    soup = BeautifulSoup(html, 'html.parser')
+    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
+    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
+    _st.ocr_text = ''
+    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
+    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
+
+    # 阶段 4（时间解析+result 初始化）：海报判定/VLM/时间回退链/R3 门控（原 L3973-4182 拆出）
+    _t4 = _resolve_time_init_result(soup, content_div, url, title, list_title,
+                                    college, campus, default_year, url_year,
+                                    imgs, _pdf_local_imgs, _pdf_poster_converted,
+                                    _do_ocr, _st)
+    result = _t4['result']
+    poster_only = _t4['poster_only']
+    vlm_fields = _t4['vlm_fields']
+    _vlm_sessions = _t4['vlm_sessions']
+    publish_time = _t4['publish_time']
+    title_year = _t4['title_year']
+    loc_times = _t4['loc_times']
+    t_untrusted = _t4['t_untrusted']
+    _pub_year_hint = _t4['pub_year_hint']
+
+    # 阶段 5a：题目/主题 + 地点（含 FB 兜底与 OCR 兜底）
+    _extract_topic_location(_st, result, title, loc_times)
+    # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
+    # 注意：排除「主讲《…》」（正文里「主讲《课程名》」是动宾短语，不是主讲人标签），
+    # 否则会把书名号后的课程名误当主讲人（如汕尾校区海报 bio 中的「主讲《动物组织学与胚胎学》」）。
+    # 汕尾校区教学工作坊海报用「主讲专家:」「专家姓名:」标注主讲人，一并纳入。
+    speaker_label_found, multi_speakers = _extract_speaker(
+        _st, result, title, imgs, vlm_fields, t_untrusted,
+        title_year, url_year, publish_time, default_year,
+        _do_ocr, college)
+    # --- 简历/简介（优先在文章正文区域内搜索）---
+    # body_text 已在函数开头构建（含可能的 OCR 文本）
+
+    # 内容摘要类标签：出现这些说明主讲人简介已结束、讲座内容介绍开始
+    # N1e/英文：补充 Abstract/Synopsis。
+    _extract_abstract_bio(_st, result, title, content_div, college,
+                          list_title, speaker_label_found)
     # R-RETRO 事后回顾稿显式守卫（用户 2026-07-28 授权）：
     # 页面存在真实发布时间戳且晚于讲座开始（含同日晚于讲座开始）→ 整页为回顾稿，
     # 直接丢弃，不进聚合、不拆分。复用 is_news_record 的判定（含 url_proxy 1天容差），
