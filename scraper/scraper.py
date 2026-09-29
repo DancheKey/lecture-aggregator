@@ -920,6 +920,121 @@ def _listdate_skip_enabled():
     return (os.environ.get('SCNU_LISTDATE_SKIP') or '1').strip() not in ('0', 'false', 'no')
 
 
+# ── 被拒 URL 台账（2026-09-29）──────────────────────────────────────────────
+# 背景：ggy / zhx / ibrr 等「名录式栏目」源的列表页条目绝大多数是回顾报道（判
+# SKIP-NEWS）或回溯旧讲座（SKIP-RETRO），既不进库、也不推进本源基线；而增量条目
+# 判据 _effective_listdate_cutoff 取 min(全局水位, 本源基线)，这些源的基线停在自己
+# 极旧的那条记录上（实测 ggy 2021-12、zhx 2013-05、ibrr 2018-12），判据形同虚设。
+# 后果：这些 URL 每轮被重新 fetch+parse，永不收敛——2026-09-29 CI 实测单轮白抓
+# 586 页、抓取阶段耗 18m45s、净新增 0 条。
+#
+# 修法：把「已抓过且判定不入库」的 URL 记进台账，下一轮在 fetch **之前**跳过。
+# 这是与「水位线（按日期）」互补的第二本账（按 URL）：水位线管「新的才抓」，
+# 台账管「判过的不再判」。两者都只决定「抓不抓」，不改任何字段值。
+#
+# ⚠ 与 existing_urls 互补而非重叠：已在库的 URL 由 existing_urls 判据先拦，
+#   台账只装「抓过但没入库」的 URL，两个集合不相交。
+# ⚠ 条目 180 天后自动作废并重判一次，避免一次误判被永久固化（源站也可能换掉旧 URL 的内容）。
+# ⚠ 全量模式（--full）只写不读，保证「宁多抓不漏抓」；台账只服务增量轮。
+_LEDGER_TTL_DAYS = 180
+_LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0}
+_LEDGER = {}  # {canon_url_key: {'v': 'rejected'|'old', 'd': 条目日期, 't': 首次记录日}}
+
+
+def _ledger_enabled():
+    """SCNU_LEDGER_SKIP=0 可关闭（回退对照 / 紧急排查），默认开启。"""
+    return (os.environ.get('SCNU_LEDGER_SKIP') or '1').strip() not in ('0', 'false', 'no')
+
+
+def _ledger_file():
+    return os.path.join(ROOT, 'data', 'scrape_ledger.json')
+
+
+def load_ledger(path=None):
+    """读台账并就地做过期清理。缺失/损坏一律退化为空台账——只影响耗时，不影响正确性。"""
+    global _LEDGER
+    path = path or _ledger_file()
+    entries = {}
+    try:
+        with open(path, encoding='utf-8') as f:
+            raw = json.load(f)
+        if isinstance(raw, dict) and isinstance(raw.get('entries'), dict):
+            entries = raw['entries']
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f'[LEDGER] 台账读取失败，按空台账继续：{e}', file=sys.stderr)
+    limit = (datetime.date.today() - datetime.timedelta(days=_LEDGER_TTL_DAYS)).isoformat()
+    kept, expired = {}, 0
+    for k, v in entries.items():
+        t = (v or {}).get('t') or ''
+        if t and t < limit:          # 缺 t 的异常条目保守保留，不静默丢弃
+            expired += 1
+            continue
+        kept[k] = v
+    _LEDGER_STATS['expired'] = expired
+    _LEDGER = kept
+    return _LEDGER
+
+
+def save_ledger(path=None, merge=True):
+    """原子写回台账。条目按 key 排序，保证相同内容产出相同字节（避免 CI 无谓提交）。
+
+    merge=True：写前先把盘上已有条目并入内存（内存优先）。局部重抓 / 分批重抓
+    会各自跑一个进程，若不合并，后跑的进程会用自己那份内存覆盖掉别的进程刚写入
+    的条目——本轮的判定结果就白丢了，收敛要多花好几轮。
+    """
+    path = path or _ledger_file()
+    if merge:
+        try:
+            with open(path, encoding='utf-8') as f:
+                raw = json.load(f)
+            disk = raw.get('entries') if isinstance(raw, dict) else None
+            if isinstance(disk, dict):
+                for k, v in disk.items():
+                    _LEDGER.setdefault(k, v)
+        except FileNotFoundError:
+            pass
+        except Exception:
+            pass          # 盘上文件损坏/形态异常：以内存为准继续写，不阻断流程
+    payload = {
+        'version': 1,
+        'updatedAt': datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
+        'ttlDays': _LEDGER_TTL_DAYS,
+        'note': '被拒 URL 台账：抓过且判定不入库（新闻报道/回溯稿/历史旧讲座）的详情页，'
+                '增量轮 fetch 前直接跳过，避免每轮重复抓取。SCNU_LEDGER_SKIP=0 可临时关闭。',
+        'entries': dict(sorted(_LEDGER.items())),
+    }
+    try:
+        _atomic_write_json(path, payload)
+    except Exception as e:
+        print(f'[LEDGER] 台账写入失败：{e}', file=sys.stderr)
+
+
+def ledger_hit(canon_key):
+    return bool(canon_key) and _ledger_enabled() and canon_key in _LEDGER
+
+
+def ledger_add(canon_key, verdict, item_date=''):
+    """登记一条被拒 URL。已存在的不刷新时间戳：TTL 从首次记录起算，保证会周期性重判。"""
+    if not canon_key or not _ledger_enabled() or canon_key in _LEDGER:
+        return
+    _LEDGER[canon_key] = {'v': verdict, 'd': item_date or '',
+                          't': datetime.date.today().isoformat()}
+    _LEDGER_STATS['added'] += 1
+
+
+def report_ledger():
+    """台账落盘 + 单轮汇总。增量主流程与 --out 局部重抓共用（否则局部重抓的判定白丢）。"""
+    if _LEDGER_STATS['added'] or _LEDGER_STATS['expired']:
+        save_ledger()
+    if _LEDGER_STATS['skipped']:
+        print(f'[LEDGER] 本轮按被拒台账跳过 {_LEDGER_STATS["skipped"]} 个详情页（未 fetch、未 parse）')
+    if _LEDGER_STATS['added']:
+        print(f'[LEDGER] 新增 {_LEDGER_STATS["added"]} 条被拒记录，台账累计 {len(_LEDGER)} 条'
+              f'（过期作废 {_LEDGER_STATS["expired"]} 条）')
+
+
 def _build_item_date_map(html, list_url, base, collect_mode):
     """一次遍历建立 {详情页URL: 'YYYY-MM-DD'} 映射：取每个条目所在容器文本里的日期。
 
@@ -1345,6 +1460,10 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     new_count += 1
                     if is_incremental and (_canon_url_key(href_norm), None) in existing_urls:
                         continue
+                    # 被拒台账：抓过且已判定不入库的 URL 不再重复 fetch/parse（见 _LEDGER 区块）
+                    if is_incremental and ledger_hit(_canon_url_key(href_norm)):
+                        _LEDGER_STATS['skipped'] += 1
+                        continue
                     if (item_date_map
                             and _should_skip_by_item_date(_canon_url_key(href_norm),
                                                           item_date_map, eff_cutoff)):
@@ -1367,6 +1486,9 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     if recs is None:
                         print(f'[SKIP-NEWS] {name} | {txt} | {href}')
+                        # 记入台账：下轮不再抓/解析这一页（回顾稿、行政通知、回溯旧讲座等）
+                        ledger_add(_canon_url_key(href_norm), 'rejected',
+                                   (item_date_map or {}).get(_canon_url_key(href_norm), ''))
                         continue
                     if not isinstance(recs, list):
                         recs = [recs]
@@ -1460,6 +1582,14 @@ def main():
             print(f'[LISTDATE] 列表页条目日期过滤已开启：条目日期 < {cutoff_date_str} 的详情页将跳过不抓')
         elif is_incremental:
             print('[LISTDATE] 列表页条目日期过滤未启用（SCNU_LISTDATE_SKIP=0 或 since 无法解析）')
+
+    # 被拒 URL 台账：仅增量轮读取（全量只写不读，保证宁多抓不漏抓）。
+    # 作用与水位线互补——水位线管「新的才抓」，台账管「已判过的不再抓」。
+    if is_incremental and _ledger_enabled():
+        load_ledger()
+        print(f'[LEDGER] 被拒 URL 台账已加载 {len(_LEDGER)} 条'
+              + (f'（过期作废 {_LEDGER_STATS["expired"]} 条）' if _LEDGER_STATS['expired'] else '')
+              + f'，本轮将跳过这些页面的 fetch（TTL {_LEDGER_TTL_DAYS} 天）')
 
     # 读取现有记录：增量模式作为基底（合并写回）+ 已抓 URL 集合（跳过解析/OCR）
     data_path = os.path.join(ROOT, 'data', 'lectures.json')
@@ -1622,6 +1752,7 @@ def main():
             #   - 事件在未来(≥水位线)的真实 upcoming 讲座 → 永不被漏掉；
             #   - 已进主数据的 URL 由 incremental_merge 的 key 锁定，不会重复加入。
             kept, dropped = [], 0
+            dropped_keys, kept_keys = set(), set()
             for r in all_fetched:
                 pub = _parse_iso(r.get('publishTime'))
                 lec = _parse_iso(r.get('lectureStart'))
@@ -1632,11 +1763,17 @@ def main():
                 is_recent = (pub is not None and pub >= cutoff) or (lec is not None and lec >= cutoff)
                 if not is_recent:
                     dropped += 1
+                    dropped_keys.add(_canon_url_key(r.get('sourceUrl')))
                     print(f'[SKIP-OLD] 增量跳过历史旧讲座(早于时间门) {r.get("sourceUrl")} | '
                           f'lectureStart={r.get("lectureStart")} | publishTime={r.get("publishTime")}')
                     continue
                 kept.append(r)
+                kept_keys.add(_canon_url_key(r.get('sourceUrl')))
             all_fetched = kept
+            # 整页被判历史旧讲座的 URL 记入台账（下轮不再抓）；
+            # 同一 URL 仍保留有场次的多讲座页不记（下轮该页可能带出新预告）
+            for _k in dropped_keys - kept_keys:
+                ledger_add(_k, 'old')
             if dropped:
                 print(f'[INCREMENTAL] 时间门过滤 {dropped} 条历史旧讲座（不计入增量，避免旧数据当新事件）')
         # 增量模式：基底(existing)原样锁定，仅对新增记录做同源去重后追加，
@@ -1666,6 +1803,8 @@ def main():
         with open(args.out, 'w', encoding='utf-8') as f:
             json.dump({'updatedAt': now_iso, 'data': out}, f, ensure_ascii=False, indent=2)
         print(f'[DONE] source={args.source} -> {args.out} ({len(out)} records)')
+        # 局部重抓也贡献台账（save_ledger 会与盘上条目合并，多进程分批不互相覆盖）
+        report_ledger()
         return
     data_dir = os.path.join(ROOT, 'data')
     os.makedirs(data_dir, exist_ok=True)
@@ -1698,6 +1837,7 @@ def main():
     if _LISTDATE_STATS['skipped']:
         print(f'[LISTDATE] 本轮共按列表页条目日期跳过 {_LISTDATE_STATS["skipped"]} 个历史详情页'
               f'（未 fetch、未 parse，省下对应 LLM 开销）')
+    report_ledger()
 
 
 if __name__ == '__main__':

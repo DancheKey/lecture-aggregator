@@ -1,0 +1,1468 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-29T10:13:56+08:00",
+  "ttlDays": 180,
+  "note": "被拒 URL 台账：抓过且判定不入库（新闻报道/回溯稿/历史旧讲座）的详情页，增量轮 fetch 前直接跳过，避免每轮重复抓取。SCNU_LEDGER_SKIP=0 可临时关闭。",
+  "entries": {
+    "http://abdn.scnu.edu.cn/a/20240716/418.html": {
+      "v": "old",
+      "d": "2024-07-08",
+      "t": "2026-09-29"
+    },
+    "http://abdn.scnu.edu.cn/a/20240716/419.html": {
+      "v": "old",
+      "d": "2024-07-09",
+      "t": "2026-09-29"
+    },
+    "http://ai.scnu.edu.cn/a/20230306/181.html": {
+      "v": "rejected",
+      "d": "2023-03-02",
+      "t": "2026-09-29"
+    },
+    "http://ai.scnu.edu.cn/a/20230616/201.html": {
+      "v": "rejected",
+      "d": "2023-06-15",
+      "t": "2026-09-29"
+    },
+    "http://cicgz.scnu.edu.cn/a/20171031/1070.html": {
+      "v": "rejected",
+      "d": "2017-10-16",
+      "t": "2026-09-29"
+    },
+    "http://cicgz.scnu.edu.cn/a/20171031/1071.html": {
+      "v": "rejected",
+      "d": "2017-10-11",
+      "t": "2026-09-29"
+    },
+    "http://cs.scnu.edu.cn/a/20260323/5946.html": {
+      "v": "old",
+      "d": "2026-03-03",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20211221/5697.html": {
+      "v": "rejected",
+      "d": "2021-12-08",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20211221/5698.html": {
+      "v": "rejected",
+      "d": "2021-12-09",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20211221/5699.html": {
+      "v": "rejected",
+      "d": "2021-12-09",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20211221/5701.html": {
+      "v": "rejected",
+      "d": "2021-12-14",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20211221/5701.html[SKIP-RETRO]": {
+      "v": "rejected",
+      "d": "2021-12-09",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220104/5712.html": {
+      "v": "rejected",
+      "d": "2021-12-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220104/5713.html": {
+      "v": "rejected",
+      "d": "2021-12-12",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220108/5714.html": {
+      "v": "rejected",
+      "d": "2022-01-08",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220112/5717.html": {
+      "v": "rejected",
+      "d": "2021-12-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220112/5719.html": {
+      "v": "rejected",
+      "d": "2021-12-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220112/5721.html": {
+      "v": "rejected",
+      "d": "2021-12-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220112/5722.html": {
+      "v": "rejected",
+      "d": "2021-12-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220112/5723.html": {
+      "v": "rejected",
+      "d": "2021-12-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220112/5724.html": {
+      "v": "rejected",
+      "d": "2021-12-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220112/5726.html": {
+      "v": "rejected",
+      "d": "2021-12-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220112/5727.html": {
+      "v": "rejected",
+      "d": "2020-12-16",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220415/5765.html": {
+      "v": "rejected",
+      "d": "2022-04-12",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220415/5766.html": {
+      "v": "rejected",
+      "d": "2022-04-10",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20220516/5785.html": {
+      "v": "old",
+      "d": "2022-05-11",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221008/5867.html": {
+      "v": "rejected",
+      "d": "2022-09-14",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221008/5868.html": {
+      "v": "rejected",
+      "d": "2022-09-29",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221014/5871.html": {
+      "v": "rejected",
+      "d": "2022-10-13",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221028/5882.html": {
+      "v": "rejected",
+      "d": "2022-10-25",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221028/5883.html": {
+      "v": "rejected",
+      "d": "2022-10-27",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221111/5893.html": {
+      "v": "rejected",
+      "d": "2022-11-10",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221124/5906.html": {
+      "v": "rejected",
+      "d": "2022-11-18",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221124/5907.html": {
+      "v": "rejected",
+      "d": "2022-11-24",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221203/5910.html": {
+      "v": "rejected",
+      "d": "2022-12-01",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221209/5912.html": {
+      "v": "rejected",
+      "d": "2022-12-08",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221210/5913.html": {
+      "v": "rejected",
+      "d": "2022-01-25",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221213/5914.html": {
+      "v": "rejected",
+      "d": "2022-12-09",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20221230/5921.html": {
+      "v": "rejected",
+      "d": "2022-12-30",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230301/5944.html": {
+      "v": "rejected",
+      "d": "2023-02-22",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230309/5946.html": {
+      "v": "rejected",
+      "d": "2023-03-08",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230329/5956.html": {
+      "v": "rejected",
+      "d": "2023-03-17",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230329/5957.html": {
+      "v": "rejected",
+      "d": "2023-03-14",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230329/5958.html": {
+      "v": "rejected",
+      "d": "2023-03-22",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230329/5959.html": {
+      "v": "rejected",
+      "d": "2023-03-24",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230416/5970.html": {
+      "v": "rejected",
+      "d": "2023-04-10",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230422/5974.html": {
+      "v": "rejected",
+      "d": "2023-04-14",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230428/5981.html": {
+      "v": "rejected",
+      "d": "2023-04-20",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230428/5983.html": {
+      "v": "rejected",
+      "d": "2023-03-10",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230508/5986.html": {
+      "v": "rejected",
+      "d": "2023-05-05",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230508/5987.html": {
+      "v": "rejected",
+      "d": "2023-05-07",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230516/5991.html": {
+      "v": "rejected",
+      "d": "2023-05-09",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230516/5991.html[SKIP-RETRO]": {
+      "v": "rejected",
+      "d": "2023-05-07",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230516/5992.html": {
+      "v": "rejected",
+      "d": "2023-05-11",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230526/5996.html": {
+      "v": "rejected",
+      "d": "2023-05-18",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230530/5999.html": {
+      "v": "rejected",
+      "d": "2023-05-26",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230609/6008.html": {
+      "v": "rejected",
+      "d": "2023-05-30",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230611/6010.html": {
+      "v": "rejected",
+      "d": "2023-06-08",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230618/6013.html": {
+      "v": "rejected",
+      "d": "2023-06-11",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230701/6023.html": {
+      "v": "rejected",
+      "d": "2023-06-20",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20230701/6024.html": {
+      "v": "rejected",
+      "d": "2023-06-21",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20231018/6088.html": {
+      "v": "rejected",
+      "d": "2023-10-12",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20231101/6094.html": {
+      "v": "rejected",
+      "d": "2023-10-26",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20231103/6110.html": {
+      "v": "rejected",
+      "d": "2023-11-03",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20231108/6113.html": {
+      "v": "rejected",
+      "d": "2023-11-08",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20231205/6138.html": {
+      "v": "rejected",
+      "d": "2023-12-05",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20231215/6137.html": {
+      "v": "rejected",
+      "d": "2023-12-15",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20240314/6191.html": {
+      "v": "rejected",
+      "d": "2024-03-14",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20240326/6186.html": {
+      "v": "rejected",
+      "d": "2024-03-26",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20240331/6185.html": {
+      "v": "rejected",
+      "d": "2024-03-31",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20240924/6320.html": {
+      "v": "rejected",
+      "d": "2024-09-10",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20241002/6321.html": {
+      "v": "rejected",
+      "d": "2024-09-22",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20241020/6298.html": {
+      "v": "rejected",
+      "d": "2024-10-12",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20241102/6322.html": {
+      "v": "rejected",
+      "d": "2024-10-21",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20241110/6332.html": {
+      "v": "rejected",
+      "d": "2024-10-29",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250228/6441.html": {
+      "v": "rejected",
+      "d": "2025-01-19",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250324/6440.html": {
+      "v": "rejected",
+      "d": "2025-03-10",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250401/6439.html": {
+      "v": "rejected",
+      "d": "2025-03-26",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250422/6409.html": {
+      "v": "rejected",
+      "d": "2025-03-28",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250422/6410.html": {
+      "v": "rejected",
+      "d": "2025-03-28",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250509/6424.html": {
+      "v": "rejected",
+      "d": "2025-04-18",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250509/6425.html": {
+      "v": "rejected",
+      "d": "2025-05-09",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250617/6450.html": {
+      "v": "rejected",
+      "d": "2025-06-06",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250618/6453.html": {
+      "v": "rejected",
+      "d": "2025-06-09",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250621/6455.html": {
+      "v": "rejected",
+      "d": "2025-06-04",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250629/6468.html": {
+      "v": "rejected",
+      "d": "2025-06-12",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250701/6467.html": {
+      "v": "rejected",
+      "d": "2025-06-30",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250707/6475.html": {
+      "v": "rejected",
+      "d": "2025-07-01",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250713/6479.html": {
+      "v": "rejected",
+      "d": "2025-06-29",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20250925/6511.html": {
+      "v": "rejected",
+      "d": "2025-09-19",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251015/6503.html": {
+      "v": "rejected",
+      "d": "2025-09-26",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251015/6504.html": {
+      "v": "rejected",
+      "d": "2025-09-29",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251015/6505.html": {
+      "v": "rejected",
+      "d": "2025-10-10",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251015/6505.html[SKIP-RETRO]": {
+      "v": "rejected",
+      "d": "2025-09-29",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251015/6506.html": {
+      "v": "rejected",
+      "d": "2025-10-11",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251022/6512.html": {
+      "v": "rejected",
+      "d": "2025-10-15",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251101/6526.html": {
+      "v": "rejected",
+      "d": "2025-10-26",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251101/6527.html": {
+      "v": "rejected",
+      "d": "2025-10-27",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251102/6523.html": {
+      "v": "rejected",
+      "d": "2025-10-27",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251102/6525.html": {
+      "v": "rejected",
+      "d": "2024-09-10",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251107/6531.html": {
+      "v": "rejected",
+      "d": "2025-11-05",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251107/6532.html": {
+      "v": "rejected",
+      "d": "2025-11-06",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251107/6533.html": {
+      "v": "rejected",
+      "d": "2025-11-06",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251119/6540.html": {
+      "v": "rejected",
+      "d": "2025-11-14",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251119/6541.html": {
+      "v": "rejected",
+      "d": "2025-11-14",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251119/6542.html": {
+      "v": "rejected",
+      "d": "2025-11-18",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251120/6544.html": {
+      "v": "rejected",
+      "d": "2025-11-19",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251120/6548.html": {
+      "v": "rejected",
+      "d": "2025-11-13",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251121/6549.html": {
+      "v": "rejected",
+      "d": "2025-11-20",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251122/6552.html": {
+      "v": "rejected",
+      "d": "2025-11-11",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251129/6556.html": {
+      "v": "rejected",
+      "d": "2025-11-28",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251129/6558.html": {
+      "v": "rejected",
+      "d": "2025-11-27",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251202/6559.html": {
+      "v": "rejected",
+      "d": "2025-11-28",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20251230/6593.html": {
+      "v": "rejected",
+      "d": "2025-12-29",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260305/6613.html": {
+      "v": "rejected",
+      "d": "2026-03-04",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260413/6631.html": {
+      "v": "rejected",
+      "d": "2026-04-09",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260430/6647.html": {
+      "v": "rejected",
+      "d": "2026-04-24",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260519/6649.html": {
+      "v": "rejected",
+      "d": "2026-05-14",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260527/6651.html": {
+      "v": "rejected",
+      "d": "2026-05-25",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260602/6656.html": {
+      "v": "rejected",
+      "d": "2026-05-29",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260602/6657.html": {
+      "v": "rejected",
+      "d": "2026-05-29",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260610/6660.html": {
+      "v": "rejected",
+      "d": "2026-06-05",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260703/6667.html": {
+      "v": "rejected",
+      "d": "2026-06-30",
+      "t": "2026-09-29"
+    },
+    "http://ggy.scnu.edu.cn/a/20260929/6681.html": {
+      "v": "rejected",
+      "d": "2026-09-24",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20250401/2859.html": {
+      "v": "rejected",
+      "d": "2025-03-31",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20250415/2872.html": {
+      "v": "rejected",
+      "d": "2025-03-23",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20250429/2889.html": {
+      "v": "rejected",
+      "d": "2025-04-27",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20250918/2970.html": {
+      "v": "rejected",
+      "d": "2025-09-09",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20251104/3002.html": {
+      "v": "rejected",
+      "d": "2025-10-24",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20251105/3007.html": {
+      "v": "rejected",
+      "d": "2025-10-30",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20251212/3051.html": {
+      "v": "rejected",
+      "d": "2025-12-12",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20251216/3054.html": {
+      "v": "rejected",
+      "d": "2025-12-16",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20260105/3070.html": {
+      "v": "rejected",
+      "d": "2025-12-30",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20260410/3108.html": {
+      "v": "rejected",
+      "d": "1926-04-09",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20260529/3185.html": {
+      "v": "rejected",
+      "d": "2026-05-27",
+      "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20260529/3186.html": {
+      "v": "rejected",
+      "d": "2026-05-29",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20190107/162.html": {
+      "v": "rejected",
+      "d": "2018-12-14",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20190107/163.html": {
+      "v": "rejected",
+      "d": "2018-12-15",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20190622/186.html": {
+      "v": "rejected",
+      "d": "2019-06-21",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20190918/196.html": {
+      "v": "rejected",
+      "d": "2019-09-16",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20191225/215.html": {
+      "v": "rejected",
+      "d": "2019-12-20",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20201027/257.html": {
+      "v": "rejected",
+      "d": "2020-10-26",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20201104/259.html": {
+      "v": "rejected",
+      "d": "2020-11-02",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20201106/293.html": {
+      "v": "rejected",
+      "d": "2020-10-01",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20201111/295.html": {
+      "v": "rejected",
+      "d": "2020-11-09",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20201126/310.html": {
+      "v": "rejected",
+      "d": "2020-11-25",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20210412/394.html": {
+      "v": "rejected",
+      "d": "2021-04-09",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20210713/417.html": {
+      "v": "rejected",
+      "d": "2021-07-12",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20211027/430.html": {
+      "v": "rejected",
+      "d": "2021-10-26",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20211103/431.html": {
+      "v": "rejected",
+      "d": "2021-11-02",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20211227/443.html": {
+      "v": "rejected",
+      "d": "2021-12-23",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20220303/457.html": {
+      "v": "rejected",
+      "d": "2022-03-03",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20220316/461.html": {
+      "v": "rejected",
+      "d": "2007-08-20",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20220402/473.html": {
+      "v": "rejected",
+      "d": "2022-03-30",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20220420/479.html": {
+      "v": "rejected",
+      "d": "2022-04-19",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20220620/490.html": {
+      "v": "rejected",
+      "d": "2022-06-17",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20220625/491.html": {
+      "v": "rejected",
+      "d": "2022-06-22",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20221028/515.html": {
+      "v": "rejected",
+      "d": "2022-10-27",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20221104/516.html": {
+      "v": "rejected",
+      "d": "2022-11-03",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20221111/518.html": {
+      "v": "rejected",
+      "d": "2022-11-10",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20221114/519.html": {
+      "v": "rejected",
+      "d": "2022-11-11",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20221121/520.html": {
+      "v": "rejected",
+      "d": "2022-11-18",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20221206/521.html": {
+      "v": "rejected",
+      "d": "2022-12-01",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20231025/626.html": {
+      "v": "rejected",
+      "d": "2023-10-23",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20231101/633.html": {
+      "v": "rejected",
+      "d": "2023-10-31",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20231120/637.html": {
+      "v": "rejected",
+      "d": "2023-11-16",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20231120/638.html": {
+      "v": "rejected",
+      "d": "2023-11-16",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20231218/644.html": {
+      "v": "rejected",
+      "d": "2023-12-15",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20240419/675.html": {
+      "v": "rejected",
+      "d": "2024-04-17",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20240426/681.html": {
+      "v": "rejected",
+      "d": "2024-04-25",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20240603/692.html": {
+      "v": "rejected",
+      "d": "2024-05-30",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20240621/694.html": {
+      "v": "rejected",
+      "d": "2024-06-17",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20241107/718.html": {
+      "v": "rejected",
+      "d": "2024-11-04",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20241111/721.html": {
+      "v": "rejected",
+      "d": "2024-11-04",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20241111/722.html": {
+      "v": "rejected",
+      "d": "2024-11-09",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20241216/730.html": {
+      "v": "rejected",
+      "d": "2024-12-12",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20250616/769.html": {
+      "v": "rejected",
+      "d": "2025-06-13",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251106/803.html": {
+      "v": "rejected",
+      "d": "2025-10-31",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251114/806.html": {
+      "v": "rejected",
+      "d": "2025-11-03",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251114/807.html": {
+      "v": "rejected",
+      "d": "2025-11-06",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251114/808.html": {
+      "v": "rejected",
+      "d": "2025-11-06",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251114/809.html": {
+      "v": "rejected",
+      "d": "2025-11-07",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251121/813.html": {
+      "v": "rejected",
+      "d": "2025-11-14",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251203/818.html": {
+      "v": "rejected",
+      "d": "2025-11-25",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251203/819.html": {
+      "v": "rejected",
+      "d": "2025-11-26",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251225/830.html": {
+      "v": "rejected",
+      "d": "2025-12-18",
+      "t": "2026-09-29"
+    },
+    "http://ibrr.scnu.edu.cn/a/20251229/831.html": {
+      "v": "rejected",
+      "d": "2025-12-22",
+      "t": "2026-09-29"
+    },
+    "http://io.scnu.edu.cn/a/20170320/635.html": {
+      "v": "rejected",
+      "d": "2017-03-20",
+      "t": "2026-09-29"
+    },
+    "http://io.scnu.edu.cn/a/20240618/1916.html": {
+      "v": "old",
+      "d": "2024-06-21",
+      "t": "2026-09-29"
+    },
+    "http://jky.scnu.edu.cn/a/20241029/5916.html": {
+      "v": "old",
+      "d": "2024-10-13",
+      "t": "2026-09-29"
+    },
+    "http://jky.scnu.edu.cn/a/20241029/5917.html": {
+      "v": "old",
+      "d": "2024-10-14",
+      "t": "2026-09-29"
+    },
+    "http://jky.scnu.edu.cn/a/20241029/5918.html": {
+      "v": "old",
+      "d": "2024-10-24",
+      "t": "2026-09-29"
+    },
+    "http://jky.scnu.edu.cn/a/20241029/5919.html": {
+      "v": "old",
+      "d": "2024-10-28",
+      "t": "2026-09-29"
+    },
+    "http://jky.scnu.edu.cn/a/20241029/5920.html": {
+      "v": "old",
+      "d": "2024-11-01",
+      "t": "2026-09-29"
+    },
+    "http://jky.scnu.edu.cn/a/20250411/6169.html": {
+      "v": "old",
+      "d": "2025-04-09",
+      "t": "2026-09-29"
+    },
+    "http://lswh.scnu.edu.cn/a/20250605/1418.html": {
+      "v": "rejected",
+      "d": "2025-05-28",
+      "t": "2026-09-29"
+    },
+    "http://lswh.scnu.edu.cn/a/20250919/1429.html": {
+      "v": "rejected",
+      "d": "2025-09-17",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2020/1030/668.html": {
+      "v": "rejected",
+      "d": "2020-10-29",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2020/1108/667.html": {
+      "v": "rejected",
+      "d": "2020-10-22",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0122/666.html": {
+      "v": "rejected",
+      "d": "2020-12-25",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0416/665.html": {
+      "v": "rejected",
+      "d": "2021-04-06",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0526/664.html": {
+      "v": "rejected",
+      "d": "2021-05-21",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0702/663.html": {
+      "v": "rejected",
+      "d": "2021-07-01",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0706/671.html": {
+      "v": "rejected",
+      "d": "2020-07-01",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0706/672.html": {
+      "v": "rejected",
+      "d": "2020-07-01",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0731/669.html": {
+      "v": "rejected",
+      "d": "2020-07-14",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0831/659.html": {
+      "v": "rejected",
+      "d": "2021-08-24",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/0927/658.html": {
+      "v": "rejected",
+      "d": "2021-09-22",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2021/1013/657.html": {
+      "v": "rejected",
+      "d": "2021-10-11",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2022/0613/650.html": {
+      "v": "rejected",
+      "d": "2022-06-10",
+      "t": "2026-09-29"
+    },
+    "http://music.scnu.edu.cn/news/events/2022/0727/670.html": {
+      "v": "rejected",
+      "d": "2020-04-28",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20151112/198.html": {
+      "v": "rejected",
+      "d": "2015-10-28",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20151112/199.html": {
+      "v": "rejected",
+      "d": "2015-11-04",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20151120/217.html": {
+      "v": "rejected",
+      "d": "2015-11-17",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20151223/250.html": {
+      "v": "rejected",
+      "d": "2015-12-13",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20151223/251.html": {
+      "v": "rejected",
+      "d": "2015-12-21",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20221208/663.html": {
+      "v": "rejected",
+      "d": "2022-05-10",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20221208/664.html": {
+      "v": "rejected",
+      "d": "2022-05-17",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20221208/665.html": {
+      "v": "rejected",
+      "d": "2022-06-21",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20221208/666.html": {
+      "v": "rejected",
+      "d": "2022-10-27",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20221208/667.html": {
+      "v": "rejected",
+      "d": "2022-11-13",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20230331/696.html": {
+      "v": "rejected",
+      "d": "2023-03-31",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20230511/717.html": {
+      "v": "rejected",
+      "d": "2023-05-07",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20230619/735.html": {
+      "v": "rejected",
+      "d": "2023-06-16",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20231118/787.html": {
+      "v": "rejected",
+      "d": "2023-11-18",
+      "t": "2026-09-29"
+    },
+    "http://skc.scnu.edu.cn/a/20231125/796.html": {
+      "v": "rejected",
+      "d": "2023-11-24",
+      "t": "2026-09-29"
+    },
+    "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2024/1213/3629.html": {
+      "v": "rejected",
+      "d": "2024-12-10",
+      "t": "2026-09-29"
+    },
+    "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2025/0707/3732.html": {
+      "v": "rejected",
+      "d": "2025-03-27",
+      "t": "2026-09-29"
+    },
+    "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2025/1021/3785.html": {
+      "v": "rejected",
+      "d": "2025-10-15",
+      "t": "2026-09-29"
+    },
+    "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2025/1105/3803.html": {
+      "v": "rejected",
+      "d": "2025-10-28",
+      "t": "2026-09-29"
+    },
+    "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2025/1120/3838.html": {
+      "v": "rejected",
+      "d": "2025-11-18",
+      "t": "2026-09-29"
+    },
+    "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2026/0513/3961.html": {
+      "v": "rejected",
+      "d": "2026-04-21",
+      "t": "2026-09-29"
+    },
+    "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2026/0625/4013.html": {
+      "v": "rejected",
+      "d": "2026-06-18",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20150701/341.html": {
+      "v": "rejected",
+      "d": "2015-07-01",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20150701/342.html": {
+      "v": "rejected",
+      "d": "2015-07-01",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20150701/343.html": {
+      "v": "rejected",
+      "d": "2012-12-12",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20201113/1966.html": {
+      "v": "rejected",
+      "d": "2020-11-08",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20201113/1967.html": {
+      "v": "rejected",
+      "d": "2020-11-04",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20210419/2014.html": {
+      "v": "rejected",
+      "d": "2021-04-19",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20211213/2077.html": {
+      "v": "rejected",
+      "d": "2021-12-08",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20211213/2078.html": {
+      "v": "rejected",
+      "d": "2021-12-09",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20211213/2079.html": {
+      "v": "rejected",
+      "d": "2021-12-10",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20220929/2152.html": {
+      "v": "rejected",
+      "d": "2022-09-29",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221118/2162.html": {
+      "v": "rejected",
+      "d": "2022-10-31",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221118/2163.html": {
+      "v": "rejected",
+      "d": "2022-10-29",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221118/2164.html": {
+      "v": "rejected",
+      "d": "2022-10-29",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221118/2165.html": {
+      "v": "rejected",
+      "d": "2022-11-03",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221118/2166.html": {
+      "v": "rejected",
+      "d": "2022-11-06",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221118/2167.html": {
+      "v": "rejected",
+      "d": "2022-11-18",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221118/2168.html": {
+      "v": "rejected",
+      "d": "2022-11-16",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221130/2172.html": {
+      "v": "rejected",
+      "d": "2022-11-30",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221212/2178.html": {
+      "v": "rejected",
+      "d": "2022-12-12",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20221212/2181.html": {
+      "v": "rejected",
+      "d": "2022-11-22",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20230103/2182.html": {
+      "v": "rejected",
+      "d": "2023-01-01",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20230103/2183.html": {
+      "v": "rejected",
+      "d": "2022-12-30",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231011/2248.html": {
+      "v": "rejected",
+      "d": "2023-09-08",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231011/2249.html": {
+      "v": "rejected",
+      "d": "2023-09-14",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231023/2254.html": {
+      "v": "rejected",
+      "d": "2023-10-15",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231023/2255.html": {
+      "v": "rejected",
+      "d": "2023-10-16",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231023/2256.html": {
+      "v": "rejected",
+      "d": "2023-10-18",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231023/2257.html": {
+      "v": "rejected",
+      "d": "2023-10-19",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231030/2261.html": {
+      "v": "rejected",
+      "d": "2023-10-27",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231108/2264.html": {
+      "v": "rejected",
+      "d": "2023-10-28",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231116/2276.html": {
+      "v": "rejected",
+      "d": "2023-11-09",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231120/2277.html": {
+      "v": "rejected",
+      "d": "2023-11-16",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231123/2285.html": {
+      "v": "rejected",
+      "d": "2023-11-17",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2288.html": {
+      "v": "rejected",
+      "d": "2023-11-15",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2289.html": {
+      "v": "rejected",
+      "d": "2023-11-24",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2290.html": {
+      "v": "rejected",
+      "d": "2023-11-29",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2291.html": {
+      "v": "rejected",
+      "d": "2023-11-28",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2292.html": {
+      "v": "rejected",
+      "d": "2023-11-28",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2293.html": {
+      "v": "rejected",
+      "d": "2023-11-27",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2294.html": {
+      "v": "rejected",
+      "d": "2023-11-26",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2295.html": {
+      "v": "rejected",
+      "d": "2023-11-22",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2296.html": {
+      "v": "rejected",
+      "d": "2023-11-18",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2297.html": {
+      "v": "rejected",
+      "d": "2023-12-07",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231218/2298.html": {
+      "v": "rejected",
+      "d": "2023-12-06",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231226/2300.html": {
+      "v": "rejected",
+      "d": "2023-12-13",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20231226/2301.html": {
+      "v": "rejected",
+      "d": "2023-12-10",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20240410/2318.html": {
+      "v": "rejected",
+      "d": "2024-03-25",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20240410/2319.html": {
+      "v": "rejected",
+      "d": "2024-03-22",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20240513/2332.html": {
+      "v": "rejected",
+      "d": "2024-04-23",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20240710/2343.html": {
+      "v": "rejected",
+      "d": "2024-06-17",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20240710/2344.html": {
+      "v": "rejected",
+      "d": "2024-06-13",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20240912/2353.html": {
+      "v": "rejected",
+      "d": "2024-09-06",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20240912/2354.html": {
+      "v": "rejected",
+      "d": "2024-09-04",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20241015/2359.html": {
+      "v": "rejected",
+      "d": "2024-09-12",
+      "t": "2026-09-29"
+    },
+    "http://zhx.scnu.edu.cn/a/20241113/2363.html": {
+      "v": "rejected",
+      "d": "2024-10-31",
+      "t": "2026-09-29"
+    },
+    "https://ose.scnu.edu.cn/a/20241224/151.html": {
+      "v": "old",
+      "d": "2024-10-31",
+      "t": "2026-09-29"
+    },
+    "https://ose.scnu.edu.cn/a/20241224/152.html": {
+      "v": "old",
+      "d": "2024-12-20",
+      "t": "2026-09-29"
+    },
+    "https://ose.scnu.edu.cn/a/20250912/288.html": {
+      "v": "rejected",
+      "d": "2025-08-31",
+      "t": "2026-09-29"
+    },
+    "vsb::em.scnu.edu.cn::640": {
+      "v": "rejected",
+      "d": "2022-06-18",
+      "t": "2026-09-29"
+    }
+  }
+}
