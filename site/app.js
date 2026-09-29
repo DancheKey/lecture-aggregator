@@ -334,6 +334,18 @@ const app = createApp({
       if (v !== undefined) return v;
       return u.recs.length < u.total;
     },
+    // 展开场次清单按时间从早到晚正序（主列表倒序只服务时间线视觉，议程清单按议程自然顺序）；
+    // 无时间场次稳定排在最后，保持其余相对顺序
+    forumRecsSorted(u) {
+      return [...u.recs].sort((a, b) => {
+        const ta = a.lectureStart || '', tb = b.lectureStart || '';
+        if (!ta && !tb) return 0;
+        if (!ta) return 1;
+        if (!tb) return -1;
+        return ta.localeCompare(tb);
+      });
+    },
+
     toggleForum(u) {
       this.expandedForums[u.url] = !this.isForumOpen(u);
     },

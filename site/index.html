@@ -381,7 +381,7 @@
                   {{ isForumOpen(u) ? '收起场次清单 ▲' : '展开场次清单 ▼' }}
                 </button>
                 <div v-if="isForumOpen(u)" class="mt-1 border-t border-slate-100 pt-2 space-y-1">
-                  <div v-for="r in u.recs" :key="r.lectureIndex ?? (r.topic || '').slice(0, 16)" class="flex items-baseline gap-2 text-11pt min-w-0">
+                  <div v-for="r in forumRecsSorted(u)" :key="r.lectureIndex ?? (r.topic || '').slice(0, 16)" class="flex items-baseline gap-2 text-11pt min-w-0">
                     <span class="shrink-0 text-slate-400 tabular-nums w-[86px]">{{ (r.lectureStart || '').slice(5, 16) }}</span>
                     <span class="min-w-0 text-slate-700 truncate" :title="r.topic">{{ r.topic || r.title }}</span>
                     <span class="shrink-0 text-slate-500">{{ r.speaker }}</span>
