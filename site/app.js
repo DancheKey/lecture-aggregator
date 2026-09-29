@@ -828,12 +828,11 @@ const app = createApp({
     },
 
     /* ---------- 数据加载（增量 / 渐进式） ----------
-     * 本地后端存在时：走 /api/lectures，返回全量最新数据。
-     * GitHub Pages 静态托管时：先拉体积最小的 latest.json（最新 50 条）立刻渲染
-     * 第一页；后台再拉 lectures.json 启用完整筛选与翻页。
-     * 关键优化：公网环境下不要先等 /api/lectures 超时，而是直接走静态切片；
-     * 浏览器缓存使用 default，让 GitHub Pages 的 max-age=600 生效，避免每次刷新
-     * 都重新下载 6MB 的 lectures.json。
+     * 本地与公网统一走静态分片路径：latest.json（70KB 首屏秒开）→ chunks
+     * （8×334KB 分片，4 路并发 + 协商缓存）→ detail（16 桶长文本按需）。
+     * 不再先试 /api/lectures（7.4MB 全量下载，长文本分离前是本地慢的根因）。
+     * server.py 的 /api/lectures 保留供管理端/调试用，但前端列表不再走它。
+     * GitHub Pages 的 max-age=600 通过 cache:'default' 生效，二次访问秒开。
      */
     // 最近一次抓取运行时间（2026-09-10）：独立小文件，由 CI 每次运行刷新，
     // 与数据版本 updatedAt 分离，见 displayUpdatedAt 的说明。
@@ -847,20 +846,9 @@ const app = createApp({
     },
 
     loadLectures() {
-      fetch('/api/lectures', { cache: 'no-store' })
-        .then(r => {
-          if (!r.ok) throw new Error('api-unavailable');
-          return r.json();
-        })
-        .then(resp => {
-          this._applyLectureData(resp);
-          this.dataStage = 'full';
-          this.loading = false;
-        })
-        .catch(() => {
-          // 静态托管（无后端）时回退：先 fastest latest，再 full lite
-          this._loadStaticLatest();
-        });
+      // 本地与公网统一走静态分片路径，不再先试 /api/lectures（7.4MB 全量下载慢）。
+      // latest.json 70KB 首屏秒开 → 后台 4 路并发拉 8 分片 → 长文本按需。
+      this._loadStaticLatest();
     },
 
     _applyLectureData(resp) {
