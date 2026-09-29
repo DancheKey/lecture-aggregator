@@ -3614,7 +3614,32 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
     return out
 
 
+class _OcrSt:
+    """解析期跨阶段共享状态（解闭包，2026-09-29）。
+
+    承载原先靠 `nonlocal` 隐式共享的 _parse_detail_impl 局部变量。这些值从
+    阶段 3 一路用到阶段 6 末尾，OCR/VLM 又在多个分支按需惰性触发，无法把
+    _do_ocr 提成独立函数。改为显式对象后，「谁在改」在任何阶段都可见、可单测。
+
+    ⚠ 迁移纪律（渐进解闭包，勿一次性全改）：
+      每个变量单独一个 commit，三个动作缺一不可——
+        ① 该变量**全部 store** 改为写 _st.xxx（含 _do_ocr 内部的赋值）
+        ② 该变量**全部 load** 改为读 _st.xxx
+        ③ 从 _do_ocr 的 `nonlocal` 列表中**删去该项**
+      三者只做其一即产生状态分叉（详见 docs/解闭包方案.md）。
+
+    ⚠ 为什么必须「全程状态化」而不能只在函数入口搬一次快照：
+      `text` 在 L4412（移除邀请人标签）有中段写入 `text = text.replace(...)`，
+      位于 _do_ocr 定义之后、调用点之间。若只在入口搬进 _st，此后 L4412 改的是
+      外层变量而 _st.text 永久陈旧 → 下游读 _st.text 拿到旧值，且 OCR 文字被拼到
+      「未移除邀请人标签」的正文上。故 store 必须逐点改为写属性。
+    """
+    __slots__ = ('body_text_llm',)
+
+
 def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
+    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
+    _st = _OcrSt()
     soup = BeautifulSoup(html, 'html.parser')
     # 补丁4 (P0-5): 讲座日程表格就地替换为干净「字段：值」文本（消除原始表格噪声、
     # 修正字段顺序），须在后续 get_text / 字段抽取之前完成。
@@ -3707,12 +3732,12 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 折叠版 body_text 仍服务纯规则正则（「张三 教授」→「张三教授」剥离依赖），
     # 但把折叠版喂给 A/B 会灭失姓名/职称边界证据，使 B 的「原文支持」判定失效
     # （idx772「彭斌 中学数学高级教师」实测教训，2026-09-09）。
-    body_text_llm = _n1_normalize(body_text, collapse_cjk_spaces=False)
+    _st.body_text_llm = _n1_normalize(body_text, collapse_cjk_spaces=False)
     body_text = _n1_normalize(body_text)  # N1：全角标点统一为半角
     body_text = _normalize_label_text(body_text)
     body_text = _strip_footer(body_text)
-    body_text_llm = _normalize_label_text(body_text_llm)
-    body_text_llm = _strip_footer(body_text_llm)
+    _st.body_text_llm = _normalize_label_text(_st.body_text_llm)
+    _st.body_text_llm = _strip_footer(_st.body_text_llm)
     # JS 渲染站点（如 maths/physics）的正文容器可能只含导航骨架，但 meta description
     # 中保存了完整讲座摘要。即便 content_div 已命中，也要把 meta 摘要补进 body_text，
     # 保证 LLM/OCR 能读到主讲人/时间/地点等关键字段。
@@ -3731,8 +3756,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         if not _meta_head or _meta_head not in _body_flat:
             body_text = body_text + ' ' + ' '.join(meta_parts)
             body_text = re.sub(r'\s+', ' ', body_text).strip()
-            body_text_llm = body_text_llm + ' ' + ' '.join(meta_parts)
-            body_text_llm = re.sub(r'\s+', ' ', body_text_llm).strip()
+            _st.body_text_llm = _st.body_text_llm + ' ' + ' '.join(meta_parts)
+            _st.body_text_llm = re.sub(r'\s+', ' ', _st.body_text_llm).strip()
     ocr_text = ''
     # 提前从 URL 解析年份/完整日期（供 OCR 图片年份门控、CV1 校验、最终兜底共用）
     url_year = _year_from_url(url)
@@ -3862,7 +3887,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                         _pdf_text = '\n'.join(_pages_text)
                         if _pdf_text:
                             body_text = body_text + '\n' + _pdf_text
-                            body_text_llm = body_text_llm + '\n' + _pdf_text
+                            _st.body_text_llm = _st.body_text_llm + '\n' + _pdf_text
                             text = text + '\n' + _pdf_text
                         # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
                         # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
@@ -3896,7 +3921,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
-        nonlocal ocr_text, body_text, body_text_llm, text
+        nonlocal ocr_text, body_text, text
         candidates = imgs[:3] + _pdf_local_imgs
         if ocr_text or not candidates:
             return
@@ -3912,7 +3937,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             ocr_text = _ocr_char_fix(ocr_text)
             # 重新归一化标签（N1/N1e），使 OCR 文本里的中英文标签也能被正确扫描
             body_text = _normalize_label_text((body_text + ' ' + ocr_text).strip())
-            body_text_llm = _normalize_label_text((body_text_llm + ' ' + ocr_text).strip())
+            _st.body_text_llm = _normalize_label_text((_st.body_text_llm + ' ' + ocr_text).strip())
             text = _normalize_label_text((text + ' ' + ocr_text).strip())
 
     # 纯海报页（正文几乎为空 / 正文虽长但全是 CMS 元信息无结构化讲座标签）
@@ -5590,7 +5615,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 apply_llm_text_hybrid(result, body_text, url, _provider, _judge,
                                       default_year, publish_time, title_year, url_year,
                                       rich_only=not _USE_LLM_TEXT,
-                                      llm_text=body_text_llm,
+                                      llm_text=_st.body_text_llm,
                                       title_text=' '.join(
                                           x for x in (list_title or '', title or '')
                                           if x))
