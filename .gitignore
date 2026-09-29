@@ -4,6 +4,8 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+# pytest 运行时缓存（自动重建，仅加速 --lf；显式列出以免依赖它自带的 .gitignore）
+.pytest_cache/
 
 # ===== 运行时日志（不入库） =====
 *.log
