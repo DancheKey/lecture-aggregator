@@ -4192,6 +4192,7 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
         'publish_time': publish_time,
         'title_year': title_year,
         'loc_times': loc_times,
+        't': t,
         't_untrusted': t_untrusted,
         'pub_year_hint': _pub_year_hint,
     }
@@ -4467,7 +4468,7 @@ LABELS = (
 STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|[*＊•·]|主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))'
 
 
-def _extract_speaker(_st, result, title, imgs, vlm_fields, t_untrusted,
+def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
                      title_year, url_year, publish_time, default_year,
                      _do_ocr, college):
     """阶段 5b：主讲人全链抽取。
@@ -5912,6 +5913,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     publish_time = _t4['publish_time']
     title_year = _t4['title_year']
     loc_times = _t4['loc_times']
+    t = _t4['t']
     t_untrusted = _t4['t_untrusted']
     _pub_year_hint = _t4['pub_year_hint']
 
@@ -5922,7 +5924,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 否则会把书名号后的课程名误当主讲人（如汕尾校区海报 bio 中的「主讲《动物组织学与胚胎学》」）。
     # 汕尾校区教学工作坊海报用「主讲专家:」「专家姓名:」标注主讲人，一并纳入。
     speaker_label_found, multi_speakers = _extract_speaker(
-        _st, result, title, imgs, vlm_fields, t_untrusted,
+        _st, result, title, imgs, vlm_fields, t, t_untrusted,
         title_year, url_year, publish_time, default_year,
         _do_ocr, college)
     # --- 简历/简介（优先在文章正文区域内搜索）---
