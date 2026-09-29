@@ -3637,10 +3637,14 @@ class _OcrSt:
     __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text')
 
 
-def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
-    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
-    _st = _OcrSt()
-    soup = BeautifulSoup(html, 'html.parser')
+def _prep_doc_text(soup, list_title, _st):
+    """阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化。
+
+    自 _parse_detail_impl 拆出（渐进重构第 4 步，commit 5）。输入已建好的 soup
+    与列表页标题；文本状态写入 _st（text / body_text / body_text_llm，均已
+    N1 + 标签归一 + 去页脚）。返回 (title, meta_parts, content_div)；
+    meta_parts 出本函数即死（仅用于正文 meta 去重守卫的追加）。
+    """
     # 补丁4 (P0-5): 讲座日程表格就地替换为干净「字段：值」文本（消除原始表格噪声、
     # 修正字段顺序），须在后续 get_text / 字段抽取之前完成。
     _replace_schedule_tables_with_text(soup)
@@ -3758,7 +3762,18 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             _st.body_text = re.sub(r'\s+', ' ', _st.body_text).strip()
             _st.body_text_llm = _st.body_text_llm + ' ' + ' '.join(meta_parts)
             _st.body_text_llm = re.sub(r'\s+', ' ', _st.body_text_llm).strip()
-    _st.ocr_text = ''
+    return title, meta_parts, content_div
+
+
+def _collect_assets(soup, content_div, url, _st):
+    """阶段 3（资源收集）：URL 年月解析、正文图片收集、内嵌 PDF 提取与 _do_ocr。
+
+    自 _parse_detail_impl 拆出（渐进重构第 4 步）。图片收集严格限定在 content_div
+    内部（防 chrome 装饰图污染 OCR）。返回
+    (url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr)；
+    _do_ocr 为惰性 OCR 入口（闭包捕获 imgs/_pdf_local_imgs/_st，调用点在阶段 4/5），
+    调用约定保持无参 _do_ocr() 不变。
+    """
     # 提前从 URL 解析年份/完整日期（供 OCR 图片年份门控、CV1 校验、最终兜底共用）
     url_year = _year_from_url(url)
     url_date = _date_from_url(url)
@@ -3942,6 +3957,18 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             _st.body_text = _normalize_label_text((_st.body_text + ' ' + _st.ocr_text).strip())
             _st.body_text_llm = _normalize_label_text((_st.body_text_llm + ' ' + _st.ocr_text).strip())
             _st.text = _normalize_label_text((_st.text + ' ' + _st.ocr_text).strip())
+    return url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr
+
+
+def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
+    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
+    _st = _OcrSt()
+    soup = BeautifulSoup(html, 'html.parser')
+    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
+    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
+    _st.ocr_text = ''
+    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
+    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
 
     # 纯海报页（正文几乎为空 / 正文虽长但全是 CMS 元信息无结构化讲座标签）
     # body_text < 150 → 几乎可确认是海报页。阈值从 50 放宽至 150，覆盖 skc/abdn 等
