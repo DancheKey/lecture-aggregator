@@ -438,6 +438,11 @@ def main():
 
     # 给前端脚本打内容 hash 版本号，避免浏览器长期缓存旧 JS（见 stamp_script_version 注释）。
     stamp_script_version('stats.html', 'stats.js')
+    # app.js 已按职责分片，各分片都要打戳——漏掉的分片会永久冻结在旧版本上（静默无告警）。
+    # 顺序与 index.html 中的加载顺序一致（app.js 组装文件放在最后）。
+    for _part in ('app.core.js', 'app.state.js', 'app.computed.js', 'app.display.js',
+                  'app.social.js', 'app.data.js', 'app.admin.js'):
+        stamp_script_version('index.html', _part)
     stamp_script_version('index.html', 'app.js')
     stamp_script_version('index.html', 'footer-counter.js')
     stamp_script_version('stats.html', 'footer-counter.js')

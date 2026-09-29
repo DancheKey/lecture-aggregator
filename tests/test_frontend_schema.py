@@ -10,6 +10,7 @@ data/lectures.json 全库键并集 ∪ 派生键 {unitType, speakerKeys}
 （二者由 generate_frontend_data 与 server._attach_unit_types 统一加工，
   行为已有 tests/test_frontend_consistency.py 锁定）。
 """
+import glob
 import json
 import os
 import re
@@ -20,7 +21,12 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, 'scraper'))
 
 DERIVED_KEYS = {'unitType', 'speakerKeys', 'b'}
-_FRONTEND_FILES = ('site/index.html', 'site/app.js')
+# 前端已按职责分片（app.core/state/computed/display/social/data/admin），
+# 字段引用分散在各分片里——这里动态发现，避免再拆/再合时扫描清单过时导致假绿或假红。
+_FRONTEND_FILES = ('site/index.html',) + tuple(
+    sorted(os.path.relpath(p, _ROOT).replace('\\', '/')
+           for p in glob.glob(os.path.join(_ROOT, 'site', 'app*.js')))
+)
 _LREF_RE = re.compile(r'\bl\.([A-Za-z_][A-Za-z0-9_]*)')
 
 
