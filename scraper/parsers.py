@@ -3634,7 +3634,7 @@ class _OcrSt:
       外层变量而 _st.text 永久陈旧 → 下游读 _st.text 拿到旧值，且 OCR 文字被拼到
       「未移除邀请人标签」的正文上。故 store 必须逐点改为写属性。
     """
-    __slots__ = ('body_text_llm', 'ocr_text', 'body_text')
+    __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text')
 
 
 def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
@@ -3682,7 +3682,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 title = headings[0].get_text(strip=True)
         title = _clean_title(title)
 
-    text = soup.get_text(' ')
+    _st.text = soup.get_text(' ')
     # 美术学院等站点：正文可能是图片，但 meta description / og:description 里保存了结构化文字
     meta_parts = []
     for meta in (
@@ -3693,13 +3693,13 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         if meta and meta.get('content') and len(meta.get('content').strip()) > 3:
             meta_parts.append(meta.get('content').strip())
     if meta_parts:
-        text = text + ' ' + ' '.join(meta_parts)
-    text = re.sub(r'\s+', ' ', text).strip()
-    text = _n1_normalize(text)  # N1：全角标点统一为半角
-    text = _normalize_label_text(text)
+        _st.text = _st.text + ' ' + ' '.join(meta_parts)
+    _st.text = re.sub(r'\s+', ' ', _st.text).strip()
+    _st.text = _n1_normalize(_st.text)  # N1：全角标点统一为半角
+    _st.text = _normalize_label_text(_st.text)
     # 截断全校级页脚/导航噪声（如「关于华南师范大学 | 统一认证 | 移动平台」），
     # 否则 location/topic 等字段会一直吞到文末把页脚吃进来。
-    text = _strip_footer(text)
+    _st.text = _strip_footer(_st.text)
 
     # 提前定位正文容器；若正文几乎为空但含图片（如行知书院讲座海报），对图片 OCR 提取文字
     # 容器链保持原优先级（先到先得），但**首命中文本过短（<80字）时改取其余候选中最长者**：
@@ -3726,7 +3726,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 _best, _best_len = _el, len(_t)
     if _first is not None:
         content_div = _first if _first_len >= 80 else _best
-    _st.body_text = content_div.get_text(' ') if content_div else text
+    _st.body_text = content_div.get_text(' ') if content_div else _st.text
     _st.body_text = re.sub(r'\s+', ' ', _st.body_text).strip()
     # LLM 证据旁路：保留 CJK 间原始空格的版本，专供模型 A/B 与溯源闸门使用。
     # 折叠版 body_text 仍服务纯规则正则（「张三 教授」→「张三教授」剥离依赖），
@@ -3888,7 +3888,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                         if _pdf_text:
                             _st.body_text = _st.body_text + '\n' + _pdf_text
                             _st.body_text_llm = _st.body_text_llm + '\n' + _pdf_text
-                            text = text + '\n' + _pdf_text
+                            _st.text = _st.text + '\n' + _pdf_text
                         # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
                         # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
                         _is_poster_pdf = ('海报' in (_abs_pdf or '')) or (len(_st.body_text.strip()) < 150) or (content_div and bool(content_div.find('iframe')))
@@ -3920,8 +3920,11 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 pass  # PDF 下载失败时不阻塞
 
     def _do_ocr():
-        """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
-        nonlocal text
+        """对正文海报图片做 OCR，把识别文字并入 _st.text / _st.body_text（仅做一次）。
+
+        原为捕获外层 4 变量的闭包（nonlocal）；逐变量状态化后已无捕获，
+        可整体上提为独立函数（重构第 4 步的拆分前提）。
+        """
         candidates = imgs[:3] + _pdf_local_imgs
         if _st.ocr_text or not candidates:
             return
@@ -3938,7 +3941,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             # 重新归一化标签（N1/N1e），使 OCR 文本里的中英文标签也能被正确扫描
             _st.body_text = _normalize_label_text((_st.body_text + ' ' + _st.ocr_text).strip())
             _st.body_text_llm = _normalize_label_text((_st.body_text_llm + ' ' + _st.ocr_text).strip())
-            text = _normalize_label_text((text + ' ' + _st.ocr_text).strip())
+            _st.text = _normalize_label_text((_st.text + ' ' + _st.ocr_text).strip())
 
     # 纯海报页（正文几乎为空 / 正文虽长但全是 CMS 元信息无结构化讲座标签）
     # body_text < 150 → 几乎可确认是海报页。阈值从 50 放宽至 150，覆盖 skc/abdn 等
@@ -3969,7 +3972,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             _do_ocr()
 
     # R3 发布时间定位（标签 > 伴生词/class > 位置兜底）
-    publish_time, publish_level = _locate_publish_time(soup, content_div, _st.body_text, text)
+    publish_time, publish_level = _locate_publish_time(soup, content_div, _st.body_text, _st.text)
 
     # 从标题提取显式年份（标题兼容紧凑格式 20251204）；URL 年份/日期已在上方提前计算
     title_year = _year_from_text(title) if title else None
@@ -4225,7 +4228,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 任意位置+必须冒号：解决 collapsed text 中「303室主题：X」无边界空格的情况
     _topic_pat_a2 = rf'主题[：:]\s*(.+?){TOPIC_STOP}'
     _topic_pat_b = rf'(?:讲座主题|沙龙主题|工作坊主题|报告主题|讲座题目|题目|报告题目|演讲题目|Topic|Title)[：:]\s*(.+?){TOPIC_STOP}'
-    m = re.search(_topic_pat_a, text) or re.search(_topic_pat_a2, text) or re.search(_topic_pat_b, text)
+    m = re.search(_topic_pat_a, _st.text) or re.search(_topic_pat_a2, _st.text) or re.search(_topic_pat_b, _st.text)
     if m:
         tp = (m.group(1) or m.group(2) or m.group(3) or '').strip()
         # 清除首尾可能粘连的章节序号（「一、主题」式结构里值后可能带「二、」下一节序号）
@@ -4251,9 +4254,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # --- 地点（兼容「地点/课程地点/讲座地点/工作坊地点」+ 英文 Venue/Location）---
     # 值捕获用 [^\n]+?（不跨换行）+ LOC_STOP：单行场景靠字段标签截断，PDF/多行场景靠行尾截断。
     _loc_pat = rf'(?:课程地点|讲座地点|教学工作坊地点|地点|Venue|Location)[：:]\s*([^\n]+?){LOC_STOP}'
-    m = re.search(_loc_pat, text)
+    m = re.search(_loc_pat, _st.text)
     # 跳过空值或被下一个字段标签填充的伪匹配（如 seri 页面"地点: 时间:"）
-    _search_loc = text
+    _search_loc = _st.text
     while m:
         loc_val = m.group(1).strip()
         if loc_val and not re.match(
@@ -4268,7 +4271,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         m2 = re.search(
             rf'(?:课程地点|讲座地点|教学工作坊地点|地点|Venue|Location)[：:]\s*'
             r'([^\n]+?)(?:\n\n|\n[一二三四五六七八九十]|面向对象|主讲人简介|报名|联系方式)',
-            text)
+            _st.text)
         if m2 and m2.group(1).strip():
             m = m2
     if m:
@@ -4316,7 +4319,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         # 且值须含地点特征词、不得以行政区开头（纯联系地址无楼栋室厅词）。
         _ma = re.search(
             rf'(?<!联系)(?<!通讯)(?<!邮寄)(?<!邮政)(?:地址|Address)[：:]\s*([^\n]+?){LOC_STOP}',
-            text)
+            _st.text)
         if _ma:
             _v = re.sub(r'\s+', '', _ma.group(1)).strip()
             if re.search(r'(?:楼|室|厅|馆|栋|幢|教室|校区|校园|园区|会议室|报告厅|礼堂|场馆|实验室|中心)', _v) \
@@ -4327,7 +4330,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         # 不得再含日期/时刻/非地点词——否则「授课时间:2016年10月12日…13:30-17:30 收看方式:
         # 方式一:…教师在线学习中心…」会因串里的「中心」二字误命中特征词，整段被当地点。
         if not _loc_fb:
-            for _mt in re.finditer(rf'时间[：:]\s*([^\n]+?){LOC_STOP}', text):
+            for _mt in re.finditer(rf'时间[：:]\s*([^\n]+?){LOC_STOP}', _st.text):
                 _tv = _mt.group(1).strip()
                 if not re.search(r'\d\s*[：:]\s*\d', _tv):
                     continue
@@ -4351,24 +4354,24 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         if not _loc_fb:
             # 平台推断（含「会议链接」指向的平台域名 meeting.tencent.com / zoom.us 等）
             _plat = ''
-            if re.search(r'腾\s*讯\s*会\s*议|tencent', text, re.I):
+            if re.search(r'腾\s*讯\s*会\s*议|tencent', _st.text, re.I):
                 _plat = '腾讯会议'
-            elif re.search(r'zoom', text, re.I):
+            elif re.search(r'zoom', _st.text, re.I):
                 _plat = 'Zoom'
-            elif re.search(r'webex', text, re.I):
+            elif re.search(r'webex', _st.text, re.I):
                 _plat = 'Webex'
-            elif re.search(r'钉钉', text):
+            elif re.search(r'钉钉', _st.text):
                 _plat = '钉钉'
-            elif re.search(r'飞书', text):
+            elif re.search(r'飞书', _st.text):
                 _plat = '飞书'
-            elif re.search(r'腾讯课堂', text):
+            elif re.search(r'腾讯课堂', _st.text):
                 _plat = '腾讯课堂'
             # ① 显式「会议号 / 会议 ID：N」标签（物理学院旧页写法「会议链接：URL 会议 ID：xxx xxx xxx」，
             #    以及 Zoom「ZOOM会议ID：873 9784 1982」），统一并入 location。
             _mid = re.search(
                 r'(?:会议\s*号|会议\s*ID|会议\s*号码|腾讯会议\s*号|Meeting\s*ID|入会码|会议入会码)'
                 r'[：:\s]*(\d{3}[\s-]?\d{3}[\s-]?\d{3}|\d{3}[\s-]\d{4}[\s-]\d{4}|\d{9,12})',
-                text, re.I)
+                _st.text, re.I)
             if _mid and _plat:
                 _loc_fb = format_meeting_location(_plat, _mid.group(1))
             # ② 平台关键词紧邻号码（原 FB3，兜底①未命中的写法）
@@ -4376,7 +4379,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                 _mp = re.search(
                     r'(腾\s*讯\s*会\s*议|Zoom|zoom|钉钉|飞书|腾讯课堂|Webex|webex|瞩目)'
                     r'[^\d\n]{0,10}?'
-                    r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{9,11})', text)
+                    r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{9,11})', _st.text)
                 if _mp:
                     _p2 = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp.group(1), _mp.group(1))
                     _loc_fb = format_meeting_location(_p2, _mp.group(2))
@@ -4384,7 +4387,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         # 正文无「地点：」标签、页脚地址被 FB1 正确拒绝时，从议程/正文括号内取第一个
         # 含楼栋室厅特征的片段；值须短（<=20 字）且不得是行政区/人名碎片。
         if not _loc_fb:
-            for _mb in re.finditer(r'[（(]([^（）()]{2,20})[)）]', text):
+            for _mb in re.finditer(r'[（(]([^（）()]{2,20})[)）]', _st.text):
                 _bv = re.sub(r'\s+', '', _mb.group(1)).strip()
                 if not _bv or len(_bv) > 20:
                     continue
@@ -4424,17 +4427,17 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 这样即使标准带冒号正则未提取到姓名，也不会被 narrative fallback 用前句垃圾覆盖，
     # 后续 F4 可从 speakerBio 中安全提取姓名（如 CTLD 4411）。
     if re.search(r'(?:\[?\s*(?:主讲人简介|报告人简介|主讲人介绍|报告人介绍|主讲介绍|专家介绍)\s*\]?\s*[：:]'
-                 r'|\[\s*(?:主讲人简介|报告人简介|主讲人介绍|报告人介绍|主讲介绍|专家介绍)\s*\])', text):
+                 r'|\[\s*(?:主讲人简介|报告人简介|主讲人介绍|报告人介绍|主讲介绍|专家介绍)\s*\])', _st.text):
         speaker_label_found = True
     # 注意：排除「主讲人/报告人」后的「简介/简历/介绍」（主讲人简介=个人简介，不是主讲人标签），
     # 否则会把简介正文误当主讲人值。也排除「主讲《…》」（动宾短语，课程名非人名）。
     # F3 step1 — 邀请人分离（如「邀请人：范智杰」），提取为 inviter 并从待扫描文本移除，避免混入主讲人
     # 注意 text 已被压成单行（无换行），故不能用 (?:\n|$) 作终止符，否则会吞掉整段正文。
     # 改为遇到下一个字段标签即停，并限长 30 字防溢出（邀请人通常为短人名/单位）。
-    inv_m = re.search(r'(?:邀请人|Inviter)\s*[：:]\s*(.{1,30}?)(?=\s*(?:报告人|主讲人|主讲师|主讲|时间|地点|题目|摘要|讲座简介|简介|审核|编辑|发布|来源|[\n]|$))', text)
+    inv_m = re.search(r'(?:邀请人|Inviter)\s*[：:]\s*(.{1,30}?)(?=\s*(?:报告人|主讲人|主讲师|主讲|时间|地点|题目|摘要|讲座简介|简介|审核|编辑|发布|来源|[\n]|$))', _st.text)
     if inv_m:
         result['inviter'] = inv_m.group(1).strip()
-        text = text.replace(inv_m.group(0), ' ', 1)
+        _st.text = _st.text.replace(inv_m.group(0), ' ', 1)
 
     # 注意：长标签必须排在短标签前面（如「主讲嘉宾」>「主讲」），
     # 否则「主讲」先匹配导致值含后续标签文本（如"嘉宾：洪源远…"），最终被 F3 守卫清空。
@@ -4447,10 +4450,10 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         rf'|报告人(?!简介|简历)|讲座人(?!简介|简历)|演讲人|报告专家|专家姓名'
         rf'|Speaker|Presenter|Lecturer)\s*[：:]\s*(.+?){STOP}'
     )
-    m = re.search(speaker_pat, text)
+    m = re.search(speaker_pat, _st.text)
     # 跳过空值或被下一个字段标签填充的伪匹配；部分页面顶部有"报告人: 地点: 时间:"
     # 等空字段骨架，真实值在后续重复标签中（如 seri 11.html）。
-    _search_text = text
+    _search_text = _st.text
     while m:
         sp = m.group(1).strip()
         _skip = False
@@ -4727,7 +4730,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         )
         mt_title = None
         sp = None
-        m = re.search(_ocr_sp_pat, text)
+        m = re.search(_ocr_sp_pat, _st.text)
         if m:
             speaker_label_found = True
             sp = m.group(1).strip()
@@ -4861,7 +4864,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             r'(?:院士|教授|研究员|讲师|博士|特聘教授|特任教授|副教授|助理教授|助理研究员|副研究员|老师)?'
             r'[\u4e00-\u9fffA-Za-z0-9·，,、。.\s]{0,80})'
         )
-        _hdr_m = _HDR_SP.search(text)
+        _hdr_m = _HDR_SP.search(_st.text)
         if _hdr_m:
             _sp = re.sub(r'\s+', '', _hdr_m.group(1))
             _nm = re.match(r'^([\u4e00-\u9fff]{2,4})', _sp)
@@ -4881,11 +4884,11 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 单位由 _extract_affiliation 从姓名后残文提取（覆盖「姓名后紧跟单位」）。仅在不含 speaker 时触发。
     if not result['speaker']:
         _loose_m = re.search(
-            r'主讲人(?!简介|简历|介绍)\s*[：:]?\s*([\u4e00-\u9fff·]{2,4})', text)
+            r'主讲人(?!简介|简历|介绍)\s*[：:]?\s*([\u4e00-\u9fff·]{2,4})', _st.text)
         if _loose_m:
             _cand = _loose_m.group(1)
             # 先尝试提取单位（姓名后残文，含职称/散文，_extract_affiliation 只取单位关键词短语）
-            _after = text[_loose_m.end():_loose_m.end() + 150]
+            _after = _st.text[_loose_m.end():_loose_m.end() + 150]
             _aff2 = _extract_affiliation(_after)
             result['speaker'] = _cand          # 交由 F3 守卫清洗尾部职称碎片
             result['speakerSource'] = 'inline'
@@ -5332,7 +5335,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         result['speaker'] = ''
     if not result.get('speaker'):
         # 尝试从 text/topic/abstract 提取「特邀专家/特邀嘉宾/专家: 姓名」
-        for _src in (text, result.get('topic') or '', result.get('abstract') or ''):
+        for _src in (_st.text, result.get('topic') or '', result.get('abstract') or ''):
             if not _src:
                 continue
             _m2 = re.search(
