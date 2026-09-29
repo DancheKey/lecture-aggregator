@@ -4467,37 +4467,14 @@ LABELS = (
 STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|[*＊•·]|主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))'
 
 
-def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
-    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
-    _st = _OcrSt()
-    soup = BeautifulSoup(html, 'html.parser')
-    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
-    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
-    _st.ocr_text = ''
-    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
-    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
-
-    # 阶段 4（时间解析+result 初始化）：海报判定/VLM/时间回退链/R3 门控（原 L3973-4182 拆出）
-    _t4 = _resolve_time_init_result(soup, content_div, url, title, list_title,
-                                    college, campus, default_year, url_year,
-                                    imgs, _pdf_local_imgs, _pdf_poster_converted,
-                                    _do_ocr, _st)
-    result = _t4['result']
-    poster_only = _t4['poster_only']
-    vlm_fields = _t4['vlm_fields']
-    _vlm_sessions = _t4['vlm_sessions']
-    publish_time = _t4['publish_time']
-    title_year = _t4['title_year']
-    loc_times = _t4['loc_times']
-    t_untrusted = _t4['t_untrusted']
-    _pub_year_hint = _t4['pub_year_hint']
-
-    # 阶段 5a：题目/主题 + 地点（含 FB 兜底与 OCR 兜底）
-    _extract_topic_location(_st, result, title, loc_times)
-    # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
-    # 注意：排除「主讲《…》」（正文里「主讲《课程名》」是动宾短语，不是主讲人标签），
-    # 否则会把书名号后的课程名误当主讲人（如汕尾校区海报 bio 中的「主讲《动物组织学与胚胎学》」）。
-    # 汕尾校区教学工作坊海报用「主讲专家:」「专家姓名:」标注主讲人，一并纳入。
+def _extract_speaker(_st, result, title, imgs, vlm_fields, t_untrusted,
+                     title_year, url_year, publish_time, default_year,
+                     _do_ocr, college):
+    """阶段 5b：主讲人全链抽取。
+    标签探测/邀请人分离/主搜 while/骨架跳过/多重兜底/真名守卫/OCR 触发
+    （need_ocr 门控 + _do_ocr 调用改写 _st）/马院海报专用兜底。
+    返回 (speaker_label_found, multi_speakers) 供阶段 6 使用。
+    """
     speaker_label_found = False
     sp_title = None
     # 若正文存在「主讲人简介/报告人简介」标签，视为已找到主讲人标识；
@@ -5101,7 +5078,44 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                         result['speaker'] = cand          # 外籍姓名
                     elif _looks_like_real_name(cand):
                         result['speaker'] = cand
+    return speaker_label_found, multi_speakers
 
+
+def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
+    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
+    _st = _OcrSt()
+    soup = BeautifulSoup(html, 'html.parser')
+    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
+    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
+    _st.ocr_text = ''
+    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
+    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
+
+    # 阶段 4（时间解析+result 初始化）：海报判定/VLM/时间回退链/R3 门控（原 L3973-4182 拆出）
+    _t4 = _resolve_time_init_result(soup, content_div, url, title, list_title,
+                                    college, campus, default_year, url_year,
+                                    imgs, _pdf_local_imgs, _pdf_poster_converted,
+                                    _do_ocr, _st)
+    result = _t4['result']
+    poster_only = _t4['poster_only']
+    vlm_fields = _t4['vlm_fields']
+    _vlm_sessions = _t4['vlm_sessions']
+    publish_time = _t4['publish_time']
+    title_year = _t4['title_year']
+    loc_times = _t4['loc_times']
+    t_untrusted = _t4['t_untrusted']
+    _pub_year_hint = _t4['pub_year_hint']
+
+    # 阶段 5a：题目/主题 + 地点（含 FB 兜底与 OCR 兜底）
+    _extract_topic_location(_st, result, title, loc_times)
+    # --- 主讲人（兼容「主讲人/主讲师/报告人/主讲嘉宾/演讲人/主讲」）---
+    # 注意：排除「主讲《…》」（正文里「主讲《课程名》」是动宾短语，不是主讲人标签），
+    # 否则会把书名号后的课程名误当主讲人（如汕尾校区海报 bio 中的「主讲《动物组织学与胚胎学》」）。
+    # 汕尾校区教学工作坊海报用「主讲专家:」「专家姓名:」标注主讲人，一并纳入。
+    speaker_label_found, multi_speakers = _extract_speaker(
+        _st, result, title, imgs, vlm_fields, t_untrusted,
+        title_year, url_year, publish_time, default_year,
+        _do_ocr, college)
     # --- 简历/简介（优先在文章正文区域内搜索）---
     # body_text 已在函数开头构建（含可能的 OCR 文本）
 
