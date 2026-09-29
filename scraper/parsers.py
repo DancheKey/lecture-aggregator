@@ -3634,7 +3634,7 @@ class _OcrSt:
       外层变量而 _st.text 永久陈旧 → 下游读 _st.text 拿到旧值，且 OCR 文字被拼到
       「未移除邀请人标签」的正文上。故 store 必须逐点改为写属性。
     """
-    __slots__ = ('body_text_llm',)
+    __slots__ = ('body_text_llm', 'ocr_text')
 
 
 def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
@@ -3758,7 +3758,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             body_text = re.sub(r'\s+', ' ', body_text).strip()
             _st.body_text_llm = _st.body_text_llm + ' ' + ' '.join(meta_parts)
             _st.body_text_llm = re.sub(r'\s+', ' ', _st.body_text_llm).strip()
-    ocr_text = ''
+    _st.ocr_text = ''
     # 提前从 URL 解析年份/完整日期（供 OCR 图片年份门控、CV1 校验、最终兜底共用）
     url_year = _year_from_url(url)
     url_date = _date_from_url(url)
@@ -3921,24 +3921,24 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 text / body_text（仅做一次）。"""
-        nonlocal ocr_text, body_text, text
+        nonlocal body_text, text
         candidates = imgs[:3] + _pdf_local_imgs
-        if ocr_text or not candidates:
+        if _st.ocr_text or not candidates:
             return
         raw = ' '.join(_img_to_text(img) for img in candidates)
         if raw:
             # 清理 OCR 中常见的顶部/底部噪声
-            ocr_text = _clean_ocr_text(raw)
+            _st.ocr_text = _clean_ocr_text(raw)
             # N1（全角→半角 + N1a 去 CJK 内部空格）：OCR 文本也应归一化，确保标签可扫描。
             # 注意：OCR 路径用 keep_word_boundaries=True（O3a 修正，保留词块边界空格供 O6d-2.5 定位）；
             # HTML 正文路径走默认 False（删除所有 CJK 空格，避免破坏姓名/标签识别）。
-            ocr_text = _n1_normalize(ocr_text, keep_word_boundaries=True)
+            _st.ocr_text = _n1_normalize(_st.ocr_text, keep_word_boundaries=True)
             # N1d：仅对 OCR 文本在三类数字上下文内纠正易混字符（O/o→0、l/I/|→1、;→:、〇→0）
-            ocr_text = _ocr_char_fix(ocr_text)
+            _st.ocr_text = _ocr_char_fix(_st.ocr_text)
             # 重新归一化标签（N1/N1e），使 OCR 文本里的中英文标签也能被正确扫描
-            body_text = _normalize_label_text((body_text + ' ' + ocr_text).strip())
-            _st.body_text_llm = _normalize_label_text((_st.body_text_llm + ' ' + ocr_text).strip())
-            text = _normalize_label_text((text + ' ' + ocr_text).strip())
+            body_text = _normalize_label_text((body_text + ' ' + _st.ocr_text).strip())
+            _st.body_text_llm = _normalize_label_text((_st.body_text_llm + ' ' + _st.ocr_text).strip())
+            text = _normalize_label_text((text + ' ' + _st.ocr_text).strip())
 
     # 纯海报页（正文几乎为空 / 正文虽长但全是 CMS 元信息无结构化讲座标签）
     # body_text < 150 → 几乎可确认是海报页。阈值从 50 放宽至 150，覆盖 skc/abdn 等
@@ -4003,7 +4003,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     if poster_only:
         result['hasPosterImage'] = True
     # OCR 成功提取到文字则打标记（poster_only 分支在此统一标记，避免其在 result 初始化前访问）
-    if poster_only and ocr_text:
+    if poster_only and _st.ocr_text:
         result['ocrExtracted'] = True
         result['imageParseMethod'] = 'ocr'
     elif poster_only and vlm_fields:
@@ -4073,12 +4073,12 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 正文未解析出日期且含海报图片：OCR 后重试（仅补缺失，不覆盖已有）
     if not t and imgs and not vlm_fields:
         _do_ocr()
-        if ocr_text:
+        if _st.ocr_text:
             result['imageParseMethod'] = 'ocr'
             result['hasPosterImage'] = True
-            t_ocr = parse_cn_time(ocr_text, default_year, publish_time=publish_time,
+            t_ocr = parse_cn_time(_st.ocr_text, default_year, publish_time=publish_time,
                                   title_year=title_year, url_year=url_year)
-            tm = re.search(r'(?:讲座)?时间[：:\s]*(.{0,40})', ocr_text)
+            tm = re.search(r'(?:讲座)?时间[：:\s]*(.{0,40})', _st.ocr_text)
             if tm:
                 t_label = parse_cn_time(tm.group(1).strip(), default_year,
                                         publish_time=publish_time, title_year=title_year, url_year=url_year)
@@ -4297,10 +4297,10 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 
     # LOC-OCR: 主正则未命中/值为空且 OCR 文本可用时，在原始 ocr_text 中
     # 以「地点/地点标签后 2-40 字」宽松搜索（多行场景下不需要 LOC_STOP 的 $ 锚点）。
-    if not result.get('location') and ocr_text:
+    if not result.get('location') and _st.ocr_text:
         loc_ocr = re.search(
             r'(?:课程地点|讲座地点|教学工作坊地点|地点'
-            r'|Venue|Location)[：:]\s*([^：:\n]{2,40})', ocr_text)
+            r'|Venue|Location)[：:]\s*([^：:\n]{2,40})', _st.ocr_text)
         if loc_ocr and len(loc_ocr.group(1).strip()) >= 2:
             result['location'] = loc_ocr.group(1).strip()
 
@@ -4926,9 +4926,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
                    or not result.get('speaker') or not result.get('topic'))
     # T3：讲座类标题 + 含图 + (时间不可信/缺失 或 地点缺失) → OCR，海报日期更具体则覆盖 lectureStart
     need_ocr = bool(imgs) and (missing_key or (title_is_lecture and (t_untrusted or not result.get('location'))))
-    if need_ocr and not ocr_text and not vlm_fields:
+    if need_ocr and not _st.ocr_text and not vlm_fields:
         _do_ocr()
-        if ocr_text:
+        if _st.ocr_text:
             result['ocrExtracted'] = True
             result['imageParseMethod'] = 'ocr'
             result['hasPosterImage'] = True
@@ -4937,10 +4937,10 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 覆盖条件收敛为「OCR 日期与现有不同 / OCR 补出了时间 / OCR 补出了结束时间」，
     # 避免把正文已正确的时间误覆盖。必须解析 ocr_text 本身，而非整页 text——
     # 整页 text 里排在前的发布日/通知日会先被命中，导致「日期相同」误判、海报日期无法覆盖。
-    if ocr_text and title_is_lecture:
-        t_ocr = parse_cn_time(ocr_text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
+    if _st.ocr_text and title_is_lecture:
+        t_ocr = parse_cn_time(_st.ocr_text, default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
         # 优先取 OCR 中「时间」标签后的片段（更精准，避免海报其他处日期干扰）
-        tm = re.search(r'(?:讲座)?时间[：:\s]*(.{0,40})', ocr_text)
+        tm = re.search(r'(?:讲座)?时间[：:\s]*(.{0,40})', _st.ocr_text)
         if tm:
             t_label = parse_cn_time(tm.group(1).strip(), default_year, publish_time=publish_time, title_year=title_year, url_year=url_year)
             if t_label:
@@ -4955,8 +4955,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 
     # OCR 海报无「主讲人:」标签时，按「姓名 + 职称」行兜底抽取主讲人（如「曾碧卿 /教授」），
     # 并顺带取姓名行后的单位作为 affiliation。仅当尚未识别到主讲人才启用，避免覆盖标签式结果。
-    if not result.get('speaker') and ocr_text:
-        _sp, _aff, _src = _extract_speaker_from_ocr(ocr_text)
+    if not result.get('speaker') and _st.ocr_text:
+        _sp, _aff, _src = _extract_speaker_from_ocr(_st.ocr_text)
         if _sp:
             result['speaker'] = _sp
             if _aff and not result.get('speakerAffiliation'):
@@ -5144,8 +5144,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             result['abstract'] = abstract
 
     # 兜底：若正文来自图片 OCR 且没有明确「摘要」标签，把 OCR 文本清理后作为摘要
-    if ocr_text and not result.get('abstract'):
-        clean = _clean_ocr_text(ocr_text)
+    if _st.ocr_text and not result.get('abstract'):
+        clean = _clean_ocr_text(_st.ocr_text)
         clean = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', clean).strip()
         clean = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', clean).strip()
         clean = re.split(rf'(?:{NOISE_MARKERS})', clean)[0].strip()
@@ -5182,7 +5182,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             result['abstract'] = clean
 
     # 图片 OCR 场景：标题通常就是海报主标题，若未提取到 topic，用标题去掉日期前缀作为主题
-    if ocr_text and not result.get('topic') and title:
+    if _st.ocr_text and not result.get('topic') and title:
         topic_candidate = re.sub(r'^(20\d{6}\s+|20\d{2}[-/]\d{2}[-/]\d{2}\s+|\d{1,2}月\d{1,2}日\s*)', '', title).strip()
         # 去掉末尾的"学术讲座"/"讲座"等通用词，保留具体主题
         topic_candidate = re.sub(r'(?:教授|老师|先生|女士)\s*(学术讲座|讲座|报告|讲坛)$', '', topic_candidate).strip()
@@ -5240,8 +5240,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
 
     # 图片 OCR 场景下，「简介」二字常被标题误触发，导致 speakerBio 变成整段海报文字。
     # 若 speakerBio 来自 OCR 且包含时间/地点等结构化信息，说明不是真正的主讲人简介，清空。
-    if ocr_text and result.get('speakerBio'):
-        if result['speakerBio'] in ocr_text or ocr_text in result['speakerBio']:
+    if _st.ocr_text and result.get('speakerBio'):
+        if result['speakerBio'] in _st.ocr_text or _st.ocr_text in result['speakerBio']:
             if any(k in result['speakerBio'] for k in ['时间', '地点', '时闻', '日期']):
                 result['speakerBio'] = ''
 
@@ -5271,7 +5271,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
             else:
                 # OCR 场景下，叙事兜底容易把主讲人简介当成讲座摘要；
                 # 若已有 OCR 文本且未提取到明确摘要标签，宁可让 abstract 留空。
-                if not (ocr_text and len(ocr_text) > 50):
+                if not (_st.ocr_text and len(_st.ocr_text) > 50):
                     # 标题伪摘要守卫（文学院短预告页根因）：叙事兜底拿到的「摘要」
                     # 若以页面标题（讲座标题/系列名，去空白、统一全/半角标点后）开头，
                     # 实为「标题 + 字段标签」粘连块（如「华南师范大学…专题系列讲座
@@ -5406,8 +5406,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 从 OCR 提取主讲人简介（若有 OCR 文本且已识别到 speaker 但尚无 bio）。
     # 原限制 poster_only 导致 body_text 略超 50 字符时整条 bio 提取被跳过（如 lswh 海报页）。
     # 加 not result.get('speakerBio') 守卫，避免覆盖 HTML 正文路径已正确提取的 bio。
-    if ocr_text and result.get('speaker') and not result.get('speakerBio'):
-        _bio_ocr = _extract_bio_from_ocr(ocr_text, result['speaker'])
+    if _st.ocr_text and result.get('speaker') and not result.get('speakerBio'):
+        _bio_ocr = _extract_bio_from_ocr(_st.ocr_text, result['speaker'])
         if _bio_ocr:
             result['speakerBio'] = _bio_ocr
             # 仅当 abstract 以 speaker 名字开头且长度接近 bio 时才判定为重复并清空
@@ -5548,7 +5548,7 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
         result['newsFilterBypass'] = True
 
     # CV1/CV3 交叉校验（仅打 note，CV3 明显异常时修正）
-    cv_notes = _cross_validate(result, url_date, ocr_text, publish_time, url_year)
+    cv_notes = _cross_validate(result, url_date, _st.ocr_text, publish_time, url_year)
     if cv_notes:
         result['timeNote'] = (result.get('timeNote') or '') + ';' + ';'.join(cv_notes)
 
