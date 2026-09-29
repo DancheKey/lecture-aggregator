@@ -3960,16 +3960,20 @@ def _collect_assets(soup, content_div, url, _st):
     return url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr
 
 
-def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
-    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
-    _st = _OcrSt()
-    soup = BeautifulSoup(html, 'html.parser')
-    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
-    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
-    _st.ocr_text = ''
-    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
-    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
+def _resolve_time_init_result(soup, content_div, url, title, list_title,
+                              college, campus, default_year, url_year,
+                              imgs, _pdf_local_imgs, _pdf_poster_converted,
+                              _do_ocr, _st):
+    """阶段 4（时间解析 + result 初始化）：海报判定 / VLM 预填 / 时间五级回退 /
+    R3 发布日门控 / result 字典初始化。
 
+    自 _parse_detail_impl 拆出（渐进重构第 4 步）。返回 dict，键：
+      result / poster_only / vlm_fields / vlm_sessions / publish_time /
+      title_year / loc_times / t_untrusted / pub_year_hint
+    （vlm_sessions 即 _vlm_sessions，阶段 6 多场拆分消费；pub_year_hint 即
+    _pub_year_hint，供 detect_multi_session 年份补全。t / publish_level /
+    url_date 仅段内使用，不外传。）
+    """
     # 纯海报页（正文几乎为空 / 正文虽长但全是 CMS 元信息无结构化讲座标签）
     # body_text < 150 → 几乎可确认是海报页。阈值从 50 放宽至 150，覆盖 skc/abdn 等
     # HTML 包裹层有文本但无「时间:/地点:/主讲人:」标签的页面，避免坐等失败。
@@ -4180,6 +4184,43 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     if t:
         result['lectureStart'] = t['start'].isoformat(sep=' ')
         result['lectureEnd'] = t['end'].isoformat(sep=' ') if t.get('end') else None
+    return {
+        'result': result,
+        'poster_only': poster_only,
+        'vlm_fields': vlm_fields,
+        'vlm_sessions': _vlm_sessions,
+        'publish_time': publish_time,
+        'title_year': title_year,
+        'loc_times': loc_times,
+        't_untrusted': t_untrusted,
+        'pub_year_hint': _pub_year_hint,
+    }
+
+
+def _parse_detail_impl(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
+    # 解闭包第 1 步（body_text_llm）：见类文档的三动作纪律。
+    _st = _OcrSt()
+    soup = BeautifulSoup(html, 'html.parser')
+    # 阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化（原 L3644-3760 拆出）
+    title, meta_parts, content_div = _prep_doc_text(soup, list_title, _st)
+    _st.ocr_text = ''
+    # 阶段 3（资源收集）：URL 年月、图片收集、内嵌 PDF 提取、_do_ocr（原 L3775-3957 拆出）
+    url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr = _collect_assets(soup, content_div, url, _st)
+
+    # 阶段 4（时间解析+result 初始化）：海报判定/VLM/时间回退链/R3 门控（原 L3973-4182 拆出）
+    _t4 = _resolve_time_init_result(soup, content_div, url, title, list_title,
+                                    college, campus, default_year, url_year,
+                                    imgs, _pdf_local_imgs, _pdf_poster_converted,
+                                    _do_ocr, _st)
+    result = _t4['result']
+    poster_only = _t4['poster_only']
+    vlm_fields = _t4['vlm_fields']
+    _vlm_sessions = _t4['vlm_sessions']
+    publish_time = _t4['publish_time']
+    title_year = _t4['title_year']
+    loc_times = _t4['loc_times']
+    t_untrusted = _t4['t_untrusted']
+    _pub_year_hint = _t4['pub_year_hint']
 
     # 字段标签前瞻——每个字段只取到下一个标签为止
     # 美术学院常见标签：讲座题目、主讲嘉宾、学术主持、主办单位、上一篇/下一篇
