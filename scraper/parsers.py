@@ -1288,27 +1288,9 @@ def _load_vlm_configs():
     return cfgs
 
 
-def _load_text_llm_configs():
-    """返回文本 LLM 通道配置（仅 Agnes，用于网页正文结构化提取）。无 key 返回空列表。
-
-    与 _load_vlm_configs() 区别：海报视觉允许 Agnes→GLM 双通道兜底；
-    而网页文本解析按用户约定仅用 Agnes（Agnes 不可用则直接回落规则，不滚 GLM）。
-    """
-    env = _load_dotenv()
-    akey = _os.environ.get('AGNES_API_KEY') or env.get('AGNES_API_KEY')
-    if not akey:
-        return []
-    return [{
-        'name': 'agnes',
-        'api_key': akey,
-        'model': (_os.environ.get('AGNES_MODEL') or env.get('AGNES_MODEL') or 'agnes-3.0-flash'),
-        'base_url': (_os.environ.get('AGNES_BASE_URL') or env.get('AGNES_BASE_URL')
-                     or 'https://api.agnes-ai.cn/v1/chat/completions'),
-    }]
-
-
-# 主动限速（统一到 llm_provider._throttle 令牌桶）：文本默认 20 RPM、VLM 默认 10 RPM，可经环境变量覆盖
-_LLM_RPM = int(_os.environ.get('LLM_RPM') or 20)
+# 主动限速（统一到 llm_provider._throttle 令牌桶）：VLM 默认 10 RPM，可经环境变量覆盖。
+# 文本通道（SCNU_LLM_TEXT 双轨）走 hybrid.apply_llm_text_hybrid，限速由 llm_provider 内部按
+# 通道名分桶处理，本文件不再持有文本侧 RPM 常量（2026-09-30 清理文本通道死代码时移除）。
 _VLM_RPM = int(_os.environ.get('VLM_RPM') or 10)
 
 
@@ -1549,37 +1531,6 @@ def _parse_vlm_datetime(s, default_year, publish_time, title_year, url_year):
     return None
 
 
-# ---------------------------------------------------------------------------
-# LLM 调用全局限速（应对 Agnes 免费层 RPM 上限：文本 20 RPM、视觉 1K/20·2K/10·3K+ /1）
-# 用 threading.Lock + 上次调用时间戳保证「任意两次调用间隔 ≥ min_interval」，
-# 跨源并发（scraper 的 max_workers）也安全。视觉比文本更严，单独限流器留出余量。
-# ---------------------------------------------------------------------------
-_LLM_TEXT_RLOCK = _threading.Lock()
-_LLM_TEXT_RLAST = [0.0]
-_VLM_RLOCK = _threading.Lock()
-_VLM_RLAST = [0.0]
-
-
-def _llm_text_rate_limit(min_interval=3.0):
-    """文本 LLM 调用限速（≈20 RPM，留余量）。"""
-    with _LLM_TEXT_RLOCK:
-        _now = _time.time()
-        _wait = min_interval - (_now - _LLM_TEXT_RLAST[0])
-        if _wait > 0:
-            _time.sleep(_wait)
-        _LLM_TEXT_RLAST[0] = _time.time()
-
-
-def _vlm_rate_limit(min_interval=6.0):
-    """视觉 VLM 调用限速（保守，应对 1K/20·2K/10·3K+/1 RPM）。"""
-    with _VLM_RLOCK:
-        _now = _time.time()
-        _wait = min_interval - (_now - _VLM_RLAST[0])
-        if _wait > 0:
-            _time.sleep(_wait)
-        _VLM_RLAST[0] = _time.time()
-
-
 # 文本 LLM 增强总开关（SCNU_LLM_TEXT=1：全字段双轨——规则 + 模型A 并行识别，
 # 分歧调模型B 裁决）。默认 '1' 开启（2026-09-23 用户裁定：LLM 不得默认关闭，
 # 须默认参与全字段双轨并发挥作用；SCNU_LLM_TEXT=0 可显式退回纯规则，
@@ -1647,43 +1598,6 @@ def _vlm_extract_fields(img_urls, cfgs):
     return None
 
 
-def _llm_extract_text_fields(body_text, url):
-    """用 Agnes 文本通道从讲座正文提取结构化字段（网页文本解析第一优先级）。返回 dict 或 None。
-
-    复用 _vlm_try_one_provider（通用发送函数，message 内容决定文本/视觉模式）。
-    仅走 Agnes（_load_text_llm_configs），Agnes 不可用则回落规则解析（由调用方处理）。
-    负缓存：全失败时写入负标记（模型返回空→硬负常驻；网络/限流失败→软负短 TTL），避免重复烧 token。
-    """
-    from llm_provider import _is_neg, _neg_expired, _neg_marker
-    cfgs = _load_text_llm_configs()
-    if not cfgs or not body_text or len(body_text) < 30:
-        return None
-    key = _hash.md5(body_text.encode('utf-8')).hexdigest()
-    cached = _vlm_cache_get(key)
-    if _is_neg(cached):
-        if not _neg_expired(cached):
-            return None  # 负缓存命中（未过期），跳过模型调用
-        # 已过期：当作未命中，继续重试
-    elif cached is not None and _vlm_fields_useful(cached):
-        return cached
-    # 截断避免超长（多数讲座正文 < 2000 字，超长反而引入页脚噪声）
-    _txt = body_text[:3500]
-    # 国内域名直连（scnu 与 agnes-ai.cn 均不绕代理，与 scraper 一致）
-    message = [{"role": "user", "content": LLM_TEXT_PROMPT.replace('{text}', _txt)}]
-    got_empty_any = False
-    for cfg in cfgs:
-        fields, got_empty = _vlm_try_one_provider(message, cfg, None, rpm=_LLM_RPM)
-        if got_empty:
-            got_empty_any = True
-        if fields:
-            _vlm_cache_set(key, fields)
-            return fields
-    # 全失败：网络/限流失败→软负；模型返回空→硬负
-    _vlm_cache_set(key, _neg_marker(hard=got_empty_any,
-                                    reason='empty' if got_empty_any else 'error'))
-    return None
-
-
 def _edit_distance(a, b):
     """计算两个字符串的 Levenshtein 距离（编辑距离）。"""
     if len(a) < len(b):
@@ -1698,162 +1612,6 @@ def _edit_distance(a, b):
             cur.append(min(cur[-1] + 1, prev[j + 1] + 1, prev[j] + cost))
         prev = cur
     return prev[-1]
-
-
-def _correct_speaker_from_title(result):
-    """用 title/listTitle 中明确出现的人名校正 LLM 可能认错的 speaker。
-
-    LLM 对生僻/形近字容易误判（如把「李骥」读成「李骁」、「郑炜」读成「郑焱」）。
-    标题/列表标题一般是发布者手工录入，可信度更高；当标题里的人名与
-    LLM 给出的 speaker「同姓且仅少量差异」时，采用标题里的写法。
-    支持 title 中常见的「姓名+职称」模式（如「郑炜教授」→ 提取「郑炜」）。
-    """
-    speaker = (result.get('speaker') or '').strip()
-    if not speaker or len(speaker) < 2:
-        return
-    # 只处理中文姓名（2-4 个汉字）
-    if not re.match(r'^[\u4e00-\u9fff]{2,4}$', speaker):
-        return
-
-    # 从 title / listTitle 收集候选姓名
-    candidates = set()
-    # 常见职称/后缀，用于从「姓名+职称」中提取姓名
-    titles = ('教授', '副教授', '讲师', '研究员', '副研究员', '高级工程师',
-              '博士', '院士', '专家', '主任', '院长', '所长', '博导', '硕导')
-    # 常见单位后缀，用于识别「单位名+姓名」结构
-    unit_suffixes = ('大学', '学院', '研究院', '研究所', '研究中心', '实验室',
-                     '师大', '理工', '科大', '医科', '农大', '林大')
-    for src in (result.get('title') or '', result.get('listTitle') or ''):
-        if not src:
-            continue
-        # 1. 显式人名标记：主讲人/报告人/主讲/报告人[:：]X...
-        for pat in (r'(?:主讲|报告人|主讲人|报告)[:：\s]*([\u4e00-\u9fff]{2,4})',
-                    r'(?:主讲人|报告人)\s*[:：]\s*([\u4e00-\u9fff]{2,4})'):
-            for m in re.finditer(pat, src):
-                w = m.group(1)
-                if w and len(w) >= 2 and w not in titles:
-                    candidates.add(w)
-        # 2. 「单位名+姓名+职称」中提取姓名（避免 greedy 吞掉单位名）
-        #    如「中国科学技术大学郑炜教授」→ 提取「郑炜」
-        unit_pat = '(?:' + '|'.join(re.escape(u) for u in unit_suffixes) + r')\s*([\u4e00-\u9fff]{2,4})\s*(?:' + '|'.join(re.escape(t) for t in titles) + ')'
-        for m in re.finditer(unit_pat, src):
-            w = m.group(1)
-            if w and len(w) >= 2:
-                candidates.add(w)
-        # 3. 兜底：连续 2-4 个汉字，过滤常见非人名词
-        for m in re.finditer(r'[\u4e00-\u9fff]{2,4}', src):
-            w = m.group()
-            if w in ('讲座', '报告', '学术', '论坛', '通知', '公告', '简介',
-                     '时间', '地点', '报告人', '主讲人', '主持人', '嘉宾',
-                     '教授', '副教授', '博士', '院士', '中国科学技术大学',
-                     '华南师范大学', '北京师范大学', '华中科技大学',
-                     '西安交通大学', '中山大学', '清华大学', '北京大学'):
-                continue
-            if len(w) >= 2:
-                candidates.add(w)
-    if not candidates:
-        return
-    # LLM 结果已在候选中，无需校正
-    if speaker in candidates:
-        return
-    # 找「同姓且长度相近、编辑距离 <=1」的候选
-    best = None
-    best_score = 0.0
-    for c in candidates:
-        if len(c) < 2 or c[0] != speaker[0]:
-            continue
-        if abs(len(c) - len(speaker)) > 1:
-            continue
-        dist = _edit_distance(c, speaker)
-        if dist <= 1:
-            import difflib
-            score = difflib.SequenceMatcher(None, c, speaker).ratio()
-            if score > best_score:
-                best_score = score
-                best = c
-    if best and best != speaker:
-        result['speaker'] = best
-
-
-def _apply_llm_text_to_result(result, f, default_year, publish_time, title_year, url_year):
-    """把 LLM 文本提取结果合并进 result：LLM 优先填充非空字段，规则结果做守卫。
-
-    - 文本类字段（speaker/location/abstract/speakerBio/topic 等）：LLM 非空即采用，否则保留规则值
-    - 时间：LLM 与规则同日期 → 采用 LLM（含精确时刻，更准）；不同日期 → 保留规则（规则基于多源更稳）
-    - 不覆盖 title（规则已妥善处理系列名/列表标题）
-    """
-    f = _normalize_vlm_keys(f)
-    if isinstance(f, list):
-        f = f[0] if f and isinstance(f[0], dict) else None
-    if not isinstance(f, dict):
-        return
-
-    _NOISE = ('null', 'None', '无', '暂无', 'N/A', 'na', '-', '—')
-    def _prefer(field, llm_val):
-        _cur = (result.get(field) or '').strip()
-        _lv = (llm_val or '').strip()
-        if _lv and _lv not in _NOISE:
-            result[field] = _lv
-        # 否则保留 _cur（规则值）
-
-    _prefer('topic', f.get('topic'))
-    _prefer('speaker', f.get('speaker'))
-    _prefer('speakerTitle', f.get('speakerTitle'))
-    _prefer('speakerAffiliation', f.get('speakerAffiliation'))
-    _prefer('location', f.get('location'))
-    _prefer('abstract', f.get('abstract'))
-    _prefer('speakerBio', f.get('speakerBio'))
-
-    # speaker 与 title/listTitle 交叉校验：LLM 容易把形近字/生僻字搞错
-    #（如把「李骥」认成「李骁」）。标题通常是人工发布的，可信度高于 LLM 推断。
-    _correct_speaker_from_title(result)
-
-    # 时间策略（严格对齐）：时间字段是讲座排序/时间门/去重的关键，不能轻信 LLM。
-    # 规则时间来自 URL 路径/页面权威标签，可信度高；LLM 易把发布日、报名截止、旧引用
-    # 错当讲座时间。因此只让 LLM 在「规则时间仅是个占位日期」时补充精确时刻/日。
-    # 采用条件：
-    #  1. LLM 给出的年份 == 规则已有 lectureStart 的年份（防年份幻觉）；
-    #  2. 规则 lectureStart 缺失，或规则 lectureStart 时刻为占位 00:00（说明只有日期）。
-    # 满足时：用 LLM 的日期+时刻覆盖；否则完全保留规则时间。
-    _rule_start = result.get('lectureStart')
-    _rule_year = None
-    _rule_has_time = False
-    if _rule_start:
-        try:
-            _rs = datetime.datetime.fromisoformat(str(_rule_start))
-            _rule_year = _rs.year
-            _rule_has_time = not (_rs.hour == 0 and _rs.minute == 0 and _rs.second == 0)
-        except Exception:
-            pass
-
-    _ls_raw = f.get('lectureStart') or f.get('start')
-    if _ls_raw and str(_ls_raw).strip() not in ('', 'null', 'None'):
-        try:
-            _ls = datetime.datetime.fromisoformat(str(_ls_raw).replace('T', ' ').replace('Z', ''))
-            _llm_year = _ls.year
-            _now = datetime.datetime.now()
-            _year_lo, _year_hi = 2018, _now.year + 2
-            if _year_lo <= _llm_year <= _year_hi:
-                # 条件1：规则无时间；或规则有年份且 LLM 年份一致；或规则连年份都没有
-                _year_match = (_rule_year is None) or (_rule_year == _llm_year)
-                # 条件2：规则时间是占位 00:00 或缺失（允许 LLM 补精确时刻/日）
-                _rule_is_placeholder = (_rule_start is None) or (not _rule_has_time)
-                if _year_match and _rule_is_placeholder:
-                    result['lectureStart'] = _ls.isoformat(sep=' ')
-                    _le_raw = f.get('lectureEnd') or f.get('end')
-                    if _le_raw and str(_le_raw).strip() not in ('', 'null', 'None'):
-                        try:
-                            _le = datetime.datetime.fromisoformat(
-                                str(_le_raw).replace('T', ' ').replace('Z', ''))
-                            if _year_lo <= _le.year <= _year_hi:
-                                result['lectureEnd'] = _le.isoformat(sep=' ')
-                        except Exception:
-                            pass
-                # 否则：规则已有具体时间或年份不一致 → 完全保留规则时间
-        except Exception:
-            pass  # LLM 时间解析失败 → 保留规则值
-
-    result['llmTextEnhanced'] = True
 
 
 def _vlm_try_one_provider(message, cfg, proxies, rpm=None):
