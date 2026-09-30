@@ -245,6 +245,11 @@ def write_html(cands, stats):
             _esc(c['evidence'] or '—'), _esc(c['title'] or '（空）'),
             _esc(c['url']), _esc(c['url']))
 
+    res_html = ''.join(card(c, i + 1, 'res') for i, c in enumerate(res))
+    if not res:
+        res_html = ('<div class="none">✅ 当前库内已无职称残片——'
+                    '此前 9 条已按源页原文全部修正。</div>')
+
     html = """<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -280,6 +285,7 @@ def write_html(cands, stats):
   .row3{font-size:12px;color:#5a6570;margin-top:6px}
   .row4{margin-top:6px;font-size:12px;word-break:break-all}
   .row4 a{color:#1d6fb8;text-decoration:none}.row4 a:hover{text-decoration:underline}
+  .none{background:#eef7f1;border:1px dashed #2f7a4d;border-radius:8px;padding:13px 16px;color:#2f7a4d;font-size:14px}
   .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}
   .plan{background:#fff;border:1px solid #e3e6ea;border-radius:10px;padding:15px 17px;position:relative}
   .plan.rec{border:2px solid #2f7a4d}
@@ -345,7 +351,7 @@ cnt();
         len(cands), __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M'),
         len(res), len(unk), len(ok),
         PLANS_HTML,
-        len(res), ''.join(card(c, i + 1, 'res') for i, c in enumerate(res)),
+        len(res), res_html,
         len(unk), ''.join(card(c, i + 1, 'unk') for i, c in enumerate(unk)),
         len(ok), ''.join(card(c, i + 1, 'ok') for i, c in enumerate(ok)),
         len(res))
