@@ -2873,14 +2873,22 @@ def _clean_title(t):
         t = t[1:-1].strip()
     # ���掉前导的 | （分割符残留）、尾部孤括号
     t = re.sub(r'^[｜|\s]+', '', t).strip()
+    # 括号必须按「全/半角合并计数」判断是否配对：源站常见半角开 + 全角闭的混用
+    # （经管学院 2020~2021 实测「(地点已更改）学术讲座」「(时间更改）华师经英seminar第30期」
+    #  「(时间更改）“华师经英Seminar”第十期」）。分字符集计数会把这类平衡括号误判成
+    # 「开括号未闭合」，整串截空 → title 为空，卡片无标题。
+    _n_open = t.count('(') + t.count('（')
+    _n_close = t.count(')') + t.count('）')
     # 仅当末尾右括号「多于」左括号（真正孤立的右括号）时才清理，
     # 避免去掉「主题（主讲人）」这种带匹配左括号的闭合括号（原 <= 会误删平衡括号）。
-    if t.endswith(')') and t.count('(') < t.count(')'):
+    if t.endswith(')') and _n_open < _n_close:
         t = t[:-1].strip()
-    if t.endswith('）') and t.count('（') < t.count('）'):
+        _n_close -= 1
+    if t.endswith('）') and _n_open < _n_close:
         t = t[:-1].strip()
+        _n_close -= 1
     # 源 listTitle 偶发末尾开括号缺右括号（如「(王建朗教授」「（张三教授」），截掉残缺主讲人段。
-    if (t.count('(') > t.count(')')) or (t.count('（') > t.count('）')):
+    if _n_open > _n_close:
         _idx = max(t.rfind('('), t.rfind('（'))
         if _idx != -1:
             t = t[:_idx].strip()
