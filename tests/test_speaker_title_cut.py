@@ -65,6 +65,15 @@ class CutPointTest(unittest.TestCase):
         """em/9240 实证：多出的「工」来自标签「工作单位」而非职称。"""
         self.assertEqual(cut('赵蕙心工作单位'), 3)
 
+    def test_08_助教授(self):
+        """em/4025 实证：源页写「丁洁瑶助教授」（港澳台/日式职称）。
+
+        只收「助理」时切点落在「教授」(位置 4)，姓名变「丁洁瑶助」。
+        库内 3 条佐证该职称真实存在（罗子俊 ×2、易君健）。
+        """
+        self.assertEqual(cut('丁洁瑶助教授'), 3)
+        self.assertEqual(cut('丁洁瑶助教授山东大学'), 3)
+
 
 class NoFalseCutTest(unittest.TestCase):
     """反向约束一：真人名不得被误切。"""
