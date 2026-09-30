@@ -130,3 +130,13 @@ jobs:
       # 比不剥更坏（会凭空造出错误的合并目标）。
       - name: Run speaker normalization tests
         run: python tests/test_speaker_normalize.py
+      # 2026-09-30 引入：讲者姓名尾部的**行政职务**残片（讲者归一第三处缺口）。
+      # 落库「刘维泉副」+ 单位「总裁(杭州乒乓智能技术有限公司」（括号不闭合），
+      # 根因是解析器职称表只含学术职称、不含职务，而姓名按 4→2 字截取后
+      # 「刘维泉副总裁」只剩职务首字，锚 $ 的整体成词正则匹配不到。
+      # 本套件用**源页正文原文**做 fixture（手写合成样本会因标签全半角不同而走
+      # 不同分支，把真实缺陷掩盖掉），并锁死一条反向约束：职务词绝不能进
+      # _TITLE_ALT_FULL——那张表作用于单位串，会把「中国心理学会副理事长，浙江大学…」
+      # 截断成「中国心理学会」。
+      - name: Run speaker duty-suffix tests
+        run: python tests/test_speaker_duty_suffix.py
