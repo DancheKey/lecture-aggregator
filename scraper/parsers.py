@@ -2956,7 +2956,8 @@ def _locate_publish_time(soup, content_div, body_text, full_text):
     return None, 0
 
 
-# ===== 补丁4 (P0-5): HTML 讲座日程表格 → 字段文本行 =====
+# ===== 规则 R4（表格归一）: HTML 讲座日程表格 → 字段文本行 =====
+# 历史编号「补丁 4 (P0-5)」，完整修复台账见 docs/PARSING_RULES.md「历史修复台账」章。
 def _despace_cjk_digits(s):
     """去除 CJK/数字/冒号/连字符内部被排版插入的空格，如「1 1 月 15 日」→「11月15日」、
     「穆 肃 教授」→「穆肃教授」、「9 : 0 0」→「9:00」。仅删相邻 CJK/数字/标点间的空格，
@@ -2967,7 +2968,7 @@ def _despace_cjk_digits(s):
 
 
 def _replace_schedule_tables_with_text(soup):
-    """补丁4 (P0-5): 将 HTML 讲座日程表格**就地替换**为干净的「字段：值」文本节点。
+    """规则 R4（表格归一）: 将 HTML 讲座日程表格**就地替换**为干净的「字段：值」文本节点。
 
     为什么是替换而非追加：
     1) 原始表格单元格含排版空格（「1 1 月 15 日」「第 86 期」），其中 workshop 编号
@@ -3358,7 +3359,7 @@ def _prep_doc_text(soup, list_title, _st):
     N1 + 标签归一 + 去页脚）。返回 (title, meta_parts, content_div)；
     meta_parts 出本函数即死（仅用于正文 meta 去重守卫的追加）。
     """
-    # 补丁4 (P0-5): 讲座日程表格就地替换为干净「字段：值」文本（消除原始表格噪声、
+    # 规则 R4（表格归一）: 讲座日程表格就地替换为干净「字段：值」文本（消除原始表格噪声、
     # 修正字段顺序），须在后续 get_text / 字段抽取之前完成。
     _replace_schedule_tables_with_text(soup)
     # 列表页标题通常就是干净的讲座标题，优先使用；否则回退到详情页 h1/title
@@ -4964,7 +4965,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         if topic_candidate and len(topic_candidate) > 3:
             result['topic'] = topic_candidate
 
-    # 补丁9/10: 标题/list_title 含「第N讲：具体主题」/「（第N场）：具体主题」结构
+    # 规则 R9/R10（题名去期号）: 标题/list_title 含「第N讲：具体主题」/「（第N场）：具体主题」结构
     # （skc 砺儒讲坛、CTLD 通识课等），当正文中未提取到独立 topic，或提取的 topic
     # 被截断（如缺闭合括号）时，从 list_title/title 提取冒号后的具体内容补全 topic。
     # 注意：topic 写入「讲座题目」，title 始终保留为 listTitle（系列名+期号+题目+主讲人），
@@ -5255,7 +5256,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
     # io 源正文常把"时间:... 地点:... 诚挚邀请..."粘到摘要尾部
     _abs = result.get('abstract') or ''
     if _abs:
-        # 补丁5: 摘要被站点面包屑/导航文本污染（如物理学院「首页 » 科学研究 » 学术活动 »
+        # 规则 R5（摘要污染清空）: 摘要被站点面包屑/导航文本污染（如物理学院「首页 » 科学研究 » 学术活动 »
         # 学术报告 » 日期 … 来源：… 点击：收藏本文」整段，或含「当前位置：」导航），
         # 这类整页正文被误当摘要且不含真实讲座摘要内容 → 直接清空。
         if ('»' in _abs or '首页' in _abs or '当前位置' in _abs
@@ -5579,7 +5580,7 @@ def _finalize_record(soup, url, title, list_title, _st, result,
                 result['hasPosterImage'] = True
             break
 
-    # ---- 单讲座：角色标签白名单提取（补丁8）----
+    # ---- 单讲座：角色标签白名单提取（规则 R8）----
     # 到达此处说明未走多讲座拆分 / 连写多主讲人 / VLM 多场路径，即单场讲座。
     # 从正文提取主持人/点评人/评议人/与谈人/嘉宾（报告人已是 speaker，不重复）。
     # 仅白名单精确匹配，避免把主持人误当第二主讲人。
@@ -5683,7 +5684,7 @@ _BLOCK_FIELD_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点
                       r'\d{4}年|\d{1,2}月\d{1,2}日|上午|下午|晚上))')
 
 
-# 角色标签白名单（补丁8）：精确匹配，互不交叉。
+# 角色标签白名单（规则 R8）：精确匹配，互不交叉。
 # 仅「报告人/主讲人/主讲」算 speaker（拆分触发依据）；「主持人」算 host；
 # 点评人/评议人/评论人→reviewer；与谈人/对谈人→discussant；嘉宾/特邀嘉宾→guest。
 # 各角色用完整词精确匹配，前置 (?:...) 非捕获组确保「点评人」不匹配「报告人/主持人」；
@@ -5702,7 +5703,7 @@ _ROLE_STOP = (r'(?=\s*(?:报告人|主讲人|主讲|主持人|点评人|评议�
 
 
 def _extract_role(text, role):
-    """按角色白名单从文本提取某角色的值（补丁8）。返回清洗后的姓名/字符串。
+    """按角色白名单从文本提取某角色的值（规则 R8）。返回清洗后的姓名/字符串。
 
     仅用白名单精确匹配，绝不使用「人[：:]」等模糊模式，避免把「主持人」误当主讲人。
     提取到的值先剥尾部职称碎片再取姓名；无法识别为姓名时保留原值（如机构组合名）。
@@ -7716,7 +7717,7 @@ _SPEAKER_NAME_RE = re.compile(
 
 
 def _extract_bio_map(full_text, speakers=None):
-    """补丁7 姓名锚定简介：从全文「简介」区按「姓名，」切分多人物简介，返回 {姓名: 简介正文}。
+    """规则 R7（姓名锚定简介）: 从全文「简介」区按「姓名，」切分多人物简介，返回 {姓名: 简介正文}。
 
     适用场景：多讲座页有一段「主讲人简介：\\n卢晓中，…\\n赵淦森，…」式共享并列简介（如 CTLD
     4407/4409）。若不锚定，split_record_by_sessions 会把整段共享简介误归因到某一场（最后一块），
@@ -7779,7 +7780,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
     base_title = base.get('title') or ''
     # 去掉 base 地点中的线上会议片段，得到纯线下会场；多场各自拼接本场会议号（2026-09-23）
     _base_phys = _strip_meeting_fragment(base.get('location') or '')
-    # 补丁7：收集各场次主讲人姓名，用于在共享简介区按姓名锚定各自的简介
+    # 规则 R7（姓名锚定简介）：收集各场次主讲人姓名，用于在共享简介区按姓名锚定各自的简介
     _all_speakers = []
     for s in sessions:
         if s.get('speaker'):
@@ -7830,7 +7831,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
         rec['sourceCount'] = 1 if i == 0 else 0
         rec['notes'] = []
         block = s.get('block', '')
-        # 角色标签白名单（补丁8）：逐块精确提取 host/reviewer/discussant/guest。
+        # 角色标签白名单（规则 R8）：逐块精确提取 host/reviewer/discussant/guest。
         # 仅 speaker 标签参与模式F 拆分触发（在 detect_multi_session 内判定），
         # host/reviewer/discussant/guest 不计入。
         for _role, _field in (('host', 'host'), ('reviewer', 'reviewer'),
@@ -7838,7 +7839,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
             _v = _extract_role(block, _role)
             if _v:
                 rec[_field] = _v
-        # splitMode 落库标记（补丁2）：沿用本场次所属候选打出的模式
+        # splitMode 落库标记（规则 R2）：沿用本场次所属候选打出的模式
         if s.get('splitMode'):
             rec['splitMode'] = s['splitMode']
         # 会议号 + 平台：优先逐块「会议号/Meeting ID」标签；否则用全文「腾讯会议专题X:ID」映射。
@@ -8017,7 +8018,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
         if _abs_m:
             _a = _abs_m.group(1).strip()
             if len(_a) > 5:
-                # 补丁5: 块内摘要若仍吸入面包屑/导航（极少数整页噪声漏入块），清空
+                # 规则 R5（摘要污染清空）: 块内摘要若仍吸入面包屑/导航（极少数整页噪声漏入块），清空
                 if ('»' in _a or '首页' in _a or '当前位置' in _a):
                     _a = ''
                 else:
@@ -8029,7 +8030,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
                 if len(_a) > 5:
                     rec['abstract'] = _a
         if _bio_map:
-            # 补丁7：检测到共享并列简介（如 CTLD 4409「主讲人简介：卢晓中，…赵淦森，…」）→
+            # 规则 R7（姓名锚定简介）：检测到共享并列简介（如 CTLD 4409「主讲人简介：卢晓中，…赵淦森，…」）→
             # 清空 base 共享继承并按本场 speaker 姓名锚定，避免整段被误归因到某一场。
             rec['speakerBio'] = ''
             _sp = rec.get('speaker') or ''
@@ -8121,8 +8122,10 @@ def split_record_by_sessions(base, sessions, full_text=''):
         if not rec.get('speaker'):
             rec['speaker'] = prev_speaker or ''
             rec['speakerAffiliation'] = prev_aff or ''
-        # 补丁16（闸6）：丢弃「无 speaker 且无 topic」的退化场次（如表格/海报解析残次行、
+        # 规则 R16（退化场次丢弃，闸6）：丢弃「无 speaker 且无 topic」的退化场次（如表格/海报解析残次行、
         # 主通知误拆出的占位块），保留至少有主讲人或题目的有效场次。
+        # 适用边界：只拦「多场拆分过程产生的退化行」；本来就是单场、只是无主讲人的记录
+        # （如年会/赛事/工作坊）不受此规则约束。
         if not (rec.get('speaker') or '').strip() and not (rec.get('topic') or '').strip():
             continue
         out.append(rec)
