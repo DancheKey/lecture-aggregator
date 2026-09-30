@@ -69,6 +69,8 @@ data/.vlm_cache.json
 # 访问量报告：均为 scripts/gen_visits_trend.py / gen_visits_report.py 的生成产物，
 # 随时可重跑得到，不入库（2026-09-29 起整个 reports/ 都不再入库——过程性审计/验证
 # 报告属内部资料，公网仓库只保留 Pages + Action 必需文件）。数据来源 data/visits.json 本身已 gitignore。
+# ⚠ 例外（2026-09-30）：访问量趋势报告已移出本目录、出片到 site/visits-trend.html
+#   （用户要求公网可看；此前 reports/ 与 daily.yml 的 git add 冲突导致 run #136 整班失败）。
 reports/
 
 # ===== scripts/ 一次性修复/审计脚本（内部资料，不入库） =====

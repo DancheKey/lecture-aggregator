@@ -1,42 +1,7 @@
-# -*- coding: utf-8 -*-
-"""生成「站点访问量趋势」报告（自包含单文件 HTML）。
-
-数据来源：
-    data/visits_history.json —— 由 scripts/fetch_visits_snapshot.py 每日在 CI 中
-    从 busuanzi 取快照累积而成（用 GET，不计数）。这是公网访问量的**唯一本地备份**：
-    busuanzi 是外部免费服务，一旦它失效，累计访问量只在这个台账里还活着。
-
-与旧的 gen_visits_report.py 的区别（勿混淆）：
-    gen_visits_report.py  ← data/visits.json（**本地 localhost** 访问，server.py 写的）
-    本脚本                ← data/visits_history.json（**公网**访问，CI 从 busuanzi 取的）
-
-输出：
-    site/visits-trend.html（2026-09-30 起从 reports/ 移入 site/）
-    - 自包含：数据内联进页面，双击即可查看（file:// 也行），无需服务器、不依赖 CDN。
-    - **公网可见**：GitHub Pages 发布 site/ 目录，线上地址
-      https://danchekey.github.io/lecture-aggregator/visits-trend.html
-      （用户要求在公网直接看访问量趋势，故随 site/ 入库、随 Pages 部署）。
-    - 报告页面无 CSP meta，内联 SVG/JS 可直接运行；唯一外链是回主站的 <a>。
-
-图表设计（2026-09-14 改版）：
-    手绘内联 SVG 双轴组合图 —— 累计访客折线（左轴，按数据 min/max 自适应）
-    + 日增访客柱（右轴）。缺失快照的日期保留在横轴上，不假装连续。
-    范围切换与表格展开由前端 JS 完成，故 file:// 直接打开也能交互。
-
-用法：
-    python scripts/gen_visits_trend.py
-"""
-import os
-import json
-import datetime
-
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HISTORY_PATH = os.path.join(ROOT, 'data', 'visits_history.json')
-OUT_DIR = os.path.join(ROOT, 'site')
-OUT_PATH = os.path.join(OUT_DIR, 'visits-trend.html')
-
-# 样式与脚本单独放常量：避免大括号与 f-string 冲突
-CSS = """
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>站点访问量趋势</title><style>
 *{box-sizing:border-box}
 body{margin:0;padding:36px 20px 48px;background:#F7F7F5;color:#2C2C2A;
   font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
@@ -83,10 +48,58 @@ tbody tr:hover td{background:#FCFCFB}
 .note{color:#B45309;font-size:13.5px}
 .foot{margin-top:28px;color:#888780;font-size:13.5px;line-height:1.8}
 .foot b{color:#5F5E5A;font-weight:600}
-"""
+</style></head>
+<body><div class="wrap">
 
-JS = """var META = {};
-var SNAPS = [];
+<header>
+  <h1>站点访问量趋势</h1>
+  <p class="sub">数据来源 busuanzi（公网）每日快照 · 覆盖
+    2026-09-10 至 2026-09-29</p>
+  <p class="subline">生成于 2026-09-30 08:46 · 台账 data/visits_history.json</p>
+</header>
+
+<div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v">1,473</div><div class="kpi-d">较前次 +13</div></div><div class="kpi"><div class="kpi-k">累计访客数</div><div class="kpi-v">1,191</div><div class="kpi-d">较前次 +6</div></div><div class="kpi"><div class="kpi-k">日均新增访客</div><div class="kpi-v">15</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">20 天</div><div class="kpi-d">快照 17 条，缺 3 天</div></div></div>
+
+<div class="card">
+  <div class="toolbar">
+    <div class="ranges">
+      <button type="button" data-range="7" class="on">近 7 天</button>
+      <button type="button" data-range="30">近 30 天</button>
+      <button type="button" data-range="0">全部</button>
+    </div>
+    <div class="legend">
+      <span><i class="sw-line"></i>累计访客数</span>
+      <span><i class="sw-bar"></i>日新增访客</span>
+    </div>
+  </div>
+  <div id="chart"></div>
+</div>
+
+<div class="tb-head">
+  <h2>快照明细</h2>
+  <span class="sub">共 <span id="tcount">0</span> 条</span>
+  <button type="button" id="toggleRows">展开全部</button>
+</div>
+<div class="tbl">
+  <table>
+    <thead><tr><th>日期</th><th>累计访问次数</th><th>累计访客数</th>
+    <th>日新增访问</th><th>日新增访客</th><th class="l">备注</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="foot">
+  <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。<br>
+  <b>累计访客数</b>：按访客去重，同一访客重复访问不再累加。<br>
+  「日新增」= 本次快照 − 上一条记录；负值一律记 0 并标注（意味着对方计数器重置）。
+  每日由 CI 用 GET 取数（不计数，避免污染统计）。<br>
+  横轴按<b>真实日期等距</b>绘制，缺失快照的日期不跳过、不补 0，避免把断档画成连续趋势；
+  左轴按数据范围自适应（累计值不从 0 起算，否则曲线会被压平贴顶）。
+</div>
+
+</div>
+<script>var META = {"source": "busuanzi（公网）", "siteUrl": "https://danchekey.github.io/lecture-aggregator/", "generatedAt": "2026-09-30 08:46"};
+var SNAPS = [{"date": "2026-09-10", "capturedAt": "2026-09-10T23:03:44+08:00", "site_pv": 1087, "site_uv": 897, "page_pv": 1065, "page_uv": 896, "uv_delta": 0, "pv_delta": 0, "note": "基线（无前序记录，日增不可用）"}, {"date": "2026-09-12", "capturedAt": "2026-09-12T08:33:59+08:00", "site_pv": 1119, "site_uv": 925, "page_pv": 1097, "page_uv": 924, "uv_delta": 28, "pv_delta": 32, "note": ""}, {"date": "2026-09-13", "capturedAt": "2026-09-13T14:23:39+08:00", "site_pv": 1142, "site_uv": 938, "page_pv": 1120, "page_uv": 937, "uv_delta": 13, "pv_delta": 23, "note": ""}, {"date": "2026-09-14", "capturedAt": "2026-09-14T14:39:48+08:00", "site_pv": 1165, "site_uv": 956, "page_pv": 1143, "page_uv": 955, "uv_delta": 18, "pv_delta": 23, "note": ""}, {"date": "2026-09-15", "capturedAt": "2026-09-15T14:39:11+08:00", "site_pv": 1180, "site_uv": 966, "page_pv": 1158, "page_uv": 965, "uv_delta": 10, "pv_delta": 15, "note": ""}, {"date": "2026-09-16", "capturedAt": "2026-09-16T14:26:09+08:00", "site_pv": 1192, "site_uv": 977, "page_pv": 1170, "page_uv": 975, "uv_delta": 11, "pv_delta": 12, "note": ""}, {"date": "2026-09-17", "capturedAt": "2026-09-17T14:41:58+08:00", "site_pv": 1206, "site_uv": 986, "page_pv": 1184, "page_uv": 985, "uv_delta": 9, "pv_delta": 14, "note": ""}, {"date": "2026-09-18", "capturedAt": "2026-09-18T14:15:55+08:00", "site_pv": 1252, "site_uv": 1023, "page_pv": 1228, "page_uv": 1022, "uv_delta": 37, "pv_delta": 46, "note": ""}, {"date": "2026-09-19", "capturedAt": "2026-09-19T14:14:56+08:00", "site_pv": 1259, "site_uv": 1028, "page_pv": 1235, "page_uv": 1026, "uv_delta": 5, "pv_delta": 7, "note": ""}, {"date": "2026-09-20", "capturedAt": "2026-09-20T14:38:29+08:00", "site_pv": 1319, "site_uv": 1076, "page_pv": 1293, "page_uv": 1074, "uv_delta": 48, "pv_delta": 60, "note": ""}, {"date": "2026-09-21", "capturedAt": "2026-09-21T14:37:54+08:00", "site_pv": 1333, "site_uv": 1088, "page_pv": 1307, "page_uv": 1087, "uv_delta": 12, "pv_delta": 14, "note": ""}, {"date": "2026-09-22", "capturedAt": "2026-09-22T14:43:55+08:00", "site_pv": 1352, "site_uv": 1101, "page_pv": 1326, "page_uv": 1100, "uv_delta": 13, "pv_delta": 19, "note": ""}, {"date": "2026-09-23", "capturedAt": "2026-09-23T14:25:07+08:00", "site_pv": 1360, "site_uv": 1107, "page_pv": 1334, "page_uv": 1105, "uv_delta": 6, "pv_delta": 8, "note": ""}, {"date": "2026-09-24", "capturedAt": "2026-09-24T14:40:37+08:00", "site_pv": 1420, "site_uv": 1159, "page_pv": 1394, "page_uv": 1158, "uv_delta": 52, "pv_delta": 60, "note": ""}, {"date": "2026-09-25", "capturedAt": "2026-09-25T04:33:15+08:00", "site_pv": 1431, "site_uv": 1169, "page_pv": 1405, "page_uv": 1168, "uv_delta": 10, "pv_delta": 11, "note": ""}, {"date": "2026-09-28", "capturedAt": "2026-09-28T15:16:13+08:00", "site_pv": 1460, "site_uv": 1185, "page_pv": 1434, "page_uv": 1184, "uv_delta": 16, "pv_delta": 29, "note": ""}, {"date": "2026-09-29", "capturedAt": "2026-09-29T14:43:20+08:00", "site_pv": 1473, "site_uv": 1191, "page_pv": 1447, "page_uv": 1190, "uv_delta": 6, "pv_delta": 13, "note": ""}];
 
 var L = 58, R = 636, T = 26, B = 206;
 var RANGE = 7, EXPANDED = false;
@@ -285,136 +298,5 @@ document.getElementById('toggleRows').addEventListener('click', function () {
 
 renderChart();
 renderTable();
-"""
-
-
-def load_snapshots():
-    if not os.path.exists(HISTORY_PATH):
-        return []
-    try:
-        with open(HISTORY_PATH, encoding='utf-8') as f:
-            return json.load(f).get('snapshots') or []
-    except (ValueError, OSError) as e:
-        print(f'[warn] 台账读取失败：{type(e).__name__}: {e}')
-        return []
-
-
-def parse_date(s):
-    try:
-        return datetime.date.fromisoformat(s)
-    except (ValueError, TypeError):
-        return None
-
-
-def build_kpis(snaps):
-    first, last = snaps[0], snaps[-1]
-    d0, d1 = parse_date(first.get('date')), parse_date(last.get('date'))
-    span_days = (d1 - d0).days if (d0 and d1) else 0
-    uv0, uv1 = int(first.get('site_uv') or 0), int(last.get('site_uv') or 0)
-    per_day = round((uv1 - uv0) / span_days) if span_days > 0 else None
-
-    def delta(v):
-        return f'较前次 +{int(v or 0):,}'
-
-    cards = [
-        ('累计访问次数', f"{int(last.get('site_pv') or 0):,}", delta(last.get('pv_delta'))),
-        ('累计访客数', f'{uv1:,}', delta(last.get('uv_delta'))),
-        ('日均新增访客', f'{per_day:,}' if per_day is not None else '—',
-         '按首末快照间隔计' if span_days > 0 else '间隔不足，暂不可算'),
-        ('时间跨度', f'{span_days + 1} 天',
-         f'快照 {len(snaps)} 条' + (
-             f'，缺 {span_days + 1 - len(snaps)} 天' if span_days + 1 > len(snaps) else '')),
-    ]
-    return ''.join(
-        f'<div class="kpi"><div class="kpi-k">{k}</div>'
-        f'<div class="kpi-v">{v}</div><div class="kpi-d">{d}</div></div>'
-        for k, v, d in cards)
-
-
-def main():
-    snaps = load_snapshots()
-    if not snaps:
-        print('[skip] 台账为空，未生成报告（先跑 fetch_visits_snapshot.py）')
-        return
-
-    os.makedirs(OUT_DIR, exist_ok=True)
-    first, last = snaps[0], snaps[-1]
-    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-
-    data_js = (
-        'var META = ' + json.dumps({
-            'source': 'busuanzi（公网）',
-            'siteUrl': 'https://danchekey.github.io/lecture-aggregator/',
-            'generatedAt': now,
-        }, ensure_ascii=False) + ';\n'
-        'var SNAPS = ' + json.dumps(snaps, ensure_ascii=False) + ';'
-    )
-    script = JS.replace('var META = {};\nvar SNAPS = [];', data_js)
-
-    html = f"""<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>站点访问量趋势</title><style>{CSS}</style></head>
-<body><div class="wrap">
-
-<header>
-  <h1>站点访问量趋势</h1>
-  <p class="sub">数据来源 busuanzi（公网）每日快照 · 覆盖
-    {first.get('date', '')} 至 {last.get('date', '')}</p>
-  <p class="subline">生成于 {now} · 台账 data/visits_history.json</p>
-</header>
-
-<div class="kpis">{build_kpis(snaps)}</div>
-
-<div class="card">
-  <div class="toolbar">
-    <div class="ranges">
-      <button type="button" data-range="7" class="on">近 7 天</button>
-      <button type="button" data-range="30">近 30 天</button>
-      <button type="button" data-range="0">全部</button>
-    </div>
-    <div class="legend">
-      <span><i class="sw-line"></i>累计访客数</span>
-      <span><i class="sw-bar"></i>日新增访客</span>
-    </div>
-  </div>
-  <div id="chart"></div>
-</div>
-
-<div class="tb-head">
-  <h2>快照明细</h2>
-  <span class="sub">共 <span id="tcount">0</span> 条</span>
-  <button type="button" id="toggleRows">展开全部</button>
-</div>
-<div class="tbl">
-  <table>
-    <thead><tr><th>日期</th><th>累计访问次数</th><th>累计访客数</th>
-    <th>日新增访问</th><th>日新增访客</th><th class="l">备注</th></tr></thead>
-    <tbody id="tbody"></tbody>
-  </table>
-</div>
-
-<div class="foot">
-  <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。<br>
-  <b>累计访客数</b>：按访客去重，同一访客重复访问不再累加。<br>
-  「日新增」= 本次快照 − 上一条记录；负值一律记 0 并标注（意味着对方计数器重置）。
-  每日由 CI 用 GET 取数（不计数，避免污染统计）。<br>
-  横轴按<b>真实日期等距</b>绘制，缺失快照的日期不跳过、不补 0，避免把断档画成连续趋势；
-  左轴按数据范围自适应（累计值不从 0 起算，否则曲线会被压平贴顶）。
-</div>
-
-</div>
-<script>{script}</script>
+</script>
 </body></html>
-"""
-
-    tmp = OUT_PATH + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
-        f.write(html)
-    os.replace(tmp, OUT_PATH)
-    print(f'[done] {os.path.relpath(OUT_PATH, ROOT)}（{len(snaps)} 条快照，'
-          f'{len(html) / 1024:.1f} KB）')
-
-
-if __name__ == '__main__':
-    main()

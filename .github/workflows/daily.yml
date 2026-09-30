@@ -91,8 +91,8 @@ jobs:
       - name: 同步静态数据源并生成前端切片
         run: python scripts/generate_frontend_data.py
 
-      # 访问量趋势报告：随仓库入库（不在公网页面展示，Pages 只发布 site/），
-      # 便于任意机器 pull 后直接查看历史趋势。
+      # 访问量趋势报告（2026-09-30 起出片到 site/visits-trend.html）：随 site/ 入库、
+      # 随 Pages 部署公网可见（用户要求直接在公网看趋势），下方 git add -A site 会带上它。
       - name: 生成访问量趋势报告
         run: python scripts/gen_visits_trend.py
 
@@ -113,16 +113,6 @@ jobs:
           name: 字段体检报告
           path: reports/audit_fields_report.html
           retention-days: 30
-
-      # 访问量趋势报告（2026-09-30）：与体检报告同命运——reports/ 整目录不入库，
-      # 但仍需可查（此前它靠 git add 入库，是 run #136 失败的直接原因，已改为 artifact）。
-      - name: 上传访问量趋势报告（保留 30 天）
-        uses: actions/upload-artifact@v4
-        with:
-          name: 访问量趋势报告
-          path: reports/visits-trend.html
-          retention-days: 30
-          if-no-files-found: ignore
 
       # 信息源健康检查（2026-09-18）：主动探测 sources.yaml 中每个栏目 URL 的可达性。
       # 为什么需要它：scraper.fetch() 对 4xx/5xx 是「返回 None 不抛异常」，collect_links(None)
@@ -172,21 +162,18 @@ jobs:
            # 未暂存改动，后续同步步骤报 exit 128 中止 → 整班 cron 失败并连带跳过
            # Pages 部署（当日新讲座与访问量快照全丢）。
           # data/ 与 site/ 在 CI 中全部由脚本产出，目录级纳入不会误收 gitignore 内容；
-          # 报告单独条件加入，避免其生成失败时 pathspec 报错。
+          # 访问量趋势报告（site/visits-trend.html）也在 site/ 内，由本条一并纳入。
           git add -A data site || { echo "::error::git add 失败（产物含无法暂存的文件？查文件名/体积/磁盘）"; exit 1; }
-          # 2026-09-30 事故修复：原第 167 行 `git add reports/visits-trend.html`，
-          # 与 .gitignore 的 `reports/`（2026-09-29 起整个 reports/ 不入库）冲突。
+          # 2026-09-30 事故记录：曾有一行 `git add reports/visits-trend.html`，
+          # 与 .gitignore 的 `reports/`（2026-09-29 起整个 reports/ 不入库）冲突——
           # `git add` 一个被 ignore 且未跟踪的文件会以 exit 1 失败，在 `set -e` 下
           # **整班 cron 失败**，连带 deploy 被跳过 → 当日新讲座全部不上线
           # （2026-09-29 20:38Z run #136 即此因，日志停在
           #  "The following paths are ignored by one of your .gitignore files: reports"）。
-          # 趋势报告的**历史数据**在 data/visits_history.json（已跟踪，每日追加），
-          # 报告本身随时可重跑生成，故按既定决策不入库，改走 step「上传访问量趋势报告」的 artifact。
+          # 终解（2026-09-30）：报告出片位置改为 site/visits-trend.html（用户要求公网可看），
+          # 由上面的目录级 add 覆盖，reports/ 专属 add 整块删除，此类冲突不再可能发生。
           # ⚠ 教训：改 .gitignore 前必须 grep 全仓（尤其 .github/workflows/）对该路径的 git add，
           #   两者不同步就会变成整班失败，且只在 CI 暴露、本地永远复现不出来。
-          if [ -f reports/visits-trend.html ] && ! git check-ignore -q reports/visits-trend.html; then
-            git add reports/visits-trend.html
-          fi
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
