@@ -75,3 +75,9 @@ jobs:
       # 覆盖全部分支，纯 node、无浏览器无网络，秒级完成。
       - name: Run long-text loading flow test
         run: node tests/js/app_longtext_flow.js
+      # 2026-09-30 纳入：折叠类名一致性。卡片简介/摘要的折叠行数由模板的 line-clamp-N 类控制，
+      # 而 _measureClamp 靠硬编码类名列表判断元素是否处于折叠态、再决定「展开」按钮是否显示。
+      # 两者不同步的症状是「文本被截断却没有展开按钮」——用户看不到全文，且**无任何报错**（静默失效），
+      # 快照/golden 锁的是解析器、也抓不到。这里静态比对两处类名集合，秒级完成。
+      - name: Run clamp class consistency test
+        run: node tests/js/app_clamp_consistency.js

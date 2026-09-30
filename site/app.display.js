@@ -176,13 +176,14 @@ Object.assign(APP_METHODS, {
       // 特征：含"资讯及通知"栏目标题，或 ≥2 条"关于…通知/公告/申报/征集"短语。
       if (/资讯及通知|(?:关于.{2,40}(?:通知|公告|申报|征集|转发|招标|遴选).*){2,}/.test(ab)) return '';
       // 上限 5000 字防超长脏数据（全库现有摘要最长约 4100 字，均不受影响）；
-      // 展示层默认 6 行截断 + 展开按钮（见 abstractLong / expandedAbstract）
+      // 展示层默认 3 行截断 + 展开按钮（见 abstractLong / expandedAbstract）
       return this.truncate(ab, 5000);
     },
     // 摘要是否被裁（需要「展开摘要」按钮）：由 DOM 实测（absOverflow）决定；
-    // 字符数仅作首次测量前的兜底（300 字，纯过渡，测量完成后不再参考）
+    // 字符数仅作首次测量前的兜底（130 字 ≈ 宽屏 3 行边界，纯过渡，测量完成后不再参考）
+    // ⚠ 改摘要折叠行数时此阈值须同步下调，否则首次测量前会漏挂按钮（表现为「有截断却无展开按钮」）
     abstractLong(l) {
-      return this.absOverflow(l) || (!this._clampMeasured && this.abstractOf(l).length > 300);
+      return this.absOverflow(l) || (!this._clampMeasured && this.abstractOf(l).length > 130);
     },
     // 主讲简介全文（放宽到 2000：全库 >400 字简介有数百条，原 400 字上限会把
     // 头衔/单位/邮箱在截断处丢失；仍保留防超长脏数据底线）
@@ -215,7 +216,9 @@ Object.assign(APP_METHODS, {
         if (!k) return;
         // 处于展开态（clamp 类已被移除）的元素测不到溢出，沿用上次判定，
         // 否则按钮会在展开瞬间消失、用户无法收起。
-        const clamped = el.classList.contains('line-clamp-2') || el.classList.contains('line-clamp-6');
+        // ⚠ 判定用的类名必须与 index.html 模板实际施加的一致，否则「展开摘要/展开简介」按钮不显示
+        // （简介 = line-clamp-2，摘要 = line-clamp-3；2026-09-30 摘要由 6 行收回 3 行）
+        const clamped = el.classList.contains('line-clamp-2') || el.classList.contains('line-clamp-3');
         if (!clamped) { if (this._clampOverflow[k]) next[k] = true; return; }
         if (el.scrollHeight - el.clientHeight > 1) next[k] = true;
       });
