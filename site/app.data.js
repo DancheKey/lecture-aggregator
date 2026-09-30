@@ -58,7 +58,7 @@ Object.assign(APP_METHODS, {
           this.loadedChunks = 0;     // 全新一次完整加载，从第 0 片开始
           this.dataStage = 'partial';
           this.loading = false;
-          this.bumpCount();          // 数字先滚到 50（首屏已加载真实条数）
+          this.bumpCount();          // 数字跳到 50（首屏已加载真实条数；阶梯跳变无动画）
           // 后台继续分片加载完整数据（启用完整筛选翻页）
           this._loadStaticFull();
           // 首屏一渲染即在后台静默预取全部长文本（简介/摘要，16 桶 gzip 约 1.6MB）——

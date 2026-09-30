@@ -46,15 +46,12 @@ const APP_STATE = function () {
       _clampTimer: null,
       _clampMeasured: false,   // 首次 DOM 测量是否已完成（兜底阈值在此之前生效）
       tick: Date.now(),     // 秒级心跳（响应式依赖）：statusInfo 内的「即将开始」倒计时读它触发每秒重渲染
-      // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
-      displayTotal: 1,
-      displaySource: 1,
-      // 上一次 bumpCount 的时刻（performance.now 基准）：bumpCount 据此算出「距上次唤醒
-      // 过了多久」并把动画时长自适应拉长，消除分片乱序到达时的数字锯齿跳动。
-      // ⚠ 必须每次 bump 都更新（与动画是否跑完无关）—— 若改由「动画定格时」写入，
-      //   分片密集到达会把动画反复打断、永远定格不了，间隔就永远测不出来。
-      // 见 app.admin.js 的 startCountAnimation / bumpCount 与 app.core.js 的 COUNT_* 常量。
-      _countLastBump: 0,
+      // 顶部数字展示值 = 已加载的真实条数。2026-09-30 起为「每分片跳变」，无插值动画：
+      // 每次分片到达由 bumpCount() 直接赋值（50 → 550 → 1050 …），故这两个字段
+      // 恒等于 totalCount / sourceNoticeCount，不存在中间过渡值。
+      // 初值 0：mounted 时数据尚未加载，模板文案是「已加载 0+ 场讲座」。
+      displayTotal: 0,
+      displaySource: 0,
       loadedChunks: 0,   // 分片加载断点续传：已成功加载的分片数
       // ---- 长文本（简介/摘要）加载：2026-09-28 剥离，2026-09-30 改「交互即预取」----
       // 主分片只带结构化字段：bio+abstract 占 68% 体积，而列表默认只显示 2~3 行 clamp。

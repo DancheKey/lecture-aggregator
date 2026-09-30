@@ -16,7 +16,7 @@ const app = createApp({
   methods: APP_METHODS,
 
   mounted() {
-    this.startCountAnimation();
+    this.syncCountDisplay();
     this.loadLikes();
     this.loadWants();
     this.loadLectureStats();
