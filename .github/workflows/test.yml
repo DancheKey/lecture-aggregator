@@ -81,3 +81,10 @@ jobs:
       # 快照/golden 锁的是解析器、也抓不到。这里静态比对两处类名集合，秒级完成。
       - name: Run clamp class consistency test
         run: node tests/js/app_clamp_consistency.js
+      # 2026-09-30 纳入：顶部总数滚动动画。动画时长由「距上次 bump 的间隔 + 本次增量」自适应
+      # （原为固定 500ms，与 4 路并发下 1.8~18s 的乱序到达不匹配 → 数字「平滑上滚→长时静止→
+      # 猛跳一段」）。这段状态机依赖 requestAnimationFrame 时序与 performance.now()，
+      # 浏览器里只能靠肉眼判断、CI 无从观察；这里用 node vm + 可控时钟逐帧仿真三种到达时序，
+      # 锁住「逐帧单调不减」「终值收敛到真实总数」「不许退回固定时长」三条不变量。
+      - name: Run header count animation test
+        run: node tests/js/app_count_animation.js

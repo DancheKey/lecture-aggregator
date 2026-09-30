@@ -49,6 +49,12 @@ const APP_STATE = function () {
       // 顶部数字「从 1 滚动增长」动画的展示值（真实数据到达后平滑定格）
       displayTotal: 1,
       displaySource: 1,
+      // 上一次 bumpCount 的时刻（performance.now 基准）：bumpCount 据此算出「距上次唤醒
+      // 过了多久」并把动画时长自适应拉长，消除分片乱序到达时的数字锯齿跳动。
+      // ⚠ 必须每次 bump 都更新（与动画是否跑完无关）—— 若改由「动画定格时」写入，
+      //   分片密集到达会把动画反复打断、永远定格不了，间隔就永远测不出来。
+      // 见 app.admin.js 的 startCountAnimation / bumpCount 与 app.core.js 的 COUNT_* 常量。
+      _countLastBump: 0,
       loadedChunks: 0,   // 分片加载断点续传：已成功加载的分片数
       // ---- 长文本（简介/摘要）加载：2026-09-28 剥离，2026-09-30 改「交互即预取」----
       // 主分片只带结构化字段：bio+abstract 占 68% 体积，而列表默认只显示 2~3 行 clamp。

@@ -2,8 +2,27 @@
 Object.assign(APP_METHODS, {
     /* ---------- 顶部数字滚动动画（目标驱动）----------
      * displayTotal 始终向 this._countTarget 平滑靠拢；每加载一片数据就调用 bumpCount()，
-     * 把目标抬到当前已加载真实条数，数字持续向上滚动（50 -> 1100 -> ... -> 3000+），
-     * 不会中途定格成死值。任一时刻数字都代表「已加载的真实条数」。
+     * 把目标抬到当前已加载真实条数，任一时刻数字都代表「已加载的真实条数」。
+     *
+     * 2026-09-30 修订：动画时长自适应，消除加载中的「锯齿跳动」。
+     * 起因：_countDur 原为**固定 500ms**，而公网 8 分片实测单片耗时 1.8~18s 且**乱序到达**
+     *   （2026-09-28 由串行改 4 路并发后时序被打乱）。动画 500ms 跑完即定格，
+     *   数字要空等 1~12s 才被下个分片唤醒 —— 实测静止帧占比 89.3%、最长静止 11.6s，
+     *   观感是「平滑上滚 → 长时间不动 → 猛跳一段」，正是用户报的「数字乱跳」。
+     * 注意：displayTotal 本身**逐帧单调不减**（实测零回落），是节奏问题不是数值回退。
+     *
+     * 两处关键改动，缺一则失效（均为实测踩坑后修正）：
+     * ① **时长自适应**（见 bumpCount）：由「距上次 bump 的间隔」与「本次增量」共同决定，
+     *    让滚动尽量覆盖整个等待期 → 数字全程在动。
+     * ② **被打断时续接进度而非重置**（见 bumpCount 的 wasRunning 分支）：
+     *    原实现每次都重写 _countStart = now，等于让缓动进度归零重来。分片密集到达时
+     *    （本地 25~60ms/片）动画被反复打断，3810 的全量跨度**永远滚不完**，
+     *    终值卡在 2685（实测）。改为续接后，长跨度终能滚完，① 才敢让间隔主导时长。
+     *
+     * 门禁 tests/js/app_count_animation.js（已入 CI）锁三条不变量：
+     *   逐帧单调不减 / 终值收敛到真实总数 3810 / 时长不再恒为 500ms。
+     * 已知残余：12s 级空档仍有约 9s 静止。动画时长只能按「历史间隔」估算，
+     *   预测不了下个分片何时到达 —— 原理性取舍，非缺陷（详见门禁内注释）。
      */
     startCountAnimation() {
       this._countFrom = 0;
@@ -12,6 +31,8 @@ Object.assign(APP_METHODS, {
       this._countSourceTarget = 0;
       this._countStart = performance.now();
       this._countDur = 600;
+      this._countLastBump = 0;   // 上次 bumpCount 时刻（performance.now 基准）
+      this._countProgress = 0;    // 当前缓动进度 e（0~1），供 bumpCount 续接
       if (!this._countRAF) this._countRAF = requestAnimationFrame(this._countTick);
     },
     _countTick(now) {
@@ -20,23 +41,59 @@ Object.assign(APP_METHODS, {
       const from = this._countFrom, to = this._countTarget;
       this.displayTotal = Math.round(from + e * (to - from));
       this.displaySource = Math.round(this._countSourceFrom + e * (this._countSourceTarget - this._countSourceFrom));
+      this._countProgress = e;   // 记进度，供下次 bumpCount 续接（见文件头 ②）
       if (t >= 1) {
         this.displayTotal = to;
         this.displaySource = this._countSourceTarget;
+        this._countProgress = 1;
         this._countRAF = null;
         return;
       }
       this._countRAF = requestAnimationFrame(this._countTick);
     },
     bumpCount() {
-      // 把滚动目标抬到当前已加载真实条数，并从当前显示值平滑接续；
-      // 若 RAF 已停（动画定格），重新启动一段滚动；运行中则就地更新目标，无跳变。
-      this._countFrom = this.displayTotal;
+      // 把滚动目标抬到当前已加载真实条数，并从当前显示值平滑接续。
+      const now = performance.now();
+      // ⚠ idle 必须**就地测量**：若改由「动画定格时」写入，则分片密集到达时动画被反复
+      //   打断、永远定格不了，间隔就永远测不出来（idle 恒为 0，时长退化成固定 2000ms）。
+      const idle = this._countLastBump ? now - this._countLastBump : 0;
+      this._countLastBump = now;
+
+      const anchor = this.displayTotal;      // 当前显示值（打断瞬间保持它不变 = 无跳变）
+      const target = this.totalCount;
+      const wasRunning = !!this._countRAF;
+
+      // 目标时长：gap 决定「最短要滚多久」（大跳变不突兀），idle 补足等待期（消锯齿）。
+      // idle 超软上限部分按 1/COUNT_IDLE_DIV 计入：既滚得久，又不会长到像卡死。
+      const gap = Math.max(0, target - anchor);
+      let want = gap * COUNT_MS_PER_ITEM;
+      if (idle > COUNT_DUR_SOFT_CAP) {
+        want = Math.max(want, COUNT_DUR_SOFT_CAP + (idle - COUNT_DUR_SOFT_CAP) / COUNT_IDLE_DIV);
+      } else {
+        want = Math.max(want, idle);
+      }
+      const newDur = Math.min(COUNT_DUR_MAX, Math.max(COUNT_DUR_MIN, want));
+
+      if (wasRunning) {
+        // 续接：起点必须是 anchor —— _countTick 在 e=0 时输出的正是 _countFrom，
+        // 只要它等于打断瞬间的显示值，曲线就天然无跳变。
+        // ⚠ 曾误写成 _countFrom = target - (target - anchor) / rest 想「反推剩余量」，
+        //   但 rest<1 时该值必然小于 anchor → 数字先回落甚至变负（实测 4→-55、811→637）。
+        this._countFrom = anchor;
+        // 真正需要续接的是**剩余时长**：easeOutCubic 剩余进度占比 rest = 1-t = (1-e)^(1/3)，
+        // 把原时长按 rest 等比缩短。这样密集分片连续打断时长不会越滚越长，
+        // 3860 这类大跨度终能收敛（不缩短时实测终值卡在 2685）。
+        const rest = Math.max(Math.cbrt(Math.max(0, 1 - (this._countProgress || 0))), 0.15);
+        this._countDur = Math.max(COUNT_DUR_MIN * rest, Math.min(newDur, this._countDur * rest));
+      } else {
+        this._countFrom = anchor;
+        this._countDur = newDur;
+      }
       this._countSourceFrom = this.displaySource;
-      this._countTarget = this.totalCount;
+      this._countTarget = target;
       this._countSourceTarget = this.sourceNoticeCount;
-      this._countStart = performance.now();
-      this._countDur = 500;
+      this._countStart = now;
+      this._countProgress = 0;
       if (!this._countRAF) this._countRAF = requestAnimationFrame(this._countTick);
     },
     retryLoadFull() {
