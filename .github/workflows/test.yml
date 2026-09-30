@@ -116,3 +116,17 @@ jobs:
       # （否则栏目改版会永久冻结全局水位闸门）。
       - name: Run list-page failure accounting tests
         run: python tests/test_list_page_failure.py
+      # 2026-09-30 引入：env 开关真值判定单一事实源。此前全仓 4 处开关各写一套
+      # 关闭值集合，同一串 'no'/'False' 在不同开关上效果相反——用户写「想关掉」
+      # 却把功能留着，且这类失效是静默的（日志正常、数据正常，只是行为反了）。
+      # 本套件既锁值语义矩阵，也锁「4 处调用点判定必须一致」+「不得回退到内联集合」。
+      - name: Run env flag semantics tests
+        run: python tests/test_env_flags.py
+      # 2026-09-30 引入：讲者归一（B6）三方口径一致性。此前落库判重
+      # （scraper._normalize_speaker）与前端归一键（speaker_keys）是两套实现：
+      # 前者剥英文头衔、后者不剥；前者职称表未按长度降序（'张三副教授'→'张三副'，
+      # 库内已污染 2 条）且缺 7 项职称。同一人在两侧算出不同键 → 跨源合并静默失效。
+      # 本套件同时锁「不得误剥真实人名」——'Jean-Claude Dreher' 被剥成 'eher'
+      # 比不剥更坏（会凭空造出错误的合并目标）。
+      - name: Run speaker normalization tests
+        run: python tests/test_speaker_normalize.py

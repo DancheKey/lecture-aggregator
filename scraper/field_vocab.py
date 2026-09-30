@@ -349,21 +349,57 @@ def strip_name_title_suffix(name):
     return t
 
 
-def split_speaker_names(raw):
-    """按 `[、,，/]` 拆分多人姓名并去空白。"""
-    return [p.strip() for p in re.split(r'[、,，/]', str(raw)) if p.strip()]
+# 英文头衔前缀。放在本模块而非各调用点内联：讲者归一此前有两套实现且互不一致
+# —— scraper._normalize_speaker 剥前缀、field_vocab.speaker_keys 不剥，同一人
+# 在「落库判重」与「前端归一键」两侧算出不同键（跨源合并失效，且无任何告警）。
+#
+# ⚠ 词边界 `\b` 不可省：真实人名可以以头衔缩写开头（Jean-Claude **Dr**eher
+# → 剥成 'eher'、**Dr**Eher 同理）。Python re 的 \w 含 CJK，故 \b 也能正确处理
+# 「Dr张伟」这类中英连写（dr 与 张 之间是边界，剥得掉），不必另加小写前瞻
+# ——实测 (?![a-z]) 在此纯冗余。与 DIRTY_TITLE_RE 的 `Dr\.?(?![A-Za-z])` 是同一教训。
+EN_TITLE_PREFIX_RE = re.compile(
+    r'^(?:associate\s+|assistant\s+|full\s+)?'
+    r'(?:professor|prof|dr|mr|mrs|ms|ph\.?d|md)\b\.?\s*',
+    re.I)
+# 剥完仍需至少留下一个像姓名的残段：光秃秃的 'Dr' / 'Prof.' 属解析残值，
+# 直接返回原串交由上层判脏，不产出空键。
+_EN_ONLY_RE = re.compile(r'^(?:professor|prof|dr|mr|mrs|ms|ph\.?d|md)\b\.?$', re.I)
 
 
-def speaker_keys(name):
-    """讲者归一化键：全角转半角、去职称后缀；英文 lower；多人逐人拆键。
+def strip_en_title_prefix(name):
+    """去掉姓名前缀的英文头衔（Dr. / Prof / Ph.D 等），保留残段。
 
-    本函数是 server.py `_speaker_keys` 与 scripts/generate_frontend_data.py
-    `speaker_keys()` 的**唯一实现**——两者必须严格一致（前端一致性守卫测试会
-    拦截部署），收敛到此处后天然一致，不会再出现两侧漂移。
+    幂等：连续调用两次与一次结果相同。
+    """
+    if not name:
+        return name
+    t = str(name).strip()
+    prev = None
+    # while 而非 if：源页偶有 'Dr. Prof. X' 双前缀叠加
+    while prev != t:
+        prev = t
+        m = EN_TITLE_PREFIX_RE.match(t)
+        if not m:
+            break
+        rest = t[m.end():]
+        if not rest or _EN_ONLY_RE.match(rest):
+            # 整个串只是头衔本身 → 视为解析残值，不剥
+            break
+        t = rest.strip()
+    return t
+
+
+def normalize_speaker_key(name):
+    """讲者归一完整口径：全角转半角 → 去英文头衔前缀 → 去尾部职称 → 多人拆键。
+
+    本函数是讲者归一的**唯一实现**。落库判重（scraper._normalize_speaker）、
+    前端归一键（server._speaker_keys / generate_frontend_data.speaker_keys）三方
+    必须共用同一口径，否则同一人跨源合并静默失效。
     """
     if not name:
         return []
     t = ''.join(chr(ord(c) - 0xFEE0) if 0xFF01 <= ord(c) <= 0xFF5E else c for c in str(name))
+    t = strip_en_title_prefix(t)
     t = strip_name_title_suffix(t)
     keys = []
     for part in split_speaker_names(t):
@@ -371,6 +407,23 @@ def speaker_keys(name):
             part = part.lower()
         keys.append(part)
     return keys
+
+
+def split_speaker_names(raw):
+    """按 `[、,，/]` 拆分多人姓名并去空白。"""
+    return [p.strip() for p in re.split(r'[、,，/]', str(raw)) if p.strip()]
+
+
+def speaker_keys(name):
+    """讲者归一化键（去英文头衔前缀 + 去职称后缀 + 多人拆键 + 英文 lower）。
+
+    本函数是 server.py `_speaker_keys` 与 scripts/generate_frontend_data.py
+    `speaker_keys()` 的**唯一实现**——两者必须严格一致（前端一致性守卫测试会
+    拦截部署），收敛到此处后天然一致，不会再出现两侧漂移。
+
+    口径细节见 normalize_speaker_key（落库判重与前端归一键共用同一实现）。
+    """
+    return normalize_speaker_key(name)
 
 
 def is_title_only(value):

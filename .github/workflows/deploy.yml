@@ -70,6 +70,8 @@ jobs:
             tests/test_server.py
             tests/test_list_page_failure.py
             tests/test_ci_gate_coverage.py
+            tests/test_env_flags.py
+            tests/test_speaker_normalize.py
             tests/js/app_bundle_smoke.js
             tests/js/app_longtext_flow.js
             tests/js/app_clamp_consistency.js

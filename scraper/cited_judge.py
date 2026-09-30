@@ -39,6 +39,7 @@ import unicodedata
 import hybrid
 import llm_provider
 import timeparse
+import env_flags
 import field_vocab as _fv
 
 # 康煕部首还原：延迟从 parsers 取（单一事实源），避免顶层引入 parsers
@@ -360,7 +361,7 @@ _SE_TAIL = (
 
 
 def _se_enabled():
-    return (os.environ.get('SCNU_JUDGE_SE') or '1').strip() not in ('0', 'false', 'no')
+    return env_flags.flag('SCNU_JUDGE_SE', default='1')
 
 
 # ---------------------------------------------------------------------------

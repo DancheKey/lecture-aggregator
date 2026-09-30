@@ -1077,6 +1077,7 @@ import json as _json
 import base64 as _b64
 import hashlib as _hash
 import time as _time
+import env_flags  # 开关真值判定的单一事实源（4 处判定此前各不相同）
 
 # ============================================================================
 # 出站请求安全基线（2026-08-05 体检修复，安全-1/2/3）：
@@ -1540,10 +1541,13 @@ def _parse_vlm_datetime(s, default_year, publish_time, title_year, url_year):
 # 优先级：真实环境变量 > 项目根 .env > 默认（2026-09-05：开关此前只读进程环境变量，
 # .env 里的 SCNU_LLM_TEXT=1 不生效，导致本地/CI 默认 rich-only、模型B 从未进入生产链路）。
 def _text_llm_flag(name, default):
+    # 真值判定委托 env_flags（4 处曾各写一套关闭值集合，同一串 'no' 在 LISTDATE
+    # 关上、在 LLM_TEXT 上却开着）。此处仍保留本模块的 .env 回退：是否读 .env 是
+    # 「配置来源」问题，与「值怎么算真」是两件事，故不整体替换为 env_flags.flag。
     v = _os.environ.get(name)
     if v is None:
         v = _load_dotenv().get(name)
-    return (v or default) not in ('0', 'false', 'False', '')
+    return env_flags.is_true(default if (v is None or str(v).strip() == '') else v)
 
 _USE_LLM_TEXT = _text_llm_flag('SCNU_LLM_TEXT', '1')
 

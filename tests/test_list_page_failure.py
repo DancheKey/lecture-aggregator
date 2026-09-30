@@ -199,5 +199,66 @@ class GlobalWatermarkGuardTest(unittest.TestCase):
                       '成功时才推进水位；失败分支必须不写 last_scrape')
 
 
+class ListDateSwitchTest(unittest.TestCase):
+    """B7：SCNU_LISTDATE_SKIP 曾是**假开关**（只管日志，真实过滤无条件执行）。
+
+    危害不在于过滤本身，而在于「回退对照」做不到：设 SCNU_LISTDATE_SKIP=0
+    想关掉过滤重放一遍，日志却打「过滤已开启」，排查者据此得出完全相反的结论。
+    修法：开关值由 main() 下传为 _process_source 的 listdate_skip_enabled，
+    真实跳过判据（_should_skip_by_item_date）与之联动。
+    """
+
+    U = 'http://t.scnu.edu.cn/list/'
+    # 条目日期 2020-01-01，远早于水位 2026-01-01 → 开启过滤时应被跳过
+    OLD_ITEM_PAGE = ('<html><body><li><a href="/a/202001/9.html">学术讲座通知</a>'
+                     '<span>2020-01-01</span></li></body></html>')
+
+    def _run(self, skip_enabled):
+        r = _SourceRun(P, {self.U: self.OLD_ITEM_PAGE})
+        err, local = r.run([_lu(self.U)], is_incremental=True,
+                           cutoff_date_str='2026-01-01',
+                           listdate_skip_enabled=skip_enabled)
+        self.assertIsNone(err, f'本用例不测失败路径：{err}')
+        return r, local
+
+    def test_10_开关开启_旧条目被跳过(self):
+        r, local = self._run(True)
+        self.assertEqual(len(local), 0, '条目日期早于水位，开启过滤时不应解析')
+        self.assertEqual(r.parsed, [], f'不该抓到详情页：{r.parsed}')
+
+    def test_11_开关关闭_旧条目照抓(self):
+        """这是 B7 的核心断言：关闭必须真的关掉（旧版无论如何都照跳）。"""
+        r, local = self._run(False)
+        self.assertEqual(len(local), 1,
+                         'SCNU_LISTDATE_SKIP=0 必须让条目级过滤真的失效（回退对照）')
+        self.assertEqual(r.parsed, ['http://t.scnu.edu.cn/a/202001/9.html'],
+                         f'关闭过滤时详情页应被抓取并解析：{r.parsed}')
+
+    def test_12_无水位日期时开关不影响抓取(self):
+        """cutoff_date_str 为空（首轮/全量）本就不过滤，行为不得因开关而变。"""
+        for flag in (True, False):
+            r = _SourceRun(P, {self.U: self.OLD_ITEM_PAGE})
+            err, local = r.run([_lu(self.U)], is_incremental=True,
+                               cutoff_date_str=None,
+                               listdate_skip_enabled=flag)
+            self.assertIsNone(err)
+            self.assertEqual(len(local), 1, f'开关={flag} 时无水位也应照抓')
+
+    def test_13_main_确实把开关下传(self):
+        """防止将来又退回「只打日志」：main 必须读一次 env 并传给 _process_source。"""
+        src = open(os.path.join(_ROOT, 'scraper', 'scraper.py'), encoding='utf-8').read()
+        self.assertIn('listdate_skip_on = _listdate_skip_enabled()', src,
+                      'main() 未读 env 开关')
+        self.assertIn("src_latest_date.get(src.get('name', ''), ''), listdate_skip_on)",
+                      src, '_process_source 的提交未带上开关值')
+
+    def test_14_默认参数为开启(self):
+        """直接调 _process_source（不传该参数）必须保持历史行为（过滤开启）。"""
+        import inspect
+        sig = inspect.signature(P._process_source)
+        self.assertIs(sig.parameters['listdate_skip_enabled'].default, True,
+                      '默认值必须是 True，否则所有既有调用方的过滤行为会静默改变')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

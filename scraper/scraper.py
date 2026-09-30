@@ -20,6 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
 from parsers import parse_detail, is_lecture, is_news_record  # noqa: E402
 from excluded_urls import load_excluded  # noqa: E402
+from env_flags import flag as env_flag  # noqa: E402  开关真值判定的单一事实源
+import field_vocab  # noqa: E402  讲者归一/职称词表单一事实源（B6 口径收敛）
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; SCNULectureAggregator/0.1)'}
 TIMEOUT = 15
@@ -416,25 +418,24 @@ def _completeness(r):
 
 
 def _normalize_speaker(speaker):
-    """主讲人归一化：去掉职称后缀与英文头衔前缀，用于跨源匹配。
+    """主讲人归一化：去掉英文头衔前缀与职称后缀，用于跨源匹配。
 
-    英文头衔前缀（Dr./Prof. 等）不剥会导致同一人跨源合并失败：
-    Winney 实测——物理学院主记录 speaker='Dr. Daniel Winney'、
-    iqm 新记录 speaker='Daniel Winney'，键不同 → 重复插入。
+    口径收敛到 field_vocab.normalize_speaker_key（2026-09-30 B6）。此前本函数
+    自带一套内联实现，与 field_vocab.speaker_keys（前端归一键）分叉，且内联版
+    存在两处实际缺陷：
+      1) 职称表未按长度降序，「副教授」先被「教授」命中 → '张三副教授' 剥成 '张三副'
+         （库内实测已污染 2 条：module/3685「刘维泉副」、iqm/189「陈洁 助理」）；
+      2) 职称表缺 '特聘/特任/长聘教授'、'助理研究员'、'老师'、'导师'、'博导' 等。
+    英文头衔前缀此前只在此处剥、speaker_keys 不剥 → 同一人在落库判重与前端归一
+    两侧算出不同键，跨源合并静默失效。
+
+    返回首个归一键（多人姓名取第一人的键，与历史行为一致；完整键组见
+    field_vocab.normalize_speaker_key）。
     """
     if not speaker:
         return ''
-    s = speaker.strip()
-    # 去英文头衔前缀（大小写不敏感，可带点、后接空格或直接连姓名）
-    s = re.sub(r'^(?:associate\s+|assistant\s+|full\s+)?'
-               r'(?:professor|prof|dr|mr|mrs|ms|ph\.?d)\.?\s*',
-               '', s, flags=re.I) or s
-    # 去掉常见职称
-    for suffix in ['教授', '副教授', '讲师', '研究员', '副研究员',
-                   '院士', '博士', '博士后', '博士生导师', '硕士生导师']:
-        if s.endswith(suffix) and len(s) > len(suffix):
-            s = s[:-len(suffix)]
-    return s.strip()
+    keys = field_vocab.normalize_speaker_key(speaker)
+    return keys[0] if keys else ''
 
 
 def _is_valid_speaker_name(name):
@@ -917,7 +918,7 @@ _LISTDATE_STATS = {'skipped': 0}
 
 def _listdate_skip_enabled():
     """SCNU_LISTDATE_SKIP=0 可关闭（回退对照用），默认开启。"""
-    return (os.environ.get('SCNU_LISTDATE_SKIP') or '1').strip() not in ('0', 'false', 'no')
+    return env_flag('SCNU_LISTDATE_SKIP', default='1')
 
 
 # ── 被拒 URL 台账（2026-09-29）──────────────────────────────────────────────
@@ -949,7 +950,7 @@ _LEDGER_KEY_RE = re.compile(r'^(?:https?://[^\s\[\]=<>]+|vsb::[A-Za-z0-9.\-]+::\
 
 def _ledger_enabled():
     """SCNU_LEDGER_SKIP=0 可关闭（回退对照 / 紧急排查），默认开启。"""
-    return (os.environ.get('SCNU_LEDGER_SKIP') or '1').strip() not in ('0', 'false', 'no')
+    return env_flag('SCNU_LEDGER_SKIP', default='1')
 
 
 def _ledger_file():
@@ -1425,7 +1426,8 @@ def incremental_merge(existing, new_records):
 
 
 def _process_source(src, year, existing_urls, is_incremental, global_exclude=None,
-                    cutoff_date_str=None, src_latest_date=None):
+                    cutoff_date_str=None, src_latest_date=None,
+                    listdate_skip_enabled=True):
     """处理单个信息源，返回 {url: rec} 字典。
 
     cutoff_date_str: 增量水位日期（'YYYY-MM-DD'）。配合列表页条目日期过滤，
@@ -1434,6 +1436,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
     src_latest_date: 该源已入库的最晚条目日期（'YYYY-MM-DD'），来自
         _build_source_latest_date。用于翻页停止判据：整页条目日期都早于它
         → 该页往后全是存量，停止翻页（仅增量生效，见循环内守卫）。
+    listdate_skip_enabled: SCNU_LISTDATE_SKIP 的值（默认 True = 过滤开启）。
+        2026-09-30 B7：此前该开关只影响 main() 的日志文案、真实过滤无条件
+        执行（假开关）。现作为参数显式下传；为 True 时行为与旧版完全一致。
+        ⚠ 由 main() 传入 env 判定结果，不在函数内读 env——便于测试注入
+        （真实值每轮固定，读 env 只会让测试必须改进程环境）。
     """
     name = src['name']
     campus = src.get('campus', '')
@@ -1492,10 +1499,19 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     # 与既有逻辑一致：取不到页面就到此为止（_next_page_url(None) 本就返回 None）
                     break
                 # 列表页条目日期映射。两种用途，故与 LISTDATE 开关解耦：
-                #   ① 条目级跳过（仅 cutoff_date_str 非空且开关开启时生效）；
+                #   ① 条目级跳过（由下面 skip_itemdate 实际生效）；
                 #   ② 翻页停止判据（下方循环尾部，仅增量 + src_latest_date 时生效）。
                 use_item_date = bool(cutoff_date_str) or bool(
                     is_incremental and src_latest_date)
+                # 2026-09-30 B7 修复：SCNU_LISTDATE_SKIP 此前是**假开关**——
+                # 它只在 main() 里决定打不打日志，真实条目级跳过（本处
+                # _should_skip_by_item_date）无条件执行。于是回退对照
+                # （SCNU_LISTDATE_SKIP=0）根本关不掉过滤，日志却宣称
+                # 「过滤未启用」，排查者据此得出完全相反的结论。
+                # 修法：把「是否跳过」显式成一个变量，与用途②解耦——
+                # 翻页停止判据不关（它是"要不要继续翻页"，不是"要不要抓这一页"，
+                # 关掉它会让无日期列表页被无限翻页，反而更慢）。
+                skip_itemdate = bool(cutoff_date_str) and listdate_skip_enabled
                 item_date_map = (_build_item_date_map(html, cur, base, collect_mode)
                                  if use_item_date else {})
                 # 条目级跳过判据取「全局水位」与「本源基线」的更早者（见
@@ -1524,7 +1540,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     if is_incremental and ledger_hit(_canon_url_key(href_norm)):
                         _LEDGER_STATS['skipped'] += 1
                         continue
-                    if (item_date_map
+                    if (skip_itemdate
+                            and item_date_map
                             and _should_skip_by_item_date(_canon_url_key(href_norm),
                                                           item_date_map, eff_cutoff)):
                         listdate_skipped += 1
@@ -1660,8 +1677,11 @@ def main():
             cutoff_date_str = '%04d-%02d-%02d' % (_c.year, _c.month, _c.day)
         if cutoff_date_str and _listdate_skip_enabled():
             print(f'[LISTDATE] 列表页条目日期过滤已开启：条目日期 < {cutoff_date_str} 的详情页将跳过不抓')
+        elif cutoff_date_str:
+            print('[LISTDATE] 列表页条目日期过滤已关闭（SCNU_LISTDATE_SKIP=0）：'
+                  '本轮回退对照，全部条目照抓（翻页停止判据仍生效）')
         elif is_incremental:
-            print('[LISTDATE] 列表页条目日期过滤未启用（SCNU_LISTDATE_SKIP=0 或 since 无法解析）')
+            print('[LISTDATE] 列表页条目日期过滤未启用（since 无法解析或非增量轮）')
 
     # 被拒 URL 台账：仅增量轮读取（全量只写不读，保证宁多抓不漏抓）。
     # 作用与水位线互补——水位线管「新的才抓」，台账管「已判过的不再抓」。
@@ -1763,7 +1783,10 @@ def main():
         # {源名: 日期} 字典。传错类型会让 _process_source 里的
         # `max(_page_dates) < src_latest_date` 抛「str < dict」TypeError，
         # 被外层 except 吞成「本源抓取失败」→ 48 个源全废且水位不推进（2026-09-28 实测）。
-        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str, src_latest_date.get(src.get('name', ''), '')): src for src in sources}
+        # listdate_skip：开关只在 main() 读一次 env 后下传（不在 _process_source 内读），
+        # 免得每个源各判一次、且测试无法注入。取值语义见 env_flags。
+        listdate_skip_on = _listdate_skip_enabled()
+        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str, src_latest_date.get(src.get('name', ''), ''), listdate_skip_on): src for src in sources}
         for future in as_completed(future_to_src):
             src_name = future_to_src[future].get('name')
             try:

@@ -73,5 +73,78 @@ class TestPeriodDigitsContradiction(unittest.TestCase):
         self.assertNotEqual(r['start'].strftime('%H:%M'), '06:00')
 
 
+class TestNoMarkerSmallHourInference(unittest.TestCase):
+    """B5：无时段标记时1–5 点按下午推断（2026-09-30 修复死代码）。
+
+    背景：_build 里 `period = 0`（非 None）使 _apply_period 的 else 分支恒不可达，
+    注释承诺的「2:30-4:00 实为 14:30-16:00」（ibc/2779）从未生效，实际落库 02:30。
+    修法：period 初值改 None（None=无标记/ 0 = 明确上午 / 12 = 下午晚上，三态不可合并）。
+    ⚠ 存量影响实测 0 条（3810 条库中 lectureStart/End 无一落在 01–05 点），
+    故只影响今后的抓取，无需回改历史数据。
+    """
+
+    def _p(self, text):
+        return parse_cn_time(text, 2018)
+
+    def test_afternoon_inferred_without_marker(self):
+        """核心断言：无标记「2:30-4:00」→ 14:30-16:00（修复前是 02:30-04:00）。"""
+        r = self._p('时间：2025年7月2日 2:30-4:00')
+        self.assertEqual(r['start'].strftime('%H:%M'), '14:30')
+        self.assertEqual(r['end'].strftime('%H:%M'), '16:00')
+
+    def test_fullwidth_colon_variant(self):
+        r = self._p('时间：2025年7月2日 2：30-4：00')
+        self.assertEqual(r['start'].strftime('%H:%M'), '14:30')
+
+    def test_hour_one_to_five_all_inferred(self):
+        for hh, want in ((1, '13'), (2, '14'), (3, '15'), (4, '16'), (5, '17')):
+            r = self._p(f'时间：2025年7月2日 {hh}:13')
+            self.assertEqual(r['start'].strftime('%H:%M'), f'{want}:13',
+                             f'{hh}:13 无标记应推为 {want}:13')
+
+    def test_six_and_above_untouched(self):
+        """6 点及以后保持原值，不得被 +12 误伤成凌晨/深夜。"""
+        for hh in (6, 7, 8, 9, 10, 11):
+            r = self._p(f'时间：2025年7月2日 {hh}:00')
+            self.assertEqual(r['start'].strftime('%H:%M'), f'{hh:02d}:00',
+                             f'{hh}:00 无标记应保持原值')
+
+    def test_zero_placeholder_untouched(self):
+        """00:00 是占位，不得被推断成 12:00。"""
+        r = self._p('时间：2025年7月2日 00:00')
+        self.assertEqual(r['start'].strftime('%H:%M'), '00:00')
+
+    def test_explicit_morning_small_hour_not_shifted(self):
+        """「上午1:30」必须留 01:30——这是 period 三态不可合并的关键反例。
+
+        若把 period 初值改成 None 的同时把 PERIOD_OFFSET['上午'] 也改成 None（或
+        反之把 None 当 0 处理），「上午1:30」会被错推成 13:30。
+        """
+        r = self._p('时间：2025年7月2日上午 1:30')
+        self.assertEqual(r['start'].strftime('%H:%M'), '01:30')
+
+    def test_explicit_morning_and_noon_sane(self):
+        for text, want in (('2025年7月2日上午 9:00', '09:00'),
+                           ('2025年7月2日中午 12:00', '12:00'),
+                           ('2025年7月2日中午 1:00', '13:00'),
+                           ('2025年7月2日下午 2:30-4:00', '14:30'),
+                           ('2025年7月2日晚上 7:30-9:00', '19:30')):
+            r = self._p('时间：' + text)
+            self.assertEqual(r['start'].strftime('%H:%M'), want, text)
+
+    def test_explicit_afternoon_unchanged_by_fix(self):
+        """带时段标记的路径必须与修复前完全一致（+12 偏移照旧）。"""
+        r = self._p('时间：2025年7月2日 下午 2:30-4:00')
+        self.assertEqual(r['start'].strftime('%H:%M'), '14:30')
+        self.assertEqual(r['end'].strftime('%H:%M'), '16:00')
+
+    def test_source_no_dead_branch(self):
+        """静态锁：period 初值必须是 None，否则 else 分支再次变成死代码。"""
+        src = open(os.path.join(ROOT, 'scraper', 'timeparse.py'), encoding='utf-8').read()
+        self.assertNotIn('\n    period = 0\n', src,
+                         'period 初值退回 0 会让 1–5 点 +12 分支再次不可达')
+        self.assertIn('\n    period = None\n', src)
+
+
 if __name__ == '__main__':
     unittest.main()
