@@ -348,7 +348,8 @@
                 {{ g.key }}
               </div>
               <template v-for="u in g.items" :key="u.key">
-              <!-- 论坛卡（2026-09-26 方案B）：同源页场次 ≥3 合并为一张卡，展开可看逐场清单；
+              <!-- 论坛卡（2026-09-30 修订）：**同一天**场次 ≥3 才合并为一张卡，展开可看逐场清单；
+                   跨天但每天仅 1~2 场的系列逐场单卡展示，不再整块折叠。
                    点赞/想听按键为 sourceUrl 级（全体场次共享同一计数），点标题进源页看完整议程 -->
               <article v-if="u.type === 'forum'" class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
                 <div class="flex items-center gap-2 text-11pt mb-1.5">
@@ -381,7 +382,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
                     </svg>
-                    <span class="text-slate-700">系列会议 · 共 <span class="font-bold text-slate-900">{{ u.total }}</span> 场报告，点标题可查看源页完整议程</span>
+                    <span class="text-slate-700">同日 <span class="font-bold text-slate-900">{{ u.total }}</span> 场报告，点标题可查看源页完整议程</span>
                   </div>
                   <div v-if="u.recs.length < u.total" class="text-amber-600 text-11pt">⚠ 当前筛选命中 {{ u.recs.length }} / {{ u.total }} 场</div>
                 </div>
@@ -688,6 +689,6 @@
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
-  <script defer src="footer-counter.js?v=90a3cd546f"></script>
+  <script defer src="footer-counter.js?v=96e9e45987"></script>
 </body>
 </html>

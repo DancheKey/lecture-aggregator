@@ -140,16 +140,20 @@ const APP_COMPUTED = {
       return list;
     },
 
-    // 渲染单元（2026-09-26 方案B）：同 sourceUrl 且场次数 ≥ 阈值 → 一个论坛单元；
-    // 其余逐条单条单元。保持 filtered 的既有排序（论坛单元落在其最新场次的位置）。
+    // 渲染单元（2026-09-30 修订）：折叠粒度 = 「同源页 + 同一天」。
+    // 仅当**同一天**的场次数 ≥ 阈值时才合并成一张论坛卡，其余（含跨天但每天只有 1~2 场
+    // 的系列）逐场单卡展示。背景：旧规则按「同源页总场次 ≥3」折叠，把「跨 3 天、每天
+    // 仅 1~2 场」的系列也整块折起（如美术学院 4 场分 3 天），反而藏掉了用户想看的逐场
+    // 时间/地点。保持 filtered 的既有排序（论坛卡落在其所在天的位置）。
     units() {
-      const MIN = 3; // 论坛折叠阈值：≥3 场合并为一张卡（2026-09-26 用户定；2 场的系列公告逐场展示更有用）
-      const bySrc = new Map();
+      const MIN = 3; // 同日折叠阈值：同一天 ≥3 场才折叠（1~2 场的日子逐场展示更有用）
+      const groupKey = l => (l.sourceUrl || '') + '|' + (l.lectureStart || '').slice(0, 10);
+      // 先统计各「同源+同日」组场次，仅达标组折叠
+      const counts = new Map();
       this.filtered.forEach(l => {
-        const u = l.sourceUrl || '';
-        if (!u) return;
-        if (!bySrc.has(u)) bySrc.set(u, []);
-        bySrc.get(u).push(l);
+        if (!l.sourceUrl) return;
+        const k = groupKey(l);
+        counts.set(k, (counts.get(k) || 0) + 1);
       });
       const units = [];
       const seen = new Set();
@@ -160,25 +164,23 @@ const APP_COMPUTED = {
           units.push({ type: 'single', recs: [l], key: 'x|' + (solo++) });
           return;
         }
-        if (seen.has(u)) return;
-        seen.add(u);
-        const recs = bySrc.get(u);
-        if (recs.length >= MIN) {
-          const head = recs[0];
-          const dates = recs.map(r => (r.lectureStart || '').slice(0, 10)).filter(Boolean).sort();
-          const d0 = dates[0] || '', d1 = dates[dates.length - 1] || '';
+        const k = groupKey(l);
+        if ((counts.get(k) || 0) >= MIN) {
+          if (seen.has(k)) return;
+          seen.add(k);
+          const recs = this.filtered.filter(x => groupKey(x) === k);
           units.push({
-            type: 'forum', url: u, recs, head,
-            total: head.lectureCount || recs.length,
-            dateLabel: d0 === d1 ? d0 : `${d0} ~ ${d1.slice(5)}`,
-            key: 'f|' + u,
+            type: 'forum', url: u, recs, head: recs[0],
+            total: recs.length,
+            dateLabel: (l.lectureStart || '').slice(0, 10),
+            key: 'f|' + k,
           });
-        } else {
-          recs.forEach(r => units.push({
-            type: 'single', recs: [r],
-            key: 's|' + (r.lectureIndex ?? 'x') + '|' + r.sourceUrl,
-          }));
+          return;
         }
+        units.push({
+          type: 'single', recs: [l],
+          key: 's|' + (l.lectureIndex ?? 'x') + '|' + u,
+        });
       });
       return units;
     },

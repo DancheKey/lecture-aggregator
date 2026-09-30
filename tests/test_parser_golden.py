@@ -146,6 +146,15 @@ CASES = [
      'count': 1, 'speakers': ['李海欧']},
     {'url': 'https://physics.scnu.edu.cn/a/20221018/12127.html', 'fixture': 'physics12127.html',
      'count': 1, 'speakers': ['陈理想']},
+    # 2026-09-30 存量修复回归：physics 13312 页 head 里的 meta description 是站点
+    # 自动生成的**陈旧摘要**——题目/时间与本页正文不对应（正文=06-05「AI辅助研究非线性
+    # 系统」，meta 却写着 06-03 另一场「非线性动力系统的广义李雅普诺夫函数」，且时间被
+    # 站点自己截断成「2026年06月03日（」）。旧版解析器把 meta 摘要当兜底文本并入正文，
+    # 拆分时按「题目数」判定 → 误拆出幽灵条（topic 取自 meta、start=2026-06-03 00:00、
+    # timeUnknown=True → 前端显示「时间待定」）。现行守卫已不复现（本机重解析只出 1 条），
+    # 本用例锁「必须只拆 1 条」防回归。见 2026-09-30 存量数据修复。
+    {'url': 'https://physics.scnu.edu.cn/a/20260602/13312.html', 'fixture': 'physics13312.html',
+     'count': 1, 'speakers': ['涂展春'], 'topic_sub': ['AI 辅助研究非线性系统']},
     # 2026-09-10 round-16 多场串页修复回归（psy「讲座一/二」结构，源页已实证）。
     # 当前 parser 仅拆分达标；字段级缺陷（bio/abs 串页、location 串场）由 KnownDefectTest 锁定。
     # psy940 两场连排（无「讲座一/二」标签，仅两块 题目/时间/地点）：同讲者刘贤臣两场
