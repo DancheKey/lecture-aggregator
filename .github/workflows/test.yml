@@ -62,7 +62,7 @@ jobs:
       - name: Run parser behavior snapshot tests
         run: python tests/test_parser_snapshot.py
       - name: Run stage function variable leak check
-        run: python -m pytest tests/test_stage_var_leak.py -q
+        run: python tests/test_stage_var_leak.py
       # 2026-09-30 纳入：前端分片组装冒烟。前端已按职责拆成 8 个文件，靠 defer 顺序
       # 与全局词法环境共享常量；任一分片漏挂、顺序错、常量改名都会在浏览器里直接白屏，
       # 而 Python 侧测试全绿也看不出来。用 node 的 vm 按序执行全部分片做集成校验，
