@@ -51,7 +51,10 @@ for l in recs:
     if lt and u:
         lt_urls[lt].add(u)
 
-groups = {'A': [], 'B': [], 'C': []}
+# 系列通称词：出现在 title 里说明 title 只是活动系列名、未含具体讲座题目
+SERIES_KEYWORDS = ('大讲堂', '前沿论坛', '讲坛', '工作坊', '研修班', '系列讲座', '沙龙', '学术论坛')
+
+groups = {'A1': [], 'A2': [], 'B': [], 'C': []}
 for l in recs:
     if not is_poster_parsed(l):
         continue
@@ -63,8 +66,10 @@ for l in recs:
         continue                      # 子串关系 = 普通清洗差异，不在本次范围
     if len(lt_urls[lt]) > 1:
         groups['B'].append(l)         # 列表标题被多页共用 → 保留 title
+    elif any(k in t for k in SERIES_KEYWORDS):
+        groups['A1'].append(l)        # title 仅为系列通称名 → 取列表条目名
     else:
-        groups['A'].append(l)
+        groups['A2'].append(l)        # title 已是实质题目 → 回改是负收益
 
 
 def e(s):
@@ -72,22 +77,33 @@ def e(s):
 
 
 GROUP_META = [
-    ('A', '建议回改：title ← 源页列表标题',
-     '这些记录的 title 来自海报上的系列名/装饰文字，listTitle 才是源页列表条目的名字。'
-     '按方案A 口径应改为 listTitle（topic 已是各场真题目，不会丢信息）。'),
+    ('A1', '已回改：title 原为系列通称名',
+     '这些记录的 title 是海报/正文上的系列活动名（如「木棉生命科学前沿论坛」），'
+     '未含本场讲座题目。已按方案A 口径改为源页列表条目名（listTitle）；'
+     '各场真题目仍在 topic 字段，信息不丢失。清洗脚本 scripts/fix_title_from_listtitle.py。'),
+    ('A2', '建议保留：title 已是实质题目',
+     '这些 title 本身就是具体讲座题目，与 listTitle 的差异只是标点/大小写/源站错别字'
+     '（如源站列表把「双受精」写成「双受镜」、「sympatric」写成「symparric」、'
+     '括号截断等），或 listTitle 只是系列名（回改会让同源多条撞成同一标题）。'
+     '在此情形下回改是负收益，建议保留现有 title。'),
     ('B', '建议保留：源站列表标题本身不区分条目',
      '同一 listTitle 被多个不同源页共用（源站列表把若干条目写成同一个名字，'
      '如「扬帆教学论坛」各周次页在列表里都写「第二周」）。此时现有 title 反而比 listTitle 准确，'
      '若强行回改会引入错误。建议保留，或另行修正源站列表配置。'),
-    ('C', '无参照：缺 listTitle 字段',
-     '这些记录没有 listTitle 字段，无法判断原列表条目名，也无法回改。'
-     '其中多为多场拆分记录，可在下次重抓时由新规则补齐。'),
+    ('C', '无参照：记录内缺 listTitle 字段',
+     '这些记录没有 listTitle 字段（多为 listTitle 字段/抓取链路完善前入库的老记录，'
+     '此后未被重抓刷新；见 scraper.py 抓取路径会无条件写入 listTitle）。'
+     '记录内无从比对，故无法回改。注：这不代表源站列表页当初没有条目名。'),
 ]
 
 parts = []
 for code, title, desc in GROUP_META:
     rows = groups[code]
     if not rows:
+        # A1 已在本轮对齐完毕，无剩余行；仍保留标题与口径说明，便于对照
+        if code == 'A1':
+            parts.append(f'\n<h2>{e(title)} <span class="badge">0</span></h2>\n'
+                         f'<p class="gdesc">{e(desc)}</p>')
         continue
     trs = []
     for i, l in enumerate(rows, 1):
