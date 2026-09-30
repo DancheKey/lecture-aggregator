@@ -61,6 +61,12 @@ Object.assign(APP_METHODS, {
           this.bumpCount();          // 数字先滚到 50（首屏已加载真实条数）
           // 后台继续分片加载完整数据（启用完整筛选翻页）
           this._loadStaticFull();
+          // 首屏一渲染即在后台静默预取全部长文本（简介/摘要，16 桶 gzip 约 1.6MB）——
+          // 2026-09-30 用户定：原策略是「交互（滚动/聚焦/翻页）才预取」，导致「打开页面就
+          // 立即搜索」时桶还没下完、搜索被迫等待并弹「正在加载完整内容」提示。改为首屏即拉，
+          // 用户开始搜索时通常已就绪；即便未就绪，搜索也不再阻塞（先出已到结果、到齐静默补全），
+          // 见 computed.filtered 与 index.html 时间线分支。
+          this._ensureLongTextAll();
         })
         .catch(() => { this._loadStaticFull(true); });
     },
@@ -285,8 +291,8 @@ Object.assign(APP_METHODS, {
           this._ltRetry = 0;
         }
       } catch (e) {
-        // 清单/整批不可用：必须置位，否则 searchPending 会永久为真 → 搜索结果永远不显示。
-        // 退化为「就绪多少显示多少」（即 2026-09-30 之前的旧行为）。
+        // 清单/整批不可用：置位后不再尝试预取（避免每次交互都空跑一遍）；
+        // 搜索本就不阻塞，此时退化为「就绪多少搜多少」（即 2026-09-30 之前的行为）。
         this._ltUnavailable = true;
         console.warn('长文本预取不可用，搜索结果将只覆盖已加载部分', e);
       } finally {

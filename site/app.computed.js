@@ -52,16 +52,11 @@ const APP_COMPUTED = {
       return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.speaker);
     },
 
-    // 搜索是否正在等长文本就绪（2026-09-30）
-    // 简介/摘要已被剥离出主分片（走 detail 桶），若用户搜的内容可能落在长文本里，就必须等
-    // 16 桶到位再渲染结果 —— 否则会先给一部分、随后条数跳变、摘要逐条冒出（用户实测体验差）。
-    // 「题目 / 地点 / 单位」三个维度只读结构化字段，不依赖长文本，可立即出结果，不阻塞。
-    searchPending() {
-      if (!this.query.trim()) return false;
-      if (this._ltAllLoaded || this._ltUnavailable) return false;
-      const f = this.searchField;
-      return f !== 'topic' && f !== 'location' && f !== 'college';
-    },
+    // 长文本（简介/摘要）不再阻塞搜索（2026-09-30 用户定）：
+    // 原 searchPending 会在「搜索可能命中长文本且 16 桶未就绪」时挡住结果并弹等待提示；
+    // 现改为「首屏即后台静默预取」（见 app.data._loadStaticLatest）＋「先出结果、到齐静默补全」：
+    // 未就绪时 filtered 照样用已到数据出结果，桶到达后 this._longText 变更触发响应式自动补全，
+    // 故不再需要任何等待/提示。该计算属性已删除。
 
     // 复合筛选 + 按讲座时间倒序
     filtered() {

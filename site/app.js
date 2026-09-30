@@ -71,8 +71,9 @@ const app = createApp({
     // 任一筛选条件变化，回到第一页
     query() {
       this.currentPage = 1;
-      // 简介/摘要在主分片之外（detail 桶），搜索需要它们才能命中长文本。
-      // 此处既启动预取，也让 searchPending 接管「等就绪再渲染」，避免结果先给一半再跳变。
+      // 长文本（简介/摘要）在主分片之外（detail 桶），搜索命中长文本时需要它们。
+      // 首屏已自动后台预取（app.data._loadStaticLatest），这里再幂等触发一次兜底；
+      // 即便尚未就绪，搜索也不再等待——先出已到结果，桶到齐后自动补全。
       this._ensureLongTextAll();
     },
     searchField() {
