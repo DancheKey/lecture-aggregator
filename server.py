@@ -19,7 +19,8 @@ import hmac
 import secrets
 import threading
 import subprocess
-import yaml
+import yaml           # 仅用于读取其它 yaml（如给 scraper 用的辅助脚本）；sources.yaml 走 ruamel
+import ruamel.yaml
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -62,6 +63,24 @@ LIKE_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同
 WANT_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同想听动作只接受一次（允许 want↔unwant 交替）
 LIKE_CAP = 999                         # 单条讲座点赞数上限（防慢速刷高；unlike 仍可继续减）
 MAX_BODY_BYTES = 1_000_000             # 请求体上限 1MB（本地 API 的 body 都是几十字节的小 JSON）
+MAX_SOURCES = 500                      # 信息源条数上限（当前 19 条。防POST 循环写入把yaml 撑成几万条，
+                                        # 且每个源都会被 daily.yml 真实抓取——几百个源会让CI 跑一整天。
+                                        # 超限直接 400，语义与既有校验一致）
+
+def _yaml_rt():
+    """sources.yaml 专用的 ruamel round-trip YAML 实例（**不要**改成 yaml.safe_load/dump）。
+
+    三个参数都是实测选定的，理由见下：
+    - round-trip（YAML() 默认）：保留注释与引号风格，这是换掉 PyYAML 的全部意义。
+    - indent(mapping=2, sequence=2, offset=0)：与仓库现有 sources.yaml 的缩进风格**逐字节一致**。
+      默认（sequence=4, offset=2）会把每行列表都多缩进 2 格，产生 600+ 行无意义 diff。
+    - width=4096：避免长 URL 被折行（折行后 YAML 语义不变，但 diff 很难读）。
+    """
+    y = ruamel.yaml.YAML()
+    y.preserve_quotes = True
+    y.width = 4096
+    y.indent(mapping=2, sequence=2, offset=0)
+    return y
 
 # ---- 写接口管理凭证（2026-09-26 审计 P1-2）----
 # 此前 sources CRUD 与 /api/scrape 的唯一防线是 _is_local_origin——而它对
@@ -159,7 +178,8 @@ def _load_stat_files():
     global _site_visits, _lecture_stats
     try:
         if os.path.exists(VISITS_PATH):
-            _site_visits = json.load(open(VISITS_PATH, encoding='utf-8')) or {'total': 0}
+            with open(VISITS_PATH, encoding='utf-8') as f:
+                _site_visits = json.load(f) or {'total': 0}
     except Exception as e:
         _warn(f'站点访问量加载失败，本次从 0 开始（{VISITS_PATH}）：{type(e).__name__}: {e}')
         _site_visits = {'total': 0}
@@ -168,7 +188,8 @@ def _load_stat_files():
         _site_visits['by_day'] = {}
     try:
         if os.path.exists(LECTURE_STATS_PATH):
-            _lecture_stats = json.load(open(LECTURE_STATS_PATH, encoding='utf-8')) or {}
+            with open(LECTURE_STATS_PATH, encoding='utf-8') as f:
+                _lecture_stats = json.load(f) or {}
     except Exception as e:
         _warn(f'讲座统计加载失败，点赞/想听计数将全部归零（{LECTURE_STATS_PATH}）：'
               f'{type(e).__name__}: {e}')
@@ -303,15 +324,28 @@ class Handler(SimpleHTTPRequestHandler):
     # ---- 信息源 CRUD ----
 
     def _load_sources(self):
+        """读 sources.yaml。**必须**用 ruamel round-trip（不能退回 yaml.safe_load）。
+
+        原因：sources.yaml 里有 19 行人工维护的注释（栏目 URL 约定、死链说明、
+        JS 渲染翻页的取舍记录等）。safe_load 丢注释 → 任何一次写接口
+        （POST/PUT/DELETE）都会把整份文件重写成无注释版，知识静默蒸发。
+        round-trip 的CommentedMap/CommentedSeq 是 dict/list 子类，
+        调用方（append / pop / 逐键赋值 / json.dumps）语义不变。
+        """
         if not os.path.exists(SOURCES_PATH):
             return {'sources': []}
         with open(SOURCES_PATH, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f) or {'sources': []}
+            data = _yaml_rt().load(f)
+        if not data or not isinstance(data, dict) or data.get('sources') is None:
+            #空文件 / 顶层不是 dict / sources 为空值：与原safe_load 的 `or {...}` 同义
+            return {'sources': []}
+        return data
 
     def _save_sources(self, data):
+        """原子写回 sources.yaml，保留注释（见 _load_sources 的说明）。"""
         tmp = SOURCES_PATH + '.tmp'
         with open(tmp, 'w', encoding='utf-8') as f:
-            yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            _yaml_rt().dump(data, f)
         os.replace(tmp, SOURCES_PATH)
 
     def _api_sources_get(self):
@@ -347,6 +381,11 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({'ok': False, 'message': 'name 和 base 为必填项'}, 400)
             return
         data = self._load_sources()
+        # 条数上限：超限直接 400，不落盘（与既有校验同一返回形态）
+        if len(data['sources']) >= MAX_SOURCES:
+            self._send_json({'ok': False,
+                             'message': f'信息源已达上限 {MAX_SOURCES} 条，请先删除不再使用的源'}, 400)
+            return
         new_src = {'name': name, 'campus': campus or '', 'base': base, 'list_urls': list_urls}
         data['sources'].append(new_src)
         self._save_sources(data)
@@ -476,9 +515,14 @@ class Handler(SimpleHTTPRequestHandler):
                 remaining -= len(chunk)
             return {}
         try:
-            return json.loads(self.rfile.read(length))
+            data = json.loads(self.rfile.read(length))
         except (json.JSONDecodeError, ValueError):
             return {}
+        # 2026-09-30：非 dict 的合法 JSON（`[1,2]` / `"x"` / `42` / `null` / `true`）此前
+        # 原样返回给调用方，而全部调用方第一件事就是 body.get(...) → AttributeError
+        # 抛到 handler 外，本线程直接崩（非只影响这一个请求）。
+        # 与非法 JSON 同等处置：按空 body 处理，让调用方走既有的 400 分支。
+        return data if isinstance(data, dict) else {}
 
     def _api_lecture_visit_post(self):
         """记录一次讲座访问：同一 (IP, url) 3 分钟内只计 1 次。"""

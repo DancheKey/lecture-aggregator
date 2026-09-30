@@ -1448,6 +1448,12 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
     seen = set()
     visited_pages = set()
     local = {}
+    # B8（2026-09-30）：列表页取不到内容时的失败记账。见 _process_source 结尾的归类说明。
+    # 三态：list_fetch_fail=取回失败（网络/HTTP/robots）；list_empty_ok=取回成功但 0 条链接
+    # （栏目真空或改版，属正常，不算失败）；list_seen_ok=取回成功且有链接。
+    list_fetch_fail = []
+    list_empty_ok = []
+    list_seen_ok = 0
     try:
         for lu in src.get('list_urls', []):
             if isinstance(lu, dict):
@@ -1457,10 +1463,34 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                 list_url = lu
                 collect_mode = 'auto'
             cur = list_url
+            # 该栏目是否还在翻页。翻页 URL 有两种来源，**可靠性差别极大**：
+            #   ① 配置里写死的 list_url（人工维护，404 确实是故障）
+            #   ② _next_page_url / _sequential_candidate **推导**出来的下一页
+            #       （形如 list/2.html，是「猜」的；源站没有第 2 页时 404 属正常）
+            # ⚠ 只有 ① 取不回才判本源失败。② 取不回只是「没有下一页」，
+            #    若也算失败，则几乎所有源都会因猜出的 /2.html 404 而被判失败
+            #    → 全局水位永久冻结（实测：正常源会被误判成
+            #    「列表页取回失败 1/2」，已由 tests/test_list_page_failure.py 锁住）。
+            on_entry_page = True
             while cur and cur.rstrip('/') not in visited_pages:
                 visited_pages.add(cur.rstrip('/'))
                 html = fetch(cur, allowed_domains=['scnu.edu.cn'])
                 new_count = 0
+                # 列表页取不到正文：此前**无守卫静默空转**——collect_links(None) 返回 []、
+                # 循环体一次都不进、函数末尾 return local, None（= 成功），
+                # 于是本源水位照常推进，而该时段讲座永久漏抓，且 failed_sources
+                # 里没有任何痕迹（这正是 B8 的实质：不是 continue，是静默空转）。
+                # 现在先记账，失败/真空的归类在函数返回前统一做。
+                if not html:
+                    if on_entry_page:
+                        list_fetch_fail.append(cur)
+                        print(f'[LIST-FAIL] {name} | {cur} | 列表页取回失败'
+                              f'（本次本源不推进水位）', file=sys.stderr)
+                    else:
+                        print(f'[PAGE-404] {name} | {cur} | 推导出的翻页页取回失败，'
+                              f'视作「无下一页」（不判本源失败）', file=sys.stderr)
+                    # 与既有逻辑一致：取不到页面就到此为止（_next_page_url(None) 本就返回 None）
+                    break
                 # 列表页条目日期映射。两种用途，故与 LISTDATE 开关解耦：
                 #   ① 条目级跳过（仅 cutoff_date_str 非空且开关开启时生效）；
                 #   ② 翻页停止判据（下方循环尾部，仅增量 + src_latest_date 时生效）。
@@ -1473,7 +1503,16 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                 # 水位误挡新公告。
                 eff_cutoff = _effective_listdate_cutoff(cutoff_date_str, src_latest_date)
                 listdate_skipped = 0
-                for href, txt in collect_links(html, base, list_url=cur, collect_mode=collect_mode):
+                page_links = collect_links(html, base, list_url=cur, collect_mode=collect_mode)
+                if page_links:
+                    list_seen_ok += 1
+                else:
+                    # 取回成功但 0 条：**不**算失败（见函数返回前的三态归类）。
+                    # 实测 2026-09-30：60 个列表页中17 个如此，其中法学院的 77 个 <a>
+                    # 全是导航、讲座正文为空——属栏目真空/改版，判失败会永久冻结
+                    # 全局水位（failed_sources 是全局闸门），代价远大于收益。
+                    list_empty_ok.append(cur)
+                for href, txt in page_links:
                     href_norm = href.rstrip('/')
                     if href_norm in seen:
                         continue
@@ -1553,10 +1592,30 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                 if _stop_paging:
                     break
                 cur = nxt
+                on_entry_page = False   # 后续页均为推导出的翻页页（见上方注释）
                 if len(visited_pages) > 300:
                     print(f'[WARN] {name} 分页超过 300 页，停止跟随')
                     break
         time.sleep(1)
+        # ---- B8 三态归类：只有「列表页取不回正文」才判本源失败 ----
+        # ⚠ failed_sources 在 main() 里是**全局**水位闸门（任一源失败即整轮不推进
+        # last_scrape）。故口径必须分层，否则一个永久死链/改版栏目会把整个增量
+        # 管线永久冻结，退回每轮全量重抓（实测 3.9h）。
+        #   list_fetch_fail 非空 → 判失败（网络/HTTP/robots 导致整页取不回，是真故障）
+        #   list_empty_ok 非空  → 只记日志，不判失败（页面取回了，只是没有讲座条目）
+        if list_fetch_fail:
+            # 分母只数**配置里的 list_url**（list_fetch_fail 与 list_seen_ok、
+            # list_empty_ok 都是入口页；推导页失败不进这些列表——见上方 on_entry_page 注释）。
+            # 若把推导页也算进分母，报错会显示「1/2」这类让人误以为「有一页坏了」的假象。
+            total_cfg = len(src.get('list_urls', [])) or 1
+            if list_empty_ok or list_seen_ok:
+                print(f'[LIST-PARTIAL] {name} | {len(list_fetch_fail)} 页取回失败、'
+                      f'{list_seen_ok} 页有内容、{len(list_empty_ok)} 页无条目', file=sys.stderr)
+            return local, (f'{name}: 列表页取回失败 {len(list_fetch_fail)}/{total_cfg}'
+                           f'（首个：{list_fetch_fail[0]}）')
+        if list_empty_ok and not list_seen_ok:
+            print(f'[LIST-EMPTY] {name} | {len(list_empty_ok)} 个列表页取回成功但 0 条讲座条目'
+                  f'（栏目真空或改版，按成功处理；如长期为 0 请人工确认源是否已迁移）', file=sys.stderr)
     except Exception as e:
         print(f'[ERROR] 信息源「{name}」抓取失败：{e}', file=sys.stderr)
         # 2026-08-05 体检修复（严重-3）：把失败上报给调用方。此前异常仅打印后吞掉，

@@ -88,3 +88,31 @@ jobs:
       # 锁住「逐帧单调不减」「终值收敛到真实总数」「不许退回固定时长」三条不变量。
       - name: Run header count animation test
         run: node tests/js/app_count_animation.js
+      # 2026-09-30 纳入 3 套此前**未被任何 workflow 引用**的测试（CI 审计发现）。
+      # 三者都覆盖「静默漏抓/静默重复抓取」这条最贵的失败模式，恰恰是规则改动最密集处：
+      #   test_ledger     —— 被拒 URL 台账（gy/zhx/ibrr 等源曾单轮白抓 586 页、净新增 0）
+      #   test_listdate   —— 列表页条目日期过滤的水位口径（哲社曾落后 4876 天）
+      #   test_admin_notice_ad3 —— 事务性通知负向规则（负例挡错、正例须放行）
+      # 均纯离线、秒级完成。⚠ test_server 需要 ruamel.yaml（B4 注释保全所引入），
+      # 故下面单独一步装 requirements.txt。
+      - name: Install server deps (ruamel for sources.yaml round-trip)
+        run: pip install -r requirements.txt
+      - name: Run rejected-URL ledger tests
+        run: python tests/test_ledger.py
+      - name: Run listdate cutoff tests
+        run: python tests/test_listdate.py
+      - name: Run admin notice AD3 tests
+        run: python tests/test_admin_notice_ad3.py
+      # 2026-09-30 引入 server.py 的**首个**测试集（此前零覆盖）。锁两个真实缺陷：
+      #   B4 sources.yaml 写接口丢 19 行人工注释（PyYAML dump 不保注释）
+      #   B3 非 dict JSON body 使调用方 AttributeError 崩线程
+      # 全部用例在 tempfile 里读写sources 副本，零网络、绝不触碰真实文件。
+      - name: Run server tests
+        run: python tests/test_server.py
+      # 2026-09-30 引入：列表页取回失败必须进 failed_sources（B8）。
+      # 此前 fetch 返回 None → collect_links([]) → 循环不进 → return None（=成功）
+      # → 水位照常推进 → 该时段讲座永久漏抓且无任何痕迹。
+      # 本套件同时锁死三态分层：只「取不回」判失败，「取回但0 条」不判
+      # （否则栏目改版会永久冻结全局水位闸门）。
+      - name: Run list-page failure accounting tests
+        run: python tests/test_list_page_failure.py

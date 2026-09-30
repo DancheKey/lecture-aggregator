@@ -3,3 +3,7 @@
 requests==2.34.2
 beautifulsoup4==4.14.2
 pyyaml==6.0.3
+# 2026-09-30：sources.yaml 往返改用 ruamel 的 round-trip 模式，保住文件里的
+# 19 行人工注释（PyYAML 的 safe_load/dump 会把它们全丢掉）。
+# 不再依赖 PyYAML 写 sources.yaml，但它仍被其它脚本读取，故保留。
+ruamel.yaml==0.19.1

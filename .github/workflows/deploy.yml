@@ -18,7 +18,81 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ---- 门禁：测试不绿就不许上线（2026-09-30 打通 CI 补）----
+  # 此前 deploy.yml 是单 job、无 needs，与 test.yml 互不阻塞 →
+  # 「测试全红照样上线」。本次 push 前的全量门禁跑在另一个工作流里，
+  # 与本工作流无任何依赖关系，故此处显式重跑同一套门禁。
+  #⚠ 选这个方案而非 on: workflow_run（跨工作流门禁）的原因：
+  #   workflow_run 只在其工作流文件**已存在于默认分支**时才触发；
+  #   一旦 test.yml 被改名/误删，部署会**静默不再触发**，公网每天的数据更新无声停摆。
+  #   门禁 job 随push 必然触发，代价只是重复跑一遍（纯离线、分钟级）。
+  # ⚠ GATE_TESTS 清单必须与 .github/workflows/test.yml 的步骤保持一致；
+  #   漂移由 tests/test_ci_gate_coverage.py 断言（缺一个即红）。
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            scraper/requirements.txt
+            requirements.txt
+      - name: 安装解析器依赖
+        run: pip install -r scraper/requirements.txt
+      - name: 安装后端依赖（ruamel 用于 sources.yaml 往返保注释）
+        run: pip install -r requirements.txt
+      - name: 跑全量门禁
+        env:
+          GATE_TESTS: >-
+            tests/test_parser_golden.py
+            tests/test_frontend_consistency.py
+            tests/test_timeparse.py
+            tests/test_hallucination_guard.py
+            tests/test_data_quality.py
+            tests/test_multi_session_split.py
+            tests/test_hybrid.py
+            tests/test_cited_judge.py
+            tests/test_bio_bracket.py
+            tests/test_location_prefix.py
+            tests/test_frontend_schema.py
+            tests/test_parser_snapshot.py
+            tests/test_stage_var_leak.py
+            tests/test_ledger.py
+            tests/test_listdate.py
+            tests/test_admin_notice_ad3.py
+            tests/test_server.py
+            tests/test_list_page_failure.py
+            tests/test_ci_gate_coverage.py
+            tests/js/app_bundle_smoke.js
+            tests/js/app_longtext_flow.js
+            tests/js/app_clamp_consistency.js
+            tests/js/app_count_animation.js
+        run: |
+          set -euo pipefail
+          rc=0
+          for t in $GATE_TESTS; do
+            case "$t" in
+              *.js) cmd="node $t" ;;
+              *)cmd="python $t" ;;
+            esac
+            echo "::group::$cmd"
+            if ! $cmd; then rc=1; echo "::endgroup::"; echo "FAILED: $cmd"; else echo "::endgroup::"; fi
+          done
+          if [ "$rc" -ne 0 ]; then
+            echo "门禁未通过，终止部署。"
+            exit 1
+          fi
+
   deploy:
+    # 门禁未绿则不部署——这就是「CI 打通」的全部含义。
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
