@@ -460,6 +460,71 @@ _SPK_TAIL_DUTY_PREFIX_RE = re.compile(
     r'(?:' + '|'.join(re.escape(w[0]) for w in _SPK_TAIL_DUTY_WORDS) + r')'
     r'[\u4e00-\u9fff]?$')
 
+# ────────────────────────────────────────────────────────────────────────────
+# 姓名切点词表（2026-10-01 方案 A）
+#
+# 由来：姓名原先是**按 4→3→2 字贪心截取**的，职称词边界完全不参与 → 切在职称
+# 中间就只剩首字（「王增建特聘研究员」→「王增建特」；全库回源页实证 9 条，
+# 见 scripts/scan_title_fragment_residues.py）。修法：先在讲者串里定位**职称词的
+# 起始位置**，以它作切点取姓名，而不是按字数硬截。
+#
+# ⚠ 与 _TITLE_ALT_FULL 的区别（关键，别混用）：
+#   _TITLE_ALT_FULL 是**剥离**语义——作用于整串、把职称及其后内容全部丢弃，
+#   且它会被用在括号/单位串上（职务词混进去会吃掉单位，psy127 实测把
+#   「浙江大学心理与行为科学系」错成「中国心理学会」）。
+#   本表**只取位置**，且切点必须落在 [2,4] 且切片通过 _looks_like_real_name
+#   才采纳 —— 单位里的职称词（位置远大于 4）天然不会被误切，语义上安全。
+#
+# ⚠ 刻意不改 field_vocab.strip_name_title_suffix 的口径：那是讲者**归一键**的
+#   依据，动它会让跨源合并目标整体变化。本表只影响「姓名切多长」，不影响归一。
+#
+# ⚠ 词表从 field_vocab 派生而非手抄：避免出现第三份语义分叉（G4 收敛的教训）。
+# ────────────────────────────────────────────────────────────────────────────
+_SPK_CUT_EXTRA_WORDS = (
+    # 岗位/学历类：不在 field_vocab 两张表内，但对切姓名同样构成边界。
+    # 「研究」应对「张炼研究科学家」（maths/7620 实证，cut 须落在 2 而非 4）；
+    # 「编审」应对「刘曙光编审、研究员」（psy/196 实证）；出版/新闻序列同理。
+    '研究科学家', '研究', '科学家', '硕博', '研究生', '博士生', '硕士生',
+    '编审', '副编审', '高级编辑', '主任编辑',
+)
+# 修饰词组合：_TITLE_ALT_FULL 只收了「特聘研究员/特聘教授」，但源页同样常见
+# 「特聘副研究员」（蒋雅丽 psy/1633、于洛迪 psy/1683 实证）——写成正则组合
+# 比逐个列举更稳，覆盖 青年/资深/特聘/长聘… × 副/助理 × 研究员/教授/讲师。
+_SPK_CUT_MOD_PAT = (r'(?:青年|资深|特聘|长聘|客座|兼职|访问|荣誉|杰出|首席|优秀)?'
+                    r'(?:副|助理)?(?:研究员|教授|讲师|科学家)')
+_SPK_CUT_TITLE_RE = re.compile(
+    r'(?:' + '|'.join(re.escape(w) for w in sorted(
+        set(_fv.NAME_TITLE_SUFFIXES) | set(_fv.ORG_TITLE_SUFFIXES)
+        | set(_SPK_TAIL_DUTY_WORDS) | set(_SPK_CUT_EXTRA_WORDS),
+        key=len, reverse=True)) + r'|' + _SPK_CUT_MOD_PAT + r')')
+
+# 字段标签也构成姓名边界：源页「专家姓名：赵蕙心 工作单位：东方财富…」
+# （em/9240 实证 speaker='赵蕙心工'，多出的「工」来自标签而非职称）。
+_SPK_CUT_LABEL_RE = re.compile(r'(?:工作单位|所在单位|研究方向|职务|职称)')
+
+
+def _speaker_name_cut(sp, sp_clean):
+    """在「姓名+职称」连写串里定位职称词起始位置 → 应取的姓名长度；None=不适用。
+
+    只采纳落在 [2,4] 的切点：短于 2 会切出单字姓名；长于 4 说明该职称词属于后面
+    的单位串（如「张三北京大学教授」的「教授」在位置 7）而非姓名后缀。
+    括号内（单位）一律不参与搜索——职务词在单位里是合法构成分。
+    """
+    for src in (sp_clean, sp):
+        if not src:
+            continue
+        head = re.split(r'[（(]', src, 1)[0]   # 只看第一个左括号之前
+        best = None
+        for pat in (_SPK_CUT_TITLE_RE, _SPK_CUT_LABEL_RE):
+            for m in pat.finditer(head):
+                if 2 <= m.start() <= 4 and (best is None or m.start() < best):
+                    best = m.start()
+            if best is not None:
+                break
+        if best is not None:
+            return best
+    return None
+
 # O6d-2.5 边界字符类：候选姓名词两侧须为「空白或标点」。同时覆盖 ASCII 与全角
 # （之前版本漏了 ASCII 逗号 ','，导致「张世海,」这类紧邻半角逗号的名字整组漏匹配）。
 _ISO_BOUND = r'[\s　（）()，、；:：]'
@@ -4475,13 +4540,31 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
                 # 从 4 字到 2 字降序尝试，取最长有效姓名。
                 # 原「{2,4}」贪婪匹配后只做一次守卫：当 4 字无效时无法回退到 3 字/2 字，
                 # 导致「陈玺上海大学…」被整个当成 speaker。
+                #
+                # ── 2026-10-01 方案 A：优先按「职称词边界」切姓名 ──
+                # 纯字数贪心不认识职称边界，会把职称首字吞进姓名（「王增建特聘研究员」
+                # →「王增建特」）。故先尝试用职称词起始位置作切点；切点不可靠时
+                # 才回落到原贪心（无职称连写、或职称词落在单位里）。
+                # 切点切出的候选**必须自己通过 _looks_like_real_name**，否则不用。
                 nm = None
-                _max_len = min(4, len(sp_clean))
-                for _l in range(_max_len, 1, -1):
-                    _nm = re.match(rf'^([\u4e00-\u9fff]{{{_l}}})', sp_clean)
-                    if _nm and _looks_like_real_name(_nm.group(1)):
-                        nm = _nm
+                for _sp_c, _sc in ((sp, sp_clean), (_sp_flat, sp_clean_flat)):
+                    _cut = _speaker_name_cut(_sp_c, _sc)
+                    if not _cut or len(_sc) < _cut:
+                        continue
+                    _cand = _sc[:_cut]
+                    if (re.fullmatch(r'[\u4e00-\u9fff]{2,4}', _cand)
+                            and _looks_like_real_name(_cand)):
+                        nm = re.match(rf'^([\u4e00-\u9fff]{{{_cut}}})', _sc)
+                        sp, sp_clean = _sp_c, _sc   # 后续 rest 按同一 cut 切，须同步
                         break
+                if nm is None:
+                    # 切点不可用（无职称连写 / 职称词在单位里 / 切片不像人名）→ 回落原贪心
+                    _max_len = min(4, len(sp_clean))
+                    for _l in range(_max_len, 1, -1):
+                        _nm = re.match(rf'^([\u4e00-\u9fff]{{{_l}}})', sp_clean)
+                        if _nm and _looks_like_real_name(_nm.group(1)):
+                            nm = _nm
+                            break
                 if nm is None:
                     # 保留空格取不到（姓名内部被误插空格 / 纯粘连无空格）→ 回落删空格版
                     sp = _sp_flat

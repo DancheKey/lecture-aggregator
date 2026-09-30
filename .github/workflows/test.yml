@@ -140,3 +140,10 @@ jobs:
       # 截断成「中国心理学会」。
       - name: Run speaker duty-suffix tests
         run: python tests/test_speaker_duty_suffix.py
+
+      # 讲者姓名切点（2026-10-01）：姓名原先按字数贪心截取，不认职称边界，
+      # 会把职称首字吞进姓名。本套件锁「按职称词起始位置切」的正例，
+      # 并锁两条反向约束——真人名（周博/胡理/王硕…）不得被误切、
+      # 单位里的职称不得被当切点。
+      - name: Run speaker name cut-point tests
+        run: python tests/test_speaker_title_cut.py
