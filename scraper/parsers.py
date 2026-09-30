@@ -1913,39 +1913,6 @@ def _vlm_try_one_provider(message, cfg, proxies, rpm=None):
     return None, False
 
 
-def _vlm_split_title(original_title, session_number, item_title):
-    """多讲座海报拆分时，生成与其它卡片一致的标题。
-
-    例：原标题「学者讲坛第7-9讲丨阿伯丁大学教师主讲...」，session_number=第七讲，
-        item_title=A Brief Introduction... → 「学者讲坛第7讲丨A Brief Introduction...」
-    """
-    if not item_title:
-        return original_title
-    # 提取 session_number 中的序号（阿拉伯或中文数字）
-    num = None
-    m = re.search(r'(\d+)', session_number or '')
-    if m:
-        num = int(m.group(1))
-    else:
-        cn = {'十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15,
-              '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10}
-        s = session_number or ''
-        for k, v in sorted(cn.items(), key=lambda x: -len(x[0])):
-            if k in s:
-                num = v
-                break
-    if not num:
-        return item_title
-    # 匹配原标题中的「前缀 + 第...讲/期 + 分隔符」
-    for unit in ('讲', '期'):
-        pat = rf'^(.*?第)(?:[一二三四五六七八九十百零0-9\-—–]+)({unit}[丨|｜\|\\/\s]*)'
-        mm = re.search(pat, original_title or '')
-        if mm:
-            return mm.group(1) + str(num) + mm.group(2) + item_title
-    # 兜底：直接用「第N讲丨单讲题目」
-    return f'第{num}讲丨{item_title}'
-
-
 def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_year,
                           poster_only=False):
     """把 VLM 结构化字段填入 result（非空才填，不覆盖已有）。
@@ -1953,49 +1920,29 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
     若 f 为 dict（单场讲座）：返回时间 dict 或 None（与原逻辑一致）。
     若 f 为 list（多场讲座）：返回 [(partial_result, t), ...] 列表。
 
-    poster_only=True 时，VLM 来自海报结构化提取，对标题优先信任：
-    若现有 title 只是系列活动通称（如「第N期教学工作坊」），而 VLM 给出了
-    真实讲座主题，则用 VLM 主题替换 title，并把 VLM topic（常为副标题）合并
-    到 title，使卡片标题展示讲座实质内容。
+    ⚠ title 恒取自源页列表标题（listTitle），VLM/OCR 不得改写（2026-09-30 用户决策，方案A）：
+    海报/图片读到的主题只写入 topic（单场题目），title 保持源页条目名不变——卡片标题
+    必须与源页列表条目一一对应，用户点进源页才认得；与规则层多场拆分口径
+    （title=列表标题/系列名，topic=单场题目，见 _build_multi_records）保持一致。
+    仅当 title 为空（源页尚无标题）时，才由下方字段回填循环以 VLM 值兜底填空。
     """
     f = _normalize_vlm_keys(f)
     if isinstance(f, list):
         # 多讲座拆分：对每场讲座生成独立的 partial result
         results = []
-        original_title = result.get('title', '')
         for item in f:
             r = result.copy()  # 浅拷贝（讲座特有字段会被覆盖，通用字段保留）
             r['sessionNumber'] = (item.get('sessionNumber') or '').strip()
-            item_title = (item.get('title') or '').strip()
-            # 多场时保留系列标题前缀（如「学者讲坛第N讲丨」），单讲英文题目作为题目部分，
-            # 使卡片标题与其它讲座保持一致。
-            if item_title:
-                r['title'] = _vlm_split_title(original_title, r['sessionNumber'], item_title)
+            # title 不改写（方案A）：多场共享源页列表标题，各场差异由 topic 体现。
             t = _apply_vlm_to_result(r, item, default_year, publish_time, title_year, url_year)
             results.append((r, t))
         return results
 
     # --- 单场讲座（原逻辑）---
-    # poster_only 场景：VLM 从海报直接读取，其 title 是真实讲座主题；
-    # 若现有 title 只是系列活动通称（如「第N期教学工作坊」），优先用 VLM 主题。
+    # poster_only 场景：VLM 从海报直接读取。此处只回填期号；
+    # title 不改写（方案A，2026-09-30）——此前海报页会在 title 含「工作坊」等
+    # 系列通称词时用 VLM 主题替换 title，导致卡片标题与源页列表条目名不一致。
     if poster_only:
-        vlm_title = _clean_title((f.get('title') or '').strip())
-        vlm_topic = _clean_title((f.get('topic') or '').strip())
-        orig_title = (result.get('title') or '').strip()
-        if vlm_title and vlm_title not in orig_title:
-            series_keywords = ('教学工作坊', '学者讲坛', '工作坊')
-            is_series = any(k in orig_title for k in series_keywords)
-            # 也覆盖极短/无意义标题
-            if is_series or len(orig_title) < 5:
-                new_title = vlm_title
-                if vlm_topic:
-                    if vlm_topic.startswith(('——', '--', '—', '-')):
-                        new_title = new_title + vlm_topic
-                    else:
-                        new_title = new_title + '——' + vlm_topic
-                result['title'] = new_title
-                result['topic'] = ''
-        # VLM 给出的期号回填
         vlm_session = (f.get('sessionNumber') or '').strip()
         if vlm_session and not result.get('sessionNumber'):
             result['sessionNumber'] = vlm_session
