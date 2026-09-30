@@ -71,14 +71,16 @@ const app = createApp({
     // 任一筛选条件变化，回到第一页
     query() {
       this.currentPage = 1;
-      // 简介/摘要已从主分片剥离（按需加载），搜索需要它们才能命中长文本。
-      // 输入停顿后后台预取全量，_longText 更新会让 computed 自动重算。
-      if (this.query) this._prefetchLongText();
+      // 简介/摘要在主分片之外（detail 桶），搜索需要它们才能命中长文本。
+      // 此处既启动预取，也让 searchPending 接管「等就绪再渲染」，避免结果先给一半再跳变。
+      this._ensureLongTextAll();
     },
     searchField() {
       this.currentPage = 1;
-      if (this.query) this._prefetchLongText();
+      this._ensureLongTextAll();
     },
+    // 翻页也是「用户在深挖」的信号：提前把长文本拉齐，翻到哪页简介与摘要都已在手
+    currentPage() { this._ensureLongTextAll(); },
     campus() { this.currentPage = 1; },
     college() { this.currentPage = 1; },
     year() { this.currentPage = 1; },

@@ -243,9 +243,24 @@ Object.assign(APP_METHODS, {
       await this._loadDetailBucket(idx);
     },
 
-    // 搜索需要简介/摘要正文才能命中：后台预取全量，完成后 computed 自动重算
+    /* ---------- 长文本（简介/摘要）预取 ---------- */
+    // 模板入口：聚焦搜索框即预热（模板不宜直接调用下划线开头的内部方法）
+    warmLongText() { this._ensureLongTextAll(); },
+
+    // 交互即预取（2026-09-30 用户定）：滚动 / 聚焦搜索框 / 翻页任一发生，就后台拉全部 16 桶。
+    // 起因：长文本被剥离后，只有首屏 50 条带简介与摘要，其余卡片要等搜索或展开才补 ——
+    // 表现为「搜索出的卡片先没有简介/摘要，过一会儿整块冒出来」，体验差。
+    // 幂等：已全量就绪 / 正在预取 / 已判定不可用 时直接返回，故可挂在任何高频事件上。
+    _ensureLongTextAll() {
+      if (this._ltUnavailable || this._ltSearching) return;
+      if (this._ltAllLoaded && !this._ltIncomplete) return;
+      this._prefetchLongText();
+    },
+
+    // 全量预取：4 路并发拉 16 桶（gzip 后约 1.6MB），完成后 _ltAllLoaded 置位。
     async _prefetchLongText() {
-      if (this._ltAllLoaded || !this.query || this._ltSearching) return;
+      if (this._ltUnavailable || this._ltSearching) return;
+      if (this._ltAllLoaded && !this._ltIncomplete) return;
       this._ltSearching = true;
       try {
         const man = await this._ltManifestJson();
@@ -257,9 +272,23 @@ Object.assign(APP_METHODS, {
           while (cur < idxs.length) await this._loadDetailBucket(idxs[cur++]);
         };
         await Promise.all(Array.from({ length: Math.min(CONC, idxs.length) }, worker));
+        // 搜索放行与「是否拉齐」解耦：_ltAllLoaded 一经首轮结束就置位（缺桶不阻塞搜索，
+        // 否则弱网下单桶失败会让搜索永远停在等待态）；_ltIncomplete 只用于允许后续交互补拉。
+        const got = Object.keys(this._ltLoaded).length;
         this._ltAllLoaded = true;
+        this._ltIncomplete = got < idxs.length;
+        if (this._ltIncomplete) {
+          this._ltRetry = (this._ltRetry || 0) + 1;
+          if (this._ltRetry > 2) this._ltIncomplete = false;   // 连续补不齐则放弃，避免反复空跑
+          else console.warn(`长文本桶未拉齐（${got}/${idxs.length}），下次交互将补拉失败桶`);
+        } else {
+          this._ltRetry = 0;
+        }
       } catch (e) {
-        console.warn('长文本预取失败，搜索将只覆盖已加载部分', e);
+        // 清单/整批不可用：必须置位，否则 searchPending 会永久为真 → 搜索结果永远不显示。
+        // 退化为「就绪多少显示多少」（即 2026-09-30 之前的旧行为）。
+        this._ltUnavailable = true;
+        console.warn('长文本预取不可用，搜索结果将只覆盖已加载部分', e);
       } finally {
         this._ltSearching = false;
       }

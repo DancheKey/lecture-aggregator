@@ -200,8 +200,12 @@ Object.assign(APP_METHODS, {
       if (typeof document === 'undefined') return;
       // 签名守卫：只在本页内容/筛选/展开态/视口宽度变化时重测。
       // 必须要有——页面有秒级 tick（倒计时）会每秒触发 updated，否则每秒重排测量。
+      // 2026-09-30 补 _longText 键数：长文本是后到的（detail 桶），到达后卡片上会**新出现**
+      // 「简介/摘要」区块，若不进签名则整个测量被跳过 → 这些新元素测不到溢出 →
+      // 「展开简介/展开摘要」按钮不显示，而 _clampMeasured 已为 true，字符数兜底也已失效。
       const sig = [this.currentPage, this.query, this.campus, this.college, this.year,
         this.all.length, this.dataStage, window.innerWidth,
+        Object.keys(this._longText).length,
         JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio)].join('|');
       if (sig === this._clampSig) return;
       this._clampSig = sig;

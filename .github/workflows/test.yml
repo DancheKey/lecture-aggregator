@@ -69,3 +69,9 @@ jobs:
       # 秒级完成、无需浏览器与网络。
       - name: Run frontend bundle smoke test
         run: node tests/js/app_bundle_smoke.js
+      # 2026-09-30 纳入：长文本（简介/摘要）加载流程。bio+abstract 占数据 68%，已从主分片
+      # 剥离到 16 个 detail 桶，「何时拉、搜索要不要等、缺桶怎么办」全靠前端状态机自洽；
+      # 这些分支在浏览器里只有弱网 / 清缓存后才显现，CI 里无从观察。用真实分片 + fetch 桩
+      # 覆盖全部分支，纯 node、无浏览器无网络，秒级完成。
+      - name: Run long-text loading flow test
+        run: node tests/js/app_longtext_flow.js

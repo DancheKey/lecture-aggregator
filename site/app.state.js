@@ -50,15 +50,19 @@ const APP_STATE = function () {
       displayTotal: 1,
       displaySource: 1,
       loadedChunks: 0,   // 分片加载断点续传：已成功加载的分片数
-      // ---- 长文本（简介/摘要）按需加载，2026-09-28 ----
+      // ---- 长文本（简介/摘要）加载：2026-09-28 剥离，2026-09-30 改「交互即预取」----
       // 主分片只带结构化字段：bio+abstract 占 68% 体积，而列表默认只显示 2~6 行 clamp。
-      // 策略：展开某条 -> 拉该条所在的 1 桶；搜索 -> 预取全量（能力不丢，只是延后加载）。
+      // 策略：展开某条 -> 拉该条所在的 1 桶；用户一有交互（滚动 / 聚焦搜索框 / 翻页）就
+      // 后台预取全量 16 桶，使卡片的简介与摘要随列表「同步」出现，而不是先渲染空壳再逐条补上。
       _longText: {},      // key -> {speakerBio, abstract}
       _ltFull: {},        // key -> true：已拿到全文（区别于 latest.json 的截断预览）
       _ltPending: {},     // key -> true：该桶正在加载
       _ltLoaded: {},      // 桶号 -> true
       _ltManifest: null,  // detail 清单
       _ltAllLoaded: false,
-      _ltSearching: false // 搜索触发的后台预取进行中
+      _ltSearching: false,  // 后台预取进行中（交互触发或搜索触发）
+      _ltUnavailable: false, // 清单拿不到等整体失败：搜索不再等待，退化为「就绪多少显示多少」
+      _ltIncomplete: false, // 首轮有桶失败：允许后续交互补拉（不影响搜索放行）
+      _ltRetry: 0           // 补拉轮次，超过上限即放弃，避免反复空跑
     };
 };

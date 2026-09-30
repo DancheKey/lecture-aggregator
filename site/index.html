@@ -287,11 +287,12 @@
                   <span class="text-slate-300">·</span>
                   覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知
                 </template>
-                <template v-if="filtered.length !== totalCount">
+                <!-- 搜索等长文本期间不显示筛选条数：否则会先亮出一个不完整的数字，等桶到位再跳变 -->
+                <template v-if="!searchPending && filtered.length !== totalCount">
                   <span class="text-slate-300">·</span>
                   当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
                 </template>
-                <template v-else-if="displayUpdatedAt && !hasActiveFilter && dataStage === 'full'">
+                <template v-else-if="!searchPending && displayUpdatedAt && !hasActiveFilter && dataStage === 'full'">
                   <span class="text-slate-300">·</span>
                   更新于 {{ displayUpdatedAt.slice(0, 10) }}
                 </template>
@@ -300,7 +301,7 @@
               <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <!-- 搜索框：移动端弹性占满剩余空间，桌面端固定宽度 -->
                 <div class="relative flex-1 sm:flex-none sm:w-44 min-w-0">
-                  <input v-model="query" type="search" :placeholder="searchPlaceholder"
+                  <input v-model="query" type="search" :placeholder="searchPlaceholder" @focus="warmLongText()"
                     class="w-full px-3 py-1.5 text-12pt rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
                   <button v-if="query" type="button" @click="query = ''"
                     class="search-clear"
@@ -341,6 +342,12 @@
 
           <!-- 时间线 -->
           <div v-if="loading" class="text-center text-slate-400 py-16 text-12pt">数据加载中…</div>
+          <!-- 搜索等长文本就绪（2026-09-30）：简介/摘要在主分片之外（detail 桶），等齐再一次性渲染，
+               避免「结果先给一半 → 条数跳变 → 摘要逐条冒出」。题目/地点/单位三个维度不依赖长文本，
+               不会走到这里。仅复用既有 utility 类，不引入新的（产物是按需子集，新类会静默失效）。 -->
+          <div v-else-if="searchPending" class="text-center text-slate-400 py-16 text-12pt">
+            正在加载完整内容（讲者简介与摘要）…
+          </div>
           <div v-else-if="filtered.length">
             <div v-for="g in pagedGroups" :key="g.key" class="mb-2">
               <div class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">

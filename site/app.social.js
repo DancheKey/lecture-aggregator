@@ -264,7 +264,11 @@ Object.assign(APP_METHODS, {
     },
     /* ---------- 回到顶部 ---------- */
     onScroll() {
-      this.showBackTop = (window.scrollY || window.pageYOffset || 0) > 400;
+      const y = window.scrollY || window.pageYOffset || 0;
+      this.showBackTop = y > 400;
+      // 滚动 = 最早的真实交互信号：立刻后台预取长文本，让往下翻时简介与摘要已在手
+      // （幂等，内部有就绪/进行中/不可用三重短路，挂在 scroll 上无额外开销）
+      if (y > 120) this._ensureLongTextAll();
     },
     scrollToTop() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
