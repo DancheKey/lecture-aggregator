@@ -21,7 +21,9 @@ jobs:
           cache: pip
           cache-dependency-path: scraper/requirements.txt
       - name: Install deps
-        run: pip install -r scraper/requirements.txt
+        run: |
+          pip install -r scraper/requirements.txt
+          pip install -r requirements.txt
       # 密封化回归（HTML/VLM 响应均已固化为 tests/fixtures/，离线可跑；失败即红）
       - name: Run golden-case regression tests
         run: python tests/test_parser_golden.py
@@ -93,10 +95,7 @@ jobs:
       #   test_ledger     —— 被拒 URL 台账（gy/zhx/ibrr 等源曾单轮白抓 586 页、净新增 0）
       #   test_listdate   —— 列表页条目日期过滤的水位口径（哲社曾落后 4876 天）
       #   test_admin_notice_ad3 —— 事务性通知负向规则（负例挡错、正例须放行）
-      # 均纯离线、秒级完成。⚠ test_server 需要 ruamel.yaml（B4 注释保全所引入），
-      # 故下面单独一步装 requirements.txt。
-      - name: Install server deps (ruamel for sources.yaml round-trip)
-        run: pip install -r requirements.txt
+      # 均纯离线、秒级完成。
       - name: Run rejected-URL ledger tests
         run: python tests/test_ledger.py
       - name: Run listdate cutoff tests
