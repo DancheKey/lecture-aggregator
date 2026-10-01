@@ -121,10 +121,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      # test_invariants.py 会 import scraper 模块，其顶层依赖 requests/yaml/bs4 等。
-      # 若未安装，"校验数据不变量"步骤会因 ImportError 直接失败（此前 13:38/14:25 邮件根因）。
+      # test_invariants.py / test_frontend_consistency.py 会 import scraper 模块与 server.py，
+      # 顶层依赖 requests/yaml/bs4/ruamel.yaml 等。缺 ruamel 则一致性守卫模块级 ImportError。
       - name: 安装 Python 依赖
-        run: pip install -r scraper/requirements.txt
+        run: |
+          pip install -r scraper/requirements.txt
+          pip install -r requirements.txt
 
       # 切片新鲜度守卫（2026-08-05 体检修复 中等-19）：部署前由 data/lectures.json
       # 重新生成前端切片，杜绝「手工改了 data/ 却忘跑切片脚本」导致公网切片陈旧。
