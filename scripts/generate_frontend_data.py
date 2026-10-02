@@ -131,7 +131,7 @@ def load_lectures():
 
 
 # load_excluded 已迁移至 scripts/excluded_urls.py（scraper / generate / server 三点共用）
-from excluded_urls import load_excluded  # noqa: E402,F811
+from excluded_urls import load_excluded, is_record_excluded  # noqa: E402,F811
 # 前端下发字段白名单 + 长文本分离（generate / server 两点共用，见 frontend_fields.py 顶部决策记录）
 from frontend_fields import (  # noqa: E402
     strip_frontend_fields, split_long_text, lt_bucket, lt_key, DETAIL_BUCKETS)
@@ -393,7 +393,10 @@ def main():
     excluded = load_excluded()
     if excluded:
         before = len(data)
-        data = [r for r in data if (r.get('sourceUrl') or '').rstrip('/') not in excluded]
+        # 2026-10-02：改用记录级判定（excluded_urls.is_record_excluded）——
+        # 此前只看主 sourceUrl，跨源合并记录的 sources[].sourceUrl 命中名单时
+        # 整条仍会上站（前端「多来源」还能跳到那个已被否决的页面，排除形同虚设）。
+        data = [r for r in data if not is_record_excluded(r, excluded)]
         print(f'[filter] 排除名单过滤: {before} -> {len(data)} (移除 {before - len(data)} 条)')
 
     # 构建 sourceUrl -> 讲座日期集合，用于区分「同一活动的多场」（同天=场）

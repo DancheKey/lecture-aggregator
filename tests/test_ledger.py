@@ -183,6 +183,83 @@ class LedgerIoTest(unittest.TestCase):
             S.load_ledger(os.path.join(d, 'nope.json'))
         self.assertEqual(S._LEDGER, {})
 
+    # ---------- 写侧 TTL 过滤（2026-10-02，B9）----------
+    #
+    # 此前 save_ledger(merge=True) 会把盘上**已过期**条目重新并回 _LEDGER 并原样写盘，
+    # 于是 load 报的「过期作废 N 条」在盘上一个都没少 → 台账永不瘦身。
+    # 下面三例锁住「写盘前按 TTL 过滤」，且与读侧共用 _ledger_is_fresh 判据。
+
+    def _stale_entry(self):
+        d = datetime.date.today() - datetime.timedelta(days=TTL + 1)
+        return {'v': 'rejected', 'd': '2020-01-01', 't': d.isoformat()}
+
+    def test_expired_not_written_back_to_disk(self):
+        """过期条目不得被 merge 回写盘——这是 B9 的核心回归。"""
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            stale_key = U
+            with open(p, 'w', encoding='utf-8') as f:
+                json.dump({'version': 1, 'entries': {stale_key: self._stale_entry()}}, f)
+            _reset()
+            S.load_ledger(p)                       # 内存里已剔除（读侧本就正确）
+            self.assertEqual(S._LEDGER, {}, '前提：读侧已剔除过期条目')
+            S.ledger_add(U2, 'old')                # 触发一次写
+            S.save_ledger(p)
+            raw = json.load(open(p, encoding='utf-8'))
+        self.assertNotIn(stale_key, raw['entries'],
+                         '过期条目被写回盘上台账永不瘦身')
+        self.assertIn(U2, raw['entries'], '有效条目应正常写入')
+
+    def test_write_side_keeps_fresh_entries(self):
+        """写侧过滤不得误伤有效期内的条目。"""
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            S.ledger_add(U, 'rejected')
+            S.save_ledger(p)
+            raw = json.load(open(p, encoding='utf-8'))
+        self.assertIn(U, raw['entries'])
+
+    def test_write_side_drops_dirty_keys(self):
+        """写侧过滤同时清掉形态异常键（与读侧口径一致）。"""
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            S._LEDGER[U] = {'v': 'old', 't': datetime.date.today().isoformat()}
+            S._LEDGER['URL[SKIP-RETRO]'] = {'v': 'old',
+                                           't': datetime.date.today().isoformat()}
+            S.save_ledger(p)
+            raw = json.load(open(p, encoding='utf-8'))
+        self.assertIn(U, raw['entries'])
+        self.assertNotIn('URL[SKIP-RETRO]', raw['entries'],
+                         '形态异常的键运行时永不命中，不该落盘')
+
+    def test_entry_without_timestamp_kept_on_write(self):
+        """缺 t 的异常条目保守保留（读侧既定语义，写侧必须一致）。"""
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            S._LEDGER[U] = {'v': 'old', 'd': '2020-01-01'}      # 无 t
+            S.save_ledger(p)
+            raw = json.load(open(p, encoding='utf-8'))
+        self.assertIn(U, raw['entries'], '缺 t 的条目应保守保留')
+
+    def test_read_and_write_share_same_predicate(self):
+        """静态锁：读侧与写侧必须共用 _ledger_is_fresh，杜绝判据分叉。"""
+        src = open(os.path.join(_ROOT, 'scraper', 'scraper.py'), encoding='utf-8').read()
+        self.assertIn('def _ledger_is_fresh(', src, '应抽出共享判据函数')
+        # 读侧：load_ledger 到下一个顶层 def 之间，不得再有内联的 TTL 计算
+        start = src.index('def load_ledger(')
+        end = src.index('\ndef ', start + 1)
+        load_body = src[start:end]
+        self.assertIn('_ledger_is_fresh', load_body,
+                      'load_ledger 未使用共享判据——读侧与写侧会分叉')
+        self.assertNotIn('timedelta(days=_LEDGER_TTL_DAYS)', load_body,
+                         'load_ledger 里仍有内联的 TTL 计算，应改用 _ledger_is_fresh')
+        # 写侧：save_ledger 同理
+        s2 = src.index('def save_ledger(')
+        e2 = src.index('\ndef ', s2 + 1)
+        save_body = src[s2:e2]
+        self.assertIn('_ledger_is_fresh', save_body,
+                      'save_ledger 未使用共享判据——写侧与读侧会分叉')
+
     def test_corrupt_file_degrades_to_empty(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, 'scrape_ledger.json')

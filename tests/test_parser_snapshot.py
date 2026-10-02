@@ -108,6 +108,15 @@ P._load_vlm_configs = lambda: [{'model': 'snapshot-replay', 'api_key': 'unused',
                                 'base_url': 'http://snapshot-test.invalid/vlm'}]
 P._vlm_cache_path = lambda: VLM_CACHE_FIXTURE
 P._vlm_cache_set = lambda key, val: None
+# ⚠ 2026-10-02：缓存读写已收敛到 scraper/llm_cache.py，parsers 与 llm_provider
+# **共享同一个函数对象**（原先是两份独立实现，可分别打桩）。只桩 P 一侧时，
+# llm_provider 仍会写真实 data/.vlm_cache.json —— 于是「读」命中录制 fixture、
+# 「写」落到真实缓存，两套状态被本测试搅在一起（实测症状：xz65 的 speakerBio
+# 分隔符由空格变逗号，因缓存被前序用例的写入污染而走了不同分支）。
+# 故两侧都要桩。这也解释了 test_llm_cache.py 为何一律指向临时目录。
+import llm_cache as _LC          # noqa: E402
+_LC.cache_path = lambda: VLM_CACHE_FIXTURE
+_LC.cache_set = lambda key, val: None      # 写桩：不让本测试写真实缓存
 
 # ── 快照覆盖的用例（与 golden 的 CASES 同源，URL 即键）─────────────────
 # 复用 golden 的 CASES 而非复制一份，避免两处漂移。

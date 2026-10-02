@@ -12,10 +12,16 @@
 
 输出：
     site/visits-trend.html（2026-09-30 起从 reports/ 移入 site/）
-    - 自包含：数据内联进页面，双击即可查看（file:// 也行），无需服务器、不依赖 CDN。
+    site/visits-trend.js（2026-10-02 拆出）+ site/visits-trend-data.json
     - **公网可见**：GitHub Pages 发布 site/ 目录，线上地址
       https://danchekey.github.io/lecture-aggregator/visits-trend.html
       （用户要求在公网直接看访问量趋势，故随 site/ 入库、随 Pages 部署）。
+    - 2026-10-02 变更：脚本与数据**从内联拆为独立文件**。此前整页 JS（含数据）
+      都在 <script> 里，迫使 CSP 放行 script-src 'unsafe-inline'；拆分后
+      script-src 可收紧为 'self'。代价是**不再支持 file:// 直接打开**
+      （fetch 受同源限制）——但该页的唯一用途是公网经 Pages 查看，
+      本地预览用 start_local.bat 起 server 即可。数据仅约 3KB（gzip 691B），
+      多一次请求的代价可忽略。
     - 报告页面无 CSP meta，内联 SVG/JS 可直接运行；唯一外链是回主站的 <a>。
 
 图表设计（2026-09-14 改版）：
@@ -34,6 +40,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HISTORY_PATH = os.path.join(ROOT, 'data', 'visits_history.json')
 OUT_DIR = os.path.join(ROOT, 'site')
 OUT_PATH = os.path.join(OUT_DIR, 'visits-trend.html')
+# 2026-10-02 拆出：脚本 / 数据 / 样式各自成文件，使页面 CSP 能去掉 'unsafe-inline'。
+# 命名与 index.html 的做法一致（站点根目录相对引用，随 site/ 一起部署）。
+JS_NAME = 'visits-trend.js'
+DATA_NAME = 'visits-trend-data.json'
+CSS_NAME = 'visits-trend.css'
+JS_PATH = os.path.join(OUT_DIR, JS_NAME)
+DATA_PATH = os.path.join(OUT_DIR, DATA_NAME)
 
 # 样式与脚本单独放常量：避免大括号与 f-string 冲突
 CSS = """
@@ -85,7 +98,10 @@ tbody tr:hover td{background:#FCFCFB}
 .foot b{color:#5F5E5A;font-weight:600}
 """
 
-JS = """var META = {};
+# 2026-10-02：JS 不再内联数据（META/SNAPS 改由 fetch 载入同目录的
+# visits-trend-data.json）。目的是让页面能去掉 CSP 的 script-src 'unsafe-inline'。
+JS = """'use strict';
+var META = {};
 var SNAPS = [];
 
 var L = 58, R = 636, T = 26, B = 206;
@@ -122,18 +138,38 @@ function niceTicks(lo, hi, seg) {
   return out;
 }
 
+// 文本节点安全写入：2026-10-02 起不再用 innerHTML 拼接用户可控文本。
+// 本页唯一来自台账的自由文本是快照的 note 字段（其余全是数字与固定日期），
+// 它经 json.dumps 内嵌进页面脚本——若 note 里含 </script> 或 <img onerror=…>，
+// innerHTML 拼接即构成存储型 XSS（CI 抓来的数据进公网页面）。
+// 这里改用 createElement + textContent：文本一律按纯文本落地，不解释标记。
+// 数值字段走 fmt()（toLocaleString 产物）且统一经 _num() 归一，非字符串不可注入。
+function el(tag, text, cls) {
+  var n = document.createElement(tag);
+  if (text !== undefined && text !== null) n.textContent = String(text);
+  if (cls) n.className = cls;
+  return n;
+}
+function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
 function renderChart() {
   var box = document.getElementById('chart');
   var snaps = inRange(SNAPS, RANGE);
   if (!snaps.length) {
-    box.innerHTML = '<div class="empty">该时间范围内没有快照记录。</div>';
+    clear(box);
+    box.appendChild(el('div', '该时间范围内没有快照记录。', 'empty'));
     return;
   }
   if (snaps.length === 1) {
     var s0 = snaps[0];
-    box.innerHTML = '<div class="empty">仅 1 条快照（' + s0.date + '）：累计访问次数 '
-      + fmt(s0.site_pv) + ' 次 / 累计访客数 ' + fmt(s0.site_uv)
-      + ' 人。<br>至少需要 2 条快照才能绘制趋势线。</div>';
+    clear(box);
+    var e = el('div', null, 'empty');
+    e.appendChild(document.createTextNode(
+      '仅 1 条快照（' + s0.date + '）：累计访问次数 ' + fmt(s0.site_pv)
+      + ' 次 / 累计访客数 ' + fmt(s0.site_uv) + ' 人。'));
+    e.appendChild(el('br'));
+    e.appendChild(document.createTextNode('至少需要 2 条快照才能绘制趋势线。'));
+    box.appendChild(e);
     return;
   }
 
@@ -155,20 +191,30 @@ function renderChart() {
   var dHi = dT[dT.length - 1] || 1;
   function yR(v) { return B - v / dHi * ph; }
 
-  var g = '';
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function sv(tag, attrs, text) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) {
+      if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
+    }
+    if (text !== undefined && text !== null) n.textContent = String(text);
+    return n;
+  }
+  var g = document.createDocumentFragment();
 
   yT.forEach(function (v) {
     var y = yL(v);
-    g += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + R + '" y2="' + y.toFixed(1)
-      + '" stroke="' + (v === yLo ? '#D3D1C7' : '#E8E6E0') + '" stroke-width="1"/>';
-    g += '<text x="' + (L - 10) + '" y="' + (y + 4).toFixed(1)
-      + '" font-size="12" fill="#888780" text-anchor="end">' + fmt(v) + '</text>';
+    g.appendChild(sv('line', { x1: L, y1: y.toFixed(1), x2: R, y2: y.toFixed(1),
+                               stroke: (v === yLo ? '#D3D1C7' : '#E8E6E0'),
+                               'stroke-width': 1 }));
+    g.appendChild(sv('text', { x: L - 10, y: (y + 4).toFixed(1), 'font-size': 12,
+                               fill: '#888780', 'text-anchor': 'end' }, fmt(v)));
   });
   dT.forEach(function (v) {
     if (v === 0) return;
     var y = yR(v);
-    g += '<text x="' + (R + 10) + '" y="' + (y + 4).toFixed(1)
-      + '" font-size="12" fill="#B4B2A9" text-anchor="start">' + fmt(v) + '</text>';
+    g.appendChild(sv('text', { x: R + 10, y: (y + 4).toFixed(1), 'font-size': 12,
+                               fill: '#B4B2A9', 'text-anchor': 'start' }, fmt(v)));
   });
 
   var bw = Math.min(36, Math.max(1.5, pw / snaps.length * 0.7));
@@ -176,30 +222,33 @@ function renderChart() {
     var v = Math.max(0, Number(s.uv_delta) || 0);
     if (!v) return;
     var x = xOf(s) - bw / 2, y = yR(v), h = B - y;
-    g += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1)
-      + '" height="' + h.toFixed(1) + '" rx="3" fill="#C9DDF3">'
-      + '<title>' + s.date + ' 日新增访客 ' + v + ' 人</title></rect>';
+    var rect = sv('rect', { x: x.toFixed(1), y: y.toFixed(1), width: bw.toFixed(1),
+                            height: h.toFixed(1), rx: 3, fill: '#C9DDF3' });
+    rect.appendChild(sv('title', {}, s.date + ' 日新增访客 ' + v + ' 人'));
+    g.appendChild(rect);
   });
 
-  g += '<polyline points="'
-    + snaps.map(function (s) {
-        return xOf(s).toFixed(1) + ',' + yL(Number(s.site_uv) || 0).toFixed(1);
-      }).join(' ')
-    + '" fill="none" stroke="#185FA5" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+  g.appendChild(sv('polyline', {
+    points: snaps.map(function (s) {
+      return xOf(s).toFixed(1) + ',' + yL(Number(s.site_uv) || 0).toFixed(1);
+    }).join(' '),
+    fill: 'none', stroke: '#185FA5', 'stroke-width': 2.5,
+    'stroke-linejoin': 'round', 'stroke-linecap': 'round'}));
 
   var showVal = snaps.length <= 8;
   snaps.forEach(function (s, i) {
     var x = xOf(s), y = yL(Number(s.site_uv) || 0);
-    g += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1)
-      + '" r="4" fill="#ffffff" stroke="#185FA5" stroke-width="2.5">'
-      + '<title>' + s.date + ' 累计访客数 ' + fmt(s.site_uv) + ' 人</title></circle>';
+    var c = sv('circle', { cx: x.toFixed(1), cy: y.toFixed(1), r: 4,
+                           fill: '#ffffff', stroke: '#185FA5', 'stroke-width': 2.5 });
+    c.appendChild(sv('title', {}, s.date + ' 累计访客数 ' + fmt(s.site_uv) + ' 人'));
+    g.appendChild(c);
     if (showVal) {
       var anchor = 'middle', lx = x;
       if (i === 0) { anchor = 'start'; lx = x + 9; }
       else if (i === snaps.length - 1) { anchor = 'end'; lx = x - 9; }
-      g += '<text x="' + lx.toFixed(1) + '" y="' + (y - 12).toFixed(1)
-        + '" font-size="12" fill="#185FA5" text-anchor="' + anchor + '">'
-        + fmt(s.site_uv) + '</text>';
+      g.appendChild(sv('text', { x: lx.toFixed(1), y: (y - 12).toFixed(1), 'font-size': 12,
+                                 fill: '#185FA5', 'text-anchor': anchor },
+                       fmt(s.site_uv)));
     }
   });
 
@@ -221,9 +270,9 @@ function renderChart() {
     var x = L + (t - t0) / span * pw;
     var has = snaps.some(function (s) { return Math.abs(dn(s.date) - t) < 0.5; });
     var lab = span <= 45 ? iso(t).slice(5) : span <= 400 ? iso(t).slice(0, 7) : iso(t).slice(0, 4);
-    g += '<text x="' + x.toFixed(1) + '" y="' + (B + 22)
-      + '" font-size="12" fill="' + (has ? '#5F5E5A' : '#B4B2A9')
-      + '" text-anchor="middle">' + lab + '</text>';
+    g.appendChild(sv('text', { x: x.toFixed(1), y: B + 22, 'font-size': 12,
+                               fill: (has ? '#5F5E5A' : '#B4B2A9'),
+                               'text-anchor': 'middle' }, lab));
   });
 
   var missing = [];
@@ -237,27 +286,44 @@ function renderChart() {
       : missing.slice(0, 3).join('、') + ' 等 ' + missing.length + ' 天');
   }
 
-  box.innerHTML = '<svg viewBox="0 0 680 250" width="100%" role="img"'
-    + ' aria-label="累计访客数折线与日新增访客柱状组合趋势图">'
-    + '<title>站点访问量趋势</title><desc>' + snaps[0].date + ' 至 '
-    + snaps[snaps.length - 1].date + ' 的累计访客数折线与每日新增访客柱状图。</desc>'
-    + g + '</svg>'
-    + '<p class="cap">覆盖 <b>' + (span + 1) + '</b> 天 · 快照 <b>' + snaps.length
-    + '</b> 条 · 左轴累计访客数（人），右轴日新增访客' + missTxt + '</p>';
+  clear(box);
+  var svg = sv('svg', { viewBox: '0 0 680 250', width: '100%', role: 'img',
+                         'aria-label': '累计访客数折线与日新增访客柱状组合趋势图' });
+  svg.appendChild(sv('title', {}, '站点访问量趋势'));
+  svg.appendChild(sv('desc', {}, snaps[0].date + ' 至 '
+    + snaps[snaps.length - 1].date + ' 的累计访客数折线与每日新增访客柱状图。'));
+  svg.appendChild(g);
+  box.appendChild(svg);
+
+  var cap = el('p', null, 'cap');
+  cap.appendChild(document.createTextNode('覆盖 '));
+  cap.appendChild(el('b', span + 1));
+  cap.appendChild(document.createTextNode(' 天 · 快照 '));
+  cap.appendChild(el('b', snaps.length));
+  cap.appendChild(document.createTextNode(' 条 · 左轴累计访客数（人），右轴日新增访客'
+    + missTxt));
+  box.appendChild(cap);
 }
 
 function renderTable() {
   var all = inRange(SNAPS, RANGE);
   var rows = all.slice().reverse();
   var limit = EXPANDED ? rows.length : Math.min(rows.length, 7);
-  var h = '';
+  var tb = document.getElementById('tbody');
+  clear(tb);
   rows.slice(0, limit).forEach(function (s) {
-    var note = s.note ? '<span class="note">' + s.note + '</span>' : '';
-    h += '<tr><td>' + s.date + '</td><td>' + fmt(s.site_pv) + '</td><td>' + fmt(s.site_uv)
-      + '</td><td>' + fmt(s.pv_delta) + '</td><td>' + fmt(s.uv_delta)
-      + '</td><td class="l">' + note + '</td></tr>';
+    var tr = el('tr');
+    tr.appendChild(el('td', s.date));
+    tr.appendChild(el('td', fmt(s.site_pv)));
+    tr.appendChild(el('td', fmt(s.site_uv)));
+    tr.appendChild(el('td', fmt(s.pv_delta)));
+    tr.appendChild(el('td', fmt(s.uv_delta)));
+    // note 是本页唯一的自由文本（来自抓取脚本写入的台账），一律按纯文本落地。
+    var last = el('td', null, 'l');
+    if (s.note) last.appendChild(el('span', s.note, 'note'));
+    tr.appendChild(last);
+    tb.appendChild(tr);
   });
-  document.getElementById('tbody').innerHTML = h;
   var btn = document.getElementById('toggleRows');
   if (rows.length > 7) {
     btn.style.display = '';
@@ -283,8 +349,33 @@ document.getElementById('toggleRows').addEventListener('click', function () {
   renderTable();
 });
 
-renderChart();
-renderTable();
+// 数据加载（2026-10-02：原先数据内联在页面脚本里，为收紧 CSP 的 script-src 改为 fetch）。
+// 失败要**显式提示**而非静默留空——访客看到空图会以为「访问量没了」，
+// 而真实原因多半是文件未随部署更新或被 CDN 缓存挡住。
+function showLoadError(msg) {
+  var box = document.getElementById('load-err');
+  if (box) {
+    box.textContent = '数据加载失败：' + msg
+      + '（若直接用 file:// 打开本页也会失败——请经 HTTP 访问，或运行 start_local.bat 起本地服务）';
+    box.hidden = false;
+  }
+  var chart = document.getElementById('chart');
+  if (chart) clear(chart);
+}
+
+fetch('visits-trend-data.json', { cache: 'no-store' })
+  .then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(function (d) {
+    META = (d && d.meta) || {};
+    SNAPS = (d && d.snaps) || [];
+    if (!SNAPS.length) throw new Error('数据为空');
+    renderChart();
+    renderTable();
+  })
+  .catch(function (e) { showLoadError(e && e.message ? e.message : String(e)); });
 """
 
 
@@ -341,20 +432,33 @@ def main():
     first, last = snaps[0], snaps[-1]
     now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 
-    data_js = (
-        'var META = ' + json.dumps({
+    # 2026-10-02：数据与脚本各自出片为独立文件，页面只留外链引用。
+    # 这样做的直接收益是 CSP 的 script-src 可从 "'self' 'unsafe-inline'"
+    # 收紧为 "'self'"——内联脚本无法满足 script-src 'self'。
+    payload = {
+        'meta': {
             'source': 'busuanzi（公网）',
             'siteUrl': 'https://danchekey.github.io/lecture-aggregator/',
             'generatedAt': now,
-        }, ensure_ascii=False) + ';\n'
-        'var SNAPS = ' + json.dumps(snaps, ensure_ascii=False) + ';'
-    )
-    script = JS.replace('var META = {};\nvar SNAPS = [];', data_js)
+        },
+        'snaps': snaps,
+    }
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>站点访问量趋势</title><style>{CSS}</style></head>
+<!-- CSP（2026-10-02）：本报告页此前是全站唯一无 CSP 的页面（2026-09-30 评审 P5），
+     补 CSP 时因脚本与数据整体内联而被迫放行 script-src 'unsafe-inline'。
+     同日两项改动使其可以完全收紧：
+       ① 全部 innerHTML 拼接改为 createElement/textContent（渲染不再解析任何文本标记）；
+       ② 脚本拆为独立 visits-trend.js、数据拆为 visits-trend-data.json（本次）。
+     故 script-src 与 style-src 均只需 'self'（style 走外链 visits-trend.css）。
+     遗留代价：页面不再支持 file:// 直接打开（fetch 受同源限制），
+     本地预览请用 start_local.bat 起本地 server。 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<title>站点访问量趋势</title>
+<link rel="stylesheet" href="visits-trend.css">
+</head>
 <body><div class="wrap">
 
 <header>
@@ -403,17 +507,29 @@ def main():
   左轴按数据范围自适应（累计值不从 0 起算，否则曲线会被压平贴顶）。
 </div>
 
+<p id="load-err" class="empty" hidden></p>
 </div>
-<script>{script}</script>
+<script src="visits-trend.js" defer></script>
 </body></html>
 """
 
-    tmp = OUT_PATH + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
-        f.write(html)
-    os.replace(tmp, OUT_PATH)
-    print(f'[done] {os.path.relpath(OUT_PATH, ROOT)}（{len(snaps)} 条快照，'
-          f'{len(html) / 1024:.1f} KB）')
+    def _write(path, content):
+        """原子写出（先 .tmp 再 replace），避免 GitHub Pages 读到半份文件。"""
+        tmp = path + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            f.write(content)
+        os.replace(tmp, path)
+
+    _write(OUT_PATH, html)
+    _write(JS_PATH, JS)
+    _write(DATA_PATH,
+           json.dumps(payload, ensure_ascii=False, separators=(',', ':')))
+    css = os.path.join(OUT_DIR, CSS_NAME)
+    _write(css, CSS)
+    for p in (OUT_PATH, JS_PATH, DATA_PATH, css):
+        print(f'[done] {os.path.relpath(p, ROOT)}'
+              f'（{os.path.getsize(p) / 1024:.1f} KB）')
+    print(f'       {len(snaps)} 条快照，生成于 {now}')
 
 
 if __name__ == '__main__':

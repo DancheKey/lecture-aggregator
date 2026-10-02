@@ -109,10 +109,25 @@ _ROBOTS_CACHE = {}
 _ROBOTS_LOCK = threading.Lock()
 
 
-def _can_fetch(url):
-    """robots.txt 合规检查。返回 False 表示站点明确 Disallow 该路径。"""
+def _can_fetch(url, allowed_domains=None):
+    """robots.txt 合规检查。返回 False 表示站点明确 Disallow 该路径。
+
+    allowed_domains 传入时做**前置短路**（2026-10-02）：域名不在白名单的 URL
+    连robots.txt 都不必问。原实现把robots 检查放在白名单校验之前，于是列表页里
+    出现的任意外站/内网链接（如 http://169.254.169.254/... 或第三方站点）都会先
+    触发一次 `GET {scheme}://{host}/robots.txt` 才被白名单拒掉——构成盲 SSRF
+    探测（响应不回传故无法读数据，但请求确实发出），且对被注入的第三方站点是
+    一次无谓打扰。robots 查询按host 缓存，同 host 只花一次，故影响面有限，
+    但白名单判据本就在函数开头、无任何成本，不该排在网络请求之后。
+    """
     host = urlparse(url).netloc
     scheme = urlparse(url).scheme or 'https'
+    # 白名单前置：不在白名单直接返回「无需再查」——调用方随后会自行拒绝该 URL。
+    # 这里返回 True（视为「未禁止」）而非 False，因为拒绝理由是白名单而非 robots，
+    # 交给调用方统一判定可避免日志里出现误导性的「robots 禁止」。
+    if allowed_domains and not any(host == d or host.endswith('.' + d)
+                                    for d in allowed_domains):
+        return True
     with _ROBOTS_LOCK:
         rp = _ROBOTS_CACHE.get(host)
     if rp is None:
@@ -157,7 +172,9 @@ def fetch(url, _retries=3, allowed_domains=None):
     from urllib.parse import urlparse
     # robots.txt 合规（2026-09-07）：站点明确 Disallow 的路径直接跳过，不消耗
     # 请求预算，也避免被源站拉黑；缓存于 _ROBOTS_CACHE 避免每个 URL 都重新解析。
-    if not _can_fetch(url):
+    # 2026-10-02：allowed_domains 一并传下去，让白名单判据前置到 robots 查询之前
+    # （原先白名单外 URL 仍会先白耗一次对外 robots 请求，见 _can_fetch 注释）。
+    if not _can_fetch(url, allowed_domains):
         print(f'[WARN] fetch: robots.txt 禁止 {url}', file=sys.stderr)
         return None
     last_err = None
@@ -957,6 +974,22 @@ def _ledger_file():
     return os.path.join(ROOT, 'data', 'scrape_ledger.json')
 
 
+def _ledger_is_fresh(entry):
+    """台账条目是否仍在 TTL 期内。
+
+    2026-10-02 提取为独立函数：load（读侧剔除）与 save（写侧过滤）必须用**同一条**
+    判据，否则又是一处「同一语义两份实现」（这正是 2026-09-30 评审点名的缺陷模式）。
+    读侧与写侧的语义一致性由 tests/test_ledger.py 的静态锁守卫。
+
+    缺 t 的条目保守返回 True（保留）：与读侧既定行为一致，不静默丢弃异常数据。
+    """
+    t = (entry or {}).get('t') or ''
+    if not t:
+        return True
+    limit = (datetime.date.today() - datetime.timedelta(days=_LEDGER_TTL_DAYS)).isoformat()
+    return t >= limit
+
+
 def load_ledger(path=None):
     """读台账并就地做过期清理。缺失/损坏一律退化为空台账——只影响耗时，不影响正确性。"""
     global _LEDGER
@@ -971,7 +1004,6 @@ def load_ledger(path=None):
         pass
     except Exception as e:
         print(f'[LEDGER] 台账读取失败，按空台账继续：{e}', file=sys.stderr)
-    limit = (datetime.date.today() - datetime.timedelta(days=_LEDGER_TTL_DAYS)).isoformat()
     kept, expired, dirty = {}, 0, 0
     for k, v in entries.items():
         # 键形态净化：盘上若混入脏键（外部脚本/手工编辑写坏），读入即剔除，
@@ -979,8 +1011,8 @@ def load_ledger(path=None):
         if not _LEDGER_KEY_RE.match(str(k)):
             dirty += 1
             continue
-        t = (v or {}).get('t') or ''
-        if t and t < limit:          # 缺 t 的异常条目保守保留，不静默丢弃
+        # TTL 判定统一走 _ledger_is_fresh（与 save_ledger 写侧同一判据，见其注释）
+        if not _ledger_is_fresh(v):
             expired += 1
             continue
         kept[k] = v
@@ -999,6 +1031,13 @@ def save_ledger(path=None, merge=True):
     merge=True：写前先把盘上已有条目并入内存（内存优先）。局部重抓 / 分批重抓
     会各自跑一个进程，若不合并，后跑的进程会用自己那份内存覆盖掉别的进程刚写入
     的条目——本轮的判定结果就白丢了，收敛要多花好几轮。
+
+    2026-10-02 修复 B9（写侧）：merge 会把盘上**已过期**的条目重新并回 _LEDGER，
+    随后原样写盘 → 台账永不瘦身，load 时报的「过期作废 N 条」在盘上一个都没少。
+    重判语义本身是好的（过期条目已在内存里被剔除，URL 再次出现会照常抓取），
+    但磁盘文件只增不减 + 每轮重复报过期，属可修的卫生问题。
+    修法：写盘前按与 load 侧同一判据（_ledger_is_fresh）过滤，
+    既让文件真正瘦身，也不改变「过期条目不参与命中」的行为。
     """
     path = path or _ledger_file()
     if merge:
@@ -1013,13 +1052,22 @@ def save_ledger(path=None, merge=True):
             pass
         except Exception:
             pass          # 盘上文件损坏/形态异常：以内存为准继续写，不阻断流程
+    # 写盘前剔除过期条目（同时清掉形态异常键，与 load 侧口径一致）
+    entries = {k: v for k, v in _LEDGER.items()
+               if _LEDGER_KEY_RE.match(str(k)) and _ledger_is_fresh(v)}
+    dropped = len(_LEDGER) - len(entries)
+    if dropped:
+        print(f'[LEDGER] 写盘前剔除 {dropped} 条过期/形态异常条目（TTL {_LEDGER_TTL_DAYS} 天）',
+              file=sys.stderr)
+        _LEDGER.clear()
+        _LEDGER.update(entries)
     payload = {
         'version': 1,
         'updatedAt': datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
         'ttlDays': _LEDGER_TTL_DAYS,
         'note': '被拒 URL 台账：抓过且判定不入库（新闻报道/回溯稿/历史旧讲座）的详情页，'
                 '增量轮 fetch 前直接跳过，避免每轮重复抓取。SCNU_LEDGER_SKIP=0 可临时关闭。',
-        'entries': dict(sorted(_LEDGER.items())),
+        'entries': dict(sorted(entries.items())),
     }
     try:
         _atomic_write_json(path, payload)
@@ -1572,9 +1620,17 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     for r in recs:
                         r['listTitle'] = txt
                         # 多讲座拆分后多条共享同一 sourceUrl，需用 期号 区分 key 防覆盖
-                        key = r['sourceUrl'] + (('#' + str(r['lectureIndex'])) if r.get('lectureIndex') else '')
+                        # 2026-10-02 口径统一：复合键一律用 `is not None` 判lectureIndex。
+                        # 此前此处用真值判断，`lectureIndex == 0` 会被当成「无期号」而与
+                        # 另一条 lectureIndex 为 None 的记录撞成同一个 key（后者覆盖前者）。
+                        # 当前数据是 1-based（无 0），故未造成实际损失，但本文件另外 5 处
+                        # 键构造（incremental_merge / dedup / cross_source_dedup / existing_urls）
+                        # 都已是 `is not None`，此处不改就是「同一语义两种写法」——
+                        # 正是 2026-09-30 评审点名的缺陷模式。
+                        _li = r.get('lectureIndex')
+                        key = r['sourceUrl'] + (('#' + str(_li)) if _li is not None else '')
                         local[key] = r
-                        tag = f' (第{r["lectureIndex"]}期)' if r.get('lectureIndex') else ''
+                        tag = f' (第{_li}期)' if _li is not None else ''
                         print(f'[OK] {name} | {r.get("lectureStart")} | {txt}{tag}')
                 if listdate_skipped:
                     print(f'[LISTDATE] {name} | {cur} | 按条目日期跳过 {listdate_skipped} 条历史详情页')

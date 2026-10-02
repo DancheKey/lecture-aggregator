@@ -564,5 +564,129 @@ class TestFieldAdoptionGuards(unittest.TestCase):
         self.assertIn('location', rule.get('llmRejected', ''))
 
 
+class TestCitedJudgeTimeReachable(unittest.TestCase):
+    """B 引证裁决对时间字段的修正必须可达（2026-10-02）。
+
+    背景：此前这条链路**两处同时断开**，导致「B 判 verdict=llm 并给出带引证的
+    正确时间」被静默丢弃：
+      ① `_ALL_FIELDS` 不含 lectureStart/lectureEnd，而 force 集合按
+         `f in _ALL_FIELDS` 过滤 → 时间字段根本进不了 force；
+      ② 时间守卫只在「规则时间是占位/缺失」时才采纳模型值 → 规则给出
+         **错误精确时刻**（14:30 误解析成 08:00、串到同页另一场次）时，
+         即使 force 生效也不会被采纳。
+    这正是「修了裁决层、没贯通采纳层」的典型形态。
+
+    修复：① 加入 _ALL_FIELDS；② 时间守卫加 force 例外（年份不一致仍拒绝）。
+    """
+
+    def setUp(self):
+        import hybrid
+        self.hybrid = hybrid
+        # 时间字段走 snippet 溯源闸门（hybrid.py 里既非 speaker 也非 affiliation
+        # 的字段统一落到 `elif not _snippet_ok(...)`），故用例必须给出**真实存在于
+        # 正文里的**时间片段，否则会被闸门正确拒绝——那正是本修复要保持的性质。
+        self.body = '讲座通知。时间：2026-03-05 14:30-16:00。地点：理6栋302。'
+
+    def _a(self, start, end=None):
+        """构造 A 值：附带与正文逐字一致的 snippet（否则过不了溯源闸门）。"""
+        a = {'lectureStart': start, 'lectureStartSnippet': start}
+        if end:
+            a['lectureEnd'] = end
+            a['lectureEndSnippet'] = end
+        return a
+
+    def test_70_ALL_FIELDS含时间字段(self):
+        for f in ('lectureStart', 'lectureEnd'):
+            self.assertIn(f, self.hybrid._ALL_FIELDS,
+                          f'_ALL_FIELDS 缺 {f} —— B 的时间裁决永远进不了 force')
+            self.assertNotIn(f, self.hybrid._RICH_FIELDS,
+                             f'rich_only 不应触碰 {f}（结构字段由规则主导）')
+
+    def test_71_force时间可覆盖错误的规则时刻(self):
+        """规则给出错误精确时刻 + B 已裁决 → 采用模型值。"""
+        result = {'lectureStart': '2026-03-05 08:00:00'}
+        a = self._a('2026-03-05 14:30:00', '2026-03-05 16:00:00')
+        adopted = self.hybrid._merge_a_into_result(
+            result, a, body_text=self.body,
+            force_fields={'lectureStart', 'lectureEnd'})
+        self.assertIn('lectureStart', adopted,
+                      'B 已裁决时时间字段应可被采纳（force 例外未生效？）')
+        self.assertEqual(result['lectureStart'], '2026-03-05 14:30:00',
+                         '规则时刻 08:00 是被 B 判错的值，应被 14:30 取代')
+        self.assertEqual(result['lectureEnd'], '2026-03-05 16:00:00')
+
+    def test_72_未force时保持占位守卫(self):
+        """未 force（纯规则/rich 路径）行为不得改变：占位才采纳。
+
+        注：这里的「占位」只认 `00:00`（`_rule_has_time = not (h==0 and m==0 and s==0)`），
+        **不含 08:00**——后者在本模块守卫里被视为具体时刻（与 parsers 的
+        `isTimeTBD` 把 08:00 当占位是不同层的约定，此处按代码实际语义写用例）。
+        """
+        result = {'lectureStart': '2026-03-05 00:00:00'}     # 00:00 为占位
+        a = self._a('2026-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(result, a, body_text=self.body)
+        self.assertEqual(result['lectureStart'], '2026-03-05 14:30:00',
+                         '占位时间（00:00）本就该被补全')
+
+        result2 = {'lectureStart': '2026-03-05 15:00:00'}    # 非占位
+        a2 = self._a('2026-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(result2, a2, body_text=self.body)
+        self.assertEqual(result2['lectureStart'], '2026-03-05 15:00:00',
+                         '未 force 时不得覆盖规则的具体时刻（幻觉防护）')
+
+        result3 = {'lectureStart': '2026-03-05 08:00:00'}    # 08:00 也算具体时刻
+        a3 = self._a('2026-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(result3, a3, body_text=self.body)
+        self.assertEqual(result3['lectureStart'], '2026-03-05 08:00:00',
+                         '08:00 在本守卫里不是占位，未 force 时不应被覆盖')
+
+    def test_73_force也不能跨年(self):
+        """年份不一致时即使 force 也不采纳——年份错比时刻错更严重。"""
+        body = '时间：2025-03-05 14:30。'
+        result = {'lectureStart': '2026-03-05 15:00:00'}
+        a = self._a('2025-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(
+            result, a, body_text=body, force_fields={'lectureStart'})
+        self.assertEqual(result['lectureStart'], '2026-03-05 15:00:00',
+                         '跨年修正未被拒绝——force 例外越权了')
+
+    def test_74_force仍受年份区间限制(self):
+        """force 也不得让模型年份超出合理区间（如 B 抽出 1998 年）。"""
+        body = '时间：1998-03-05 14:30。'
+        result = {'lectureStart': '2026-03-05 15:00:00'}
+        a = self._a('1998-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(
+            result, a, body_text=body, force_fields={'lectureStart'})
+        self.assertEqual(result['lectureStart'], '2026-03-05 15:00:00')
+
+    def test_75_守卫在字段循环之外(self):
+        """时间字段**不得**在字段循环里被直接覆写——必须走守卫。
+
+        这是本次修复的关键结构约束：循环在前、守卫在后，若循环也放行时间字段，
+        就会在守卫之前写入模型值，年份一致性与年份区间检查全部失效
+        （2026-10-02 实测正是如此）。
+        rich_only 路径用的是 _RICH_FIELDS（不含时间），故用非 rich 路径验证。
+        """
+        result = {'lectureStart': '2026-03-05 15:00:00'}
+        a = self._a('2026-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(
+            result, a, body_text=self.body,
+            force_fields={'lectureStart'})
+        # 值确实被采纳（守卫放行），但 adopted 里只能由守卫追加一次
+        self.assertEqual(result['lectureStart'], '2026-03-05 14:30:00')
+        self.assertEqual(result.get('llmAdopted', '').count('lectureStart'), 1,
+                         'lectureStart 被重复计入 adopted（循环与守卫各写一次）')
+
+    def test_76_force不绕过年份校验(self):
+        """force 也必须过年份闸门：跨年值不得写入。"""
+        body = '时间：2024-03-05 14:30。'       # 正文是 2024，规则却是 2026
+        result = {'lectureStart': '2026-03-05 15:00:00'}
+        a = self._a('2024-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(
+            result, a, body_text=body, force_fields={'lectureStart'})
+        self.assertEqual(result['lectureStart'], '2026-03-05 15:00:00',
+                         'force 绕过了年份一致性检查')
+
+
 if __name__ == '__main__':
     unittest.main()

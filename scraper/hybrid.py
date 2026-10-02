@@ -453,8 +453,16 @@ def _apply_bio_fallback(result):
 # rich_only 模式只处理丰富/补全型字段，绝不碰结构字段（speaker/topic/location），
 # 确保结构字段完全由规则主导。
 _RICH_FIELDS = ('abstract', 'speakerBio', 'speakerTitle', 'speakerAffiliation')
+# 2026-10-02 补入时间字段：此前不含 lectureStart/lectureEnd，导致
+# 「B 引证裁决判定时间字段以模型为准」这条链路**完全不可达**——
+# force 集合按 `f in _ALL_FIELDS` 过滤，时间字段根本进不去；
+# 而下方时间守卫又只在「规则时间是占位/缺失」时才采纳模型值，
+# 于是规则给出**错误精确时刻**时（把 14:30 解析成 08:00、串到别场次等），
+# B 即使判verdict=llm 并给出带引证的正确时间，也会被静默丢弃。
+# 详见 _merge_a_into_result 时间守卫处的说明。
 _ALL_FIELDS = ('topic', 'speaker', 'speakerTitle', 'speakerAffiliation',
-              'location', 'abstract', 'speakerBio')
+              'location', 'abstract', 'speakerBio',
+              'lectureStart', 'lectureEnd')
 
 # rich 字段边界截断（2026-09-05 起）：锚点词表收敛到 field_vocab 单一事实源。
 # A 模型对 abstract/speakerBio 缺乏边界约束，会把后续「专家简介/报告题目/报告时间」
@@ -777,6 +785,13 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
     # speaker 溯源范围 = 正文 + 标题（见 apply_llm_text_hybrid 的 title_text 说明）
     _trace_text = (body_text or '') + ' ' + (extra_source or '')
     for fld in _fields:
+        # 时间字段由下方的「时间守卫」统一处理（那里才有年份一致 / 年份区间 /
+        # force 例外等规则）。此处若也放行，会在守卫**之前**用模型值直接覆写规则值，
+        # 把守卫的意义完全绕过（2026-10-02 实测：force 时间后规则的非占位时刻
+        # 会被 snippet 闸门放行直接覆盖，年份错/跨场次都不再受检）。
+        # 故明确跳过——守卫会在最后统一写入并记 adopted。
+        if fld in ('lectureStart', 'lectureEnd'):
+            continue
         cur = (result.get(fld) or '').strip()
         lv = (a.get(fld) or '').strip()
         # 仅填空：规则已有值的字段一律保留（含摘要/简介，2026-09-05 修订）；
@@ -881,15 +896,24 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
         adopted.append(fld)
     if rejected:
         result['llmRejected'] = '|'.join(rejected)
-    if adopted:
-        result['llmAdopted'] = '|'.join(adopted)
+    # ⚠ llmAdopted 的写入**必须**在下方时间守卫之后——守卫也会往 adopted 里追加
+    # lectureStart/lectureEnd，写在前面会漏记这两个字段（调用方据此判
+    # llmTextEnhanced，漏记会让「B 裁决修正了时间」表现为「未采纳任何字段」）。
 
     # 纯规则兜底：模型 A 偶发抽不到 affiliation/title 时，从已有 speakerBio 开头片段
     # 正则提取（确定性、不依赖模型可用性）。仅在 A 仍未提供时触发，绝不覆盖已有值。
     _apply_bio_fallback(result)
 
-    # 时间守卫：仅当规则时间是占位/缺失且年份与 A 一致时，才采用 A 的精确时刻。
-    # 规则已有具体时间或年份不一致 -> 完全保留规则时间（防 LLM 年份/时刻幻觉）。
+    # 时间守卫：默认仅当规则时间是占位/缺失且年份与 A 一致时，才采用 A 的精确时刻。
+    # 规则已有具体时间或年份不一致 -> 保留规则时间（防 LLM 年份/时刻幻觉）。
+    #
+    # 2026-10-02 补例外（force_time）：当调用方声明 lectureStart/lectureEnd 在
+    # force_fields 里时，说明**B 引证裁决已判定该时间以模型为准**（判定依据是源页
+    # 引文，不是猜测）。此时即便规则给出了具体时刻也采纳模型值——因为规则值正是
+    # 被 B 判为错误的那一个（典型：规则把 14:30 误解析成 08:00 占位、或串到同页
+    # 另一场次；这类错误规则自己发现不了，只有见过原文的 B 能判）。
+    # 反之未 force 时行为完全不变（占位才采纳），故幻觉防护不受影响。
+    _force_time = bool(_force & {'lectureStart', 'lectureEnd'})
     _rule_start = result.get('lectureStart')
     _rule_year = None
     _rule_has_time = False
@@ -910,8 +934,12 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             if _year_lo <= _llm_year <= _year_hi:
                 _year_match = (_rule_year is None) or (_rule_year == _llm_year)
                 _rule_is_placeholder = (_rule_start is None) or (not _rule_has_time)
-                if _year_match and _rule_is_placeholder:
+                # 年份不一致时 B 的 force 也不能覆盖——年份错比时刻错更严重
+                # （跨年讲座会被挪到另一年，且 A/B 都可能拿错场次）。
+                if _year_match and (_rule_is_placeholder or _force_time):
                     result['lectureStart'] = _ls.isoformat(sep=' ')
+                    if 'lectureStart' not in adopted:
+                        adopted.append('lectureStart')
                     _le_raw = a.get('lectureEnd') or a.get('end')
                     if _le_raw and str(_le_raw).strip() not in ('', 'null', 'None'):
                         try:
@@ -919,10 +947,15 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                                 str(_le_raw).replace('T', ' ').replace('Z', ''))
                             if _year_lo <= _le.year <= _year_hi:
                                 result['lectureEnd'] = _le.isoformat(sep=' ')
+                                if 'lectureEnd' not in adopted:
+                                    adopted.append('lectureEnd')
                         except Exception:
                             pass
         except Exception:
             pass  # A 时间解析失败 -> 保留规则值
+    # 时间守卫也会追加采纳字段，故 llmAdopted 必须在此（守卫之后）落盘
+    if adopted:
+        result['llmAdopted'] = '|'.join(adopted)
     return adopted
 
 

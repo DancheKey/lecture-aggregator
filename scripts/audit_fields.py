@@ -173,6 +173,15 @@ def audit(recs):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--html', default=None, help='输出 HTML 明细报告路径')
+    ap.add_argument('--fail-on', default='', choices=['', 'high', 'any'],
+                    help='退出码策略（2026-10-02 新增）：'
+                         'high=出现「高」严重度问题时非零退出（CI 阻断）；'
+                         'any=出现任何问题即非零；'
+                         '留空（默认）=恒返回 0，保持「体检只出报告、不阻断」的既有行为。'
+                         '默认留空是刻意的：本脚本每日产出体检报告供人工查阅，'
+                         '存量库里有大量历史遗留问题，若默认阻断则流水线天天红、'
+                         '久而久之被无视，反而失去护栏意义。'
+                         '要当门禁用请显式传 --fail-on high。')
     args = ap.parse_args()
 
     data = json.load(open(os.path.join(ROOT, 'data', 'lectures.json'), encoding='utf-8'))['data']
@@ -198,6 +207,58 @@ def main():
         _write_html(args.html, data, issues)
         print(f'\nHTML 明细报告: {args.html}')
 
+    # ---- 退出码（2026-10-02）----
+    # 此前本脚本恒以 0 退出，在 daily.yml 里与 test_invariants 并列却「天然不阻断」：
+    # 体检发现时间/地点/讲者字段大面积异常时，工作流照样绿、人工收不到任何信号。
+    # 但**不能**改成默认阻断——存量库的历史问题会让流水线天天红，久之被忽略，
+    # 那比不阻断更糟。故默认保持 0，需要当门禁时显式 --fail-on。
+    if args.fail_on == 'high':
+        high = [i for i in issues if i[2] == '高']
+        if high:
+            print(f'\n::error::字段体检发现 {len(high)} 个「高」严重度问题'
+                  f'（--fail-on high，阻断）：'
+                  f'{high[0][0]}/{high[0][1]} {high[0][3][:40]}', file=sys.stderr)
+            return 1
+        print('\n字段体检：0 个高严重度问题（--fail-on high）')
+    elif args.fail_on == 'any':
+        if issues:
+            print(f'\n::error::字段体检发现 {len(issues)} 个问题'
+                  f'（--fail-on any，阻断）', file=sys.stderr)
+            return 1
+        print('\n字段体检：0 个问题（--fail-on any）')
+    return 0
+
+
+def _esc(s):
+    """HTML 文本/属性转义（2026-10-02）。
+
+    本报告的数据源是 `data/lectures.json`，其中 speaker / location / abstract
+    等字段是**从外部网站抓来的任意文本**，且 desc 里会回显讲者姓名。直接拼进
+    HTML 时：
+      · 文本位置遇 `<script>` / `<img onerror=…>` 即构成注入（报告是 CI 附件，
+        维护者下载后双击打开就会执行）；
+      · `href="{u}"` 位置更危险——`javascript:` 伪协议可直接点击执行。
+    故所有插入点一律经此函数转义。
+    """
+    return (str(s)
+            .replace('&', '&amp;')      # 必须最先处理，否则会把已转义的 &amp; 再转
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;')
+            .replace("'", '&#39;'))
+
+
+def _esc_url(u):
+    """URL 属性转义：额外挡掉 javascript:/data: 等可执行伪协议。
+
+    报告里的链接只用于跳回源页核对该字段，故只允许 http/https——
+    非此二者的值退化为纯文本（不生成可点击链接），避免「点了就跑脚本」。
+    """
+    s = str(u or '').strip()
+    if s.lower().startswith(('http://', 'https://')):
+        return _esc(s)
+    return ''
+
 
 def _write_html(path, recs, issues):
     by_cat = Counter((i[0], i[2]) for i in issues)
@@ -211,11 +272,20 @@ def _write_html(path, recs, issues):
         loc = r.get('location') or ''
         ls = r.get('lectureStart') or ''
         bio_head = (r.get('speakerBio') or '')[:40]
+        href = _esc_url(u)
+        # 非 http(s) 的 sourceUrl 不给链接，只展示文本（_esc_url 已返回空串）
+        link = (f'<a href="{href}" target="_blank" rel="noopener noreferrer">'
+                f'{_esc(rid[-42:])}</a>') if href else _esc(rid[-42:])
         rows.append(
-            f'<tr><td>{cat}</td><td>{sev}</td>'
-            f'<td><a href="{u}" target="_blank">{rid[-42:]}</a></td>'
-            f'<td>{r.get("college","")}</td><td>{fld}</td><td>{desc}</td>'
-            f'<td>spk={spk!r}<br>aff={aff!r}<br>loc={loc[:24]!r}<br>time={ls}<br>bio头={bio_head!r}</td></tr>')
+            f'<tr><td>{_esc(cat)}</td><td>{_esc(sev)}</td>'
+            f'<td>{link}</td>'
+            f'<td>{_esc(r.get("college", ""))}</td><td>{_esc(fld)}</td>'
+            f'<td>{_esc(desc)}</td>'
+            f'<td>spk={_esc(spk)}<br>aff={_esc(aff)}<br>loc={_esc(loc[:24])}'
+            f'<br>time={_esc(ls)}<br>bio头={_esc(bio_head)}</td></tr>')
+
+    summary_rows = ''.join(
+        f'{_esc(c[0])} [{_esc(c[1])}]: <b>{n}</b>' for c, n in sorted(by_cat.items()))
 
     html = (
         '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
@@ -227,9 +297,9 @@ def _write_html(path, recs, issues):
         'th{background:#fdf0f0;position:sticky;top:0}'
         '.box{background:#f6f8fa;border-left:4px solid #c44;padding:10px 16px;margin:12px 0}'
         '</style></head><body>'
-        '<h2>全库字段质量审计 · ' + str(len(issues)) + ' 条 / ' + str(len(recs)) + ' 条记录</h2>'
-        '<div class="box"><b>按类型×严重度：</b><br>' +
-        '<br>'.join(f'{c[0]} [{c[1]}]: <b>{n}</b>' for c, n in sorted(by_cat.items())) +
+        '<h2>全库字段质量审计 · ' + str(len(issues)) + ' 条 / ' + str(len(recs))
+        + ' 条记录</h2>'
+        '<div class="box"><b>按类型×严重度：</b><br>' + summary_rows +
         '</div>'
         '<table><tr><th>类型</th><th>严重度</th><th>记录</th><th>学院</th>'
         '<th>字段</th><th>问题描述</th><th>字段现值</th></tr>' +
@@ -243,4 +313,6 @@ def _write_html(path, recs, issues):
 
 
 if __name__ == '__main__':
-    main()
+    # 退出码须真正传给 shell（2026-10-02）：此前写成 `main()` 会丢弃返回值，
+    # 使 --fail-on 的判定形同虚设——函数 return 1 但进程仍以 0 结束。
+    sys.exit(main())
