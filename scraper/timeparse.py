@@ -14,6 +14,7 @@
 但**不删除**任何文本）；resolve_lecture_time 是编排层，实现 R1/R2/R4/R6。
 """
 import re
+import datetime as _dt_module  # 仅为 timedelta（datetime 是类，不能取 .timedelta）
 from datetime import datetime, date
 
 PERIOD_OFFSET = {'上午': 0, '早上': 0, '中午': '中午', '下午': 12, '晚上': 12, '傍晚': 12,
@@ -121,9 +122,14 @@ def _build(m, seg, y, mo, d):
     #   12    = 明确「下午/晚上/傍晚/晚」；'中午' 走 _apply_period 的专用分支
     # 2026-09-30 修复：此前初值为 0（非 None），使 _apply_period 的 else 分支恒不可达，
     # 无标记的小时刻一律按字面值落库（ibc/2779「2:30-4:00」实为 14:30-16:00 被记成
-    # 02:30-04:00）。⚠ 存量影响经实测为 0 条：全库 3810 条 lectureStart/lectureEnd
-    # 无一落在 01–05 点（这类页面当时多已被 is_lecture/news 过滤挡掉），
-    # 故本修正**只影响今后的抓取**，无需回改历史数据。
+    # 02:30-04:00）。存量影响实测 **3 条**（非 0）：用修复后的解析器重跑这三页
+    # 源页缓存，时间全部改变，故已于 2026-10-02 回填——
+    #   seri/2019/1107/37.html  02:30 → 14:30
+    #   em/20170504/5614.html   01:13 → 13:13
+    #   em/20140626/3730.html   02:00 → 14:00
+    # ⚠ 本注释此前写「存量影响经实测为 0 条：全库 3810 条无一落在 01–05 点」——
+    #    该断言与实际数据矛盾，并已误导一次评审（把真实存在的 3 条当成伪任务剔除）。
+    #    改动前请以实际扫描为准，不要照抄任何未复核的数量断言。
     period = None
     pm = re.search(r'(上午|早上|中午|下午|晚上|傍晚|晚)', seg)
     if pm:
@@ -192,6 +198,32 @@ def _build(m, seg, y, mo, d):
                                       COLLAPSED_LITERAL_MAX_MINUTES):
                     start = datetime(y_i, mo_i, d_i, h0_raw, m0_raw)
                     end = datetime(y_i, mo_i, d_i, h1_raw, m1_raw)
+            # 2026-10-02 修复（无时段标记的区间倒挂）：period is None 时，
+            # _apply_period 的 1–5 点 +12 推断**只作用于落进 1–5 区间的那一端**，
+            # 于是「4:00-6:00」= start 16:00（4 点被 +12）而 end 06:00（6 点原值），
+            # 产出 end < start 的倒挂区间。实测：4:00-6:00 → 16:00/06:00、
+            # 5:00-7:00 → 17:00/07:00；而「2:30-4:00」两端都落在 1–5，恰好不倒挂，
+            # 故原测试未暴露。
+            #
+            # 纠正分两级（阈值与判据复用 C5 收敛的 is_reasonable_span）：
+            #   ① end 补 +12h（首选）：字面 04:00-06:00 作为凌晨段不合理（讲座不在
+            #      凌晨办），+12 后 16:00-18:00 才是本意。不采用「取消全部偏移」，
+            #      那会把「4:00-6:00」退化成 04:00-06:00 凌晨场，错得更远。
+            #   ② 补 +12 后跨度仍超限（如「1:00-8:00」= 13:00→20:00 跨 7h），
+            #      说明这一组字面更像一个长场次而非跨正午的两段——回退为
+            #      **两端都取字面值**（01:00-08:00），至少保证不倒挂。
+            #   ③ 字面值自己也倒挂/不合理（如「5:00-4:00」）→ 丢弃区间（end=None），
+            #      宁可少一个结束时间，也绝不向下游输出倒挂区间。
+            elif (period is None and not s0 and not s1 and end < start):
+                _lit_s = datetime(y_i, mo_i, d_i, h0_raw, m0_raw)
+                _lit_e = datetime(y_i, mo_i, d_i, h1_raw, m1_raw)
+                _end12 = end + _dt_module.timedelta(hours=12)
+                if is_reasonable_span(start, _end12, COLLAPSED_SHIFT_MAX_MINUTES):
+                    end = _end12                      # ①
+                elif is_reasonable_span(_lit_s, _lit_e, COLLAPSED_LITERAL_MAX_MINUTES):
+                    start, end = _lit_s, _lit_e        # ②
+                else:
+                    end = None                         # ③
     return {'start': start, 'end': end, 'has_time': True}
 
 
