@@ -115,8 +115,9 @@ P._vlm_cache_set = lambda key, val: None
 # 分隔符由空格变逗号，因缓存被前序用例的写入污染而走了不同分支）。
 # 故两侧都要桩。这也解释了 test_llm_cache.py 为何一律指向临时目录。
 import llm_cache as _LC          # noqa: E402
-_LC.cache_path = lambda: VLM_CACHE_FIXTURE
-_LC.cache_set = lambda key, val: None      # 写桩：不让本测试写真实缓存
+# 2026-09-27：原在此处（导入时）改写 _LC.cache_path/cache_set 且从不还原——
+# 污染同进程其他测试模块（test_llm_cache 并发写全落空桩）。改由
+# ParserSnapshotTest 的 setUp/tearDown 打桩/还原。
 
 # ── 快照覆盖的用例（与 golden 的 CASES 同源，URL 即键）─────────────────
 # 复用 golden 的 CASES 而非复制一份，避免两处漂移。
@@ -214,6 +215,14 @@ def _load_baseline():
 
 
 class ParserSnapshotTest(unittest.TestCase):
+    def setUp(self):
+        self._lc_orig = (_LC.cache_path, _LC.cache_set)
+        _LC.cache_path = lambda: VLM_CACHE_FIXTURE
+        _LC.cache_set = lambda key, val: None      # 写桩：不让本测试写真实缓存
+
+    def tearDown(self):
+        _LC.cache_path, _LC.cache_set = self._lc_orig
+
     """全字段行为比对。基线由 --bless 生成，键为 URL。"""
 
     @classmethod

@@ -51,8 +51,11 @@ P._vlm_cache_set = lambda key, val: None           # 测试期不落盘新缓存
 # 仍会写真实 data/.vlm_cache.json —— 污染本机生产缓存，并可能与夹具状态互相干扰
 # （test_parser_snapshot 曾因此出现 xz65 的 speakerBio 分隔符假红）。两侧都桩。
 import llm_cache as _LC                              # noqa: E402
-_LC.cache_path = lambda: VLM_CACHE_FIXTURE
-_LC.cache_set = lambda key, val: None
+
+# 2026-09-27：原在此处（导入时）直接改写 _LC.cache_path/cache_set——pytest
+# 收集阶段会导入全部测试模块，该补丁对整个进程常驻，导致 test_llm_cache 的
+# 200 并发写全部落进空桩（全量套件 4 红假失败，见其 SharedCacheTest.setUp 注释）。
+# 改为 _GoldenCacheMixin 在 setUp/tearDown 打桩/还原，用例内行为不变。
 
 # 垃圾 topic 特征（历史上由表格/页眉误读产生）：如 '0- 17' / '0 -12' / 纯序号
 _FORBIDDEN_TOPIC = ('0-', '0 -', '0—')
@@ -241,7 +244,23 @@ def _make_test(case):
     return test
 
 
-class GoldenTest(unittest.TestCase):
+class _GoldenCacheMixin(unittest.TestCase):
+    """缓存隔离：golden 用例期间桩化 llm_cache，tearDown 还原。
+
+    （2026-09-27：原为模块导入时打桩且从不还原，污染同进程内其他测试模块——
+    test_llm_cache 的并发写全部落进空桩。pytest 单文件进程不受影响，故 CI
+    逐文件跑时是绿的、全量 pytest 跑时红。）"""
+
+    def setUp(self):
+        self._lc_orig = (_LC.cache_path, _LC.cache_set)
+        _LC.cache_path = lambda: VLM_CACHE_FIXTURE
+        _LC.cache_set = lambda key, val: None
+
+    def tearDown(self):
+        _LC.cache_path, _LC.cache_set = self._lc_orig
+
+
+class GoldenTest(_GoldenCacheMixin):
     def test_00_ctld432_inverted_speaker(self):
         """idx2635 职务倒装「主讲人：网络中心主任 林南晖」→ speaker=林南晖 + speakerTitle=网络中心主任。
 
@@ -280,7 +299,7 @@ def _judge_available():
         return False
 
 
-class KnownDefectTest(unittest.TestCase):
+class KnownDefectTest(_GoldenCacheMixin):
     """2026-09-10 round-16 已知解析缺陷清单（源页锚点均已实证）——期望行为用 @expectedFailure 锁定。
 
     这些页面的库内数据是人工修复的，但 parser 重抓会再次产出污染。

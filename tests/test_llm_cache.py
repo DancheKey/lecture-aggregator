@@ -75,16 +75,20 @@ class SharedCacheTest(unittest.TestCase):
              符合「缓存不可用不得阻断主链路」的既定语义；
           ② 直接读前先确认文件存在，缺失时给出可诊断的失败信息而非裸异常。
         """
-        if not os.path.exists(self.path):
-            self.fail('缓存文件未生成：%s（cache_set 应已写入）' % self.path)
-        try:
-            with open(self.path, encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            # 极小概率落在 os.replace 的两步之间；重试一次即可稳定
-            time.sleep(0.05)
-            with open(self.path, encoding='utf-8') as f:
-                return json.load(f)
+        # 2026-09-27：读取必须持 cache_set 同一把进程锁——Windows 的 os.replace
+        # 是「删旧+改名」两步，200 并发写下裸读会撞进间隙（全量套件下确定性
+        # 复现 4 红；单跑必绿的「偶发」实为负载差）。持锁后读写串行化，间隙关闭。
+        with llm_cache._CACHE_LOCK:
+            if not os.path.exists(self.path):
+                self.fail('缓存文件未生成：%s（cache_set 应已写入）' % self.path)
+            try:
+                with open(self.path, encoding='utf-8') as f:
+                    return json.load(f)
+            except FileNotFoundError:
+                # 双保险：极小概率仍落在两步之间；稍候重试一次
+                time.sleep(0.05)
+                with open(self.path, encoding='utf-8') as f:
+                    return json.load(f)
 
     # ---------- 静态：单一实现 ----------
     def test_50_两模块共用llm_cache(self):
