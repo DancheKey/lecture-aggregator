@@ -306,8 +306,39 @@ ORG_TITLE_SUFFIXES = (
 # C) 通用尊称
 HONORIFIC_SUFFIXES = ('先生', '女士')
 
+# D) 「学段+学科+高级职称」等复合职称（2026-10-02 收敛批次 2 新增）。
+#
+# 背景：这些形态**主表 A/B 都没有**，但 parsers.py 至少三处内联引用了它们
+# （_TITLE_ALT_FULL 的高级系列、_extract_affiliation_from_bio 的等级教授系列、
+# _derive_org 路径的「特聘研究员」）。此前它们只活在正则里，是「主表之外」的
+# 隐形词表——正是本轮要消灭的那类副本，只不过副本方不是 parsers 而是主表本身缺项。
+# 放进独立分组而非并入 A/B：它们的语义（复合/等级/荣誉型）与普通学术职称不同，
+# 并入 A 会让所有「剥尾部职称」的调用点意外开始匹配「一级教授」这类词。
+COMPLEX_TITLE_SUFFIXES = (
+    # 学段+学科+高级职称：「中学数学高级教师」「小学语文高级教师」等
+    '高级实验师', '高级讲师', '高级教师', '高级工程师', '高级会计师', '高级经济师',
+    '特级教师', '实验师', '工程师', '会计师', '经济师',
+    # 等级教授（高校职级）：仅在简介「现为…二级教授」这类句子里出现
+    '一级教授', '二级教授', '三级教授', '四级教授',
+    # 荣誉/聘任型教授：源页常见「周忠宝…特聘教授」「客座教授」等
+    '讲座教授', '讲席教授', '客座教授', '名誉教授', '兼职教授',
+    '青年教授', '卓越教授',
+)
+
+# 修饰前缀 + 基础职称（姓氏型复合，如「青年研究员」「特聘研究员」）。
+# 与 COMPLEX 独立：这一类是「修饰词 + 职称」，正则需组合而非枚举全部变体。
+TITLE_MODIFIERS = ('青年', '资深', '特聘', '长聘', '客座', '兼职',
+                   '访问', '荣誉', '杰出', '首席', '优秀')
+
 # 尾部剥离用超集：姓名/单位末尾出现即应去掉的职称、职务、尊称字样。
+# ⚠ 不含 COMPLEX_TITLE_SUFFIXES——那是「简介句子里的复合职称」专用，
+#   并入会改变 _clean_affiliation 等调用点的既有行为（见 D 组注释）。
 TAIL_TITLE_SUFFIXES = NAME_TITLE_SUFFIXES + ORG_TITLE_SUFFIXES + HONORIFIC_SUFFIXES
+
+# 全量并集：静态门禁（tests/test_title_vocab_convergence.py）据此断言
+# parsers.py 里不得再出现「不在本并集内」的职称词。
+ALL_TITLE_SUFFIXES = (NAME_TITLE_SUFFIXES + ORG_TITLE_SUFFIXES
+                      + HONORIFIC_SUFFIXES + COMPLEX_TITLE_SUFFIXES)
 
 # 机构性单位结尾词：判断「XX 中心主任」里的 XX 是否为机构名
 # （parsers._derive_org_from_title 用）。
@@ -329,9 +360,58 @@ def _alt(words):
 NAME_TITLE_SUFFIX_RE = re.compile(_alt(NAME_TITLE_SUFFIXES))
 ORG_TITLE_SUFFIX_RE = re.compile(_alt(ORG_TITLE_SUFFIXES))
 TAIL_TITLE_RE = re.compile(_alt(TAIL_TITLE_SUFFIXES) + '$')
+# 「串中是否含职称」检测用（**无 $ 锚点**）。2026-10-02 新增。
+# 为什么不能直接用 TAIL_TITLE_RE：它带 `$`，语义是「整串尾部是职称」，
+# 用于 re.search 时虽常能命中（正则会回溯到串尾），但意图不明确且脆弱
+# （一旦前面加了 \s* 或分组就会被 $ 绑死）。检测语义请用本入口。
+TAIL_TITLE_ANY_RE = re.compile(_alt(TAIL_TITLE_SUFFIXES))
+# 「串尾是**一个或多个**职称词」——用于把「张三特聘教授研究员」整段切给 speakerTitle。
+# 与 TAIL_TITLE_RE（只吃一个后缀）的区别就在 `+`：此处要吃掉连续多个。
+# 2026-10-02 新增，替代 parsers 里手抄的 `(助理研究员|…|先生|女士)+$`。
+NAME_TITLE_TAIL_RUN_RE = re.compile(
+    '(?:' + _alt(NAME_TITLE_SUFFIXES) + r')+$')
 # 整串**仅由**职称/职务/尊称构成（可重复），如「教授」「副教授研究员」。
 # 显式带 ^...$：调用方可能用 match / search / fullmatch，锚定后三者语义一致。
 TITLE_ONLY_RE = re.compile('^(?:' + _alt(TAIL_TITLE_SUFFIXES) + ')+$')
+
+# ---- 2026-10-02 批次 2：为「刻意裁剪 / 复合形态」增设的派生入口 ----
+#
+# parsers.py 里有两类**不能**直接改用 TAIL_TITLE_RE 的职称串，它们此前各自
+# 内联手抄。硬替换会改变行为，故在此为它们各开一个**语义明确的入口**，
+# 让 parsers 改为引用——达到「加词只改一处」的目的，同时保持行为不变。
+
+# ① 姓名**紧邻**职称的无标签识别用（parsers._SPEAKER_TITLE）。
+#    与 A 组的区别：**刻意排除**职务词（院长/主任/主席/秘书长…）——这些常出现在
+#    bio 正文里且前面并非主讲人姓名，纳入会把「简介里被介绍的人」误当主讲人
+#    （parsers.py:394 原注释即此意）。故此处是 A ∪ 尊称，**不含 B 组**。
+SPEAKER_ADJACENT_TITLE_RE = re.compile(_alt(NAME_TITLE_SUFFIXES + HONORIFIC_SUFFIXES))
+
+# ② 简介/单位里的复合职称（parsers._TITLE_ALT_FULL）。
+#    含 D 组（高级系列、等级教授、荣誉型）+「学段+学科+高级职称」组合 +
+#    「修饰前缀 + 基础职称」组合。
+#
+#    ⚠️ 组合**不能**做笛卡尔积：原正则里学科只与「自己对应的」高级职称组合
+#    （中学数学高级教师），而 g×s×a 全展开会造出「中学体育高级会计师」这类
+#    现实中不存在的词——它们永远匹配不到，只会撑爆正则长度（G4 收敛的原则：
+#    派生入口必须与旧表达式**逐字等价**，不能"更宽松"）。故按原结构精确构造：
+#      · 复合词清单（学段/学科/高级职称）逐项显式登记，不相乘；
+#      · 需要组合的只登记两种真实形态：学段+学科+高级职称、学科+高级职称。
+_SUBJ_TITLES = ('数学', '语文', '英语', '物理', '化学', '生物', '政治',
+                '历史', '地理', '科学', '美术', '音乐', '体育', '信息技术')
+_GRADES = ('中学', '小学', '初中', '高中')
+# 「高级…」系列的各后缀（与 _ACAD_TAIL 同集合，此处按高级系列再列一次供组合用）
+_ADV_TAILS = ('高级教师', '高级讲师', '高级实验师', '高级工程师', '高级会计师', '高级经济师')
+
+_SUBJ_GRADED = (
+    tuple(f'{s}{a}' for s in _SUBJ_TITLES for a in _ADV_TAILS)      # 数学高级教师
+    + tuple(f'{g}{s}{a}' for g in _GRADES for s in _SUBJ_TITLES     # 中学数学高级教师
+            for a in _ADV_TAILS)
+)
+_MOD_TITLE_WORDS = tuple(
+    f'{m}{t}' for m in TITLE_MODIFIERS for t in ('研究员', '教授', '讲师'))
+_COMPLEX_ALL_WORDS = (COMPLEX_TITLE_SUFFIXES + _MOD_TITLE_WORDS + _SUBJ_GRADED
+                      + NAME_TITLE_SUFFIXES + HONORIFIC_SUFFIXES)
+COMPLEX_TITLE_ALT_RE = re.compile(_alt(_COMPLEX_ALL_WORDS))
 
 
 def strip_name_title_suffix(name):

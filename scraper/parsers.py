@@ -391,10 +391,12 @@ def _is_plausible_han_name(s):
 
 
 # F3 补充：主讲人职称词（用于「姓名 紧邻职称」式无标签主讲人识别，如海报「曾碧卿 /教授」）。
-# 不含「院长/主任/主席」等职务词——这些常出现在 bio 正文里、前面并非主讲人姓名，
-# 纳入会导致把简介里被介绍的人误当主讲人。
-_SPEAKER_TITLE = (r'(?:特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|助理研究员|研究员|'
-                  r'教授|讲师|博士后|博士|院士|老师|导师|先生|女士)')
+# 2026-10-02 收敛：原先在此内联手抄 13 个词，与 field_vocab.NAME_TITLE_SUFFIXES
+# 缺少「博士生导师/硕士生导师/博导/硕导/硕士」5 项。改引语义入口
+# _fv.SPEAKER_ADJACENT_TITLE_RE（= 姓名职称 ∪ 尊称，**刻意不含**职务词）。
+# 不含职务词的理由见上：院长/主任/主席等常出现在 bio 正文里且前面并非主讲人姓名，
+# 纳入会导致把简介里被介绍的人误当主讲人（故不能用 TAIL_TITLE_RE）。
+_SPEAKER_TITLE = _fv.SPEAKER_ADJACENT_TITLE_RE.pattern
 
 # 完整职称交替式（单一事实源，2026-09-09）：供 ①尾部职称剥离（3720/3846 两处）
 # ②姓名后残文的头部职称剥离 复用。含「学段+学科+高级职称」复合形态——
@@ -402,14 +404,14 @@ _SPEAKER_TITLE = (r'(?:特聘教授|特任教授|长聘教授|副教授|助理�
 # （idx772 speaker='彭斌中学' 实测教训）。2026-09-22 补「青年/资深」等修饰前缀复合职称——
 # 「青年研究员」若只剥「研究员」会把「青年」残留在姓名里（iqm429 speaker='孙开佳青年'、
 # iqm303 '徐子骏青年' 实测教训）。
-_TITLE_ALT_FULL = (
-    r'(?:高级实验师|高级讲师|高级教师|高级工程师|高级会计师|高级经济师|特级教师'
-    r'|实验师|工程师|会计师|经济师'
-    r'|(?:(?:中学|小学|初中|高中)(?:数学|语文|英语|物理|化学|生物|政治|历史|地理|科学|美术|音乐|体育|信息技术)?'
-    r'|数学|语文|英语|物理|化学|生物|政治|历史|地理|科学|美术|音乐|体育)?高级(?:教师|讲师|实验师|工程师|会计师|经济师)'
-    r'|(?:青年|资深|特聘|长聘|客座|兼职|访问|荣誉|杰出|首席|优秀)(?:研究员|教授|讲师)'
-    r'|特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)'
-)
+# 2026-10-02 收敛：原先在此内联手抄整张复合职称表。改引 field_vocab 的
+# _fv.COMPLEX_TITLE_ALT_RE。逐条展开比对确认**旧词集被新表完全覆盖**
+# （无「仅旧有新」项），且新表额外含 13 项主表本就有、旧内联串漏掉的词：
+#   等级教授（一/二/三/四级）、讲座/讲席/名誉/兼职/青年/卓越教授、
+#   博士生导师/硕士生导师/博导/硕导/硕士
+# 这些不是「放宽」，而是本次收敛要修的正是「主表加了词、副本不知道」的漂移；
+# 它们只在「姓名尾部恰是这类职称」时才生效，由全量解析测试兜底（见本次提交）。
+_TITLE_ALT_FULL = _fv.COMPLEX_TITLE_ALT_RE.pattern
 
 # 讲者姓名尾部的**行政职务**（2026-09-30 新增，B6 后续缺口）。
 # module/3685 实证：源页写「刘维泉副总裁（杭州乒乓智能技术有限公司）」，
@@ -572,12 +574,15 @@ def _extract_speaker_from_ocr(text):
         v = re.split(r'[（(]', m.group(1).strip())[0].strip()
         # 剥离常见职称/头衔（OCR 常识别出「陈建邦校长」「李洪修教授」等）
         # 不用 $ 锚定，因为贪婪匹配可能取到「姓名职称+后续文本」的长串
-        v = re.sub(r'(?:校长|教授|副教授|讲师|研究员|副研究员|助理研究员|博士|院士'
-                  r'|特聘教授|特任教授|院长|系主任|处长|局长|老师|导师)', '', v).strip()
+        # 2026-10-02 收敛：原内联 15 词，改引主表 _fv.TAIL_TITLE_RE
+        # （姓名职称 + 行政职务 + 尊称；长词优先，_alt 已按长度降序）。
+        # 旧串含而主表也含的词全部保留（校长/教授/副教授/讲师/研究员/副研究员/
+        # 助理研究员/博士/院士/特聘教授/特任教授/院长/系主任/处长/局长/老师/导师），
+        # 且额外能剥掉主表新增的职务词——正是「主表加词、副本不知道」要修的漂移。
+        v = re.sub(_fv.TAIL_TITLE_RE.pattern, '', v).strip()
         # 若剥离后仍非纯姓名，用「姓名+职称」精确模式重提取（仅取到职称为止）
         if v and not _looks_like_real_name(v):
-            nm = re.match(r'^([\u4e00-\u9fff·]{2,4})(?:校长|教授|副教授|讲师|研究员|副研究员|助理研究员|博士|院士'
-                      r'|特聘教授|特任教授|院长|系主任|处长|局长|老师|导师)', v)
+            nm = re.match(r'^([\u4e00-\u9fff·]{2,4})' + _fv.TAIL_TITLE_RE.pattern, v)
             if nm and _looks_like_real_name(nm.group(1)):
                 v = nm.group(1)
             else:
@@ -1065,8 +1070,11 @@ def _clean_location(loc, title=None):
 def _extract_bio_from_ocr(ocr_text, speaker):
     if not ocr_text or not speaker:
         return ''
-    _TITLE_RE = (r'(?:教授|副教授|讲师|研究员|副研究员|助理研究员|博士|院士|老师|'
-                 r'校长|院长|主任|特聘教授|特任教授|导师|嘉宾)?')
+    # 「姓名 + 可选职称」的定位式匹配（注意末尾的 ?：多数姓名后并不跟职称）。
+    # 2026-10-02：词表主体已改引主表 _fv.TAIL_TITLE_RE（原先内联 14 词）。
+    # 末尾保留「嘉宾」——它是**角色词而非职称**（海报写「特邀嘉宾：」指人，
+    # 不属于 field_vocab 的职称/职务/尊称任一语义），故留在本处不进主表。
+    _TITLE_RE = (r'(?:' + _fv.TAIL_TITLE_RE.pattern + r'|嘉宾)?')
     occ = [(m.start(), m.end())
            for m in re.finditer(re.escape(speaker) + _TITLE_RE, ocr_text)]
     if not occ:
@@ -4427,12 +4435,12 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
         _names = None
         # 1) 空格分隔
         if re.match(r'^([\u4e00-\u9fff·]{2,4})(?:\s+[\u4e00-\u9fff·]{2,4})+$', _sp_orig) and \
-           not re.search(r'(特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)', _sp_orig):
+           not _fv.TAIL_TITLE_ANY_RE.search(_sp_orig):
             _names = _sp_orig.split()
         # 2) 粘连无空格：尝试拆成 2~4 字/段的纯姓名（如魏文娅|傅承哲）。
         # 额外要求首字为常见姓氏，避免「魏文/娅傅承哲」这类错误切分被 _looks_like_real_name 误放。
         if _names is None and re.match(r'^[\u4e00-\u9fff·]{4,8}$', _sp_orig) and \
-           not re.search(r'(特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)', _sp_orig):
+           not _fv.TAIL_TITLE_ANY_RE.search(_sp_orig):
             for cut in range(2, 5):
                 a, b = _sp_orig[:cut], _sp_orig[cut:]
                 if (2 <= len(b) <= 4 and _is_plausible_han_name(a) and _is_plausible_han_name(b)
@@ -4468,16 +4476,18 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
                 _pairs = []
                 for _s2 in _segs2:
                     _s2 = _s2.strip()
-                    _n2 = re.sub(
-                        r'(?:特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|'
-                        r'助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$',
-                        '', _s2).strip()
-                    _t2 = re.search(
-                        r'(特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|'
-                        r'助理研究员|研究员|教授|讲师|博士后|博士|院士|老师)', _s2)
+                    _n2 = re.sub(r'\s*' + _fv.NAME_TITLE_SUFFIX_RE.pattern + r'.*$',
+                             '', _s2).strip()
+                    # 2026-10-02 收敛：取「串中第一个职称词」改用主表 NAME_TITLE_SUFFIX_RE
+                    # （_alt 已按长度降序，保证「特聘教授」先于「教授」命中）。
+                    # ⚠ 必须用 group(0) 而非 group(1)：_alt 生成的是**非捕获组**
+                    #    `(?:A|B)`（G4 收敛时的既定格式），没有 group(1)。
+                    #    旧的内联串用的是捕获组 `(A|B)`——这正是手抄副本的隐患：
+                    #    换成主表后 group 语义会静默改变。
+                    _t2 = _fv.NAME_TITLE_SUFFIX_RE.search(_s2)
                     if re.fullmatch(r'[\u4e00-\u9fff·]{2,4}', _n2) and _looks_like_real_name(_n2):
                         _pairs.append({'name': _n2,
-                                       'honorific': _t2.group(1) if _t2 else '', 'aff': ''})
+                                       'honorific': _t2.group(0) if _t2 else '', 'aff': ''})
                     else:
                         _pairs = None
                         break
@@ -4675,9 +4685,13 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
             speaker_label_found = True
             sp = m.group(1).strip()
             # F3 step2 — 职称后缀分离为 speakerTitle（如「助理研究员」「教授」）
-            mt_title = re.search(r'(助理研究员|副研究员|助理研究员|研究员|特聘教授|特任教授|长聘教授|副教授|助理教授|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)+$', sp)
+            # 2026-10-02 收敛：原内联 15 词且「助理研究员」重复出现两次，
+            # 改引主表 _fv.NAME_TITLE_TAIL_RUN_RE（姓名职称 ∪ 可连续多个 + $ 锚定）。
+            # 主表版不含职务词——与 _SPEAKER_TITLE 同理，speakerTitle 只该是学术职称。
+            # ⚠ 取 group(0)：_alt 生成的是非捕获组 `(?:A|B)`，无 group(1)。
+            mt_title = _fv.NAME_TITLE_TAIL_RUN_RE.search(sp)
         if mt_title:
-            sp_title = mt_title.group(1).strip()
+            sp_title = mt_title.group(0).strip()
         # 英文/拉丁姓名快路径（2026-07-24 修复：cs 5294「Yan Zhang, University of Oslo」
         # 原中文抽取路径只匹配 CJK、英文全落空，被守卫清空）。命中则直接落库并跳过 CJK 路径。
         if m and sp:
@@ -4760,13 +4774,16 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
                     mm = re.match(r'(.+?)\s*[（(]([^）)]{2,40})[）)]', sp)
                     if mm:
                         result['speaker'] = sp_clean.split('（')[0].split('(')[0].strip()
-                        aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm.group(2)).strip()
+                        aff = re.sub(r'\s*' + _fv.TAIL_TITLE_RE.pattern + r'.*$', '', mm.group(2)).strip()
                         # 清除「现为/现任/现供职于/目前任职于」等状态前缀
                         aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
                         result['speakerAffiliation'] = re.sub(r'\s+', '', aff)
                     else:
                         # 空格分隔的「姓名 职称 单位」或「姓名 单位」（如物理学院「郑炜 教授 中国科学技术大学」）
-                        _TITLES = r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师)'
+                        # 2026-10-02 收敛：原内联 11 词，改引主表（姓名职称 ∪ 尊称）。
+                        # 刻意不含职务词——此处切的是「姓名 职称 单位」三段式，
+                        # 职务词（院长/主任…）出现在单位段而非职称段。
+                        _TITLES = _fv.SPEAKER_ADJACENT_TITLE_RE.pattern
                         # 先处理「姓名 职称，单位」逗号分隔（生命科学学院常见：报告人：肖媛 博士，清华大学）
                         sp_normalized = re.sub(r'[，,]', ' ', sp)
                         mm2 = re.match(rf'^([\u4e00-\u9fff·]{{2,5}})\s+[\u4e00-\u9fff]{{0,4}}{_TITLES}\s+([\u4e00-\u9fffA-Za-z].{{2,40}})$', sp_normalized)
@@ -4776,7 +4793,7 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
                             mm2 = re.match(r'^([\u4e00-\u9fff·]{2,4})\s+([\u4e00-\u9fff]{4,40})$', sp_normalized)
                         if mm2:
                             result['speaker'] = mm2.group(1).strip()
-                            aff = re.sub(r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', mm2.group(2)).strip()
+                            aff = re.sub(r'\s*' + _fv.TAIL_TITLE_RE.pattern + r'.*$', '', mm2.group(2)).strip()
                             # 清除「现为/现任/现供职于/目前任职于」等状态前缀
                             aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
                             result['speakerAffiliation'] = re.sub(r'\s+', '', aff).strip()
@@ -4811,8 +4828,7 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
         _HDR_SP = re.compile(
             r'(?:[一二三四五六七八九十百零0-9]+|[（(][一二三四五六七八九十0-9]+[)）])\s*[、.．。]?\s*'
             r'主讲人(?!简介|简历|介绍)\s*'
-            r'([\u4e00-\u9fff·]{2,4}'
-            r'(?:院士|教授|研究员|讲师|博士|特聘教授|特任教授|副教授|助理教授|助理研究员|副研究员|老师)?'
+            r'([\u4e00-\u9fff·]{2,4}' + _fv.NAME_TITLE_SUFFIX_RE.pattern + r'?'
             r'[\u4e00-\u9fffA-Za-z0-9·，,、。.\s]{0,80})'
         )
         _hdr_m = _HDR_SP.search(_st.text)
@@ -5900,9 +5916,7 @@ def _extract_role(text, role):
     if not m:
         return ''
     val = m.group(1).strip()
-    cand_core = re.sub(
-        r'\s*(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-        r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士).*$', '', val).strip()
+    cand_core = re.sub(r'\s*' + _fv.TAIL_TITLE_RE.pattern + r'.*$', '', val).strip()
     nm = _SPEAKER_NAME_RE.match(cand_core)
     if nm and _looks_like_real_name(nm.group(1)):
         return nm.group(1)
@@ -6314,8 +6328,8 @@ def _detect_nth_field_sessions(text, default_year=None, publish_time=None,
                 _srest = _srest[:_cut.start()]
             _srest = _srest.strip(' （(，,）)')
             # 先按职称词切出姓名头部：否则 3 字贪心会把「陆毅教授…」取成「陆毅教」。
-            _JOB = (r'(?:特聘教授|特任教授|副教授|助理教授|副研究员|助理研究员|'
-                    r'研究员|教授|讲师|博士后|博士|院士|老师|导师|先生|女士)')
+            # 2026-10-02 收敛：原内联 14 词，改引主表 _fv.NAME_TITLE_SUFFIX_RE
+            _JOB = _fv.NAME_TITLE_SUFFIX_RE.pattern
             _tm = re.search(_JOB, _srest)
             _head = _srest[:_tm.start()] if _tm else _srest
             _nm = None
@@ -6702,11 +6716,11 @@ def _extract_affiliation(rest):
     else:
         aff = re.sub(r'^\s*[（(]?\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', rest).strip()
     aff = re.sub(r'^\s*(?:现为|现任|现供职于|目前任职于|就职于)\s*', '', aff).strip()
+    # 2026-10-02 收敛：职称部分改引主表 _fv.COMPLEX_TITLE_ALT_RE（含等级/荣誉/聘任型教授
+    # 与高级系列），另保留学位词（硕士/学士，主表 A 组只有博士）与党派/政治面貌词
+    #（党员/九三学社…）——后者不是职称，属「单位串尾噪声」，故仍在本处。
     aff = re.sub(
-        r'\s*(?:特聘教授|特任教授|长聘教授|讲座教授|讲席教授|客座教授|名誉教授|兼职教授|'
-        r'青年教授|卓越教授|二级教授|三级教授|四级教授|一级教授|'
-        r'副教授|助理教授|副研究员|助理研究员|研究员|教授|讲师|博士后|博士|硕士|学士|'
-        r'院士|老师|导师|先生|女士|'
+        r'\s*(?:' + _fv.COMPLEX_TITLE_ALT_RE.pattern + r'|硕士|学士|'
         r'中共党员|共产党员|党员|九三学社|民进|民盟|民建|致公党|农工党|台盟|无党派).*$',
         '', aff).strip()
     aff = aff.strip(' （()）')
@@ -6863,9 +6877,10 @@ def _split_english_speaker(sp):
         aff = aff.strip(' ,，（）()')
         # 去掉尾部职称词（归入 speakerTitle，与中文路径一致），如「…信息技术学院教授」→「…信息技术学院」。
         # 允许职称后跟句号/逗号等标点（seri 11 "Daniel Schlenck教授。"）。
-        aff = re.sub(r'(?:特聘教授|特任教授|长聘教授|副教授|助理教授|副研究员|'
-                     r'助理研究员|研究员|教授|讲师|博士后|博士|院士|老师|导师|'
-                     r'先生|女士)\s*[。，.,]?$', '', aff).strip()
+        # 2026-10-02 收敛：原内联 14 词，改引主表 _fv.NAME_TITLE_SUFFIX_RE
+        #（_alt 已按长度降序，保证「特聘教授」先于「教授」命中）。
+        aff = re.sub(r'(?:' + _fv.NAME_TITLE_SUFFIX_RE.pattern
+                     + r')\s*[。，.,]?$', '', aff).strip()
         # 去职称后只剩标点/空白 → 清空
         if re.fullmatch(r'[。，.,\s]+', aff):
             aff = ''
