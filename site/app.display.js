@@ -204,7 +204,15 @@ Object.assign(APP_METHODS, {
       // 2026-09-30 补 _longText 键数：长文本是后到的（detail 桶），到达后卡片上会**新出现**
       // 「简介/摘要」区块，若不进签名则整个测量被跳过 → 这些新元素测不到溢出 →
       // 「展开简介/展开摘要」按钮不显示，而 _clampMeasured 已为 true，字符数兜底也已失效。
-      const sig = [this.currentPage, this.query, this.campus, this.college, this.year,
+      // 2026-10-02 补 speaker/showLikedOnly/searchField（修复 B2）：签名漏了三个筛选维度，
+      // 而它们都会改变卡片 DOM 却不改签名。触发路径比想象中常见——app.js 的 watch 只对
+      // 前三个（query/searchField/campus/college/year/showLikedOnly）置 currentPage=1，
+      // **speaker 没有 watcher**（只在 pickSpeaker 里手动置 1）。于是：
+      //   ① 在第 1 页点「讲者」标签 → DOM 全换、签名不变 → 跳过测量 →
+      //      新卡片测不到溢出，「展开简介/摘要」按钮缺失且字符数兜底已失效；
+      //   ② 二次筛选（默认就在第 1 页）同样不触发重测。
+      const sig = [this.currentPage, this.query, this.searchField, this.campus,
+        this.college, this.year, this.speaker, this.showLikedOnly,
         this.all.length, this.dataStage, window.innerWidth,
         Object.keys(this._longText).length,
         JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio)].join('|');

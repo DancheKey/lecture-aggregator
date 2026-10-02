@@ -154,12 +154,27 @@ const APP_COMPUTED = {
     units() {
       const MIN = 3; // 同日折叠阈值：同一天 ≥3 场才折叠（1~2 场的日子逐场展示更有用）
       const groupKey = l => (l.sourceUrl || '') + '|' + (l.lectureStart || '').slice(0, 10);
-      // 先统计各「同源+同日」组场次，仅达标组折叠
-      const counts = new Map();
+      // 2026-10-02 修复 B1：折叠组同时需要两个计数——修复前只有一个且取错了来源。
+      //
+      //   filteredCounts：filtered（已应用筛选/搜索）里的命中场次 → 决定是否折叠；
+      //   allCounts：all（未筛选全集）里的真实场次 → 卡片上的「同日 N 场」。
+      //
+      // 修复前 `total: recs.length` 而 recs 来自 filtered，导致 total ≡ recs.length，
+      // 下游两处恒为死条件：
+      //   ① index.html 的「⚠ 当前筛选命中 X / Y 场」——`recs.length < total` 永不成立；
+      //   ② app.display.isForumOpen 的默认值 `recs.length < total` 永为 false，
+      //      「筛选命中子集时自动展开场次清单」整条策略静默失效。
+      const filteredCounts = new Map();
+      const allCounts = new Map();
       this.filtered.forEach(l => {
         if (!l.sourceUrl) return;
         const k = groupKey(l);
-        counts.set(k, (counts.get(k) || 0) + 1);
+        filteredCounts.set(k, (filteredCounts.get(k) || 0) + 1);
+      });
+      this.all.forEach(l => {
+        if (!l.sourceUrl) return;
+        const k = groupKey(l);
+        allCounts.set(k, (allCounts.get(k) || 0) + 1);
       });
       const units = [];
       const seen = new Set();
@@ -171,13 +186,16 @@ const APP_COMPUTED = {
           return;
         }
         const k = groupKey(l);
-        if ((counts.get(k) || 0) >= MIN) {
+        if ((filteredCounts.get(k) || 0) >= MIN) {
           if (seen.has(k)) return;
           seen.add(k);
           const recs = this.filtered.filter(x => groupKey(x) === k);
           units.push({
             type: 'forum', url: u, recs, head: recs[0],
-            total: recs.length,
+            // 全集场次（未经筛选）：与 recs.length 在有筛选时才不同。
+            // 数据尚未全量加载完时 all 少于 filtered 是可能的，取二者较大值兜底，
+            // 保证 total >= recs.length 这个不变式（下游依赖它做「部分命中」判定）。
+            total: Math.max(allCounts.get(k) || 0, recs.length),
             dateLabel: (l.lectureStart || '').slice(0, 10),
             key: 'f|' + k,
           });

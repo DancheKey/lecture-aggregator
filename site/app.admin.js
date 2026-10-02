@@ -92,9 +92,14 @@ Object.assign(APP_METHODS, {
                 if (r.ok) this.showToast('已触发后台更新，几分钟后刷新即可看到最新数据');
                 else throw new Error('dispatch-failed');
               })
-              .catch(() => this.showToast('立即更新触发失败，网站每天自动更新两次（约 11:00 与次日 01:00）'));
+              .catch(() => this.showToast('立即更新触发失败，网站每天自动更新两次（约 09:00 与次日 00:00）'));
           } else {
-            this.showToast('网站每天自动更新两次（约 11:00 与次日 01:00）；如需立即更新，请在本机运行爬虫或手动触发工作流');
+            // ⚠ 文案里的时刻必须与 .github/workflows/daily.yml 的 on.schedule 对齐
+            // （01:00/16:00 UTC = 北京时间 09:00 / 次日 00:00）。2026-10-02 实测发现
+            // 此处与 docs/deploy.md 都写着「11:00 与次日 01:00」，与实际配置差 2 小时——
+            // 用户按文案去查 Actions 会得出「这个点还没跑」的错误结论。
+            // 改班次时三处一起改：daily.yml（本源）、app.admin.js、docs/deploy.md。
+            this.showToast('网站每天自动更新两次（约 09:00 与次日 00:00）；如需立即更新，请在本机运行爬虫或手动触发工作流');
           }
         })
         .finally(() => { this.scraping = false; });

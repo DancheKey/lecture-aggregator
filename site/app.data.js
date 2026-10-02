@@ -55,7 +55,6 @@ Object.assign(APP_METHODS, {
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
-          this.loadedChunks = 0;     // 全新一次完整加载，从第 0 片开始
           this.dataStage = 'partial';
           this.loading = false;
           this.bumpCount();          // 数字跳到 50（首屏已加载真实条数；阶梯跳变无动画）
@@ -130,7 +129,6 @@ Object.assign(APP_METHODS, {
       };
       const pool = Math.min(CONCURRENCY, chunks.length);
       await Promise.all(Array.from({ length: pool }, () => worker()));
-      this.loadedChunks = 0;
       if (failed.length) {
         // 仍有分片失败：保留已加载的真实条数并暴露重试入口；
         // 绝不 finalize 到 50 死值，避免数字定格成假数据。
