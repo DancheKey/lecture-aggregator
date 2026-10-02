@@ -32,8 +32,9 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 全部入库 .py（不含 tests/ 与 scripts/ 的一次性脚本——那些不进流水线，
-# 但语法坏掉同样只会让人扑空，故一并纳入，反正编译是零成本的）
+# 全部入库核心模块。scripts/ 下被 .gitignore 刻意忽略的一次性脚本
+# （backfill_*/fix_*/probe_* 等）不入库、CI 根本没有，不能列入清单；
+# 它们语法坏掉只会让人本地扑空，但那是本地维护责任，非流水线范畴。
 CORE_MODULES = [
     'server.py',
     'scraper/scraper.py',
@@ -49,7 +50,6 @@ CORE_MODULES = [
     'scripts/frontend_fields.py',
     'scripts/excluded_urls.py',
     'scripts/test_invariants.py',
-    'scripts/backfill_b5_small_hour.py',
 ]
 
 
