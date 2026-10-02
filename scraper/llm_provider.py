@@ -240,46 +240,14 @@ def _unwrap(obj):
 
 # ---------------------------------------------------------------------------
 # 自包含缓存（与 parsers 共享 data/.vlm_cache.json，key 加 "text:" 前缀隔离）
+#
+# 2026-10-02：读写实现收敛到 scraper/llm_cache.py。此前本模块的 _CACHE_LOCK
+# 与 parsers._VLM_CACHE_LOCK 是**两把互不可见的锁**，却各自对同一个文件做
+# 「整文件读→改→整文件写」——单进程 5 线程下文本抽取与 VLM 抽取并发时，
+# 后写者会用自己读时的快照覆盖文件，丢掉对方刚写的整批条目
+# （表现为缓存命中下降、重复烧 API 额度）。现两方共用一把锁与一份实现。
 # ---------------------------------------------------------------------------
-_CACHE_LOCK = threading.Lock()
-
-
-def _cache_path():
-    here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(os.path.dirname(here), 'data', '.vlm_cache.json')
-
-
-def _cache_get(key):
-    try:
-        with _CACHE_LOCK:
-            p = _cache_path()
-            if not os.path.exists(p):
-                return None
-            with open(p, encoding='utf-8') as f:
-                c = json.load(f)
-            return c.get(key)
-    except Exception:
-        return None
-
-
-def _cache_set(key, val):
-    try:
-        with _CACHE_LOCK:
-            p = _cache_path()
-            c = {}
-            if os.path.exists(p):
-                try:
-                    with open(p, encoding='utf-8') as f:
-                        c = json.load(f)
-                except Exception:
-                    c = {}
-            c[key] = val
-            tmp = p + '.tmp'
-            with open(tmp, 'w', encoding='utf-8') as f:
-                json.dump(c, f, ensure_ascii=False)
-            os.replace(tmp, p)
-    except Exception:
-        pass
+from llm_cache import cache_get as _cache_get, cache_set as _cache_set  # noqa: E402
 
 
 def _fields_useful(f):

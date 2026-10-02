@@ -15,8 +15,10 @@ import re
 import sys
 import json
 import time
+import atexit
 import hmac
 import secrets
+import socket
 import threading
 import subprocess
 import yaml           # 仅用于读取其它 yaml（如给 scraper 用的辅助脚本）；sources.yaml 走 ruamel
@@ -31,7 +33,7 @@ SOURCES_PATH = os.path.join(ROOT, 'scraper', 'sources.yaml')
 # 确保 scripts/ 与 scraper/ 下的共享模块可被导入（excluded_urls、field_vocab）
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
-from excluded_urls import load_excluded
+from excluded_urls import load_excluded, is_record_excluded
 from frontend_fields import strip_frontend_fields
 import field_vocab as _fv
 
@@ -204,11 +206,53 @@ def _atomic_write_json(path, obj):
     os.replace(tmp, path)
 
 
+# ---- 统计落盘：脏标记 + 锁外flush（2026-10-02）----
+#
+# 此前每次计数变更都在 **_stat_lock 内**同步写盘。2026-08-05 体检（中字-16）
+# 只把「发响应」移出了锁，写盘仍留在锁内——锁的持有时间仍覆盖整个文件 IO，
+# 而历史实测 p50=32ms / p90=516ms（Windows + Defender 扫描 + 小文件很多时尤甚），
+# 意味着一次点赞可能把其余所有统计请求堵住半秒。
+#
+# 改法：锁内只置脏标记（O(1)），锁外由 flush 真正落盘。取舍与正确性：
+#   · 丢失窗口：进程被强杀时最多丢「最后一次未落盘的计数」——统计是尽力而为的
+#     展示数据（点赞/想听/访问），丢 1~2 次计数不影响正确性语义；原子写保证
+#     不会留下半份文件。
+#   · 并发安全：flush 用 try-lock，抢不到就跳过本轮（脏标记保持为真，
+#     下一次统计请求会再次触发 flush），不阻塞请求线程。
+#   · 关停保障：注册 atexit，关停前必落一次，避免正常退出丢数据。
+_stats_dirty = {'visits': False, 'lectures': False}
+
+
+def _mark_dirty(kind):
+    """置脏标记。由调用方在持有 _stat_lock 时调用（O(1)，无 IO）。"""
+    _stats_dirty[kind] = True
+
+
+def _flush_stats():
+    """锁外落盘：把置脏的统计写回磁盘。可安全并发调用（内部 try-lock）。"""
+    if not (_stats_dirty['visits'] or _stats_dirty['lectures']):
+        return
+    if not _stat_lock.acquire(blocking=False):
+        return                      # 别的线程正持锁处理请求，下一轮再落
+    try:
+        # 快照后再清标记：期间的新变更会再次置脏，不会被本次落盘吞掉
+        want_visits, want_lectures = _stats_dirty['visits'], _stats_dirty['lectures']
+        _stats_dirty['visits'] = _stats_dirty['lectures'] = False
+        if want_visits:
+            _save_visits()
+        if want_lectures:
+            _save_lecture_stats()
+    finally:
+        _stat_lock.release()
+
+
 def _save_visits():
     try:
         _atomic_write_json(VISITS_PATH, _site_visits)
     except Exception as e:
         _warn(f'站点访问量写盘失败（{VISITS_PATH}）：{type(e).__name__}: {e}')
+        # 落盘失败必须把标记放回去，否则这次变更永远不会被重试
+        _stats_dirty['visits'] = True
 
 
 def _save_lecture_stats():
@@ -216,6 +260,18 @@ def _save_lecture_stats():
         _atomic_write_json(LECTURE_STATS_PATH, _lecture_stats)
     except Exception as e:
         _warn(f'讲座统计写盘失败（{LECTURE_STATS_PATH}）：{type(e).__name__}: {e}')
+        _stats_dirty['lectures'] = True
+
+
+def _flush_stats_atexit():
+    """进程退出前尽力落盘（含 Ctrl+C 路径）。失败只告警，不影响退出码。"""
+    try:
+        _flush_stats()
+    except Exception:
+        pass
+
+
+atexit.register(_flush_stats_atexit)
 
 
 # 讲座 sourceUrl 白名单（按 lectures.json mtime 缓存）：写统计接口仅接受已知讲座，
@@ -289,9 +345,33 @@ def _find_scraper_python():
     return sys.executable  # 兜底：实在找不到就沿用当前解释器（会如实报错）
 
 
+# 连接级 socket 超时（秒，2026-10-02）。ThreadingHTTPServer 每连接一线程、
+# 基类默认**无任何超时**：客户端连上不发数据、或声明 Content-Length 后慢速发体，
+# 线程就永久阻塞在 read()，少量连接即可耗尽线程（本机实测声明 99MB 后只发 2 字节，
+# 服务端 3 秒内零响应且不返回）。
+# 本地 API 的正常交互都是几十字节的请求 + 立即响应，15 秒绰绰有余；
+# 超时后线程自行退出回收，不影响其它请求。
+SOCKET_TIMEOUT = 15
+
+
 class Handler(SimpleHTTPRequestHandler):
+    timeout = SOCKET_TIMEOUT          # 供基类 setup() 施加到连接；使 rfile.read 抛超时而非挂死
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=SITE_DIR, **kwargs)
+
+    def handle_one_request(self):
+        """把「读请求头阶段超时」也收敛掉，不让它冒成未捕获异常刷满 stderr。
+
+        基类实现里 socket.timeout 会走 handle_one_request 的 except 并正常关闭连接，
+        但 SimpleHTTPRequestHandler 在读头超时后仍可能继续走 send_error；
+        这里统一 catch 成静默关闭——静默超时是正常现象（探活/端口扫描/慢速连接），
+        记 WARN 只会让日志噪音掩盖真正的错误。
+        """
+        try:
+            super().handle_one_request()
+        except (socket.timeout, TimeoutError, ConnectionError):
+            self.close_connection = True
 
     def end_headers(self):
         # 禁用缓存：每次刷新都拿到最新数据
@@ -475,6 +555,8 @@ class Handler(SimpleHTTPRequestHandler):
         # 2026-08-05 体检修正（中等-16）：锁内只改状态，锁外发响应。
         # 此前在 with _stat_lock 内直接 _send_json，慢客户端写响应期间
         # 会持锁阻塞所有其它统计请求。
+        # 2026-10-02：锁内写盘也移出（锁内只置脏标记，见 _flush_stats 注释），
+        # 否则一次计数变更会把其它统计请求堵住整个文件 IO（实测 p90=516ms）。
         with _stat_lock:
             last = _recent_site_ip.get(ip, 0)
             if now - last >= VISIT_THROTTLE:
@@ -483,8 +565,9 @@ class Handler(SimpleHTTPRequestHandler):
                 bd = _site_visits.setdefault('by_day', {})
                 bd[today] = bd.get(today, 0) + 1
                 _recent_site_ip[ip] = now
-                _save_visits()
+                _mark_dirty('visits')
             payload = {'ok': True, 'total': _site_visits.get('total', 0), 'by_day': dict(_site_visits.get('by_day', {}))}
+        _flush_stats()
         return self._send_json(payload)
 
     def _api_lecture_stats_get(self):
@@ -505,14 +588,18 @@ class Handler(SimpleHTTPRequestHandler):
         if length <= 0:
             return {}
         if length > MAX_BODY_BYTES:
-            print(f'[API-WARN] 请求体过大已忽略: {length} bytes > {MAX_BODY_BYTES}',
+            # 2026-10-02 安全修复：此前进入「读完丢弃」循环，而客户端若只声明
+            # Content-Length 却迟迟不发数据（慢速发体 / 恶意挂起），服务端线程会
+            # **无限期阻塞在 rfile.read()**。ThreadingHTTPServer 每连接一线程、
+            # 默认无 socket 超时，故单个客户端可挂住任意多条线程拖垮本机服务。
+            # 实测：声明 Content-Length: 99999999 后只发 2 字节，3 秒内无任何响应。
+            #
+            # 处置：既不等待也不读，直接断开连接（Connection: close）。本地 API 的
+            # body 都是几十字节的小 JSON，超过 1MB 本身就是异常请求，断开比
+            # 「读完再返回 400」更合适——继续读只会把攻击面交给对端。
+            print(f'[API-WARN] 请求体过大，拒绝并断开: {length} bytes > {MAX_BODY_BYTES}',
                   file=sys.stderr)
-            remaining = length
-            while remaining > 0:
-                chunk = self.rfile.read(min(remaining, 65536))
-                if not chunk:
-                    break
-                remaining -= len(chunk)
+            self.close_connection = True
             return {}
         try:
             data = json.loads(self.rfile.read(length))
@@ -524,10 +611,31 @@ class Handler(SimpleHTTPRequestHandler):
         # 与非法 JSON 同等处置：按空 body 处理，让调用方走既有的 400 分支。
         return data if isinstance(data, dict) else {}
 
+    @staticmethod
+    def _url_from_body(body):
+        """从请求体取 url，返回去除首尾空白的字符串；不可用时返回 ''。
+
+        2026-10-02 修复 B3 剩余半边：`_read_body_json` 只保证「body 是 dict」，但
+        **dict 内的字段类型仍未校验**——`{"url": 123}` / `{"url": [1,2]}` /
+        `{"url": {"a":1}}` 会让 `(body.get('url') or '').strip()` 抛
+        AttributeError（123/列表/字典都是真值，逃过 `or ''`），异常抛到 handler
+        外，本线程直接崩、客户端拿不到任何响应。
+
+        为什么必须在这里统一收口：5 个统计端点（visit/like/unlike/want/unwant）
+        各写一遍 `(body.get('url') or '').strip()`，逐处加 isinstance 是典型的
+        「修一处漏四处」。故改为单一入口 —— 新增端点只需调用本方法即自动受保护。
+        非字符串一律按「缺字段」处理（返回 '' → 走既有的 400 'url 必填' 分支），
+        与非法 JSON 的既有语义保持一致。
+        """
+        v = (body or {}).get('url')
+        if not isinstance(v, str):
+            return ''
+        return v.strip()
+
     def _api_lecture_visit_post(self):
         """记录一次讲座访问：同一 (IP, url) 3 分钟内只计 1 次。"""
         body = self._read_body_json()
-        url = (body.get('url') or '').strip()
+        url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
         if url.rstrip('/') not in _known_lecture_urls():
@@ -541,9 +649,10 @@ class Handler(SimpleHTTPRequestHandler):
                 st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 st['visits'] = st.get('visits', 0) + 1
                 _recent_lecture[key] = now
-                _save_lecture_stats()
+                _mark_dirty('lectures')
             cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
             payload = {'ok': True, 'visits': cur.get('visits', 0)}
+        _flush_stats()   # 锁外落盘（2026-10-02，见 _flush_stats）
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_like_post(self):
@@ -553,7 +662,7 @@ class Handler(SimpleHTTPRequestHandler):
         防止脚本无限刷赞；允许 like↔unlike 交替（即正常用户切换点赞状态）。
         """
         body = self._read_body_json()
-        url = (body.get('url') or '').strip()
+        url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
         if url.rstrip('/') not in _known_lecture_urls():
@@ -576,8 +685,9 @@ class Handler(SimpleHTTPRequestHandler):
                 else:
                     st['likes'] = st.get('likes', 0) + 1
                     _recent_like_action[key] = (now, 'like')
-                    _save_lecture_stats()
+                    _mark_dirty('lectures')
                     payload = {'ok': True, 'likes': st.get('likes', 0)}
+        _flush_stats()   # 锁外落盘（2026-10-02，见 _flush_stats）
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_unlike_post(self):
@@ -586,7 +696,7 @@ class Handler(SimpleHTTPRequestHandler):
         防刷：同一 IP 对同一讲座在 LIKE_THROTTLE 秒内重复「取消」动作只计一次。
         """
         body = self._read_body_json()
-        url = (body.get('url') or '').strip()
+        url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
         if url.rstrip('/') not in _known_lecture_urls():
@@ -603,8 +713,9 @@ class Handler(SimpleHTTPRequestHandler):
                 st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 st['likes'] = max(0, st.get('likes', 0) - 1)
                 _recent_like_action[key] = (now, 'unlike')
-                _save_lecture_stats()
+                _mark_dirty('lectures')
                 payload = {'ok': True, 'likes': st.get('likes', 0)}
+        _flush_stats()   # 锁外落盘（2026-10-02，见 _flush_stats）
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_want_post(self):
@@ -613,7 +724,7 @@ class Handler(SimpleHTTPRequestHandler):
         防刷：同一 IP 对同一讲座在 WANT_THROTTLE 秒内重复「想听」动作只计一次。
         """
         body = self._read_body_json()
-        url = (body.get('url') or '').strip()
+        url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
         if url.rstrip('/') not in _known_lecture_urls():
@@ -630,8 +741,9 @@ class Handler(SimpleHTTPRequestHandler):
                 st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 st['wants'] = st.get('wants', 0) + 1
                 _recent_want_action[key] = (now, 'want')
-                _save_lecture_stats()
+                _mark_dirty('lectures')
                 payload = {'ok': True, 'wants': st.get('wants', 0)}
+        _flush_stats()   # 锁外落盘（2026-10-02，见 _flush_stats）
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def _api_lecture_unwant_post(self):
@@ -640,7 +752,7 @@ class Handler(SimpleHTTPRequestHandler):
         防刷：同一 IP 对同一讲座在 WANT_THROTTLE 秒内重复「取消」动作只计一次。
         """
         body = self._read_body_json()
-        url = (body.get('url') or '').strip()
+        url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
         if url.rstrip('/') not in _known_lecture_urls():
@@ -657,8 +769,9 @@ class Handler(SimpleHTTPRequestHandler):
                 st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
                 st['wants'] = max(0, st.get('wants', 0) - 1)
                 _recent_want_action[key] = (now, 'unwant')
-                _save_lecture_stats()
+                _mark_dirty('lectures')
                 payload = {'ok': True, 'wants': st.get('wants', 0)}
+        _flush_stats()   # 锁外落盘（2026-10-02，见 _flush_stats）
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
     def do_GET(self):
@@ -694,7 +807,10 @@ class Handler(SimpleHTTPRequestHandler):
             # 全局排除名单过滤：凡是列入的 URL 不应展示（与公网静态切片一致）。
             excluded = load_excluded()
             if excluded:
-                data = [r for r in data if (r.get('sourceUrl') or '').rstrip('/') not in excluded]
+                # 2026-10-02：与 generate_frontend_data 同步改用记录级判定——
+                # 跨源合并记录的 sources[].sourceUrl 命中名单时整条排除，
+                # 否则本地能看到的页面公网看不到（或反之），两端行为分叉。
+                data = [r for r in data if not is_record_excluded(r, excluded)]
             # 本地下发的 /api/lectures 须与公网静态切片一致地补上 unitType（场/期），
             # 否则 app.js 拿不到该字段会全部回退显示「期」。
             data = _attach_unit_types(data)
@@ -709,18 +825,45 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._send_json({'ok': False,
                                         'message': '管理凭证仅限本机获取'}, 403)
             return self._send_json({'ok': True, 'token': _ADMIN_TOKEN})
-        # 屏蔽切片原子写留下的 *.tmp（写入窗口内可被读到半份 JSON）
-        if self.path.split('?')[0].endswith('.tmp'):
+        # 静态资源守卫（2026-10-02 提取，供 GET / HEAD 共用）：
+        # ① 屏蔽切片原子写留下的 *.tmp（写入窗口内可被读到半份 JSON）
+        # ② 目录列表禁用（2026-09-26 审计 P3）：无 index.html 的目录（如lectures/）
+        #    不再渲染文件清单；带 index.html 的根目录照常服务。
+        #
+        # ⚠ 两项都**必须基于解码后的路径**判定。此前只判 `self.path.endswith('.tmp')`
+        # （原始未解码串），而文件查找用的 translate_path 会 unquote，
+        # 于是 `/lectures/latest.json%2etmp` 不匹配后缀 → 守卫放行 →
+        # 服务端按 `.tmp` 真实文件名找到半份 JSON 并 200 返回（实测复现）。
+        return self._static_guard() or super().do_GET()
+
+    def _static_guard(self):
+        """静态资源守卫：命中应屏蔽的路径时返回 True（已响应），否则返回 False。
+
+        2026-10-02：从 do_GET 提取为独立方法，好让 do_HEAD 复用——
+        否则 HEAD 会绕过全部守卫（实测 `HEAD /lectures/x.json.tmp` 返回 200），
+        攻击者可用 HEAD 探测写入窗口内半份文件的存在性与长度。
+        """
+        # unquote 而非只 split('?')：%3F（?）、%2e（.）等百分号编码都要还原后判定。
+        # 只解一次即可——解码出的路径若仍含 %.. 之类，translate_path 内部的
+        # 安全检查（越界即 403/404）会兜住。
+        from urllib.parse import unquote, urlsplit
+        path = unquote(urlsplit(self.path).path)
+        if path.endswith('.tmp'):
             # 状态行仅 latin-1 安全，中文消息会 UnicodeEncodeError 断连（2026-09-26 修复）
             self.send_error(404, 'Temporary file not accessible')
-            return
-        # 目录列表禁用（2026-09-26 审计 P3）：无 index.html 的目录（如 lectures/）
-        # 不再渲染文件清单；带 index.html 的根目录照常服务。
-        _dir = self.translate_path(self.path.split('?')[0])
+            return True
+        _dir = self.translate_path(path)
         if os.path.isdir(_dir) and not os.path.exists(os.path.join(_dir, 'index.html')):
             self.send_error(404, 'Directory listing not available')
+            return True
+        return False
+
+    def do_HEAD(self):
+        # 2026-10-02：HEAD 必须与 GET 走同一套静态守卫。此前本类未实现 do_HEAD，
+        # 基类实现直接吐 Content-Length 200 —— .tmp 与目录列表守卫全部被绕过。
+        if self._static_guard():
             return
-        super().do_GET()
+        super().do_HEAD()
 
     def do_POST(self):
         if not self._is_local_origin():

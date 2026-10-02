@@ -1409,7 +1409,23 @@ def _load_vlm_configs():
 # 主动限速（统一到 llm_provider._throttle 令牌桶）：VLM 默认 10 RPM，可经环境变量覆盖。
 # 文本通道（SCNU_LLM_TEXT 双轨）走 hybrid.apply_llm_text_hybrid，限速由 llm_provider 内部按
 # 通道名分桶处理，本文件不再持有文本侧 RPM 常量（2026-09-30 清理文本通道死代码时移除）。
-_VLM_RPM = int(_os.environ.get('VLM_RPM') or 10)
+#
+# 2026-10-02 补 .env 回退：此前只读进程环境，项目根 .env 里配 VLM_RPM 无效
+# （与同文件 _text_llm_flag 早已修好的「环境变量 > .env > 默认」三级优先级不一致
+# ——同一文件里开关读了 dotenv、限速常量没读，是「修一半」的典型形态）。
+def _vlm_rpm():
+    """VLM 限速值：进程环境 > 项目根 .env > 默认 10。"""
+    v = _os.environ.get('VLM_RPM')
+    if v is None or str(v).strip() == '':
+        v = _load_dotenv().get('VLM_RPM')
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        # .env 里写错值时退回默认，不让整条链路因一个配置项崩掉
+        return 10
+
+
+_VLM_RPM = _vlm_rpm()
 
 
 def _vlm_cache_path():
@@ -1420,42 +1436,12 @@ def _vlm_cache_path():
 # 2026-08-05 体检修复（严重-7）：缓存「整文件读入→改→截断写回」在 scraper 的
 # 5 线程并发下存在读改写竞争：丢缓存、读到半截文件被静默当空缓存（重复烧 VLM
 # 额度）、写一半崩溃后文件永久损坏。改为全程持锁 + 写临时文件后 os.replace 原子替换。
-import threading as _threading
-_VLM_CACHE_LOCK = _threading.Lock()
-
-
-def _vlm_cache_get(key):
-    with _VLM_CACHE_LOCK:
-        try:
-            p = _vlm_cache_path()
-            if _os.path.exists(p):
-                with open(p, encoding='utf-8') as f:
-                    d = _json.load(f)
-                return d.get(key)
-        except Exception:
-            pass
-        return None
-
-
-def _vlm_cache_set(key, val):
-    with _VLM_CACHE_LOCK:
-        try:
-            p = _vlm_cache_path()
-            d = {}
-            if _os.path.exists(p):
-                try:
-                    with open(p, encoding='utf-8') as f:
-                        d = _json.load(f)
-                except Exception:
-                    d = {}  # 缓存损坏时重建，而不是让整个写入失败
-            d[key] = val
-            _os.makedirs(_os.path.dirname(p), exist_ok=True)
-            tmp = p + '.tmp'
-            with open(tmp, 'w', encoding='utf-8') as f:
-                _json.dump(d, f, ensure_ascii=False)
-            _os.replace(tmp, p)
-        except Exception:
-            pass
+#
+# 2026-10-02 补上跨模块那一半：上条只消除了**本模块内**的竞争，而 llm_provider
+# 对同一个 data/.vlm_cache.json 另持一把 _CACHE_LOCK——两把锁互不可见，
+# 文本抽取与 VLM 抽取并发时仍会互相覆盖整批条目。现读写收敛到 scraper/llm_cache.py，
+# 全仓库一把锁、一份实现（那里有完整背景说明）。
+from llm_cache import cache_get as _vlm_cache_get, cache_set as _vlm_cache_set  # noqa: E402
 
 
 def _vlm_img_b64(img_url):

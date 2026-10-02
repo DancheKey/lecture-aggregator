@@ -24,6 +24,10 @@ server.py 最小测试集（2026-09-30 引入，此前 server.py 零测试覆盖
   ④ sources 条数上限（MAX_SOURCES）
   ⑤ _read_body_json 对非 dict 的一律降级为空 body（用真 socket 灌真实请求字节）
   ⑥ 真实 _read_body_json 在超长/非法 Content-Length 下不抛未捕获异常
+  ⑦ dict **内字段**类型守卫（`{"url": 123}` / `{"url": [1,2]}` / `{"url": {"a":1}}`）——
+     ⑤ 只挡了「整个 body 不是 dict」，body 是 dict 但 url 字段是数字/列表/字典时，
+     `(body.get('url') or '').strip()` 仍会抛 AttributeError（真值为真，逃过 `or ''`）。
+     2026-10-02 实测 5 个统计端点全部崩线程；现已收敛到 Handler._url_from_body 单一入口。
 
 全部用例零网络、零外部服务：sources 读写一律在 tempfile 临时目录里做，
 **绝不触碰真实的 scraper/sources.yaml**。
@@ -31,6 +35,7 @@ server.py 最小测试集（2026-09-30 引入，此前 server.py 零测试覆盖
 运行：python tests/test_server.py
 """
 import importlib.util
+import ast
 import io
 import json
 import os
@@ -39,6 +44,7 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import warnings
 
@@ -298,6 +304,317 @@ class TestReadBodyJsonGuards(unittest.TestCase):
         finally:
             self.srv.MAX_BODY_BYTES = orig
         self.assertEqual(v, {})
+
+
+class TestUrlFieldTypeGuard(unittest.TestCase):
+    """B3 第二半：body 是 dict 但 url 字段类型错误时不得崩线程（2026-10-02）。
+
+    `_read_body_json` 只保证 body 是 dict，`{"url": 123}` 这类 body 完全合法地
+    通过了那一关；随后 5 个统计端点各自的 `(body.get('url') or '').strip()`
+    会因 int/list/dict 无 .strip() 而抛 AttributeError → 异常逃到 handler 外，
+    本线程直接崩、客户端连接被重置（连 400 都拿不到）。
+
+    修法：收敛到 Handler._url_from_body() 单一入口，非字符串按「缺字段」处理。
+    本类锁两件事：① 该入口的类型守卫；② 5 个端点都真的走了它（防将来改回手写）。
+    """
+
+    _ENDPOINTS = ('/api/lecture/visit', '/api/lecture/like', '/api/lecture/unlike',
+                  '/api/lecture/want', '/api/lecture/unwant')
+
+    _BAD_BODIES = [
+        ('int', b'{"url":123}'),
+        ('float', b'{"url":1.5}'),
+        ('list', b'{"url":[1,2]}'),
+        ('dict', b'{"url":{"a":1}}'),
+        ('bool', b'{"url":true}'),
+        ('zero', b'{"url":0}'),
+        ('null', b'{"url":null}'),
+        ('empty', b'{"url":""}'),
+        ('whitespace', b'{"url":"   "}'),
+        ('missing', b'{}'),
+    ]
+
+    def setUp(self):
+        self.srv = _load_server()
+
+    def test_20_非字符串url一律降级为空串(self):
+        f = self.srv.Handler._url_from_body
+        for name, raw in self._BAD_BODIES:
+            body = json.loads(raw)
+            self.assertEqual(f(body), '', f'{name}: 应降级为空串（走 400 分支）')
+            self.assertIsInstance(f(body), str, f'{name}: 返回值必须是 str')
+
+    def test_21_合法url正常返回并去空白(self):
+        f = self.srv.Handler._url_from_body
+        self.assertEqual(f({'url': 'http://a.scnu.edu.cn/x'}), 'http://a.scnu.edu.cn/x')
+        self.assertEqual(f({'url': '  http://a/  '}), 'http://a/')
+        self.assertEqual(f({}), '')
+        self.assertEqual(f(None), '')
+
+    def test_22_五端点均走统一入口(self):
+        """静态锁：5 个统计端点不得再手写 `(body.get('url') or '').strip()`。
+
+        这是本条修复的**回归闸**：逐处加 isinstance 必然漏改，唯一的防法是
+        让所有端点都调用同一个函数，并用本测试把「手写取值」判为失败。
+
+        用 ast 判定（而非字符串查找）：docstring 里为了说明问题会原样引用这行
+        旧代码，字符串查找会把说明文字误判成残留实现。
+        """
+        src_path = os.path.join(ROOT, 'server.py')
+        src = open(src_path, encoding='utf-8').read()
+        tree = ast.parse(src)
+        offenders = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            f = node.func
+            if not (isinstance(f, ast.Attribute) and f.attr == 'strip'):
+                continue
+            seg = ast.get_source_segment(src, node) or ''
+            if "body.get('url')" in seg:
+                offenders.append(f'line {node.lineno}')
+        self.assertEqual(
+            offenders, [],
+            '统计端点又手写了 url 取值（body.get(...).strip()）：' + '、'.join(offenders)
+            + ' —— 请改用 self._url_from_body(body)')
+        # 每个端点各调用一次统一入口
+        self.assertEqual(src.count('self._url_from_body(body)'),
+                         len(self._ENDPOINTS),
+                         '统一入口的调用次数应与统计端点数量一致')
+
+    def test_23_端点定义齐全(self):
+        """防将来新增统计端点时忘记接入守卫。"""
+        src = open(os.path.join(ROOT, 'server.py'), encoding='utf-8').read()
+        for ep in self._ENDPOINTS:
+            self.assertIn(ep, src, f'缺少端点 {ep}，用例清单需同步')
+
+
+class _StaticGuardLiveBase(unittest.TestCase):
+    """起一个真实的 server 实例（回环 + 随机端口），用裸 socket 发请求。
+
+    静态守卫的判定依赖 self.path 的**原始编码形态**与 translate_path 的解码，
+    纯单元测试（直接调方法）无法覆盖，故必须走真实 HTTP。
+    零外部依赖：只绑 127.0.0.1，临时文件写在 site/lectures/ 下并在 tearDown 清理。
+    """
+
+    def setUp(self):
+        self.srv_mod = _load_server()
+        Handler = self.srv_mod.Handler
+        from http.server import ThreadingHTTPServer
+        self.httpd = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        self.port = self.httpd.server_address[1]
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+        self.tmp_probe = os.path.join(self.srv_mod.SITE_DIR, 'lectures', '_test_guard.json.tmp')
+        os.makedirs(os.path.dirname(self.tmp_probe), exist_ok=True)
+        with open(self.tmp_probe, 'w', encoding='utf-8') as f:
+            f.write('{"half": tru')          # 故意写半份，模拟原子写窗口
+
+    def tearDown(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+        if os.path.exists(self.tmp_probe):
+            os.remove(self.tmp_probe)
+
+    def _request(self, raw_req, timeout=5):
+        s = socket.create_connection(('127.0.0.1', self.port), 5)
+        try:
+            s.sendall(raw_req.encode('utf-8'))
+            s.settimeout(timeout)
+            data = b''
+            while True:
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+        finally:
+            s.close()
+        head = data.split(b'\r\n\r\n', 1)[0].decode('latin-1', 'replace')
+        return (head.split('\r\n')[0] if head else 'NO-RESPONSE'), data
+
+    @staticmethod
+    def _req(method, path):
+        return f'{method} {path} HTTP/1.0\r\n\r\n'
+
+
+class TestTmpFileGuardBypass(_StaticGuardLiveBase):
+    """*.tmp 原子写残留文件的屏蔽（含编码绕过与 HEAD 绕过）。
+
+    修复前实测（2026-09-30）：
+      GET  /lectures/_chk.json.tmp     -> 404（守卫生效）
+      GET  /lectures/_chk.json%2etmp   -> 200（**绕过**：守卫判的是未解码的 raw path，
+                                          而文件查找走 translate_path 会 unquote）
+      HEAD /lectures/_chk.json.tmp     -> 200（**绕过**：本类未实现 do_HEAD）
+    两处都是「守卫写在 do_GET 里且只看原始路径」这一半修法的直接后果。
+    """
+
+    def _paths(self):
+        return [
+            '/lectures/_test_guard.json.tmp',      # 明文
+            '/lectures/_test_guard.json%2etmp',    # . 编码
+            '/lectures/_test_guard.j%73on%2etmp',  # s 与 . 均编码
+            '/lectures/_test_guard.json%2Etmp',    # 大写 E
+            '/lectures/_test_guard.json.tmp%3Fx=1', # ? 编码在文件名里
+        ]
+
+    def test_30_get_各类编码路径均404(self):
+        for p in self._paths():
+            status, data = self._request(self._req('GET', p))
+            self.assertIn('404', status, f'GET {p} 应被屏蔽，实得 {status}')
+            self.assertNotIn(b'"half"', data, f'GET {p} 泄露了半份 JSON 内容')
+
+    def test_31_head_同样被屏蔽(self):
+        for p in self._paths():
+            status, data = self._request(self._req('HEAD', p))
+            self.assertIn('404', status, f'HEAD {p} 应被屏蔽，实得 {status}')
+
+    def test_32_正常文件不受影响(self):
+        """守卫不能误伤：正常 JSON 与首页必须 200。"""
+        for p in ('/lectures/chunks.json', '/index.html', '/'):
+            status, _ = self._request(self._req('GET', p))
+            self.assertIn('200', status, f'GET {p} 不应被误伤，实得 {status}')
+
+    def test_33_目录列表_get与head均屏蔽(self):
+        for m in ('GET', 'HEAD'):
+            status, _ = self._request(self._req(m, '/lectures/'))
+            self.assertIn('404', status, f'{m} /lectures/ 应屏蔽目录列表，实得 {status}')
+
+    def test_34_路径穿越仍被拒(self):
+        status, data = self._request(self._req('GET', '/../data/admin_token.json'))
+        self.assertIn('404', status)
+        self.assertNotIn(b'token', data, 'admin_token 内容泄露')
+
+    def test_35_守卫基于解码后路径(self):
+        """静态锁：守卫必须先unquote 再判后缀，否则编码绕过会再次回归。"""
+        src = open(os.path.join(ROOT, 'server.py'), encoding='utf-8').read()
+        self.assertIn('def _static_guard(self):', src,
+                      '静态守卫应抽为可复用的独立方法（供 GET/HEAD 共用）')
+        self.assertIn('def do_HEAD(self):', src,
+                      '缺少 do_HEAD —— HEAD 会绕过全部静态守卫')
+        self.assertIn('unquote(', src, '守卫必须基于解码后的路径判定')
+
+
+class TestSlowBodyNoBlock(_StaticGuardLiveBase):
+    """慢速/超大请求体不得挂住服务端线程（2026-10-02）。
+
+    修复前的两种挂死路径：
+      ① `Content-Length: 99999999` + 只发 2 字节 → `_read_body_json` 进入
+         「读完丢弃」循环，线程**无限期**阻塞在 rfile.read()；
+      ② 任意不完整请求体（哪怕 Content-Length 只有 100）→ 基类无 socket 超时，
+         同样永久阻塞。
+    ThreadingHTTPServer 每连接一线程，故少量挂起连接即可耗尽本机服务线程。
+    """
+
+    PROBE_TIMEOUT = 4      # 探针侧超时；须明显小于 server 的 SOCKET_TIMEOUT(15)
+
+    def _slow(self, head, timeout=None):
+        t0 = time.time()
+        st, _tag = self._raw(head, timeout=timeout or self.PROBE_TIMEOUT)
+        return st, time.time() - t0
+
+    def _raw(self, head, timeout=4):
+        s = socket.create_connection(('127.0.0.1', self.port), 5)
+        tag = 'eof'
+        data = b''
+        try:
+            s.sendall(head.encode('utf-8'))
+            s.settimeout(timeout)
+            while True:
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+        except Exception as e:                        # noqa: BLE001
+            tag = type(e).__name__
+        finally:
+            s.close()
+        h = data.split(b'\r\n\r\n', 1)[0].decode('latin-1', 'replace')
+        return (h.split('\r\n')[0] if h else 'NO-RESPONSE'), tag
+
+    def test_40_超大ContentLength立即响应不阻塞(self):
+        """修复前：声明 99MB 后只发 2 字节，服务端永不响应。"""
+        st, dt = self._slow('POST /api/lecture/want HTTP/1.0\r\n'
+                            'Content-Type: application/json\r\n'
+                            'Content-Length: 99999999\r\n\r\n{}')
+        self.assertIn('400', st, f'超大请求体应立即得到 400，实得 {st}')
+        self.assertLess(dt, 3,
+                        f'耗时 {dt:.1f}s —— 疑似仍阻塞在读体循环（修复前为无限）')
+
+    def test_41_不完整请求体由socket超时兜底(self):
+        """声明 Content-Length 但不发数据：服务端线程应在 SOCKET_TIMEOUT 内被回收。
+
+        探针侧先超时（4s < server 15s）属预期——要证明的是「服务端会自行回收」，
+        而不是让本用例干等 15s。
+        """
+        srv_mod = _load_server()
+        self.assertGreater(srv_mod.SOCKET_TIMEOUT, self.PROBE_TIMEOUT,
+                           '探针超时须小于服务端超时，否则测不出回收行为')
+        st, _ = self._slow('POST /api/lecture/want HTTP/1.0\r\n'
+                           'Content-Type: application/json\r\n'
+                           'Content-Length: 100\r\n\r\n')
+        self.assertEqual(st, 'NO-RESPONSE',
+                         f'不应有响应（服务端在等数据），实得 {st}')
+
+    def test_42_设置连接超时(self):
+        """静态锁：Handler 必须声明 timeout，否则删掉类属性即静默失效。"""
+        srv_mod = _load_server()
+        self.assertTrue(hasattr(srv_mod.Handler, 'timeout'),
+                        'Handler 缺 timeout 属性 —— 基类默认无超时，线程可被挂死')
+        self.assertGreater(srv_mod.Handler.timeout, 0)
+        self.assertLessEqual(srv_mod.Handler.timeout, 60,
+                             '超时过长则失去防挂死意义')
+
+    def test_43_超限分支不得再读流(self):
+        """静态锁：超限分支必须「不读」，而不是「读完丢弃」。
+
+        「读完」在客户端不发数据时等价于无限阻塞，是本次修复的根因。
+
+        用 ast 判定而非文本查找：分支注释里为了说明问题原样引用了 rfile.read()
+        （2026-10-02 首次实现时被文本查找误判），约束的对象是**执行到的代码**，
+        不是注释里提到过这个词。
+        """
+        import ast
+        src_path = os.path.join(ROOT, 'server.py')
+        with open(src_path, encoding='utf-8') as f:
+            src = f.read()
+        tree = ast.parse(src)
+        target = None
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef) or node.name != '_read_body_json':
+                continue
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.If):
+                    seg = ast.get_source_segment(src, sub.test) or ''
+                    if 'length' in seg and 'MAX_BODY_BYTES' in seg:
+                        target = sub
+                        break
+            if target:
+                break
+        self.assertIsNotNone(target, '未找到 `if length > MAX_BODY_BYTES` 分支')
+        # 分支体内不得出现任何对 rfile 的读调用
+        reads = [n.lineno for n in ast.walk(target)
+                 if isinstance(n, ast.Call)
+                 and isinstance(n.func, ast.Attribute)
+                 and n.func.attr == 'read'
+                 and isinstance(n.func.value, ast.Attribute)
+                 and n.func.value.attr == 'rfile']
+        self.assertEqual(reads, [],
+                         f'超限分支 L{reads} 仍在读流 —— 客户端不发数据时永久阻塞')
+        # 且必须断开连接
+        self.assertTrue(any(isinstance(n, ast.Assign)
+                            and any(getattr(t, 'attr', '') == 'close_connection'
+                                    for t in n.targets)
+                            for n in ast.walk(target)),
+                        '超限分支应设置 close_connection 直接断开')
+
+    def test_44_正常请求不受影响(self):
+        """加固不能误伤：静态资源与正常 POST 仍须照常工作。"""
+        st, _ = self._raw('GET /lectures/chunks.json HTTP/1.0\r\n\r\n')
+        self.assertIn('200', st)
+        st, _ = self._raw('POST /api/lecture/like HTTP/1.0\r\n'
+                          'Content-Type: application/json\r\n'
+                          'Content-Length: 2\r\n\r\n{}')
+        self.assertIn('400', st, '空body 应走 400 分支')
 
 
 class TestSourcesYamlLoaderEdgeCases(_SourcesRoundTripBase):
