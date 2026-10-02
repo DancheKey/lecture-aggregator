@@ -146,3 +146,41 @@ jobs:
       # 单位里的职称不得被当切点。
       - name: Run speaker name cut-point tests
         run: python tests/test_speaker_title_cut.py
+
+      # 2026-10-02 引入：核心模块**可编译性**门禁。
+      # 起因是一次批量编辑把 `_stats_dirty = {...}` 误写成 `def _stats_dirty = {...}`，
+      # server.py 直接 SyntaxError 而无人察觉——CI 从不 import 它（公网部署用不到，
+      # 它只在本地起服务时才被执行），既有用例也抓不到「语法层面」的坏文件。
+      # py_compile 是纯语法分析（不导入、不执行、不落 __pycache__），零成本零副作用。
+      - name: Run module compile gate
+        run: python tests/test_module_compile.py
+
+      # 前端 computed 行为门禁（2026-10-02）：论坛卡 total 口径 + clamp 签名覆盖。
+      # 两处缺陷都只在**运行时数据流**上暴露（total≡recs.length、签名漏三维），
+      # 既有 node 门禁只做组装冒烟与 clamp 类名一致性，看不到这两类语义错误。
+      - name: Run forum card and clamp signature tests
+        run: node tests/js/app_forum_and_clamp.js
+
+      # 访问量趋势报告渲染门禁（2026-10-02）：该页此前用 innerHTML 拼接渲染，
+      # 而快照 note 是唯一来自台账的自由文本（经 json.dumps 内嵌进内联脚本），
+      # 含 </script> 或 <img onerror=…> 即构成存储型 XSS。现已全部改为
+      # createElement/textContent；同日子脚本与数据拆为独立文件，CSP 得以
+      # 从 'unsafe-inline' 收紧为 'self'。本门禁锁四项：无 innerHTML、
+      # CSP 已收紧、外链齐全、DOM 化后渲染仍正常（最小 DOM 桩，无需浏览器）。
+      - name: Run visits-trend render tests
+        run: node tests/js/visits_trend_render.js
+
+      # 审计报告转义门禁（2026-10-02）：audit_fields.py 的 HTML 报告把抓来的
+      # speaker/location/speakerBio 直接拼进 HTML（报告是 CI 附件，维护者
+      # 下载后双击打开即执行），且 href="{sourceUrl}" 未限制协议，
+      # javascript: 伪协议可直接点击执行。现已加 _esc/_esc_url 全面转义。
+      - name: Run audit report escape tests
+        run: python tests/test_audit_html_escape.py
+
+      # 缓存并发门禁（2026-10-02）：data/.vlm_cache.json 曾被 parsers 与
+      # llm_provider 各持一把**互不可见**的锁，两边都做「整文件读→改→写回」，
+      # 单进程多线程下互相覆盖整批条目 → 缓存命中下降 → 重复烧付费 API 额度。
+      # 现已收敛到 scraper/llm_cache.py 一把锁一份实现，本套件同时锁静态
+      # （不得再各自定义锁）与动态（200 并发写不丢条目）。
+      - name: Run shared LLM cache tests
+        run: python tests/test_llm_cache.py

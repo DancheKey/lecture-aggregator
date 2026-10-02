@@ -104,8 +104,60 @@ jobs:
       # 数据质量体检（2026-09-06）：每天抓取+修复后自动检查全库字段
       # （时间/地点/主讲人/单位的错误与缺失），报告存为运行附件保留 30 天，
       # 出现异常当天可见，不用等用户在网页上发现问题来反馈。
+      #
+      # 2026-10-02：此前本步恒以 0 退出（体检发现大面积异常也照样绿），
+      # audit_fields.py 现已支持 --fail-on。但**不**直接加 --fail-on high：
+      # 存量库有大量历史遗留问题（当前「高」严重度数十条），会令流水线天天红、
+      # 久而久之被无视，比不阻断更糟。
+      # 改用「基线对比」：把「高」严重度问题数写入 data/ 下的基线文件，
+      # 本轮**新增**问题才阻断。存量问题随数据修复自然下降，基线随之收紧；
+      # 一旦出现新引入的高严重度问题，流水线立刻变红并报出差值。
       - name: 数据质量体检（自动）
         run: python scripts/audit_fields.py --html reports/audit_fields_report.html
+
+      - name: 字段体检基线对比（新增高危问题才阻断）
+        run: |
+          set -euo pipefail
+          python - <<'PYEOF'
+          import json, os, sys, subprocess
+          ROOT = os.environ.get('GITHUB_WORKSPACE', '.')
+          sys.path.insert(0, os.path.join(ROOT, 'scraper'))
+          sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+          import audit_fields
+          data = json.load(open(os.path.join(ROOT, 'data', 'lectures.json'),
+                               encoding='utf-8'))['data']
+          issues = audit_fields.audit(data)
+          high = [i for i in issues if i[2] == '高']
+          # 归一化到「类型|字段|描述模板」，避免同一类问题因数据变化反复触发
+          def key(i):
+              return f'{i[0]}|{i[1]}|{i[3].split("（")[0]}'
+          cur = {}
+          for i in high:
+              cur[key(i)] = cur.get(key(i), 0) + 1
+          base_path = os.path.join(ROOT, 'data', 'audit_baseline.json')
+          base = {}
+          if os.path.exists(base_path):
+              try:
+                  base = json.load(open(base_path, encoding='utf-8')).get('high') or {}
+              except Exception:
+                  base = {}
+          regressions = {k: v - base.get(k, 0) for k, v in cur.items()
+                         if v > base.get(k, 0)}
+          total = sum(cur.values())
+          print(f'高严重度问题：本次 {total} 条 / 基线 {sum(base.values())} 条')
+          if regressions:
+              print('::error::字段体检出现基线之外的新问题（已阻断部署）：', file=sys.stderr)
+              for k, d in sorted(regressions.items(), key=lambda x: -x[1]):
+                  print(f'  +{d}  {k}', file=sys.stderr)
+              sys.exit(1)
+          # 无新增则把基线收紧到当前值（存量问题被修复时自动下调）
+          if cur != base:
+              json.dump({'version': 1, 'high': cur},
+                        open(base_path, 'w', encoding='utf-8'),
+                        ensure_ascii=False, indent=2, sort_keys=True)
+              print(f'基线已更新：{base_path}')
+          print('字段体检：无新增高危问题')
+          PYEOF
 
       - name: 上传体检报告（保留 30 天）
         uses: actions/upload-artifact@v4

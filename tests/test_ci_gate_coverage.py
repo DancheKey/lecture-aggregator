@@ -143,5 +143,90 @@ class GateSanityTest(unittest.TestCase):
                          '请重新评估「test.yml 被改名则静默停发」的风险')
 
 
+class CronDocConsistencyTest(unittest.TestCase):
+    """定时班次的时刻：workflow 配置与两处文案必须一致（2026-10-02）。
+
+    背景：cron 时刻在三个地方各写了一份——
+      ① `.github/workflows/daily.yml` 的 `on.schedule`（唯一事实源）
+      ② `docs/deploy.md`（部署文档）
+      ③ `site/app.admin.js` 的降级 toast 文案（访客在页面上看到）
+
+    实测已漂移两次：文档写 03:00/17:00 UTC（实际 01:00/16:00），页面文案写
+    「11:00 与次日 01:00」（实际 09:00 与次日 00:00）。后果不是功能故障而是
+    **误导**：访客/维护者按文案去Actions 查结果，发现「这个点还没跑」，
+    进而怀疑流水线挂了。三处各改一处必然还会漂第四次，故固化为断言。
+
+    注：docs/ 在 .gitignore 内（本地文档），故该用例在 CI 上会自动跳过——
+    保留它是为了本地跑全量门禁时能拦住漂移。
+    """
+
+    DAILY_YML = os.path.join(WF_DIR, 'daily.yml')
+    DOC = os.path.join(ROOT, 'docs', 'deploy.md')
+    ADMIN_JS = os.path.join(ROOT, 'site', 'app.admin.js')
+
+    def _cron_hours(self):
+        """从 daily.yml 取两班的**小时**（cron 格式 '分 时 日 月 周'，第 2 段是小时）。"""
+        with open(self.DAILY_YML, encoding='utf-8') as f:
+            text = f.read()
+        hs = []
+        for m in re.finditer(r"-\s*cron:\s*['\"]?(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*['\"]?", text):
+            hs.append(int(m.group(2)))          # group(1)=分，group(2)=时
+        self.assertEqual(len(hs), 2,
+                         f'daily.yml 的 cron 班次数异常（解析到 {hs}）——'
+                         f'改班次时请同步 deploy.md 与 site/app.admin.js 的文案')
+        return sorted(hs)
+
+    def test_06_cron班次为两班且升序(self):
+        a, b = self._cron_hours()
+        self.assertLess(a, b)
+
+    def test_07_文档时刻与daily_yml一致(self):
+        if not os.path.exists(self.DOC):
+            self.skipTest('docs/ 不入库（本地文档），跳过')
+        a, b = self._cron_hours()
+        with open(self.DOC, encoding='utf-8') as f:
+            text = f.read()
+        want_utc = {'%02d:00' % a, '%02d:00' % b}
+        bj = {'%02d:00' % ((a + 8) % 24), '%02d:00' % ((b + 8) % 24)}
+
+        # 只在**与 cron/班次相关**的行里比对时刻，避免把文档别处的时刻
+        # （如「超时 08:00」「保留 30 天」之类）误当成班次。
+        lines = [l for l in text.splitlines()
+                 if ('cron' in l or '北京时间' in l or 'UTC' in l or '自动更新' in l
+                     or '自动抓取并更新' in l)]
+        code = '\n'.join(lines)
+        # 排除「历史错值说明」行（如「本文档写的是 03:00/17:00 UTC，与实际配置差 2 小时」）：
+        # 那是纠错记录而非当前配置，计入会造成假红。
+        code = '\n'.join(l for l in lines if '实测发现' not in l)
+
+        for u in want_utc:
+            self.assertIn(u, code, f'daily.yml 的 {u} UTC 未出现在 deploy.md 的班次描述里')
+        for t in bj:
+            self.assertIn(t, code, f'docs/deploy.md 未写北京时间 {t}（与 daily.yml 不符）')
+        # 反向：班次描述行里不得出现其它时刻
+        stale = set(re.findall(r'\b\d{2}:\d{2}\b', code)) - want_utc - bj
+        self.assertEqual(stale, set(),
+                         f'docs/deploy.md 的班次描述里残留与 daily.yml 不符的时刻：'
+                         f'{sorted(stale)}')
+
+    def test_08_页面文案与daily_yml一致(self):
+        if not os.path.exists(self.ADMIN_JS):
+            self.skipTest('site/app.admin.js 不存在')
+        a, b = self._cron_hours()
+        want = {'%02d:00' % ((a + 8) % 24), '%02d:00' % ((b + 8) % 24)}
+        with open(self.ADMIN_JS, encoding='utf-8') as f:
+            text = f.read()
+        # 只看 toast 文案（排除注释里的说明）
+        code_lines = [l for l in text.splitlines() if 'showToast' in l and not l.strip().startswith('//')]
+        code = '\n'.join(code_lines)
+        found = set(re.findall(r'\b\d{2}:\d{2}\b', code))
+        self.assertTrue(found, '未能从 toast 文案里解析出任何时刻')
+        for t in found:
+            self.assertIn(t, want,
+                          f'页面文案写「{t}」与 daily.yml 推出的北京时间 {sorted(want)} 不符')
+        for t in want:
+            self.assertIn(t, found, f'页面文案缺少班次时刻 {t}')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
