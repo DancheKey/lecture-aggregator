@@ -33,9 +33,23 @@ concurrency:
   group: daily-scrape
   cancel-in-progress: false
 
+# ---- runner 镜像版本：显式钉 ubuntu-24.04，不跟随 ubuntu-latest ----
+# 2026-10-02：GitHub 公告 ubuntu-latest 将在 2026-10-19 ~ 11-19 渐进迁移到
+# Ubuntu 26.04（https://github.blog/changelog/2026-09-17-ubuntu-26-generally-available-and-latest-migration/）。
+# 本项目**主动钉住 24.04** 而非跟随 latest，理由：
+#   1) daily.yml 依赖 RapidOCR / onnxruntime（含预编译二进制），对 glibc 与系统库
+#      变化最敏感——公告本身即警告新镜像「updated, and in some cases removed,
+#      tools and tool versions」；
+#   2) 若跟随 latest，迁移当天的流水线可能在无人值守时红掉，而 cron 失败通常要等
+#      下一次运行或邮件告警才被发现；
+#   3) 钉住后，升级变成**显式可测的决定**（另开 PR 改版本号并手动 workflow_dispatch
+#      验证），而不是被动等推送落到自己头上。
+# 将来想升级：把三处 ubuntu-24.04 改为 ubuntu-26.04 → 手动触发 daily.yml 验证
+# → 通过后再合并。三处版本必须一致，由 tests/test_ci_gate_coverage.py 守卫。
+
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     # job 级 permissions 覆盖工作流级设置：只给写回数据与告警 Issue 所需权限，
     # 刻意**不给 pages: write / id-token: write**——发布权限隔离到 deploy job。
@@ -309,7 +323,7 @@ jobs:
   # ---------------------------------------------------------------------
   deploy:
     needs: scrape        # 爬虫/护栏失败时不发布（宁可不发，不发半成品）
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read     # 仅检出已推送的产物
@@ -354,7 +368,7 @@ jobs:
   gate:
     needs: scrape
     if: always()        # 关键：scrape 失败时仍要执行告警检查
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read

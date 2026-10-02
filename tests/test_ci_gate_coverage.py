@@ -228,5 +228,57 @@ class CronDocConsistencyTest(unittest.TestCase):
             self.assertIn(t, found, f'页面文案缺少班次时刻 {t}')
 
 
+class RunnerImagePinTest(unittest.TestCase):
+    """runner 镜像必须显式钉版本，不得用 ubuntu-latest（2026-10-02）。
+
+    背景：GitHub 公告 ubuntu-latest 将在 2026-10-19 ~ 11-19 渐进迁移到
+    Ubuntu 26.04。本项目 daily.yml 依赖 RapidOCR / onnxruntime（含预编译二进制），
+    对 glibc 与系统库变化最敏感；若跟随 latest，迁移可能在无人值守时把 cron 跑红，
+    而失败要等下一次运行或邮件告警才发现。故三处显式钉 ubuntu-24.04，
+    把升级变成「改版本号 + 手动 workflow_dispatch 验证」的显式决定。
+
+    本类锁两件事：① 三个 workflow 不得出现 ubuntu-latest；
+    ② 三处版本号必须一致（混版会出现「测试在 A 镜像过、部署在 B 镜像」的错配）。
+    """
+
+    WF_FILES = ('daily.yml', 'deploy.yml', 'test.yml')
+    RUNS_ON_RE = re.compile(r'^\s*runs-on:\s*(\S+)\s*$', re.M)
+
+    def _images(self):
+        out = {}
+        for name in self.WF_FILES:
+            with open(os.path.join(WF_DIR, name), encoding='utf-8') as f:
+                text = f.read()
+            # 只取代码行：注释里提到 ubuntu-latest 是说明文字，不算声明
+            code = '\n'.join(l for l in text.splitlines()
+                             if not l.lstrip().startswith('#'))
+            imgs = self.RUNS_ON_RE.findall(code)
+            self.assertTrue(imgs, f'{name} 未声明 runs-on')
+            out[name] = imgs
+        return out
+
+    def test_50_不得使用ubuntu_latest(self):
+        for name, imgs in self._images().items():
+            for img in imgs:
+                self.assertNotIn(
+                    'latest', img,
+                    f'{name} 的 runs-on: {img} 使用了浮动标签——'
+                    f'迁移到 Ubuntu 26.04 时会静默改变运行环境，'
+                    f'请显式钉 ubuntu-24.04（或验证后升到26.04）')
+
+    def test_51_三处版本一致(self):
+        imgs = self._images()
+        allv = {v for lst in imgs.values() for v in lst}
+        self.assertEqual(len(allv), 1,
+                         f'各 workflow 的 runner 版本不一致：{imgs}——'
+                         f'混版会让「测试在 A 镜像过、部署在 B 镜像」')
+
+    def test_52_版本号格式合法(self):
+        for name, imgs in self._images().items():
+            for img in imgs:
+                self.assertRegex(img, r'^ubuntu-\d+\.\d+$',
+                                 f'{name} 的 runner 版本 {img!r} 格式异常')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

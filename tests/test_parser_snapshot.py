@@ -215,15 +215,37 @@ def _load_baseline():
 
 
 class ParserSnapshotTest(unittest.TestCase):
+    """全字段行为比对。基线由 --bless 生成，键为 URL。"""
+
     def setUp(self):
-        self._lc_orig = (_LC.cache_path, _LC.cache_set)
+        # ⚠ 2026-10-02：桩 _LC.cache_set **不够**——llm_provider / parsers 都在导入时
+        # `from llm_cache import cache_set`，把函数对象绑到自己命名空间，此后改
+        # llm_cache.cache_set 对它们无效。漏桩的结果是：本机有模型 key 时，文本通道
+        # 的真实调用结果被写进 **git 跟踪的夹具** tests/fixtures/vlm_cache.json
+        # （实测从 1 条涨到 24 条），污染后用例的缓存命中集合随模型输出漂移。
+        # 故逐个桩调用方的模块属性。
+        import parsers as _P
+        import llm_provider as _LP
+        self._orig = {
+            'lc_path': _LC.cache_path,
+            'lc_set': _LC.cache_set,
+            'lp_set': _LP._cache_set,
+            'p_vlm_set': getattr(_P, '_vlm_cache_set', None),
+        }
         _LC.cache_path = lambda: VLM_CACHE_FIXTURE
-        _LC.cache_set = lambda key, val: None      # 写桩：不让本测试写真实缓存
+        _LC.cache_set = lambda key, val: None
+        _LP._cache_set = lambda key, val: None
+        if self._orig['p_vlm_set'] is not None:
+            _P._vlm_cache_set = lambda key, val: None
 
     def tearDown(self):
-        _LC.cache_path, _LC.cache_set = self._lc_orig
-
-    """全字段行为比对。基线由 --bless 生成，键为 URL。"""
+        import parsers as _P
+        import llm_provider as _LP
+        _LC.cache_path = self._orig['lc_path']
+        _LC.cache_set = self._orig['lc_set']
+        _LP._cache_set = self._orig['lp_set']
+        if self._orig['p_vlm_set'] is not None:
+            _P._vlm_cache_set = self._orig['p_vlm_set']
 
     @classmethod
     def setUpClass(cls):

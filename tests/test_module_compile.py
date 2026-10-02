@@ -215,6 +215,72 @@ class ScriptEntrypointTest(unittest.TestCase):
         self.assertIsInstance(payload['high'], dict)
         self.assertEqual(payload.get('version'), 1)
 
+    def test_47_测试不得在导入期改写全局缓存(self):
+        """防「夹具被测试写脏」（2026-10-02 实踩）。
+
+        本机.env 有 B 模型 key 时，golden/snapshot 会真实调模型；若某个缓存写入
+        路径没被 setUp 里的桩覆盖，结果会落进 **git 跟踪的夹具**
+        `tests/fixtures/vlm_cache.json`。实测该文件从 1 条涨到 24 条——污染后每次
+        跑用例的缓存命中集合都不同，且内容随模型输出漂移，排查成本极高。
+
+        正确做法是 setUp/tearDown 成对打桩（用完还原）；模块导入阶段赋值则对全
+        进程常驻，既污染夹具、也会让同进程其他测试（如 test_llm_cache 的并发写）
+        全部落进空桩。本用例把「只能在 setUp/tearDown 里打桩」变成硬约束。
+        """
+        import ast
+        bad = []
+        for rel in ('tests/test_parser_golden.py', 'tests/test_parser_snapshot.py'):
+            path = os.path.join(ROOT, rel)
+            with open(path, encoding='utf-8') as f:
+                tree = ast.parse(f.read())
+            for node in tree.body:          # 模块级语句（不在函数/类体内）
+                targets = []
+                if isinstance(node, ast.Assign):
+                    targets = node.targets
+                elif isinstance(node, ast.AugAssign):
+                    targets = [node.target]
+                for t in targets:
+                    if isinstance(t, ast.Attribute) \
+                            and isinstance(t.value, ast.Name) and t.value.id == '_LC' \
+                            and t.attr in ('cache_path', 'cache_set'):
+                        bad.append((rel, node.lineno, t.attr))
+        self.assertEqual(
+            bad, [],
+            '这些模块在**导入阶段**改写了 llm_cache 全局状态：\n'
+            + '\n'.join(f'  {r}:{ln} _LC.{a} = ...' for r, ln, a in bad)
+            + '\n后果：① 本机有模型 key 时会把结果写进 git 跟踪的'
+              ' tests/fixtures/vlm_cache.json（夹具污染）；'
+              '② 同进程其他测试的缓存桩被永久改写。'
+              '\n修法：移到该测试类的 setUp/tearDown 里成对打桩/还原。')
+
+    def test_48_夹具不得被测试写脏(self):
+        """git 跟踪的 VLM 夹具内容必须与 HEAD 一致（防污染静默扩散）。
+
+        上一条锁「不得在导入期改写全局状态」，本条兜住漏网：直接比对夹具内容与
+        仓库基线——即使污染发生在别的路径（如某个脚本误写），也会在此变红。
+        """
+        import subprocess
+        rel = 'tests/fixtures/vlm_cache.json'
+        cur = os.path.join(ROOT, rel)
+        if not os.path.exists(cur):
+            self.skipTest('夹具不存在')
+        head = subprocess.run(['git', 'show', 'HEAD:' + rel], cwd=ROOT,
+                              capture_output=True)
+        if head.returncode != 0:
+            self.skipTest('该夹具尚未入库（首次提交前无法比对）')
+        try:
+            a = json.loads(head.stdout.decode('utf-8'))
+            b = json.loads(self._read(rel))
+        except ValueError:
+            self.skipTest('夹具非合法 JSON，交由其它用例报错')
+        self.assertEqual(set(b.keys()), set(a.keys()),
+                         f'{rel} 的键集与 HEAD 不一致——'
+                         f'新增 {sorted(set(b) - set(a))[:3]}、'
+                         f'缺失 {sorted(set(a) - set(b))[:3]}。'
+                         f'该文件是 git 跟踪的测试夹具，'
+                         f'本机有模型 key 时测试会把真实调用结果写进来。'
+                         f'修法：git checkout -- {rel}，并检查缓存写入路径是否被打桩。')
+
     def test_47_模型波动容错条件不得过严(self):
         """防「容错条件写错 → 形同虚设」（2026-10-02 实踩）。
 

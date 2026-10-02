@@ -29,7 +29,9 @@ jobs:
   # ⚠ GATE_TESTS 清单必须与 .github/workflows/test.yml 的步骤保持一致；
   #   漂移由 tests/test_ci_gate_coverage.py 断言（缺一个即红）。
   gate:
-    runs-on: ubuntu-latest
+    # runner 镜像钉住 24.04：ubuntu-latest 将在 2026-10-19~11-19 迁移到 Ubuntu 26.04，
+    # 迁移可能因系统库/工具版本变化导致门禁误红。理由与 daily.yml 同，见该文件注释。
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -83,6 +85,7 @@ jobs:
             tests/test_module_compile.py
             tests/test_llm_cache.py
             tests/test_audit_html_escape.py
+            tests/test_title_vocab_convergence.py
         run: |
           set -euo pipefail
           rc=0
@@ -102,7 +105,7 @@ jobs:
   deploy:
     # 门禁未绿则不部署——这就是「CI 打通」的全部含义。
     needs: gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read

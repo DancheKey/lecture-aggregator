@@ -8,7 +8,9 @@ on:
 
 jobs:
   golden:
-    runs-on: ubuntu-latest
+    # runner 镜像钉住 24.04：ubuntu-latest 将在 2026-10-19~11-19 迁移到 Ubuntu 26.04。
+    # 理由与 daily.yml 同一段注释；将来升级改版本号并手动验证。
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -176,6 +178,14 @@ jobs:
       # javascript: 伪协议可直接点击执行。现已加 _esc/_esc_url 全面转义。
       - name: Run audit report escape tests
         run: python tests/test_audit_html_escape.py
+
+      # 职称词表收敛门禁（2026-10-02）：项目铁律是职称/职务词表只维护一份
+      # （scraper/field_vocab.py），其他代码引用而不许手抄。历史上真实发生过
+      # 「秘书长」在两边词表分叉，导致同一值一条路径判正常单位、另一条判脏值。
+      # 本套件扫 parsers.py 的内联职称串，断言词集落在主表并集内——
+      # 将来往主表加新职称而忘了改副本时立即变红。
+      - name: Run title vocab convergence tests
+        run: python tests/test_title_vocab_convergence.py
 
       # 缓存并发门禁（2026-10-02）：data/.vlm_cache.json 曾被 parsers 与
       # llm_provider 各持一把**互不可见**的锁，两边都做「整文件读→改→写回」，

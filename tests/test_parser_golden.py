@@ -56,6 +56,17 @@ import llm_cache as _LC                              # noqa: E402
 # 收集阶段会导入全部测试模块，该补丁对整个进程常驻，导致 test_llm_cache 的
 # 200 并发写全部落进空桩（全量套件 4 红假失败，见其 SharedCacheTest.setUp 注释）。
 # 改为 _GoldenCacheMixin 在 setUp/tearDown 打桩/还原，用例内行为不变。
+#
+# ⚠ 2026-10-02 加固：模块导入阶段**不得**再出现 `_LC.cache_path = ...` 这类赋值。
+#   它对全进程常驻，会让本模块一被 pytest 收集就永久改写缓存路径。本轮排查时
+#   确认那两句已不在，但夹具 tests/fixtures/vlm_cache.json 曾从 1 条涨到 24 条
+#   （本机 .env 有 B 模型 key，golden/snapshot 的真实调用结果被写进了 git 跟踪的
+#   夹具）。污染后每次跑用例的缓存命中集合都不同，且内容随模型输出漂移，
+#   极难排查——故用下面的 assert 把「只能在 setUp/tearDown 里打桩」变成硬约束。
+for _name in ('cache_path', 'cache_set'):
+    assert getattr(_LC, _name).__module__ != __name__, \
+        f'_LC.{_name} 在模块导入阶段被改写（{__name__}）——' \
+        f'打桩只能在 _GoldenCacheMixin.setUp/tearDown 内做，否则全进程常驻'
 
 # 垃圾 topic 特征（历史上由表格/页眉误读产生）：如 '0- 17' / '0 -12' / 纯序号
 _FORBIDDEN_TOPIC = ('0-', '0 -', '0—')
@@ -245,19 +256,46 @@ def _make_test(case):
 
 
 class _GoldenCacheMixin(unittest.TestCase):
-    """缓存隔离：golden 用例期间桩化 llm_cache，tearDown 还原。
+    """缓存隔离：golden 用例期间桩化**所有调用方**的缓存写入，tearDown 还原。
 
     （2026-09-27：原为模块导入时打桩且从不还原，污染同进程内其他测试模块——
     test_llm_cache 的并发写全部落进空桩。pytest 单文件进程不受影响，故 CI
-    逐文件跑时是绿的、全量 pytest 跑时红。）"""
+    逐文件跑时是绿的、全量 pytest 跑时红。）
+
+    ⚠ 2026-10-02 修正：桩 `_LC.cache_set` **不够**。llm_provider 与 parsers 都在
+    导入时写了 `from llm_cache import cache_set as _cache_set`，把函数对象**绑到
+    自己命名空间**；此后改 llm_cache.cache_set 对它们已无效（实测：
+    `LP._cache_set is LC.cache_set` 改前True、改后 False）。于是文本通道的
+    真实模型调用结果被写进 **git 跟踪的夹具** tests/fixtures/vlm_cache.json
+    ——本轮实测该文件从 1 条涨到 24 条。夹具被污染后每次跑用例的缓存命中集合
+    都不同，且内容随模型输出漂移，排查成本极高。
+    故必须**逐个桩调用方的模块属性**（它们各自的 _cache_set / _vlm_cache_set）。
+    """
 
     def setUp(self):
-        self._lc_orig = (_LC.cache_path, _LC.cache_set)
+        import parsers as _P
+        import llm_provider as _LP
+        # 保存原引用（调用方的 from-import 绑定 + llm_cache 本体），tearDown 逐一还原
+        self._orig = {
+            'lc_path': _LC.cache_path,
+            'lc_set': _LC.cache_set,
+            'lp_set': _LP._cache_set,
+            'p_vlm_set': getattr(_P, '_vlm_cache_set', None),
+        }
         _LC.cache_path = lambda: VLM_CACHE_FIXTURE
         _LC.cache_set = lambda key, val: None
+        _LP._cache_set = lambda key, val: None          # 文本通道（from-import 绑定）
+        if self._orig['p_vlm_set'] is not None:
+            _P._vlm_cache_set = lambda key, val: None   # VLM 通道
 
     def tearDown(self):
-        _LC.cache_path, _LC.cache_set = self._lc_orig
+        import parsers as _P
+        import llm_provider as _LP
+        _LC.cache_path = self._orig['lc_path']
+        _LC.cache_set = self._orig['lc_set']
+        _LP._cache_set = self._orig['lp_set']
+        if self._orig['p_vlm_set'] is not None:
+            _P._vlm_cache_set = self._orig['p_vlm_set']
 
 
 class GoldenTest(_GoldenCacheMixin):
