@@ -317,13 +317,24 @@ HONORIFIC_SUFFIXES = ('先生', '女士')
 COMPLEX_TITLE_SUFFIXES = (
     # 学段+学科+高级职称：「中学数学高级教师」「小学语文高级教师」等
     '高级实验师', '高级讲师', '高级教师', '高级工程师', '高级会计师', '高级经济师',
-    '特级教师', '实验师', '工程师', '会计师', '经济师',
+    '特级教师', '实验师', '会计师', '经济师',
     # 等级教授（高校职级）：仅在简介「现为…二级教授」这类句子里出现
     '一级教授', '二级教授', '三级教授', '四级教授',
     # 荣誉/聘任型教授：源页常见「周忠宝…特聘教授」「客座教授」等
     '讲座教授', '讲席教授', '客座教授', '名誉教授', '兼职教授',
     '青年教授', '卓越教授',
 )
+
+# 复合职称模式**额外并入**的行政职务词：它们已由 ORG_TITLE_SUFFIXES 声明为职务，
+# 但 _TITLE_ALT_FULL 历史上也匹配（源页「张三高级工程师」「…公司工程师」等），
+# 删掉会让这些值不再被剥离 → 姓名尾部残留职称。
+# 故在此**显式并入模式**（而非在 COMPLEX 组里重复声明），
+# 这样「词表的分组归属」与「模式的匹配范围」两件事各归其位：
+#   · 工程师/会计师/经济师等只在 ORG 组声明一次（分组无歧义）
+#   · COMPLEX_TITLE_ALT_RE 仍能匹配它们（行为与改动前逐字一致）
+_EXTRA_COMPLEX_JOBS = tuple(
+    w for w in ORG_TITLE_SUFFIXES
+    if w in ('工程师', '会计师', '经济师', '实验师'))
 
 # 修饰前缀 + 基础职称（姓氏型复合，如「青年研究员」「特聘研究员」）。
 # 与 COMPLEX 独立：这一类是「修饰词 + 职称」，正则需组合而非枚举全部变体。
@@ -409,7 +420,8 @@ _SUBJ_GRADED = (
 )
 _MOD_TITLE_WORDS = tuple(
     f'{m}{t}' for m in TITLE_MODIFIERS for t in ('研究员', '教授', '讲师'))
-_COMPLEX_ALL_WORDS = (COMPLEX_TITLE_SUFFIXES + _MOD_TITLE_WORDS + _SUBJ_GRADED
+_COMPLEX_ALL_WORDS = (COMPLEX_TITLE_SUFFIXES + _EXTRA_COMPLEX_JOBS
+                      + _MOD_TITLE_WORDS + _SUBJ_GRADED
                       + NAME_TITLE_SUFFIXES + HONORIFIC_SUFFIXES)
 COMPLEX_TITLE_ALT_RE = re.compile(_alt(_COMPLEX_ALL_WORDS))
 

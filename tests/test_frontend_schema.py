@@ -11,6 +11,7 @@ data/lectures.json 全库键并集 ∪ 派生键 {unitType, speakerKeys}
   行为已有 tests/test_frontend_consistency.py 锁定）。
 """
 import glob
+import hashlib
 import json
 import os
 import re
@@ -63,6 +64,119 @@ class FrontendSchemaGuardTest(unittest.TestCase):
         若 parsers 开始直出，generate/server 的加工就不再单一。"""
         for k in DERIVED_KEYS:
             self.assertNotIn(k, self.produced)
+
+
+class ScriptVersionStampTest(unittest.TestCase):
+    """index.html / stats.html 的 `?v=` 版本戳必须等于 **Git 里那份** JS 的 hash。
+
+    背景（2026-10-02 两次误判后定案）：GitHub Pages 对未哈希的静态资源长期缓存，
+    项目用「`?v=<sha256[:10]>`」做缓存破坏，只有
+    `scripts/generate_frontend_data.py::stamp_script_version` 会重打。
+
+    ⚠ **校验基准必须是 Git 里的内容，不是工作区文件。**
+    本仓库 `site/*.js` 在工作区是 CRLF，入库时被 git 转成 LF（core.autocrlf），
+    两者 sha256 必然不同：
+
+        工作区 app.display.js (CRLF, 17511B) -> e72f3e2d48
+        git 里 app.display.js  (LF,   17208B) -> fd8ba8ea49
+
+    而 `stamp_script_version` 哈希的是**工作区文件**，Pages 发的是 **git 里那份**——
+    于是页面上的版本号与实际下发的文件永远对不上，缓存破坏**完全失效**
+    （回访用户持续加载旧 JS，且零报错）。
+
+    首次发现时我误判成「改完 JS 忘了重打戳」，重打后本地校验全绿；
+    实则本地校验用的也是工作区文件，同样是错的。真正判定必须看 git 内容。
+
+    本用例按 git blob 校验（见 `_git_blob_hash`），并与工作区校验交叉对照，
+    二者不一致即说明存在 CRLF/LF 转换——那正是本缺陷的成因。
+    """
+
+    PAGES = ('site/index.html', 'site/stats.html')
+    SCRIPT_RE = re.compile(r'src="([\w./-]+\.js)\?v=([0-9a-f]{10})"')
+
+    def _html(self, page):
+        p = os.path.join(_ROOT, page)
+        if not os.path.exists(p):
+            self.skipTest('%s 不存在' % page)
+        with open(p, encoding='utf-8') as f:
+            return f.read()
+
+    @staticmethod
+    def _git_blob_hash(rel):
+        """取 Git 索引/HEAD 里该文件的真实字节 sha256[:10]；取不到返回 None。
+
+        优先读工作区的 git 索引（`git show :path`），这样**未提交的改动也能校验**，
+        避免"提交后才发现"的滞后暴露。
+        """
+        import subprocess
+        r = subprocess.run(['git', 'show', ':' + rel], cwd=_ROOT,
+                           capture_output=True)
+        if r.returncode != 0 or not r.stdout:
+            return None
+        return hashlib.sha256(r.stdout).hexdigest()[:10]
+
+    def test_版本戳与git内容一致(self):
+        for page in self.PAGES:
+            html = self._html(page)
+            tags = self.SCRIPT_RE.findall(html)
+            self.assertTrue(tags, '%s 里没有任何带 ?v= 的 script 引用——'
+                                  '缓存破坏机制可能已被移除' % page)
+            for name, ver in tags:
+                rel = 'site/' + name
+                real = self._git_blob_hash(rel)
+                self.assertIsNotNone(real, '%s 引用了不存在/未入库的 %s' % (page, name))
+                self.assertEqual(
+                    ver, real,
+                    '%s 里 %s 的版本戳是 %s，但 **Git 里**的实际 hash 是 %s——'
+                    'Pages 下发的是 git 那份，浏览器会按版本戳从 CDN 缓存拿旧文件。'
+                    '\n修法：见 scripts/generate_frontend_data.py::stamp_script_version'
+                    ' ——它必须哈希 Git 内容（或仓库统一为 LF），'
+                    '否则重打多少次都对不上。'
+                    % (page, name, ver, real))
+
+    def test_工作区与git换行一致(self):
+        """工作区与 Git 内容不应存在 CRLF/LF 差异。
+
+        这是版本戳对不上的**根因**：stamp 哈希工作区（CRLF）、Pages 发 Git（LF），
+        两者永远不同。凡是入库的 site/*.js 有此差异，缓存破坏即失效。
+        这里给出明确报错，而非让维护者去比对两个毫无关联的 hash。
+        """
+        import subprocess
+        diff = []
+        for f in sorted(os.listdir(os.path.join(_ROOT, 'site'))):
+            if not f.endswith('.js'):
+                continue
+            rel = 'site/' + f
+            blob = subprocess.run(['git', 'show', ':' + rel], cwd=_ROOT,
+                                  capture_output=True).stdout
+            local_p = os.path.join(_ROOT, rel)
+            if not os.path.exists(local_p) or not blob:
+                continue
+            with open(local_p, 'rb') as fh:
+                local = fh.read()
+            if local != blob:
+                diff.append('%s（工作区 %dB / git %dB）'
+                            % (rel, len(local), len(blob)))
+        self.assertEqual(
+            diff, [],
+            '工作区与 Git 索引内容不一致（通常是 CRLF/LF 转换）：\n  '
+            + '\n  '.join(diff)
+            + '\n影响：stamp_script_version 哈希的是工作区文件，而 Pages 下发 git 那份，'
+              '两者永远不同 → ?v= 缓存破坏完全失效。'
+              '\n修法：① 让 stamp 按 git 内容哈希；或 ② 仓库内统一使用 LF'
+              '（如在 .gitattributes 里为 site/*.js 固定 eol=lf，并重新 checkout）。')
+
+    def test_所有app分片都被引用(self):
+        """反向：site/app*.js 都要被 index.html 引用，否则是孤儿文件。"""
+        html = self._html('site/index.html')
+        referenced = {os.path.basename(n) for n, _ in self.SCRIPT_RE.findall(html)}
+        site = os.path.join(_ROOT, 'site')
+        for f in sorted(os.listdir(site)):
+            if not re.fullmatch(r'app[\w.]*\.js', f):
+                continue
+            self.assertIn(f, referenced,
+                          'site/%s 存在但没被 index.html 引用——'
+                          '它是孤儿分片（改了也不会生效）' % f)
 
 
 if __name__ == '__main__':

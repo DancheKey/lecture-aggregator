@@ -55,8 +55,40 @@ def atomic_write_json(path, data):
     atomic_write_text(path, json.dumps(data, ensure_ascii=False, separators=(',', ':')))
 
 
-def _short_hash(path, length=10):
-    """返回文件内容的短 hash，用作静态资源缓存破坏版本号。"""
+def _short_hash(path, length=10, git_first=True):
+    """返回文件内容的短 hash，用作静态资源缓存破坏版本号。
+
+    ⚠ 2026-10-02 修正（关键）：必须优先哈希 **Git 索引里那份内容**，而非工作区文件。
+
+    本仓库 `site/*.js` 在工作区是 CRLF，入库时被 git 转成 LF
+    （core.autocrlf / .gitattributes 未对 site/*.js 固定 eol）。于是：
+
+        工作区 app.display.js (CRLF, 17511B) -> e72f3e2d48
+        git 里 app.display.js  (LF,   17208B) -> fd8ba8ea49
+
+    而 **GitHub Pages 下发的是 git 里那份**。原先哈希工作区文件，等于给
+    一个 Pages 永远不会下发的字节序列算版本号 —— `?v=` 缓存破坏**完全失效**，
+    回访用户持续加载旧 JS，且零报错（这正是该机制要防的事）。
+
+    故这里用 `git show :<path>` 读**索引**（不是 HEAD）的内容：既能拿到 Pages
+    将要下发的那份字节，又能覆盖「尚未提交的本地改动」（git add 后即在索引里）。
+
+    取不到 git（未初始化仓库 / 非 git 目录）时退回工作区文件，保证脚本仍可用，
+    但会打印警告——那种情况下算出的版本号仍可能与 Pages 不一致。
+    """
+    if git_first:
+        import subprocess
+        rel = os.path.relpath(path, ROOT).replace(os.sep, '/')
+        try:
+            r = subprocess.run(['git', 'show', ':' + rel], cwd=ROOT,
+                               capture_output=True, timeout=15)
+            if r.returncode == 0 and r.stdout:
+                return hashlib.sha256(r.stdout).hexdigest()[:length]
+        except Exception:
+            pass
+        print(f'[warn] {os.path.basename(path)}: 无法从 Git 索引取内容，'
+              f'退回工作区文件计算版本号——若该文件存在 CRLF/LF 转换，'
+              f'版本号将与 Pages 实际下发的内容不符（缓存破坏失效）')
     h = hashlib.sha256()
     with open(path, 'rb') as f:
         h.update(f.read())

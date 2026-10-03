@@ -162,6 +162,33 @@ class TitleVocabConvergenceTest(unittest.TestCase):
         self.assertNotIn('一级教授', FV.TAIL_TITLE_RE.pattern,
                          'TAIL_TITLE_RE 混入了复合职称——会改变所有剥离调用点行为')
 
+    def test_73_词表分组不得重叠(self):
+        """各分组必须互斥——同一词声明在两组会让「按组改词表」产生分歧。
+
+        2026-10-02 实踩：收敛职称副本时把「工程师」放进了 COMPLEX_TITLE_SUFFIXES，
+        而它本来就属于 ORG_TITLE_SUFFIXES（行政职务）。功能上无害（set 会去重），
+        但语义上同一词有了两个"归属"，将来按组增删词表的人必然困惑——而这正是
+        本轮收敛要根除的那类问题，不能自己又造一个。
+        """
+        groups = {
+            'NAME_TITLE_SUFFIXES': set(FV.NAME_TITLE_SUFFIXES),
+            'ORG_TITLE_SUFFIXES': set(FV.ORG_TITLE_SUFFIXES),
+            'HONORIFIC_SUFFIXES': set(FV.HONORIFIC_SUFFIXES),
+            'COMPLEX_TITLE_SUFFIXES': set(FV.COMPLEX_TITLE_SUFFIXES),
+        }
+        names = list(groups)
+        clashes = {}
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                common = groups[a] & groups[b]
+                if common:
+                    clashes['%s ∩ %s' % (a, b)] = sorted(common)
+        self.assertEqual(clashes, {},
+                         f'词表分组重叠：{clashes}——'
+                         '同一词只应在语义归属的那一组声明一次；'
+                         '若某组确需匹配它（如 COMPLEX 模式要匹配 ORG 的职务词），'
+                         '请用 _EXTRA_COMPLEX_JOBS 显式并入模式，而不是重复声明进分组。')
+
     def test_73_parsers确实在引用派生入口(self):
         """确认收敛真的落地（而非只有 field_vocab 定义了却没人用）。"""
         with open(PARSERS, encoding='utf-8') as f:

@@ -1,0 +1,26 @@
+# 统一换行策略（2026-10-02 新增）
+#
+# 背景：`site/*.js` 等前端静态资源在工作区是 CRLF，入库时被 git 归一为 LF
+# （core.autocrlf 的默认行为）。而 GitHub Pages 下发的是 **git 里那份 LF**，
+# 于是 `scripts/generate_frontend_data.py::stamp_script_version` 若按工作区
+# 文件算 sha256，得到的版本号永远与 Pages 实际下发的字节对不上——
+# `?v=` 缓存破坏**完全失效**，回访用户持续加载旧 JS，且零报错。
+# （该缺陷在引入 ?v= 机制后一直存在：91faa57 有 7/8 不一致、62800aa 有 2/8。）
+#
+# 两条修法（本次同时采用，互为保险）：
+#   ① stamp_script_version 改为哈希 **Git 索引内容**（见该函数 docstring）；
+#   ② 本文件把 site/ 的换行**固定**，让工作区与仓库内容一致——
+#      这样「本地读文件算 hash」与「Pages 下发内容」也不会分叉，
+#      其它工具（编辑器插件、外部脚本）读文件算 hash 时同样得到正确结果。
+
+# 默认：文本文件入库统一为 LF，检出时不转换（避免各平台工作区不一致）
+* text=auto eol=lf
+
+# 前端静态资源：强制 LF，且**不做** CRLF 转换（Pages 直接下发仓库内容）
+site/** text eol=lf
+
+# 明确排除二进制
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
