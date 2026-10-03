@@ -224,13 +224,13 @@
     },
     {
       "date": "2026-10-03",
-      "capturedAt": "2026-10-03T04:38:06+08:00",
-      "site_pv": 1507,
-      "site_uv": 1214,
-      "page_pv": 1481,
-      "page_uv": 1213,
-      "uv_delta": 0,
-      "pv_delta": 0,
+      "capturedAt": "2026-10-03T14:15:21+08:00",
+      "site_pv": 1508,
+      "site_uv": 1215,
+      "page_pv": 1482,
+      "page_uv": 1214,
+      "uv_delta": 1,
+      "pv_delta": 1,
       "note": ""
     }
   ]
