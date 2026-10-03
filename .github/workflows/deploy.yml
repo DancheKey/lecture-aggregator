@@ -82,6 +82,10 @@ jobs:
             tests/js/app_count_animation.js
             tests/js/app_forum_and_clamp.js
             tests/js/visits_trend_render.js
+            tests/js/app_topic_session.js
+            tests/js/app_ltkey_consistency.js
+            tests/js/app_merge_chunk.js
+            tests/test_main_water_gate.py
             tests/test_module_compile.py
             tests/test_llm_cache.py
             tests/test_audit_html_escape.py

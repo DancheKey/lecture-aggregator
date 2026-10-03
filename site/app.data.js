@@ -67,7 +67,13 @@ Object.assign(APP_METHODS, {
           // 见 computed.filtered 与 index.html 时间线分支。
           this._ensureLongTextAll();
         })
-        .catch(() => { this._loadStaticFull(true); });
+        .catch((e) => {
+          // 2026-10-02：补原始错误。同文件 :167-174 的 catch 已是 console.error(e) 口径，
+          // 此处原先是 `() => {...}` 把 e 丢掉——「网络抖动」与「latest.json 未部署/404」
+          // 是两种完全不同的处置（前者重试即可，后者要查部署），丢掉错误就无从区分。
+          console.error('[load] latest.json 加载失败，回退整文件 lectures.json', e);
+          this._loadStaticFull(true);
+        });
     },
 
     _loadStaticFull(fallbackToOriginal = false) {
@@ -181,7 +187,10 @@ Object.assign(APP_METHODS, {
     _sleep(ms) { return new Promise(res => setTimeout(res, ms)); },
 
     /* ---------- 长文本（简介/摘要）按需加载 ---------- */
-    // 键必须与 generate_frontend_data._lt_key() 逐字一致
+    // 键必须与 scripts/frontend_fields.py 的 lt_key() 逐字一致（实现已随前端拆分
+    // 从 app.js 移到本文件 app.data.js——旧注释写 app.js 会让人去错文件里找）。
+    // 两端无共享代码，只靠此约定；一致性由 tests/js/app_ltkey_consistency.js
+    // 跨语言逐条比对守护，改任一侧即红。
     _ltKey(l) {
       return (l.sourceUrl || '') + '#' + (l.lectureIndex != null ? l.lectureIndex : '');
     },

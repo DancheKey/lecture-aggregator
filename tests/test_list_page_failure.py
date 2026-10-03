@@ -198,6 +198,26 @@ class GlobalWatermarkGuardTest(unittest.TestCase):
         self.assertIn("'last_scrape': now_iso", tail,
                       '成功时才推进水位；失败分支必须不写 last_scrape')
 
+    def test_09_水位读取失败必须告警而非静默退化(self):
+        """水位文件读坏 → 全量抓取（实测 3.9h），必须留痕。
+
+        2026-10-02（Q1 拍板加）。此前这里是裸`except: since = None`，
+        退化后 CI 日志零痕迹，只表现为「今天跑得特别久」。
+
+        定位说明：server.py 也有同样的读取，但按其 `_warn` docstring 属
+        「构造命令参数」应保持静默，且 scraper 会再兜底读一次同一文件——
+        **本行才是决定「要不要全量重抓」的那处**，故只锁这里。
+        """
+        src = open(os.path.join(_ROOT, 'scraper', 'scraper.py'), encoding='utf-8').read()
+        seg = src[src.index("since = json.load(open(last_scrape_path"):]
+        seg = seg[:seg.index('is_incremental =')]
+        self.assertIn('except Exception as e:', seg,
+                      '水位读取的 except 必须绑定异常对象，否则无法告警')
+        self.assertIn('[WARN]', seg,
+                      '水位读取失败未告警——本轮会静默退化为全量抓取（实测 3.9h）')
+        self.assertIn('全量抓取', seg,
+                      '告警文案须点明「退化为全量」与耗时量级，否则读日志的人不会当回事')
+
 
 class ListDateSwitchTest(unittest.TestCase):
     """B7：SCNU_LISTDATE_SKIP 曾是**假开关**（只管日志，真实过滤无条件执行）。

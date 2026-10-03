@@ -110,10 +110,18 @@ site/sources.html
 secrets.*
 *token*.txt
 
-# ===== 临时调试/测试/备份文件（务必不要提交，避免泄露内部数据） =====
-_*.py
-_*.txt
-_*.md
+# ===== 临时调试/测试/备份文件（务必不要提交，避免泄露内部数据）=====
+# 2026-10-02：`_*.py` 等三条改为**根锚定**（`/_*.py`）。
+# 原来无锚定 → 匹配任意层级，凡以 `_` 开头都被静默忽略（`git check-ignore` 实测：
+# scripts/_x.py、tests/_helper.py、scraper/_x.py 全部被误伤）。危害不是「多忽略」，
+# 而是**反向的静默**：子目录里有人写了 `scripts/_helper.py`，他 `git add` 时 git
+# 不报错也不入库，换台机器就没了。与本文件 :30 已记录的 `fix_*.py` 误伤教训同类
+# （那次把 scripts/fix_physical_nbsps.py 吞掉，当时无人察觉），故一并收敛。
+# 根目录下的临时探针（本项目调试脚本惯用 `_` 前缀）仍照常忽略。
+/_*.py
+/_*.txt
+/_*.md
+/_*
 data/_*
 data/*.backup.json
 data/*.bak.*

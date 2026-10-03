@@ -172,6 +172,28 @@ jobs:
       - name: Run visits-trend render tests
         run: node tests/js/visits_trend_render.js
 
+      # topicHasSession 门禁（2026-10-02）：该函数此前零测试，且 n>99 时会拼出
+      # 'undefined十undefined' 这种永不匹配的正则（静默失效 → 题目被重复追加
+      # 「（第N期）」）。当前全库 lectureIndex 最大 32 故零触发，属「结构已坏、
+      # 只是还没触发」。本门禁锁 1–99 识别正确、n>99 不产生 undefined、
+      # 且哨兵不退化为空串（那会让含「讲座」的无关标题被误判为已含期数）。
+      - name: Run topic session tests
+        run: node tests/js/app_topic_session.js
+
+      # 前端数据流行为门禁（2026-10-02，P1）。三条都是「此前只有间接/巧合式覆盖」的
+      # 关键语义，任一退化都会静默出错、零报错：
+      #  ① _ltKey 跨语言一致：Python lt_key 与 JS _ltKey 无共享代码，改一侧会让
+      #     **全站简介/摘要静默变空**；原覆盖靠桩数据恰好同用 '#' 字面量（改桩即失效）。
+      #  ② _mergeChunk 覆盖语义：首屏 50 条是全集子集，必须覆盖而非追加，
+      #     否则首页显示 3860 而非 3810；原测试用简化版 merge，未执行真实函数体。
+      #  ③ main() 水位闸门：failed_sources 非空时冻结 last_scrape 是增量正确性的
+      #     铁律（水位越过失败时段 → 该时段讲座永远补不回）；原覆盖只有源码字面量断言。
+      - name: Run frontend data-flow behavior tests
+        run: |
+          node tests/js/app_ltkey_consistency.js
+          node tests/js/app_merge_chunk.js
+          python tests/test_main_water_gate.py
+
       # 审计报告转义门禁（2026-10-02）：audit_fields.py 的 HTML 报告把抓来的
       # speaker/location/speakerBio 直接拼进 HTML（报告是 CI 附件，维护者
       # 下载后双击打开即执行），且 href="{sourceUrl}" 未限制协议，

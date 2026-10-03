@@ -65,7 +65,12 @@ def strip_frontend_fields_all(items):
 # ---------- 长文本（简介/摘要）分离 ----------
 
 def lt_key(item):
-    """长文本条目的稳定键。必须与 site/app.js 的 _ltKey() 逐字一致。"""
+    """长文本条目的稳定键。必须与 site/app.data.js 的 _ltKey() 逐字一致。
+
+    ⚠ 前端实现随分片拆分已从 app.js 移到 app.data.js（旧注释写 app.js 会误导定位）。
+    两端无共享代码，一致性由 tests/js/app_ltkey_consistency.js 跨语言逐条比对守护：
+    改任一侧即红（否则症状是全站简介/摘要静默变空、零报错）。
+    """
     return '%s#%s' % (item.get('sourceUrl') or '',
                       '' if item.get('lectureIndex') is None else item.get('lectureIndex'))
 

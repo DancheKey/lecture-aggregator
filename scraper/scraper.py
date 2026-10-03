@@ -1050,8 +1050,15 @@ def save_ledger(path=None, merge=True):
                     _LEDGER.setdefault(k, v)
         except FileNotFoundError:
             pass
-        except Exception:
-            pass          # 盘上文件损坏/形态异常：以内存为准继续写，不阻断流程
+        except Exception as e:
+            # 2026-10-02：原先是裸 `except Exception: pass`，与紧邻的 load 侧
+            # （:1005 打印「台账读取失败」）口径不一致——同一个文件损坏，
+            # 读的时候有提示、写的时候悄悄吞掉，排查时两边对不上。
+            # 这里确实不该中断流程（台账只是加速器，坏了不影响抓取正确性），
+            # 但必须留痕：并进来的盘上条目会丢，后续每轮都要重抓这些页。
+            print(f'[LEDGER] 盘上台账合并失败，以内存为准继续写'
+                  f'（盘上条目本轮未被继承，相关页面下轮会重抓）：'
+                  f'{type(e).__name__}: {e}', file=sys.stderr)
     # 写盘前剔除过期条目（同时清掉形态异常键，与 load 侧口径一致）
     entries = {k: v for k, v in _LEDGER.items()
                if _LEDGER_KEY_RE.match(str(k)) and _ledger_is_fresh(v)}
@@ -1719,8 +1726,16 @@ def main():
     if not since and not args.full and os.path.exists(last_scrape_path):
         try:
             since = json.load(open(last_scrape_path, encoding='utf-8')).get('last_scrape')
-        except Exception:
+        except Exception as e:
             since = None
+            # 2026-10-02（Q1 拍板）：水位读取失败会**静默退化为全量抓取**（实测 3.9h）。
+            # server.py:887 有同样的读取，但那里属「构造命令参数」按 _warn 约定保持静默
+            # （且 scraper 会再兜底读一次同一文件），**这里才是真正的静默点**——
+            # 一旦降级，CI 日志里没有任何痕迹，只表现为「今天跑得特别久」。
+            # 故此处必须留痕：属于「静默降级且代价极高」的路径，不是探测类。
+            print(f'[WARN] 水位文件 {last_scrape_path} 读取失败，本轮退化为**全量抓取**'
+                  f'（耗时可能从数分钟增至数小时）：{type(e).__name__}: {e}',
+                  file=sys.stderr)
     is_incremental = bool(since) and not args.full
 
     # 列表页条目日期过滤用的水位日期（'YYYY-MM-DD'）。仅增量模式有意义：

@@ -65,7 +65,7 @@ LIKE_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同
 WANT_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同想听动作只接受一次（允许 want↔unwant 交替）
 LIKE_CAP = 999                         # 单条讲座点赞数上限（防慢速刷高；unlike 仍可继续减）
 MAX_BODY_BYTES = 1_000_000             # 请求体上限 1MB（本地 API 的 body 都是几十字节的小 JSON）
-MAX_SOURCES = 500                      # 信息源条数上限（当前 19 条。防POST 循环写入把yaml 撑成几万条，
+MAX_SOURCES = 500                      # 信息源条数上限（当前 53 条。防POST 循环写入把yaml 撑成几万条，
                                         # 且每个源都会被 daily.yml 真实抓取——几百个源会让CI 跑一整天。
                                         # 超限直接 400，语义与既有校验一致）
 

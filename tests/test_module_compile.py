@@ -28,6 +28,7 @@ server.py——那正是最容易悄悄坏掉的一类。
 import json
 import os
 import re
+import sys
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -281,7 +282,86 @@ class ScriptEntrypointTest(unittest.TestCase):
                          f'本机有模型 key 时测试会把真实调用结果写进来。'
                          f'修法：git checkout -- {rel}，并检查缓存写入路径是否被打桩。')
 
-    def test_47_模型波动容错条件不得过严(self):
+    def test_49_daily依赖完整性(self):
+        """daily.yml 装的依赖必须覆盖它调用的脚本的 import 需求（防将来分裂）。
+
+        背景（2026-10-02）：daily.yml 只 `pip install -r scraper/requirements.txt`，
+        而根 requirements.txt（含 ruamel）**不被 daily 安装**。当前不炸，因为
+        daily 调用的 6 个脚本都不 import server.py。但这是**潜伏风险**：哪天有人
+        在 scripts/ 里 import server（或 scraper 侧新增 ruamel 用法），
+        每日 cron 会在无人值守时 ImportError 红掉，且只在 Actions 日志里可见。
+
+        本用例不依赖「谁 import 谁」的静态猜测，而是直接比对：daily 声明安装的
+        依赖集，是否覆盖 daily 调用的脚本**实际 import**的第三方包。
+        """
+        import re
+        import subprocess as sp
+        wf = os.path.join(ROOT, '.github', 'workflows', 'daily.yml')
+        text = self._read(os.path.relpath(wf, ROOT).replace('\\', '/')) \
+            if os.path.exists(wf) else ''
+        if not text:
+            self.skipTest('daily.yml 不存在')
+        m = re.search(r'pip install -r ([\w./-]+\.txt)', text)
+        self.assertIsNotNone(m, 'daily.yml 未找到 pip install -r 语句')
+        req_files = re.findall(r'-r ([\w./-]+\.txt)', text)
+        installed = set()
+        for rf in req_files:
+            p = os.path.join(ROOT, rf)
+            self.assertTrue(os.path.exists(p), f'daily.yml 引用了不存在的 {rf}')
+            with open(p, encoding='utf-8') as f:
+                for line in f:
+                    line = line.split('#')[0].strip()
+                    if line:
+                        installed.add(re.split(r'[=<>!]', line)[0].strip().lower())
+
+        # daily 调用的脚本 → 其第三方 import
+        scripts = set(re.findall(r'python ([\w./-]+\.py)', text))
+        stdlib_ok = set(getattr(sys, 'stdlib_module_names', None)
+                        or sys.builtin_module_names)
+        # 本仓库内的模块（含 scraper/ 与 scripts/ 下的同目录文件）
+        local_mods = {'scraper', 'scripts', 'server', 'tests'}
+        for sub in ('scraper', 'scripts'):
+            d = os.path.join(ROOT, sub)
+            if os.path.isdir(d):
+                local_mods |= {os.path.splitext(f)[0] for f in os.listdir(d)
+                               if f.endswith('.py')}
+        # import 名与 PyPI 包名不一致的映射（import X 实为安装 Y）
+        alias = {'bs4': 'beautifulsoup4', 'yaml': 'pyyaml',
+                 'ruamel': 'ruamel.yaml', 'PIL': 'pillow',
+                 'cv2': 'opencv-python-headless', 'sklearn': 'scikit-learn',
+                 'dotenv': 'python-dotenv'}
+        # requirements 包名里 `-` 与 `_` 互通（PEP 503 规范化），
+        # 故比对时统一把两种符号都换成下划线。
+        def norm(pkg):
+            return pkg.lower().replace('-', '_')
+
+        installed_norm = {norm(i) for i in installed}
+        missing = {}
+        for s in sorted(scripts):
+            p = os.path.join(ROOT, s)
+            if not os.path.exists(p):
+                continue
+            with open(p, encoding='utf-8') as f:
+                src = f.read()
+            for mod in re.findall(r'^\s*(?:import|from)\s+([a-zA-Z_][\w.]*)',
+                                  src, re.M):
+                top = mod.split('.')[0].lower()
+                if top in stdlib_ok or top in local_mods:
+                    continue
+                pkg = alias.get(top, top)
+                if norm(pkg) in installed_norm or norm(top) in installed_norm:
+                    continue
+                missing.setdefault(s, set()).add(pkg)
+        self.assertEqual(
+            {k: sorted(v) for k, v in missing.items()}, {},
+            'daily.yml 调用的脚本 import 了未在 daily 安装的第三方包：\n'
+            + '\n'.join(f'  {k}: {sorted(v)}' for k, v in missing.items())
+            + '\ndaily.yml 只装了 ' + ', '.join(req_files)
+            + '；缺包会在无人值守的 cron 里 ImportError。'
+              '修法：把该包加进 scraper/requirements.txt，'
+              '或让 daily.yml 额外 `-r requirements.txt`。')
+
+    def test_50_模型波动容错条件不得过严(self):
         """防「容错条件写错 → 形同虚设」（2026-10-02 实踩）。
 
         test_parser_golden 有一个针对 B 模型输出波动的 skip 容错：断言失败且消息

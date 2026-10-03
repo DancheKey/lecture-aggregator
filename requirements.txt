@@ -1,5 +1,23 @@
-# server.py 本地后端最小依赖（爬虫完整依赖见 scraper/requirements.txt）
-# 2026-08-05 体检修复（中等-21）：固定版本并与 scraper/requirements.txt 对齐
+# server.py 本地后端依赖（爬虫完整依赖见 scraper/requirements.txt）
+#
+# ⚠ 2026-10-02 澄清本文件的用途，避免后人误判：
+#
+#   requests / beautifulsoup4 —— **server.py 并不 import 它们**。
+#       它出现在这里唯一的地方是 server.py:338 的探测命令字符串
+#       `[_find_scraper_python(), '-c', 'import requests, bs4']`：
+#       server 启动时逐个试候选解释器，用「能否 import requests, bs4」
+#       来判断哪个解释器装得上爬虫依赖（server 自身可能跑在没装这些的
+#       解释器上）。列在这里是为了让**探测必然成功**——否则所有候选都被
+#       判为不可用，_find_scraper_python 会一路兜底到 sys.executable。
+#       真正的爬虫依赖清单在 scraper/requirements.txt（含 RapidOCR 等重项）。
+#
+#   pyyaml —— server.py:24 只 import 它读取其它 yaml；sources.yaml 的
+#       读写走 ruamel（见下）。
+#
+#   ruamel.yaml —— sources.yaml 往返必须用它（PyYAML 的 safe_load/dump
+#       会把文件里的 19 行人工注释全部丢掉）。
+#
+# 三条版本与 scraper/requirements.txt 对齐（同版本号，避免装出两套）。
 requests==2.34.2
 beautifulsoup4==4.14.2
 pyyaml==6.0.3

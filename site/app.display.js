@@ -276,8 +276,18 @@ Object.assign(APP_METHODS, {
         chinese = n === 10 ? '十' : units[n];
       } else if (n < 20) {
         chinese = '十' + units[n % 10];
-      } else {
+      } else if (n <= 99) {
         chinese = units[Math.floor(n / 10)] + '十' + units[n % 10];
+      } else {
+        // n > 99：中文数字表只覆盖到 99，units[Math.floor(100/10)] 即 units[10]
+        // 为 undefined → 旧实现会拼出 'undefined十undefined' 这种永不匹配的正则
+        // （静默失效，题目被重复追加「（第N期）」）。
+        //
+        // ⚠ 哨兵**不能用空串**：那样 new RegExp('讲座\\s*') 会匹配任何含「讲座」的
+        //   标题（如「本报告主要内容是关于讲座的总结」）→ 返回 true → 该显示期数
+        //   却被静默吞掉，把一个静默失效换成另一个静默失效（2026-10-02 实测确认）。
+        // \uFFFF 是永不可能出现在标题里的字符，用作「永不匹配」哨兵。
+        chinese = '\\uFFFF';
       }
       const t = String(title);
       const patterns = [

@@ -214,10 +214,18 @@ class ConsistencyTest(unittest.TestCase):
             self.assertEqual(b, r['b'], f'桶号不一致：条目标 {r["b"]}，实存 {b}（{key}）')
             checked += 1
         self.assertEqual(checked, len(by_key),
-                         'detail 桶里有主分片不存在的孤儿条目（键口径与 generate/app.js 分叉）')
-        # 桶号须与前端 _ltKey 口径一致：lt_key 是唯一实现，app.js 逐字对照
+                         'detail 桶里有主分片不存在的孤儿条目（键口径与前端 _ltKey 分叉）')
+        # 桶号须与前端 _ltKey 口径一致。
+        # ⚠ 这里只断言 Python 侧；真正的跨语言比对在 tests/js/app_ltkey_consistency.js
+        #   （执行真实的 site/app.data.js._ltKey 并与 lt_key 逐条比对）。前端实现在
+        #   app.data.js 而非 app.js——随前端分片拆分迁移，旧注释写 app.js 会误导定位。
         self.assertEqual(gen.lt_key({'sourceUrl': 'u', 'lectureIndex': 3}), 'u#3')
         self.assertEqual(gen.lt_key({'sourceUrl': 'u'}), 'u#')
+        # 跨语言门禁必须在两侧流水线里都跑（否则改 JS 不会被发现）
+        ltkey_js = os.path.join(ROOT, 'tests', 'js', 'app_ltkey_consistency.js')
+        self.assertTrue(os.path.exists(ltkey_js),
+                        '缺少 tests/js/app_ltkey_consistency.js —— '
+                        '_ltKey 与 lt_key 的跨语言一致性将无人守护')
 
 
 class TestGeneratedArtifactsCovered(unittest.TestCase):
