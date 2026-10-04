@@ -3,8 +3,10 @@
 """前端下发字段白名单 + 长文本分离 —— 展示层加工的单一事实源。
 
 背景（2026-09-28 首屏加载卡顿修复）：全库 3804 条的前端 JSON 里，
-`llmSelfExtract`/`qaRepaired`/`timeConfidence`/`images` 等 31 个内部审计与
+`llmSelfExtract`/`qaRepaired`/`images` 等 30 个内部审计与
 溯源字段前端**一个都没读**，却占 8.3% 原始体积（0.46MB / gzip 后约 0.15MB）。
+（例外：`timeConfidence` 于 2026-10-04 方案 A 第 5 步进入白名单——
+  前端 isDateSuspect 用它给 low 置信度记录打「日期待核」角标。）
 GitHub Pages 只支持 gzip（brotli/zstd 均不识别），编码层面已无空间，
 所以体积只能从「少传字段」和「长文本按需」两头抠。
 
@@ -33,6 +35,11 @@ FRONTEND_KEEP = frozenset({
     'sourceUrl', 'title', 'listTitle', 'topic',
     # 时间
     'lectureStart', 'lectureEnd', 'publishTime', 'timeUnknown',
+    # 时间置信度（2026-10-04 方案 A 第 5 步）：low 的记录在卡片上显示「日期待核」
+    # 角标（site/app.display.js::isDateSuspect）。此前它被白名单剥离、全链路无人
+    # 消费，年份存疑的记录被「假装确定」地分组/排序。中/高置信度也随字段下发——
+    # 体积代价约等于零（短字符串），换来筛选与排障时可直接看置信度。
+    'timeConfidence',
     # 人员
     'speaker', 'speakerAffiliation', 'speakerBio', 'host', 'participants',
     # 地点与组织

@@ -1908,8 +1908,9 @@ def is_news_record(rec, poster_page=False):
     报道或回顾，不纳入聚合。
     - 若讲座时刻「真实已知」（非占位），用「时刻」比较：发布晚于讲座即命中，
       可抓住「当天讲座、当晚发回顾」的情况（原逻辑只比日期会漏）。
-    - 若讲座时刻未知（缺省 00:00:00）或仅为铁律占位 08:00:00（页面只给日期、
-      无具体时刻，按「时间占位约定」统一填充的凌晨占位），退化为「日期」比较：
+    - 若讲座时刻「占位」（源页只给日期）：占位与否由**单一事实源**
+      field_vocab.is_placeholder_time 判定——timeUnknown 显式标注优先，
+      未标注时 00:00/08:00 视为铁律填充的占位；退化为「日期」比较：
       仅当发布日期**严格晚于**讲座日期（隔天/更晚才发）才判新闻；但发布日期
       == 讲座日期且发布时刻在当晚(>=18:00) 时，仍判为新闻——当天发布且不知
       具体时刻、又拖到晚上才发，符合事后回顾稿特征（2026-08-01 用户裁定）。
@@ -1956,12 +1957,13 @@ def is_news_record(rec, poster_page=False):
         if delta_days <= 1:
             return False
         return pub_dt.date() > ls_dt.date()
-    _zero = datetime.time(0, 0)
-    _placeholder = datetime.time(8, 0)
-    # 真实发布时间戳：时刻「真实已知」（非占位）用时刻比（抓「当晚发回顾」）；
-    # 占位 08:00（页面只给日期、按铁律统一填的凌晨占位）与 00:00 同等视为时刻
-    # 未知，退化为日期比，且发布日期 == 讲座日期时不判新闻（当天发布预告属正常）。
-    if ls_dt.time() != _zero and ls_dt.time() != _placeholder:
+    # 占位判定走单一事实源 field_vocab.is_placeholder_time（2026-10-04 收敛）：
+    # 此前这里把 00:00/08:00 写死、且不看 timeUnknown——一条**人工核实过的真实
+    # 08:00 讲座**（timeUnknown=False）会被当成「时刻未知」退化为日期比，与
+    # 前端 isTimeTBD、hybrid 时间守卫三套口径分叉（与 hybrid 历史问题同型）。
+    # 现在三条口径同源：timeUnknown 显式优先，其次按 00:00/08:00 填充约定。
+    if not _fv.is_placeholder_time(rec):
+        # 讲座时刻真实已知 → 用「时刻」比较（抓「当天讲座、当晚发回顾」）
         return pub_dt > ls_dt
     # 讲座时刻占位（只给日期、无具体时刻）：
     # 规则（2026-08-01 用户裁定）：占位 + 发布日==讲座日 + 发布在当晚(>=18:00)
@@ -2960,13 +2962,22 @@ def _cross_validate(result, url_date, ocr_text, publish_time, url_year):
         ls_d = _date_head(ls)
         if pub_d and ls_d and pub_d > ls_d:
             notes.append('cv-publish-after-lecture')
-    # CV3：结束早于开始 → 修正；时分越界 → 置空
+    # CV3：结束早于开始 → 修正；结束==开始 → 置空；时分越界 → 置空
     le = result.get('lectureEnd')
     if ls and le:
         try:
             st = datetime.datetime.fromisoformat(ls)
             en = datetime.datetime.fromisoformat(le)
-            if en < st:
+            if en == st:
+                # 「中午12:15」式单时刻页面：start/end 同值不是时长为 0，而是
+                # end 本就未知（2026-10-04 存量体检：库里曾积压 72 条这种自相
+                # 矛盾的值，63 条集中在物理学院午间沙龙）。前端只用 end 参与
+                # statusOf 且有 endRaw>start 兜底，所以此前没露馅，但任何
+                # 未来消费 end 的功能（时长、日历块、去重）都会踩。
+                # 现在出口即清空，与「end 缺失 → 前端按 start+2h 兜底」一致。
+                result['lectureEnd'] = None
+                notes.append('cv-end-eq-start-cleared')
+            elif en < st:
                 # 「晚7：30-9：00」型：区间首时刻继承了「晚/下午」的 +12h 偏移，
                 # 第二时刻没有。先尝试 end+12h——若由此得到的时长合理（≤6h），
                 # 说明是偏移缺失而非字段颠倒，修正 end 而不是 swap。
@@ -3458,10 +3469,23 @@ def _mark_time_unknown(rec):
     地点时间回填四条路径都会带上它。本函数优先采用该信号；拿不到时退回
     「是否落在占位值上」的保守判定（标 True）。
 
-    ## 不覆盖已有标注
+    ## 不覆盖已有标注 + 溯源（timeUnknownSource，2026-10-04）
 
     若记录已带 `timeUnknown`（人工标注或旧数据），一律保留不动——人工判断
     优先于自动推断，尤其在源页改版、解析器升级等场景下。
+
+    但**光保留还不够**：全量重抓（--full / 水位文件读取失败的静默降级）是从空
+    dict 重建记录，盘上继承来的标注根本到不了本函数。故本函数同时落溯源键：
+
+      timeUnknownSource = 'auto'    本函数按 _hasClock 推出的标注
+                         = 'legacy' 记录上已有、但没带来源的标注
+                                   （2026-10-03 之前爬虫不产出该字段，故那批
+                                    几乎都是人工写的；无从逐条考证，保守视为
+                                    需保留的人工判断）
+
+    另有人工脚本直接写 'human'（scripts/fix_real_8am_lectures.py 的逐页核实结果）。
+    消费方：scraper.py 全量分支按 (sourceUrl, lectureIndex) 把 source ∈
+    {human, legacy} 的标注合并回新记录；source == 'auto' 的一律以最新解析为准。
 
     参考：scraper/field_vocab.py::is_placeholder_time 是同一口径的前端/后端共用实现，
     本函数只负责**产出**该标记，判定语义以它为准（由 tests/js/app_time_placeholder.js
@@ -3470,7 +3494,9 @@ def _mark_time_unknown(rec):
     if not isinstance(rec, dict):
         return
     if 'timeUnknown' in rec:          # 已有标注（人工或旧数据）→ 不覆盖
+        rec.setdefault('timeUnknownSource', 'legacy')
         return
+    rec['timeUnknownSource'] = 'auto'
     has_clock = rec.pop('_hasClock', None)
     if has_clock is None:
         # 解析阶段未透出时钟信息 → 退回保守判定：落在占位值上或无时间即视为未知
@@ -4027,7 +4053,14 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
              #   知道但丢在了返回结构外），故此处按 start 是否为 00:00 判定——
              #   与 timeparse 的口径一致（解析到真实钟点必非 00:00）。
              'has_time': not (_rt_start.hour == 0 and _rt_start.minute == 0)}
-        result['timeConfidence'] = rt.get('confidence')
+        # 词表收敛到 {high, mid, low}（timeparse._cross_year 的规格，2026-10-04）：
+        # 库里曾出现孤儿值 'mid' 之外的 'medium'（旧版某会议路径产出，现已无产方），
+        # 而消费方 scripts/repair_backfill.py 用 startswith('high') 闸门，词表一散
+        # 就会出现「算过却没人认得」的取值。出口统一归一，未知值按保守的 mid 落库。
+        _conf = rt.get('confidence')
+        if _conf is not None and _conf not in ('high', 'mid', 'low'):
+            _conf = 'mid'
+        result['timeConfidence'] = _conf
         result['timeNote'] = rt.get('note')
     # 正文未解析出日期且含海报图片：OCR 后重试（仅补缺失，不覆盖已有）
     if not t and imgs and not vlm_fields:
@@ -4345,15 +4378,26 @@ def _extract_topic_location(_st, result, title, loc_times):
             result['location'] = _loc_fb
 
     # 把地点字段里分离出的时间区间回填到讲座时间：
-    #  - 若已有日期但时间完全缺失（00:00），用分离出的区间补全 start/end；
-    #  - 若 start 已有时间但 end 缺失，用分离出的结束时间补全 end；
+    #  - 若开始时刻是**占位**（00:00，或未标注为真时钟的 08:00），用分离出的
+    #    区间补全 start/end；
+    #  - 若 start 已是真实时刻但 end 缺失，用分离出的结束时间补全 end；
     # 这样海报中「地点: 南教-209教室14:30-17:00」式 OCR 能补全完整的起止时间。
     # 注意：回填必须在所有地点处理分支之后（loc_times 已完成填充）。
+    #
+    # 2026-10-04 口径收敛：占位判据由「只看 hour==0」改为单一事实源
+    # field_vocab.is_placeholder_time + _hasClock。此前 08:00 占位的记录会走
+    # elif 分支，只把 end 填成地点区间的结束时刻，留下「08:00-17:00」这种
+    # 半真半假的区间（start 是铁律占位、end 却像真时刻）；同分支还使 08:00
+    # 占位错失 start 补全。真实 08:00（_hasClock 为真）则不受影响——它不是
+    # 占位，仍走「只补 end」的老分支。
     if loc_times and result['lectureStart']:
         h0, m0, h1, m1 = loc_times[0]
         try:
             st = datetime.datetime.fromisoformat(result['lectureStart'])
-            if st.hour == 0 and st.minute == 0:
+            _st_is_ph = ((st.hour == 0 and st.minute == 0)
+                         or (_fv.is_placeholder_time(result)
+                             and result.get('_hasClock') is not True))
+            if _st_is_ph:
                 st = st.replace(hour=h0, minute=m0)
                 result['lectureStart'] = st.isoformat(sep=' ')
                 # 时刻来自地点文字里的「14:30-17:00」，是页面原文给出的真实时钟

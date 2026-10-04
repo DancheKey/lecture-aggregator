@@ -68,6 +68,19 @@ Object.assign(APP_METHODS, {
       const hh = d.getHours(), mm = d.getMinutes();
       return (hh === 8 || hh === 0) && mm === 0;
     },
+    // 时间置信度角标（2026-10-04 方案 A 第 5 步）。
+    //
+    // timeConfidence ∈ {high, mid, low}（单一规格见 scraper/timeparse.py::_cross_year，
+    // 由 scripts/fix_time_known_issues.py 把历史孤儿值 medium 归一为 mid）。
+    //   high 权威标签/同日/同年；mid 补年源可靠但非权威；**low 年份本身存疑**
+    //   （crossyear-uncertain 跨年窗口无法判定、publish-unparseable 发布时间不可解析）。
+    //
+    // 只有 low 才打扰用户：这些记录此前被「假装确定」地按某一年份分组、排序、筛选，
+    // 而年份恰恰是错的高风险区。mid 不显示——它属正常降级（general-page 等路径），
+    // 全量亮起来只会变成噪音。缺字段（326 条老记录）按不显示处理。
+    isDateSuspect(l) {
+      return !!l && l.timeConfidence === 'low';
+    },
     fmtDateTime(l) {
       if (!l) return '待定';
       const iso = l.lectureStart;

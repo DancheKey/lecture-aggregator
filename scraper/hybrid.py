@@ -949,7 +949,11 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                         try:
                             _le = datetime.datetime.fromisoformat(
                                 str(_le_raw).replace('T', ' ').replace('Z', ''))
-                            if _year_lo <= _le.year <= _year_hi:
+                            # end>start 守卫（2026-10-04）：此前只校验年份区间，
+                            # 模型幻觉出「end==start 或 end 早于 start」可直接入库
+                            # （库里曾积压 72 条 end==start）。不满足就不采纳，
+                            # 留着规则值/None——宁缺勿错，CV3 也会兜底清空。
+                            if _year_lo <= _le.year <= _year_hi and _le > _ls:
                                 result['lectureEnd'] = _le.isoformat(sep=' ')
                                 if 'lectureEnd' not in adopted:
                                     adopted.append('lectureEnd')

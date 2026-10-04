@@ -1,0 +1,822 @@
+# -*- coding: utf-8 -*-
+"""讲座数据质量专项扫描（2026-09-08）
+
+扫描 data/lectures.json，检测主讲人 / 单位 / 时间 / 地点四类字段的明显污染，
+产出可点击 HTML 清单（每条带源页链接，支持勾选与导出）。
+
+与 scripts/audit_fields.py 的区别：
+  - audit_fields 偏「字段完整性」体检（缺失/基本格式）
+  - 本脚本偏「值内容污染」专项（正文残段粘入、结束时间跨天、职称混入姓名等）
+
+运行： python scripts/audit_data_quality.py [--html reports/data_quality_report.html]
+"""
+import os
+import re
+import sys
+import json
+import html
+import argparse
+import datetime
+import collections
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
+sys.path.insert(0, os.path.join(ROOT, 'scraper'))
+import field_vocab as _fv  # noqa: E402  多人/判脏词表单一事实源（C2 收敛）
+
+
+def get(r, *keys):
+    """取第一个非空字段值"""
+    for k in keys:
+        v = (r.get(k) or '')
+        if isinstance(v, str):
+            v = v.strip()
+        if v:
+            return v
+    return ''
+
+
+# ---------------- 规则库 ----------------
+# 职称/职务词（姓名与单位都不该含）
+# 注：不含「研究生」——「XX研究生院」是机构名，会造成大量误报（清华深研院、工程物理研究院研究生院）
+TITLE_RE = re.compile(
+    r'(教授|副教授|研究员|副研究员|助理研究员|讲师(?!团)|院士|博士|硕士|博士后|'
+    r'老师|主任|院长|所长|书记|校长|会长|主席|主编|编辑|编委|工程师|'
+    r'博导|硕导|特聘|客座|兼职|名誉|系主任|教授级|高级教师|正高级|'
+    r'同学|女士|先生|Prof\.|Dr\.|Professor|Ph\.?D|PhD)'
+)
+# 机构词
+# 机构词（2026-09-08 补充英文：此前只认中文机构词，导致「姓名+英文单位」粘连未被检出）
+ORG_RE = re.compile(r'(大学|学院|研究所|研究院|实验室|中心|公司|集团|学会|协会|医院|中学|小学|出版社|'
+                    r'Publishing|University|Institute|Laboratory|Department|School|College|'
+                    r'Academy|Hospital|Centre|Center)')
+# 期刊/出版社（误当单位）
+# 注：不含裸「新闻」——「新闻与传播学院」是正规学院名，会误伤清华/暨大
+JOURNAL_RE = re.compile(
+    # 2026-09-10 去掉「出版社」：以「出版社」结尾的多为真实出版机构（idx371
+    # 「中国社会科学院中国社会科学出版社」经用户确认为正确单位），期刊名误当单位
+    # 的主要形态是英文刊名（Journal/Nature/Letters 等），保留英文词即可覆盖。
+    r'(Journal|Proceedings|Nature|Letters|Physical Review|'
+    r'PRB|PRL|ACS|IEEE|Elsevier|Springer|学报|杂志|期刊|日报|周报)',
+    re.I
+)
+# 含 Science 但属于合法机构/学科名的搭配，需先剔除再判期刊，
+# 否则「Southern University of Science and Technology」「Computer Science」会被误判
+SCI_OK = ('Science and Technology', 'Computer Science', 'of Science', 'School of Science',
+          'College of Science', 'Natural Science', 'Life Science', 'Space Science',
+          'Materials Science', 'Data Science', 'Social Science', 'Political Science',
+          'Environmental Science', 'Information Science', 'Cognitive Science',
+          'Fundamental Science', 'Basic Science')
+# 地点正文标签残段（说明地点抓取时吞进了正文）
+LOC_LABEL_RE = re.compile(
+    r'(主办|承办|协办|报告人|主讲人|主持人|邀请人|时间[:：]|地点[:：]|摘要|'
+    r'报告题目|内容简介|欢迎|参加|报名|您想|如何|培训对象|名额|对象[:：]|'
+    r'嘉宾|领导|议程|日程|备注|联系人|联系电话)'
+)
+# 英文头衔前缀
+EN_TITLE_RE = re.compile(r'^\s*(Prof|Doctor|Dr|Professor|Mr|Ms|Mrs|Sir|Madam)\.?\s+', re.I)
+
+
+# 英文机构词（英文机构全称天然长，长度阈值单独放宽）
+EN_ORG_RE = re.compile(
+    r'University|Institute|Laboratory|Department|School|College|'
+    r'Academy|Hospital|Centre|Center|Publishing')
+# 单位首段含机构词 → 后面的职称词属头衔描述（如「北京大学博雅荣休教授、博士生导师」），
+# 2026-09-09 经用户逐条确认为合规形态，不再标脏（真脏形态如「教授，华南师大」仍会命中）
+AFF_HEAD_OK_RE = re.compile(
+    r'^[^，,、;；]*?(大学|学院|研究院|研究所|实验室|中心|系|公司|办公室|'
+    r'University|Institute|College|School|Laboratory|Center|Centre|Academy)',
+    re.I)
+# 地点建筑词：含完整楼栋/厅室的地址属正常长形态
+# 2026-09-09 补充英文词：idx2876「Lecture Hall on the 5th floor of School of Psychology」
+# 是合法英文地点，此前因不认英文楼栋词被误报过长
+LOC_BLD_RE = re.compile(r'栋|楼|室|厅|馆|校区|校园|会议室|报告厅|大厦|'
+                        r'Hall|Floor|Building|Auditorium|Room', re.I)
+# 纯头衔占位简介（2026-09-10）：speakerBio 整体只是头衔词（如 idx171 旧值「教授」——
+# 把 Professor 头衔误当简介填入），无信息量，视为占位坏值
+# 2026-09-26 审计收敛（G4）：职称部分取 field_vocab 主表（原手抄副本缺主表的
+# 长聘教授/特任教授等），前缀型客座/讲座/兼职教授与英文头衔为本处私有补充。
+BIO_TITLE_ONLY_RE = re.compile(
+    r'^(?:' + _fv.NAME_TITLE_SUFFIX_RE.pattern
+    + r'|客座教授|讲座教授|兼职教授'
+    + r'|Professor|Associate Professor|Assistant Professor|Prof\.?|Dr\.?|Doctor)$',
+    re.I)
+
+# 全天/多日会议型标题：时长偏长多为正常议程（研讨会/论坛含签到+多场次），
+# 不再标「时长偏长」人工核对（2026-09-23 用户确认 psy/1598、psy/1840、ggy/5326 为全天会议）
+ALL_DAY_TITLE_RE = re.compile(
+    r'研讨会|论坛|峰会|年会|大会|工作坊|研修班|培训班|夏令营|'
+    r'学术会议|国际会议|交流会|报告会|系列讲座', re.I)
+
+
+def is_journal_name(a):
+    """判断是否期刊/出版社误当单位。
+    先剔除含 Science 的合法机构/学科名搭配，避免误伤
+    「Southern University of Science and Technology」「Department of Computer Science」等。
+    """
+    t = a
+    for ok in SCI_OK:
+        t = t.replace(ok, '')
+    return bool(JOURNAL_RE.search(t))
+
+
+def has_unclosed_paren(s):
+    return s.count('(') != s.count(')') or s.count('（') != s.count('）')
+
+
+# ---------------- 可修性判定 ----------------
+# auto   = 规则明确，可批量自动清洗（低风险）
+# manual = 能修，但需人工回源页确认真实值，自动有臆造风险
+# nfix   = 源页本身无信息 / 当前值属合规正常形态（不是错误），不建议改
+FIX_RULES = [
+    (r'^姓名含职称', 'auto', '去掉职称/职务词，保留纯姓名'),
+    (r'^英文名带头衔', 'auto', '去掉 Prof./Dr. 等英文头衔前缀，保留姓名'),
+    (r'^姓名混入日期', 'auto', '截断「日期」及其后残片，保留姓名'),
+    (r'^姓名含换行', 'auto', '换行/制表符替换为空格'),
+    (r'^姓名含机构名', 'auto', '把括号里的机构名移到单位字段，姓名取括号前部分'),
+    (r'^姓名过长', 'manual', '回源页确认真实姓名（复姓、长英文名可能是正常的）'),
+    (r'^括号未闭合', 'manual', '抓取被截断，需回源页重新解析（自动补全有臆造风险）'),
+    (r'^单位中含主讲人姓名', 'auto', '去掉姓名前缀，保留机构名'),
+    (r'^单位含换行', 'auto', '换行替换为空格'),
+    (r'^单位含职称', 'manual', '回源页确认真实单位'),
+    (r'^疑似期刊', 'nfix', '讲者确属期刊/出版社（如 Nature 编辑）时为合法值；需精确单位可回源页'),
+    (r'^单位过长', 'manual', '人工判断是否为真实长机构名（如带重点实验室后缀）'),
+    (r'^英文单词粘连', 'manual', '人工恢复空格（自动加空格易切错单词边界）'),
+    (r'^时间格式非法', 'manual', '回源页重新解析时间'),
+    (r'^年份异常', 'manual', '回源页核对年份'),
+    (r'^占位时刻', 'auto', '标记 timeUnknown=true，前端按「时刻未知」处理'),
+    (r'^结束时间早于开始时间', 'auto', '结束时间不可信，置空'),
+    (r'^结束时间与开始时间相同', 'auto', '时长为 0 不是真实区间，置空结束时间'),
+    (r'^时长异常', 'auto', '结束时间抓错（跨天/跨月），置空结束时间'),
+    (r'^时长偏长', 'manual', '可能是全天会议/多日议程，回源页确认'),
+    (r'^置信度 high', 'manual', '回源页核对讲座年份（常见为标签年份差一年）；'
+                                '确认后修正 lectureStart 或把 timeConfidence 降为 mid/low'),
+    (r'^地点含换行', 'auto', '换行替换为空格'),
+    (r'^地点含正文标签', 'auto', '截断到「主办/报告人/时间:」等标签之前'),
+    (r'^地点含长串英文', 'auto', '截断到长串英文之前（英文为报告题目误入）'),
+    (r'^地点过长', 'manual', '人工截断（正文边界不固定，自动截断易截错）'),
+    (r'^地点偏长', 'manual', '人工确认是否为完整地址'),
+    (r'^发布日期晚于讲座日', 'manual', '疑似回顾稿/新闻稿：按规则应删除而非修复，需人工确认'),
+]
+
+FIX_LABEL = {'auto': ('可自动修', 'fx-a'),
+             'manual': ('需人工核对', 'fx-m'),
+             'nfix': ('无法修 / 无需修', 'fx-n')}
+
+
+def fixability(cat, desc, val=''):
+    """返回 (kind, 修复建议)"""
+    v = str(val or '')
+    if cat == '缺失':
+        return 'nfix', ('源页未提供则无法凭空补；可回源页重解析或用 LLM/VLM 补录，'
+                        '若源页本身未写则确实无法修')
+    # 院士称号+机构名是项目规则允许的合规写法，不是污染
+    if desc.startswith('单位含职称') and re.search(r'院士\s*$', v):
+        return 'nfix', ('院士称号+机构名属项目规则允许的合规写法（如「中国科学院院士，清华大学」），'
+                        '不是错误，无需修改')
+    # 姓名混机构名：有括号时可自动拆，无括号分隔则需人工
+    if desc.startswith('姓名含机构名') and not (('(' in v) or ('（' in v)):
+        return 'manual', '姓名里混了机构名但无括号分隔，需人工拆分出真实姓名'
+    for pat, kind, advice in FIX_RULES:
+        if re.match(pat, desc):
+            return kind, advice
+    return 'manual', '需人工回源页核对'
+
+
+# ---------------- 缺失字段人工复核裁定（2026-09-23） ----------------
+# 依据 scripts/verify_missing_fields.py 对 335 条缺失项逐条核源页的结果，
+# 再经人工剔除假阳性（fallback 误命中页面导航栏 / 议程项、label 取到正文句子）
+# 后固化到此处。三类：
+#   fixable = 源页确有该字段、系规则漏抓，建议按 advice 补录
+#   manual  = 源页有线索但真实值需人工确认
+#   nfix    = 源页未提供该字段 / 无法确认（默认归类，保持为空即可）
+# 未在此映射中的缺失项一律视为 nfix。
+MISSING_REVIEW = {
+    # 已按用户确认写回 data/lectures.json，不再列入「需处理」
+    ('http://psy.scnu.edu.cn/a/20181024/1598.html', 'speakerAffiliation'):
+        ('nfix', '华南师范大学心理学院',
+         '用户已确认并写回：认知控制研讨会（多嘉宾大会）主办学院'),
+    ('http://psy.scnu.edu.cn/a/20161019/1117.html', 'speakerAffiliation'):
+        ('nfix', '华南师范大学心理学院',
+         '用户已确认并写回：第一届认知控制研讨会主办学院'),
+    ('https://physics.scnu.edu.cn/a/20101118/787.html', 'speakerAffiliation'):
+        ('nfix', '华南师范大学材料物理团队',
+         '用户已确认并写回：讲者为南师材料物理团队'),
+    ('http://swc.scnu.edu.cn/collaborative/2023/1101/46.html', 'location'):
+        ('nfix', '华南师范大学汕尾校区',
+         '用户已确认并写回'),
+    ('http://io.scnu.edu.cn/a/20201015/1555.html', 'location'):
+        ('nfix', '华南师范大学大学城校区国际会议厅',
+         '用户已确认并写回'),
+    ('http://music.scnu.edu.cn/news/events/2020/0630/673.html', 'location'):
+        ('nfix', '',
+         '用户确认：线上音乐会，无需地点，保持为空'),
+    # 用户确认无法判断，保持为空
+    ('https://physics.scnu.edu.cn/a/20211008/11723.html', 'speakerAffiliation'):
+        ('nfix', '',
+         '用户确认无法判断，保持为空（疑为组织方而非讲者单位）'),
+    ('https://physics.scnu.edu.cn/a/20101124/788.html', 'speakerAffiliation'):
+        ('nfix', '',
+         '用户确认无法判断，保持为空（疑为主办方南师团队）'),
+}
+
+
+def missing_kind(it, verify_map=None):
+    """缺失项最终裁定：优先用 verify_missing_fields.py 的逐条复核结果；
+    其次命中 MISSING_REVIEW；否则默认 nfix。
+    返回 (kind, advice, value)"""
+    r = it[5]
+    key = (r.get('sourceUrl') or '', it[1])
+
+    # 1) 动态读取复核结果（ freshest 裁定）
+    if verify_map is None:
+        verify_map = _load_verify_map()
+    v = verify_map.get(key)
+    if v:
+        kind = v.get('fix_kind', 'nfix')
+        advice = v.get('reason') or {
+            'fixable': '源页明确包含该字段，建议按建议值补录',
+            'manual': '源页有线索但真实值需人工确认',
+            'nfix': '源页未提供该字段，保持为空即可'
+        }.get(kind, '需人工判断')
+        value = v.get('evidence') or ''
+        return kind, advice, value
+
+    # 2) fallback 到写死的 MISSING_REVIEW（复核结果文件缺失时仍可工作）
+    hit = MISSING_REVIEW.get(key)
+    if hit:
+        return hit[0], hit[2], hit[1]
+    return 'nfix', '源页未提供该字段，保持为空即可', ''
+
+
+def _load_verify_map():
+    """加载 .workbuddy/missing_verify_result.json，返回 {(url,field): record}。"""
+    vp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      '.workbuddy', 'missing_verify_result.json')
+    try:
+        data = json.load(open(vp, encoding='utf-8'))
+        return {(r.get('url'), r.get('field')): r for r in data}
+    except Exception:
+        return {}
+
+
+def scan(recs):
+    """返回 issues: [(分类, 字段, 严重度, 问题描述, 当前值, 记录)]"""
+    issues = []
+
+    for i, r in enumerate(recs):
+        url = r.get('sourceUrl') or ''
+        spk = get(r, 'speaker')
+        aff = get(r, 'speakerAffiliation', 'affiliation')
+        loc = get(r, 'location')
+        st = get(r, 'lectureStart')
+        en = get(r, 'lectureEnd')
+
+        # ---------- 主讲人 ----------
+        if not spk:
+            issues.append(('缺失', 'speaker', '低', '主讲人为空', '(空)', r))
+        else:
+            if TITLE_RE.search(spk):
+                issues.append(('主讲人', 'speaker', '高', '姓名含职称/职务', spk, r))
+            if ORG_RE.search(spk):
+                issues.append(('主讲人', 'speaker', '高', '姓名含机构名', spk, r))
+            if re.search(r'日期|\d{1,2}月\d{1,2}日', spk):
+                issues.append(('主讲人', 'speaker', '高', '姓名混入日期残片', spk, r))
+            if has_unclosed_paren(spk):
+                issues.append(('主讲人', 'speaker', '高', '括号未闭合（抓取截断）', spk, r))
+            if EN_TITLE_RE.match(spk):
+                issues.append(('主讲人', 'speaker', '中', '英文名带头衔前缀', spk, r))
+            # 外文音译名含「·」为正常形态（如「克里斯蒂安·盖勒兰」），不按过长误报
+            # 多人豁免走 field_vocab.is_multi_speaker_clean（C2 收敛，与 audit_fields/hybrid 同源）
+            if len(spk) > 6 and re.search(r'[一-鿿]', spk) \
+                    and '·' not in spk and not _fv.is_multi_speaker_clean(spk):
+                issues.append(('主讲人', 'speaker', '中', f'姓名过长({len(spk)}字)，疑似混入其他内容', spk, r))
+            if '\n' in spk or '\t' in spk:
+                issues.append(('主讲人', 'speaker', '高', '姓名含换行/制表符', spk, r))
+
+        # ---------- 单位 ----------
+        if not aff:
+            issues.append(('缺失', 'speakerAffiliation', '低', '单位为空', '(空)', r))
+        else:
+            # 首段含机构词时，职称词属头衔描述（「北京大学博雅荣休教授」），不标
+            if TITLE_RE.search(aff) and not AFF_HEAD_OK_RE.search(aff):
+                issues.append(('单位', 'speakerAffiliation', '高', '单位含职称/学位', aff, r))
+            # 期刊/出版社编辑任职场景（idx295「与Nature Ecology & Evolution 编辑面对面」，
+            # 讲者是期刊编辑，期刊名即雇主单位）→ 合法值，豁免
+            if is_journal_name(aff) and not re.search(r'编辑', (r.get('title') or '')):
+                issues.append(('单位', 'speakerAffiliation', '高', '疑似期刊/出版社误当单位', aff, r))
+            if spk and spk in aff:
+                issues.append(('单位', 'speakerAffiliation', '高', '单位中含主讲人姓名', aff, r))
+            if has_unclosed_paren(aff):
+                issues.append(('单位', 'speakerAffiliation', '中', '括号未闭合（抓取截断）', aff, r))
+            # 英文机构全称天然长（阈值 130：联合学院/双机构全称如 idx1879 的
+            # 「Aberdeen - South China Normal University (SCNU) Joint Institute / ...」123 字
+            # 为真实全称）；中文多机构并列/重点实验室后缀也常见（45）
+            aff_len_limit = 130 if EN_ORG_RE.search(aff) else 45
+            if len(aff) > aff_len_limit:
+                issues.append(('单位', 'speakerAffiliation', '中', f'单位过长({len(aff)}字)', aff, r))
+            # 英文单词粘连：连续 >18 个字母且无空格
+            if re.search(r'[A-Za-z]{18,}', aff) and ' ' not in aff.strip():
+                issues.append(('单位', 'speakerAffiliation', '中', '英文单词粘连（空格丢失）', aff, r))
+            if '\n' in aff:
+                issues.append(('单位', 'speakerAffiliation', '高', '单位含换行', aff, r))
+
+        # ---------- 简介 ----------
+        bio = (r.get('speakerBio') or '').strip()
+        if bio and BIO_TITLE_ONLY_RE.match(bio):
+            issues.append(('简介', 'speakerBio', '中',
+                           '简介仅为头衔词，疑似占位坏值（真实简介应含人物经历）', bio, r))
+
+        # ---------- 时间 ----------
+        if not st:
+            issues.append(('缺失', 'lectureStart', '低', '讲座开始时间缺失', '(空)', r))
+        else:
+            m = re.match(r'^(\d{4})-(\d{2})-(\d{2})', st)
+            if not m:
+                issues.append(('时间', 'lectureStart', '高', '时间格式非法', st, r))
+            else:
+                y = int(m.group(1))
+                # 数据实际覆盖 2009~2026，故 <2005 才判异常（避免把真实老讲座误报）
+                if y < 2005 or y > 2031:
+                    issues.append(('时间', 'lectureStart', '高', f'年份异常({y})', st, r))
+                hm = st[11:16] if len(st) >= 16 else ''
+                # 2026-10-04 修口径：原判据是 `not r.get('timeUnknown')`，把
+                # **人工确认为真时间**的 timeUnknown=False 也当「未标记」——
+                # fix_real_8am_lectures.py 核实的 2 条真 08:00 讲座因此天天报中危。
+                # 现在只在「值是占位、且根本没打标注」时才报（单一事实源见
+                # field_vocab.is_placeholder_time）；标了 True 是正确标注，标了
+                # False 是人工裁定的真时刻，两者都不该告警。
+                if hm in ('00:00', '08:00') and r.get('timeUnknown') is None:
+                    issues.append(('时间', 'lectureStart', '中', f'占位时刻 {hm} 但未标记 timeUnknown', st, r))
+            if en:
+                try:
+                    ds = datetime.datetime.strptime(st[:19], '%Y-%m-%d %H:%M:%S')
+                    de = datetime.datetime.strptime(en[:19], '%Y-%m-%d %H:%M:%S')
+                    delta_h = (de - ds).total_seconds() / 3600.0
+                    if delta_h < 0:
+                        issues.append(('时间', 'lectureEnd', '高', '结束时间早于开始时间', f'{st} → {en}', r))
+                    elif delta_h == 0:
+                        # 2026-10-04 补档：此前只报 <0 / >24 / 8~24 三档，
+                        # end==start（库里曾积压 72 条，63 条为物理学院午间沙龙
+                        # 「12:15-12:15」）落不进任何一档，对体检完全隐身。
+                        issues.append(('时间', 'lectureEnd', '中',
+                                       '结束时间与开始时间相同（时长为 0）', f'{st} → {en}', r))
+                    elif delta_h > 24:
+                        issues.append(('时间', 'lectureEnd', '高',
+                                       f'时长异常({delta_h:.0f}小时)，疑似把页面其他日期当成结束时间',
+                                       f'{st} → {en}', r))
+                    elif delta_h > 8:
+                        # 2026-09-10 降级「中」→「低」：同日 8~24h 基本是全天论坛/工作坊，
+                        # 误抓场景（把其他日期当结束）通常 >24h，已由上一档单独报「高」。
+                        # 2026-09-23：标题含全天/多日会议型词（研讨会/论坛/大会等）视作正常
+                        # 议程，不再标人工核对（用户确认 psy/1598、psy/1840、ggy/5326 为全天会议）。
+                        _ttl = get(r, 'title') or ''
+                        if ALL_DAY_TITLE_RE.search(_ttl):
+                            pass
+                        else:
+                            issues.append(('时间', 'lectureEnd', '低',
+                                           f'时长偏长({delta_h:.1f}小时)，可能是全天会议或误抓',
+                                           f'{st} → {en}', r))
+                except Exception:
+                    pass
+            # 高置信度 ↔ CV 异常信号互相矛盾（2026-10-04 新增）：
+            # cv-publish-after-lecture 说明「发布时间晚于讲座日」。当差值很大
+            # （≥30 天，典型是恰好 365 天）时几乎必是**讲座年份差了一年**——
+            # 源页标签把年份写错，此时 timeConfidence 仍是 high，等于异常信号
+            # 算了却没人降级。
+            # 例外①：差值 <30 天属「活动后补发页面」的正常现象，不告警
+            #   （实测 3 条 0~4 天的记录全是这种情况，报了只会变成噪音）。
+            # 例外②：timeNote 带 cv-verified-published-late 的已回源页核过，
+            #   是「页面确实晚发」而非「讲座年份错」，不再重复告警。
+            _conf = r.get('timeConfidence')
+            _tn = str(r.get('timeNote') or '')
+            if _conf == 'high' and 'cv-publish-after-lecture' in _tn \
+                    and 'cv-verified-published-late' not in _tn:
+                try:
+                    _gap = (datetime.datetime.strptime(r.get('publishTime')[:10], '%Y-%m-%d')
+                            - datetime.datetime.strptime(st[:10], '%Y-%m-%d')).days
+                except Exception:
+                    _gap = 0
+                if _gap >= 30:
+                    issues.append(('时间', 'timeConfidence', '中',
+                                   f'置信度 high 但已命中 cv-publish-after-lecture'
+                                   f'（发布晚于讲座 {_gap} 天，疑似错年）',
+                                   f"high | 讲座 {st} | 发布 {r.get('publishTime') or ''}", r))
+            # 词表越界：timeparse 规格只认 high/mid/low（曾出现孤儿值 medium）
+            if _conf is not None and _conf not in ('high', 'mid', 'low'):
+                issues.append(('时间', 'timeConfidence', '中',
+                               f'置信度取值越界({_conf})，应为 high/mid/low', str(_conf), r))
+
+        # ---------- 地点 ----------
+        if not loc:
+            issues.append(('缺失', 'location', '低', '地点缺失', '(空)', r))
+        else:
+            # 含建筑词且 ≤60 字 = 完整地址正常形态，豁免长度检查（正文标签仍单独检）
+            # 线上会议完整形态（腾讯会议+会议ID/链接，忽略空格差异）同样豁免
+            # （idx1141「会议 ID+密码」、idx2224/2243「会议ID+链接」均为合法长形态）
+            online_ok = '腾讯会议' in loc and (
+                '会议ID' in loc.replace(' ', '') or 'meeting.tencent.com' in loc)
+            bld_ok = (bool(LOC_BLD_RE.search(loc)) and len(loc) <= 60) or online_ok
+            if len(loc) > 40 and not bld_ok:
+                issues.append(('地点', 'location', '高', f'地点过长({len(loc)}字)，疑似正文段落混入', loc, r))
+            elif len(loc) > 30 and not bld_ok:
+                issues.append(('地点', 'location', '中', f'地点偏长({len(loc)}字)', loc, r))
+            if LOC_LABEL_RE.search(loc):
+                issues.append(('地点', 'location', '高', '地点含正文标签/正文句子', loc, r))
+            if re.search(r'[A-Za-z]{25,}', loc):
+                issues.append(('地点', 'location', '高', '地点含长串英文（疑似标题混入）', loc, r))
+            if '\n' in loc:
+                issues.append(('地点', 'location', '中', '地点含换行', loc, r))
+
+        # ---------- 跨字段 ----------
+        pt = get(r, 'publishTime')
+        if pt and st and len(pt) >= 10 and len(st) >= 10:
+            try:
+                d = (datetime.datetime.strptime(pt[:10], '%Y-%m-%d') -
+                     datetime.datetime.strptime(st[:10], '%Y-%m-%d')).days
+                if d > 1:
+                    # 2026-09-10 降级「中」→「低」：发布晚于讲座日是回顾性报道的
+                    # 正常现象，仅提示非污染。
+                    issues.append(('跨字段', 'publishTime', '低',
+                                   f'发布日期晚于讲座日 {d} 天（疑似回顾稿/新闻）', f'{pt[:10]} vs {st[:10]}', r))
+            except Exception:
+                pass
+
+    return issues
+
+
+def build_html(recs, issues, out_path):
+    by_cat = collections.defaultdict(list)
+    for it in issues:
+        by_cat[it[0]].append(it)
+
+    sev_rank = {'高': 0, '中': 1, '低': 2}
+    for k in by_cat:
+        by_cat[k].sort(key=lambda x: (sev_rank.get(x[2], 9), x[3]))
+
+    missing = by_cat.get('缺失', [])
+    pollute = [it for it in issues if it[0] != '缺失']
+    total_high = sum(1 for it in pollute if it[2] == '高')
+    total_mid = sum(1 for it in pollute if it[2] == '中')
+    # 涉及多少条不同记录（仅污染类）
+    n_recs = len({it[5].get('sourceUrl') for it in pollute})
+    n_missing = len(missing)
+    # 可修性统计（仅针对污染类；缺失类统一归为 nfix，在统计区单独说明）
+    fx_cnt = collections.Counter()
+    for it in pollute:
+        k, _ = fixability(it[0], it[3], it[4])
+        fx_cnt[k] += 1
+
+    CSS = """
+    body{font-family:"Microsoft YaHei",sans-serif;max-width:1200px;margin:24px auto;
+         padding:0 16px;color:#1a1a1a;background:#fff;line-height:1.6}
+    h1{font-size:22px;margin-bottom:6px}
+    .sub{color:#888;font-size:13px;margin-bottom:18px}
+    h2{font-size:17px;margin-top:32px;border-left:4px solid #c33;padding-left:10px}
+    .cards{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
+    .card{flex:1;min-width:130px;border:1px solid #e5e5e5;border-radius:8px;padding:12px 14px;background:#fafafa}
+    .card .n{font-size:24px;font-weight:700}
+    .card .l{font-size:12px;color:#666;margin-top:2px}
+    .card.h .n{color:#c33} .card.m .n{color:#c98a00} .card.k .n{color:#0a7d3e}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+    th,td{border:1px solid #e0e0e0;padding:7px 9px;text-align:left;vertical-align:top}
+    th{background:#f5f5f5;font-weight:600;position:sticky;top:0}
+    tr:nth-child(even) td{background:#fcfcfc}
+    .sev{font-weight:700;white-space:nowrap}
+    .sev.高{color:#c33} .sev.中{color:#c98a00}
+    .val{color:#333;word-break:break-all;max-width:430px}
+    .mini{color:#888;font-size:12px}
+    a{color:#1668dc;text-decoration:none} a:hover{text-decoration:underline}
+    .chk{width:16px;height:16px;cursor:pointer}
+    .bar{position:sticky;top:0;background:#fff;padding:10px 0;border-bottom:1px solid #eee;
+         margin-bottom:10px;z-index:5}
+    button{font-family:inherit;font-size:13px;padding:6px 14px;border:1px solid #ccc;
+           background:#fff;border-radius:5px;cursor:pointer;margin-right:8px}
+    button:hover{background:#f0f0f0}
+    .note{background:#fffbe6;border:1px solid #ffe58f;padding:10px 14px;
+          border-radius:6px;margin:14px 0;font-size:13px}
+    h3{font-size:15px;margin:20px 0 6px}
+    .fx-a{color:#0a7d3e} .fx-m{color:#c98a00} .fx-n{color:#999}
+    h3.fx-a{border-left:4px solid #0a7d3e;padding-left:8px}
+    h3.fx-m{border-left:4px solid #c98a00;padding-left:8px}
+    h3.fx-n{border-left:4px solid #bbb;padding-left:8px}
+    .fxtag{font-weight:700;font-size:12px;white-space:nowrap}
+    details{margin:14px 0} summary{cursor:pointer;font-weight:600;color:#1668dc;
+            padding:6px 0}
+    .adv{color:#666;font-size:12px}
+    """
+
+    parts = ['<!doctype html><html lang="zh"><head><meta charset="utf-8">',
+             '<title>讲座数据质量专项扫描报告</title><style>%s</style></head><body>' % CSS]
+    parts.append('<h1>讲座数据质量专项扫描报告</h1>')
+    parts.append('<div class="sub">数据源 data/lectures.json · 共 %d 条记录 · 生成时间 %s</div>'
+                 % (len(recs), datetime.datetime.now().strftime('%Y-%m-%d %H:%M')))
+
+    parts.append('<div class="cards">')
+    parts.append('<div class="card h"><div class="n">%d</div><div class="l">高优先级问题</div></div>' % total_high)
+    parts.append('<div class="card m"><div class="n">%d</div><div class="l">中优先级问题</div></div>' % total_mid)
+    parts.append('<div class="card k"><div class="n">%d</div><div class="l">可自动修</div></div>'
+                 % fx_cnt.get('auto', 0))
+    parts.append('<div class="card m"><div class="n">%d</div><div class="l">需人工核对</div></div>'
+                 % fx_cnt.get('manual', 0))
+    parts.append('<div class="card"><div class="n">%d</div><div class="l">无法修/无需修</div></div>'
+                 % fx_cnt.get('nfix', 0))
+    parts.append('<div class="card"><div class="n">%d</div><div class="l">字段缺失项</div></div>' % n_missing)
+    parts.append('</div>')
+
+    parts.append('<div class="note"><b>分级说明</b>：'
+                 '<span class="sev 高">高</span> = 值内容被明显污染（正文残段、职称混入姓名、结束时间跨天等），建议修正；'
+                 '<span class="sev 中">中</span> = 疑似问题或轻度不规范，需人工确认。'
+                 '每行「当前值」即数据库里的原始内容，点「源页」可直接打开原通知核对。</div>')
+    parts.append('<div class="note"><b>可修性图例</b>：'
+                 '<span class="fxtag fx-a">可自动修</span> = 规则明确、可批量清洗，误伤风险低；'
+                 '<span class="fxtag fx-m">需人工核对</span> = 能修，但要回源页确认真实值，'
+                 '自动补全有臆造风险；'
+                 '<span class="fxtag fx-n">无法修 / 无需修</span> = 源页本身未提供该信息，'
+                 '或当前值是合规写法（并非错误）。'
+                 '每个类别下先给「问题类型 → 条数 → 修复建议」，再逐条列出当前值与源页链接。</div>')
+
+    parts.append('<div class="bar"><button onclick="selAll(true)">全选</button>'
+                 '<button onclick="selAll(false)">全不选</button>'
+                 '<button onclick="expSel()">导出选中为 CSV</button>'
+                 '<span id="cnt" class="mini"></span></div>')
+
+    order = ['主讲人', '单位', '时间', '地点', '跨字段']
+    for cat in order:
+        lst = by_cat.get(cat, [])
+        if not lst:
+            continue
+        nh = sum(1 for x in lst if x[2] == '高')
+        parts.append('<h2>%s（%d 项，其中高优先级 %d）</h2>' % (cat, len(lst), nh))
+
+        # 本类可修性概览
+        fxstat = collections.Counter()
+        for x in lst:
+            k, _ = fixability(x[0], x[3], x[4])
+            fxstat[k] += 1
+        segs = []
+        for k in ('auto', 'manual', 'nfix'):
+            if fxstat.get(k):
+                lab, cls = FIX_LABEL[k]
+                segs.append('<span class="fxtag %s">%s %d 条</span>' % (cls, lab, fxstat[k]))
+        parts.append('<div class="note">本类构成：' + '　'.join(segs) + '</div>')
+
+        for k in ('auto', 'manual', 'nfix'):
+            sub = [x for x in lst if fixability(x[0], x[3], x[4])[0] == k]
+            if not sub:
+                continue
+            lab, cls = FIX_LABEL[k]
+            parts.append('<h3 class="%s">%s（%d 条）</h3>' % (cls, lab, len(sub)))
+
+            # 档内「问题类型 → 条数 → 修复建议」聚合（把数字归一，便于归并同一类问题）
+            agg = collections.Counter()
+            advice_of = {}
+            for x in sub:
+                key = re.sub(r'\d+', 'N', x[3])
+                agg[key] += 1
+                advice_of[key] = fixability(x[0], x[3], x[4])[1]
+            parts.append('<table><tr><th style="width:190px">问题类型</th>'
+                         '<th style="width:56px">条数</th><th>修复建议</th></tr>')
+            for key, n in agg.most_common():
+                parts.append('<tr><td>%s</td><td><b>%d</b></td><td class="adv">%s</td></tr>'
+                             % (html.escape(key), n, html.escape(advice_of[key])))
+            parts.append('</table>')
+
+            # 逐条明细：每条都带源页链接，便于人工回源核对
+            parts.append('<table><tr><th style="width:34px"></th><th style="width:44px">级别</th>'
+                         '<th style="width:150px">问题</th><th class="val">当前值</th>'
+                         '<th style="width:120px">学院</th><th style="width:110px">主讲人</th>'
+                         '<th style="width:100px">讲座时间</th><th style="width:60px">源页</th></tr>')
+            for _, field, sev, desc, val, r in sub:
+                url = r.get('sourceUrl') or ''
+                idx = r.get('__dbg_idx', '')
+                esc = lambda x: html.escape(str(x or ''))
+                parts.append(
+                    '<tr data-url="%s" data-cat="%s" data-sev="%s" data-fix="%s" data-desc="%s">'
+                    '<td><input type="checkbox" class="chk"></td>'
+                    '<td><span class="sev %s">%s</span></td>'
+                    '<td>%s<div class="mini">数据 idx %s</div></td>'
+                    '<td class="val">%s</td>'
+                    '<td>%s</td><td>%s</td><td>%s</td>'
+                    '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
+                    % (esc(url), esc(cat), esc(sev), esc(lab), esc(desc),
+                       esc(sev), esc(sev), esc(desc), esc(idx), esc(val[:300]),
+                       esc(r.get('college')), esc(r.get('speaker')),
+                       esc((r.get('lectureStart') or '')[:10]), esc(url))
+                )
+            parts.append('</table>')
+
+    # ---------- 缺失统计区（人工复核裁定：需处理 vs 源页未提供） ----------
+    # 依据 scripts/verify_missing_fields.py 逐条核源页 + 人工剔除假阳性（见 MISSING_REVIEW）。
+    # 目标：让用户只聚焦真正需判断的少数条（可补录/需人工），"源页未提供"的大头折叠收起。
+    if missing:
+        per_field = collections.Counter(it[1] for it in missing)
+        FIELD_CN = {'speaker': '主讲人', 'speakerAffiliation': '主讲人单位',
+                    'lectureStart': '讲座开始时间', 'location': '讲座地点'}
+        # 给每条缺失项打最终裁定，分「需处理（fixable/manual）」与「源页未提供（nfix）」
+        verify_map = _load_verify_map()
+        need_fix, nfix_items = [], []
+        for it in missing:
+            k, advice, val = missing_kind(it, verify_map)
+            (need_fix if k in ('fixable', 'manual') else nfix_items).append((it, k, advice, val))
+        kind_label = {'fixable': '可补录', 'manual': '需人工', 'nfix': '无法修 / 无需修'}
+        kind_cls = {'fixable': 'fx-a', 'manual': 'fx-m', 'nfix': 'fx-n'}
+
+        parts.append('<h2>字段缺失统计（%d 项，含人工复核裁定）</h2>' % n_missing)
+        parts.append('<div class="note">缺失项没有「当前值」可核对。已对全部缺失项逐条核源页并人工剔除假阳性：'
+                     '<b>需处理的见下方「可补录 / 需人工」清单，共 %d 条</b>'
+                     '（建议补录 %d、待人工确认 %d）；'
+                     '其余 <b>%d 条按可信度分两层列出</b>（已扫描确认未提供 / 源页未抓取·无法判定，'
+                     '详见下方折叠区；后者可能含漏抓，需重抓源页确认）。</div>'
+                     % (len(need_fix),
+                        sum(1 for x in need_fix if x[1] == 'fixable'),
+                        sum(1 for x in need_fix if x[1] == 'manual'),
+                        len(nfix_items)))
+
+        # 字段分布表
+        parts.append('<table><tr><th>缺失字段</th><th>缺失条数</th><th>占总记录比</th></tr>')
+        for f, n in per_field.most_common():
+            parts.append('<tr><td>%s</td><td><b>%d</b></td><td>%.1f%%</td></tr>'
+                         % (FIELD_CN.get(f, f), n, 100.0 * n / len(recs)))
+        parts.append('</table>')
+
+        # 需处理清单（fixable + manual）——重点，默认展开
+        if need_fix:
+            need_fix.sort(key=lambda x: (x[1] != 'fixable', x[0][1]))  # fixable 在前，manual 在后
+            parts.append('<h3 class="fx-m">需处理：可补录 / 需人工（%d 条）</h3>' % len(need_fix))
+            parts.append('<table><tr><th style="width:34px"></th><th style="width:80px">裁定</th>'
+                         '<th style="width:110px">缺失字段</th><th class="val">建议值 / 待确认</th>'
+                         '<th style="width:280px">裁定说明</th><th style="width:120px">学院</th>'
+                         '<th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>')
+            for it, k, advice, val in need_fix:
+                field, r = it[1], it[5]
+                url = r.get('sourceUrl') or ''
+                esc = lambda x: html.escape(str(x or ''))
+                parts.append(
+                    '<tr data-url="%s" data-cat="缺失" data-sev="低" data-fix="%s" data-desc="%s">'
+                    '<td><input type="checkbox" class="chk"></td>'
+                    '<td><span class="fxtag %s">%s</span></td>'
+                    '<td>%s<div class="mini">数据 idx %s</div></td>'
+                    '<td class="val"><b>%s</b></td>'
+                    '<td class="adv">%s</td>'
+                    '<td>%s</td><td>%s</td>'
+                    '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
+                    % (esc(url), esc(kind_label[k]), '需处理',
+                       kind_cls[k], esc(kind_label[k]),
+                       esc(FIELD_CN.get(field, field)), esc(r.get('__dbg_idx', '')),
+                       esc(val if val else '(需回源页确认)'), esc(advice),
+                       esc(r.get('college')), esc((r.get('lectureStart') or '')[:10]), esc(url))
+                )
+            parts.append('</table>')
+
+        # 源页未提供（nfix）——按判定可信度分两层：
+        #   已扫描确认（源页文本已拿到且确认无字段）/ 源页未抓取（fetch_failed，无法判定，可能含漏抓）
+        if nfix_items:
+            esc = lambda x: html.escape(str(x or ''))
+            # 软依赖 verify 脚本中间结果，建立 (url,field)->detect_method
+            _vm = {}
+            _vp = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               '.workbuddy', 'missing_verify_result.json')
+            if os.path.exists(_vp):
+                try:
+                    for _r in json.load(open(_vp, encoding='utf-8')):
+                        _vm[(_r.get('url'), _r.get('field'))] = _r.get('detect_method')
+                except Exception:
+                    _vm = {}
+            def _nf_method(it):
+                return _vm.get((it[0][5].get('sourceUrl'), it[0][1])) or 'scan'
+            nf_fields = [f for f, _ in collections.Counter(
+                x[0][1] for x in nfix_items).most_common()]
+            scanned = [x for x in nfix_items if _nf_method(x) != 'fetch_failed']
+            ungot   = [x for x in nfix_items if _nf_method(x) == 'fetch_failed']
+
+            parts.append('<details><summary>源页未提供 / 无需补（%d 条，默认保持为空，已折叠）</summary>'
+                         % len(nfix_items))
+
+            # —— 已扫描确认组：源页文本已拿到，确实无该字段 ——
+            if scanned:
+                parts.append('<div class="note">以下缺失项已拿到源页文本并扫描确认：源页本身未提供该字段，'
+                             '无需人工补录；按字段分列，展开可逐条核对源页。</div>')
+                for f in nf_fields:
+                    sub = [x for x in scanned if x[0][1] == f]
+                    if not sub:
+                        continue
+                    parts.append('<details><summary class="fx-n">%s 缺失 · 已扫描确认未提供（%d 条）</summary>'
+                                 % (FIELD_CN.get(f, f), len(sub)))
+                    parts.append('<table><tr><th style="width:34px"></th><th style="width:120px">学院</th>'
+                                 '<th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>')
+                    for it, k, advice, val in sub:
+                        url = it[5].get('sourceUrl') or ''
+                        r = it[5]
+                        parts.append(
+                            '<tr data-url="%s" data-cat="缺失" data-sev="低" '
+                            'data-fix="无法修 / 无需修" data-desc="源页未提供，保持为空">'
+                            '<td><input type="checkbox" class="chk"></td>'
+                            '<td>%s</td><td>%s</td>'
+                            '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
+                            % (esc(url), esc(r.get('college')),
+                               esc((r.get('lectureStart') or '')[:10]), esc(url))
+                        )
+                    parts.append('</table></details>')
+
+            # —— 源页未抓取组（盲区）：可能含漏抓，需重抓源页确认 ——
+            if ungot:
+                parts.append('<div class="note" style="background:#fff4e6;border-left:4px solid #ff9f43;">'
+                             '⚠ 以下 <b>%d 条源页未成功抓取</b>（站点反爬 / 网络拦截），'
+                             '「源页未提供」是从「未拿到文本」推得的，<b>无法判定是否真缺失，可能含漏抓</b>。'
+                             '需重新抓取源页后才能确认，暂归入此组待复核。</div>' % len(ungot))
+                for f in nf_fields:
+                    sub = [x for x in ungot if x[0][1] == f]
+                    if not sub:
+                        continue
+                    parts.append('<details><summary class="fx-n" style="color:#d97706;">%s 缺失 · 源页未抓取·无法判定（%d 条）</summary>'
+                                 % (FIELD_CN.get(f, f), len(sub)))
+                    parts.append('<table><tr><th style="width:34px"></th><th style="width:120px">学院</th>'
+                                 '<th style="width:90px">讲座时间</th><th style="width:56px">源页</th></tr>')
+                    for it, k, advice, val in sub:
+                        url = it[5].get('sourceUrl') or ''
+                        r = it[5]
+                        parts.append(
+                            '<tr data-url="%s" data-cat="缺失" data-sev="低" '
+                            'data-fix="待重抓确认" data-desc="源页未抓取，无法判定">'
+                            '<td><input type="checkbox" class="chk"></td>'
+                            '<td>%s</td><td>%s</td>'
+                            '<td><a href="%s" target="_blank">源页 ↗</a></td></tr>'
+                            % (esc(url), esc(r.get('college')),
+                               esc((r.get('lectureStart') or '')[:10]), esc(url))
+                        )
+                    parts.append('</table></details>')
+
+            parts.append('</details>')
+
+    parts.append("""
+<script>
+function rows(){return Array.from(document.querySelectorAll('tr[data-url]'))}
+function selAll(v){rows().forEach(r=>r.querySelector('.chk').checked=v);upd()}
+function upd(){const n=rows().filter(r=>r.querySelector('.chk').checked).length;
+ document.getElementById('cnt').textContent='已选中 '+n+' 项';}
+function expSel(){
+ const sel=rows().filter(r=>r.querySelector('.chk').checked);
+ if(!sel.length){alert('请先勾选要导出的行');return}
+ const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+ let csv=['可修性,类别,级别,问题,当前值,学院,主讲人,讲座时间,源页'].join(',')+'\\n';
+ sel.forEach(r=>{const d=r.dataset;
+  const tds=r.querySelectorAll('td');
+  const val=tds[3].innerText.replace(/\\s+/g,' ').trim();
+  csv+=[q(d.fix),q(d.cat),q(d.sev),q(d.desc),q(val),q(tds[4].innerText),q(tds[5].innerText),
+        q(tds[6].innerText),q(d.url)].join(',')+'\\n'});
+ const b=new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(b);
+ a.download='讲座数据问题清单.csv';a.click();
+}
+document.addEventListener('change',e=>{if(e.target.classList.contains('chk'))upd()});
+upd();
+</script>
+""")
+    parts.append('</body></html>')
+
+    parent = os.path.dirname(out_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(out_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(parts))
+    return out_path, total_high, total_mid
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--html', default=os.path.join(ROOT, 'reports', 'data_quality_report.html'))
+    ap.add_argument('--json', default='')
+    args = ap.parse_args()
+
+    data = json.load(open(DATA_PATH, encoding='utf-8'))
+    recs = data['data']
+    for i, r in enumerate(recs):
+        r['__dbg_idx'] = i
+
+    issues = scan(recs)
+    out, nh, nm = build_html(recs, issues, args.html)
+
+    print('扫描记录: %d 条' % len(recs))
+    print('问题项: %d （高 %d / 中 %d）' % (len(issues), nh, nm))
+    cnt = collections.Counter((it[0], it[2]) for it in issues)
+    for (cat, sev), n in sorted(cnt.items()):
+        print('  %-6s %s : %d' % (cat, sev, n))
+    print('HTML 报告: %s' % out)
+
+    if args.json:
+        payload = []
+        for c, f, s, d, v, r in issues:
+            k, adv = fixability(c, d, v)
+            payload.append({'cat': c, 'field': f, 'sev': s, 'desc': d, 'value': v,
+                            'fixKind': k, 'fix': FIX_LABEL[k][0], 'advice': adv,
+                            'url': r.get('sourceUrl'), 'college': r.get('college'),
+                            'speaker': r.get('speaker'), 'start': r.get('lectureStart'),
+                            'idx': r.get('__dbg_idx')})
+        os.makedirs(os.path.dirname(args.json) or '.', exist_ok=True)
+        json.dump(payload, open(args.json, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+        print('JSON 清单: %s' % args.json)
+
+
+if __name__ == '__main__':
+    main()

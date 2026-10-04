@@ -89,8 +89,9 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 // 方法数用于发现「某分片的方法没挂上」或「意外增删」；改动分片后需同步此值。
 // （2026-09-30：新增 warmLongText / _ensureLongTextAll —— 长文本改为交互即预取，94 → 96）
 // （2026-09-30：顶部数字改「阶梯跳变」，删除已无插值作用的 _countTick，96 → 95）
+// （2026-10-04：新增 isDateSuspect —— timeConfidence=low 的记录挂「日期待核」角标，95 → 96）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 95) errs.push(`方法数 ${nMethods} != 95`);
+if (nMethods !== 96) errs.push(`方法数 ${nMethods} != 96`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');

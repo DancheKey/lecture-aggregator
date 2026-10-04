@@ -190,7 +190,29 @@ def _load_html(fixture):
         return raw.decode('gb18030', errors='replace')
 
 
+def _stub_vlm_cache():
+    """把 VLM 缓存钉到 tests/fixtures/vlm_cache.json 并禁写（bless 与校验共用）。
+
+    2026-10-04 修复：`--bless` 此前**不打这个桩**，读写的是仓库里的
+    data/.vlm_cache.json。本机跑过 test_parser_golden（它不桩缓存）之后，那个文件
+    会多出真模型的抽取结果——于是 bless 出的基线与 unittest（走夹具缓存）对不上：
+    xz65 实测出现「topic 有值/简介带标点」与「topic 空/简介空格分隔」两套值，
+    刷新基线反而把测试搞红。
+
+    桩值必须与 ParserSnapshotTest.setUp 逐字一致，否则两条路径继续分叉。
+    """
+    import llm_cache as _LC
+    import llm_provider as _LP
+    import parsers as _P
+    _LC.cache_path = lambda: VLM_CACHE_FIXTURE
+    _LC.cache_set = lambda key, val: None
+    _LP._cache_set = lambda key, val: None
+    if getattr(_P, '_vlm_cache_set', None) is not None:
+        _P._vlm_cache_set = lambda key, val: None
+
+
 def _parse(case):
+    _stub_vlm_cache()           # bless 与 unittest 两条路径必须同一份确定性缓存
     _force_pure_rules()          # 每次解析前强制纯规则（顺序独立，见 _force_pure_rules 注释）
     html = _load_html(case['fixture'])
     recs = P.parse_detail(html, case['url'], college='', campus='', default_year=None)

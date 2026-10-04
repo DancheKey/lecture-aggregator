@@ -86,7 +86,9 @@ scripts/repair_*.py
 scripts/reverify_*.py
 scripts/purge_*.py
 scripts/verify_*.py
-scripts/audit_data_quality.py
+# audit_data_quality.py 不在此列（2026-10-04 移出）：它是常驻体检工具而非一次性脚本，
+# 被 clean_data_issues.py 与 CI 门禁 tests/test_time_fixes_20261004.py 加载，
+# 入库否则 CI 检出缺文件直接红。
 scripts/clean_data_issues.py
 scripts/dedup_existing.py
 scripts/demo_sameunit_fusion.py

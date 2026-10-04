@@ -1480,6 +1480,65 @@ def incremental_merge(existing, new_records):
     return no_url_recs + list(base_map.values()) + final_new
 
 
+# 人工/存量标注的溯源值：这些标注必须在全量重抓后保留。
+#   human   = 人工脚本逐页核实后写入的（scripts/fix_real_8am_lectures.py 等）
+#   legacy  = 2026-10-03 之前爬虫不产出 timeUnknown，盘上那批几乎都是人工写的，
+#             无从逐条考证，保守按人工对待
+# 解析器自产的标注（auto）不在此列：全量重抓本就该以最新解析为准，
+# 否则旧版解析器打错的标注会被永久锁死（这正是全量模式存在的意义）。
+_HUMAN_TIME_SOURCES = ('human', 'legacy')
+
+
+def restore_human_time_annotations(new_records, existing):
+    """全量重抓后，把盘上的人工 timeUnknown 标注合并回新记录（方案 A 第 2 步）。
+
+    背景（2026-10-04）：全量模式从空 dict 重建记录（见 main 里
+    `lectures = {}` 仅在增量分支用 existing 打底），`_mark_time_unknown`
+    的「不覆盖已有标注」保护的是**本条新记录里已有的键**——重抓时键根本不存在，
+    于是人工标注整体丢失。而全量并非罕见路径：`--full` 手动执行，或
+    `data/last_scrape.json` 读取失败时 main() 会静默退化为全量。
+
+    键与 incremental_merge 一致：(sourceUrl, lectureIndex)，多讲座页靠
+    lectureIndex 区分场次，不会互相覆盖。
+
+    :param new_records: 本轮全量产出的记录列表（原地修改并返回）
+    :param existing: 写盘前的旧数据（data/lectures.json）
+    :return: 合并后的 new_records
+    """
+    if not existing:
+        return new_records
+    index = {}
+    for r in existing:
+        if not isinstance(r, dict):
+            continue
+        if r.get('timeUnknown') is None:
+            continue
+        if r.get('timeUnknownSource') not in _HUMAN_TIME_SOURCES:
+            continue                      # auto 标注以最新解析为准，不进索引
+        u = r.get('sourceUrl')
+        if not u:
+            continue
+        index[(u, r.get('lectureIndex'))] = r
+
+    restored = 0
+    for rec in new_records:
+        if not isinstance(rec, dict):
+            continue
+        old = index.get((rec.get('sourceUrl'), rec.get('lectureIndex')))
+        if old is None:
+            continue
+        if rec.get('timeUnknown') == old.get('timeUnknown') \
+                and rec.get('timeUnknownSource') == old.get('timeUnknownSource'):
+            continue                      # 无分歧，不必动
+        rec['timeUnknown'] = old['timeUnknown']
+        rec['timeUnknownSource'] = old['timeUnknownSource']
+        restored += 1
+    if restored:
+        print(f'[FULL] 人工 timeUnknown 标注合并回新记录 {restored} 条'
+              f'（source ∈ {"/".join(_HUMAN_TIME_SOURCES)}；auto 标注以最新解析为准）')
+    return new_records
+
+
 def _process_source(src, year, existing_urls, is_incremental, global_exclude=None,
                     cutoff_date_str=None, src_latest_date=None,
                     listdate_skip_enabled=True):
@@ -1736,6 +1795,11 @@ def main():
             print(f'[WARN] 水位文件 {last_scrape_path} 读取失败，本轮退化为**全量抓取**'
                   f'（耗时可能从数分钟增至数小时）：{type(e).__name__}: {e}',
                   file=sys.stderr)
+            print('[WARN] 全量重抓会重新解析所有历史页面：人工标注的 timeUnknown'
+                  '（timeUnknownSource ∈ {human, legacy}）将在写盘前按 '
+                  '(sourceUrl, lectureIndex) 合并回新记录，'
+                  '解析器自产的标注（auto）以最新解析为准。',
+                  file=sys.stderr)
     is_incremental = bool(since) and not args.full
 
     # 列表页条目日期过滤用的水位日期（'YYYY-MM-DD'）。仅增量模式有意义：
@@ -1963,6 +2027,9 @@ def main():
         # --out 模式由各源独立写出、最后由驱动脚本统一合并，故此处跳过跨源去重避免重复。
         if not args.out:
             out = cross_source_dedup(out)
+        # 全量从空 dict 重建，人工标注不会自己跟过来 → 显式合并回盘上的人工判断。
+        # 增量分支以 existing 为基底，天然带着，不需要也不应该走这里。
+        out = restore_human_time_annotations(out, existing)
     out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)
     # 用北京时间（Asia/Shanghai）记录更新时间，避免 GitHub Runner 默认 UTC 导致日期差一天
     try:

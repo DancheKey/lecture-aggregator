@@ -51,6 +51,9 @@ CORE_MODULES = [
     'scripts/frontend_fields.py',
     'scripts/excluded_urls.py',
     'scripts/test_invariants.py',
+    # 2026-10-04 入库（移出 .gitignore）：CI 守卫 test_time_fixes_20261004 按路径
+    # 加载它做体检新档的断言，文件必须随仓库走，语法坏掉也要在编译门禁先红。
+    'scripts/audit_data_quality.py',
 ]
 
 

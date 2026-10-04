@@ -359,6 +359,8 @@
                     </svg>
                     <span class="font-medium">{{ u.dateLabel }}</span>
                   </span>
+                  <span v-if="isDateSuspect(u.head)" class="px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-amber-50 text-amber-600 border border-amber-200"
+                    title="解析器对该条的日期置信度为 low（跨年窗口无法判定/发布时间不可解析），年份可能有误">日期待核</span>
                   <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap', statusInfo(u.head).cls]">
                     <span class="hidden sm:inline">{{ statusInfo(u.head).label }}</span>
                     <span class="sm:hidden">{{ statusInfo(u.head).labelShort }}</span>
@@ -428,6 +430,8 @@
                     </svg>
                     <span class="font-medium">{{ fmtDateTime(l) }}</span>
                   </span>
+                  <span v-if="isDateSuspect(l)" class="px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-amber-50 text-amber-600 border border-amber-200"
+                    title="解析器对该条的日期置信度为 low（跨年窗口无法判定/发布时间不可解析），年份可能有误">日期待核</span>
                   <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1', statusInfo(l).cls]">
                     <span v-if="statusInfo(l).dot" class="live-dot rounded-full shrink-0" style="width:6px;height:6px;background:currentColor"></span>
                     <!-- 移动端用紧凑倒计时（还有 17:44:59），桌面端保留完整语义（即将开始 · 还有 17 时 44 分 59 秒） -->
@@ -680,7 +684,7 @@
   <script defer src="app.core.js?v=6684a6e682"></script>
   <script defer src="app.state.js?v=90d2339a73"></script>
   <script defer src="app.computed.js?v=764ff43144"></script>
-  <script defer src="app.display.js?v=f4e23c384e"></script>
+  <script defer src="app.display.js?v=0e1add536d"></script>
   <script defer src="app.social.js?v=f2c3f20f97"></script>
   <script defer src="app.data.js?v=ec65775b38"></script>
   <script defer src="app.admin.js?v=1f191a6ae7"></script>

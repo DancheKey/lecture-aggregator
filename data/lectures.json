@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-03T23:01:54+08:00",
+  "updatedAt": "2026-10-04T12:11:10+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260925/8850.html",
@@ -4016,7 +4016,8 @@
       "speakerTitle": "副研究员",
       "abstract": "近年来，随着实验操控精度的显著提升，开放量子系统研究范式正从“被动抑制耗散”转向“主动设计耗散”。例如，耗散可用于诱导扩展-局域转变、加速弛豫动力学，以及产生非平衡周期振荡现象。本报告将介绍我们近年来在开放量子系统中关于量子同步与时间晶体的研究。二者均与耗散维持的极限环吸引子密切相关：量子同步表现为极限环之间或极限环与外部驱动之间的相位锁定，而时间晶体则对应多体开放系统长时动力学中的持续周期振荡。我们首先在囚禁离子平台中观测到单个耗散量子比特与外部驱动之间的量子同步；随后在耗散型海森堡自旋网络中，揭示了量子同步与 flip-flop 型量子关联之间的联系，并提出了同步操控方案。在同一类系统中，我们还发现了无驱动连续时间晶体，即开放系统在无外部驱动条件下仍可形成持续周期振荡并破缺连续时间平移对称性。基于上述研究，一个自然问题是：强驱动或强相互作用下量子同步如何失效？我们发现，这一问题需要在热力学极限下回答。在驱动集体自旋系统中引入非线性耗散后，系统呈现两类无驱动刘维尔背景吸引子：polar fixed point与 self-sustained oscillator。二者在共振强驱动下均可诱导边界时间晶体，说明量子同步可通过 Hopf 型动力学相变进入时间晶体相。进一步地，非共振边界时间晶体只能由self-sustained-oscillator背景支撑。该结果建立了一个基于刘维尔背景的统一框架，将量子同步、同步失效与边界时间晶体联系起来。",
       "speakerBio": "揭建文,深圳技术大学工程物理学院助理教授 / 副研究员,硕导。长期从事量子科学方向研究,近年来主要研究兴趣集中在量子开放系统和量子计量学。以第一作者或者通讯作者身份在 PRL/A/B/Research 、 Communications Physics 等期刊发表论文 17 篇。长期担任 APS 、 IOP 、 Cell Press 等期刊的审稿人,国内外受邀学术报告 20 余次。主持国家自然科学基金面上项目和青年 C 类项目,曾获深圳技术大学年度考核优秀奖和科研与校企合作部先进个人奖。",
-      "qaRepaired": "2026-09-05.3"
+      "qaRepaired": "2026-09-05.3",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260517/8711.html",
@@ -5130,14 +5131,14 @@
       "title": "周一午餐会报告（第234次-梁振涛）",
       "topic": "非互易Ising模型与量子Lotka-Volterra模型",
       "lectureStart": "2026-04-20 12:15:00",
-      "lectureEnd": "2026-04-20 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "梁振涛",
       "speakerAffiliation": "量子所",
       "organizer": "物理学院",
       "publishTime": "2026-04-17 09:22:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第234次-梁振涛）",
       "sources": [],
       "merged": false,
@@ -5770,7 +5771,8 @@
       "speakerBio": "Professor Pacheco-Stefan focuses on human memory research in natural and complex scenarios, building innovative experimental paradigms with XR technologies. He integrates machine learning, AI and multivariate statistical methods to analyze single-unit, iEEG data from epilepsy patients and scalp EEG combined with physiological signals from healthy participants. Through these approaches, he decodes the neural basis of specific experiences and tracks how memory evolves over time. His research is notable for integrating deep-learning-based analyses of content-specific memory traces with highly ecologically valid XR-based experimental designs. His findings have been published in top-tier academic journals such as Nature Communications, Nature Human Behaviour, and PNAS.",
       "qaRepaired": "2026-09-10.round7",
       "timeUnknown": false,
-      "abstract": "In this presentation, I will summarize recent work integrating intracranial EEG (iEEG), immersive virtual reality (VR), and deep neural network (DNN) models to investigate naturalistic memory representations in the human brain across multiple experimental contexts. First, I will present evidence that stimulus-specific memory representations are systematically organized by the phase of hippocampal theta oscillations during memory formation in a VR paradigm, revealing a temporally structured code that segregates encoding and retrieval functions and representations according to semantic content. Next, I will describe results from a recent study employing DNN models of visual processing to characterize the representational format of prioritized visual working memory content, with particular emphasis on representational transformations across encoding, maintenance, and prioritization. Finally, I will discuss recent findings demonstrating that fear learning and extinction in humans are supported by context-dependent neural representations in the amygdala and prefrontal cortex, characterizing the dynamic representational processes underlying the extinction of fear memories in the human brain."
+      "abstract": "In this presentation, I will summarize recent work integrating intracranial EEG (iEEG), immersive virtual reality (VR), and deep neural network (DNN) models to investigate naturalistic memory representations in the human brain across multiple experimental contexts. First, I will present evidence that stimulus-specific memory representations are systematically organized by the phase of hippocampal theta oscillations during memory formation in a VR paradigm, revealing a temporally structured code that segregates encoding and retrieval functions and representations according to semantic content. Next, I will describe results from a recent study employing DNN models of visual processing to characterize the representational format of prioritized visual working memory content, with particular emphasis on representational transformations across encoding, maintenance, and prioritization. Finally, I will discuss recent findings demonstrating that fear learning and extinction in humans are supported by context-dependent neural representations in the amygdala and prefrontal cortex, characterizing the dynamic representational processes underlying the extinction of fear memories in the human brain.",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20260324/2940.html",
@@ -6103,14 +6105,14 @@
       "title": "周一午餐会报告（第231次-王振宇）",
       "topic": "量子传感中的一个相变现象",
       "lectureStart": "2026-03-23 12:15:00",
-      "lectureEnd": "2026-03-23 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "王振宇",
       "speakerAffiliation": "华南师范大学物理学院 理论所",
       "organizer": "物理学院",
       "publishTime": "2026-03-20 15:02:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第231次-王振宇）",
       "sources": [],
       "merged": false,
@@ -6360,14 +6362,14 @@
       "title": "周一午餐会报告（第230次-朱燕清）",
       "topic": "能带中的拓扑与量子几何",
       "lectureStart": "2026-03-16 12:15:00",
-      "lectureEnd": "2026-03-16 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "朱燕清",
       "speakerAffiliation": "量子所",
       "organizer": "物理学院",
       "publishTime": "2026-03-16 09:15:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第230次-朱燕清）",
       "sources": [],
       "merged": false,
@@ -8389,7 +8391,8 @@
       "timeUnknown": false,
       "abstract": "我们研究量子力学中的一类非线性Klein-Gordon-Dirac方程组的非相对论极限问题。在量子力学理论研究中有不同尺度的模型,其经典模型是线性或非线性薛定谔方程,其相对论复杂模型为非线性Klein-Gordon方程组、Dirac方程组,或通过Yukawa作用下的非线性耦合Klein-Gordon-Dirac方程组,更一般的情形是电磁场作用下的Klein-Gordon-Dirac方程组。为了判别该理论的重要性和模型的有效性,建立电磁场作用下的量子力学模型到经典的薛定谔方程是量子力学理论的基本问题,其在凝聚态物理和非线性几何光学理论中有重要应用。本报告将报告在数学理论和计算方法上关于这一理论的最新进展,并报告我们的最新进展,我们从数学上严格证明了电磁场作用下的非线性Klein-Gordon-Dirac方程组的非相对论极限,在适当的振荡初值的光滑假设下,获得了电磁场作用下的高维非线性Klein-Gordon-Dirac方程组的解到带电势原项的线性Schrodinger方程解在Sobolev范数意义下的收敛速率。",
       "speakerBio": "王术,现为北京工业大学二级教授、博士生导师。1998年南京大学博士毕业,后在中科院数学所和奥地利维也纳大学做博士后。主要研究方向:偏微分方程及其应用。曾主持国家自然科学基金重点项目,曾获得北京市科学技术奖二等奖1项。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "human"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251226/8578.html",
@@ -8831,7 +8834,8 @@
       "timeUnknown": false,
       "abstract": "美国得克萨斯州作为如今全美华人人口第三多的州，得州华人史研究却相对薄弱。当下，美墨边境非法移民危机持续发酵。回溯过去，《排华法案》如何在南部边境实施？在方法上，得州华人史研究与加州、夏威夷等地传统美国华人史研究有何不同？讲者将结合自身在得州田野调查的经历，分享如何整合美国国家、地方、大学档案机构文献及口述史料，开展多层级、多类型的一手史料研究。讲者提出“以社区为基础”的宗旨，通过与当地学者、艺术家、档案馆员、华人华侨合作，推动历史研究“从群众中来，到群众中去”。",
       "speakerBio": "张守岳，墨尔本大学历史学博士候选人，从事美国移民与族裔史研究，运营学术类公众号“在美国学历史”。他的论文及书评见于《世界历史评论》、Journal of American Ethnic History等刊物，曾被人大书报资料中心《历史学文摘》转载。他将在2026年美国历史学会（AHA）和美国历史学家组织（OAH）的年会上作报告。",
-      "llmTextEnhanced": true
+      "llmTextEnhanced": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251219/8579.html",
@@ -9548,14 +9552,14 @@
       "title": "周一午餐会报告（第225次-王昊琳）",
       "topic": "利用NEC寻找轻夸克dipole算符",
       "lectureStart": "2025-12-08 12:15:00",
-      "lectureEnd": "2025-12-08 12:15:00",
+      "lectureEnd": null,
       "location": "理8栋210",
       "speaker": "王昊琳",
       "speakerAffiliation": "量子院",
       "organizer": "物理学院",
       "publishTime": "2025-12-05 16:31:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第225次-王昊琳）",
       "sources": [],
       "merged": false,
@@ -9735,7 +9739,8 @@
       "timeUnknown": false,
       "abstract": "敦煌地处河西走廊西端，是镶嵌在丝绸之路上的璀璨明珠，是古代东西方文化交流的桥梁和纽带。长期以来，中原文明与西域文明、古印度文明、古波斯文明等在此相交融，形成了独具特色多元一体的敦煌文化。莫高窟，作为敦煌最负盛名的文化名片，保存了大量洞窟、彩塑及壁画等珍贵文物，展示了敦煌艺术的独特魅力。",
       "speakerBio": "张小贵，先后就读于北京师范大学、中山大学，历史学博士。现为暨南大学文学院历史学系系主任、教授，博士生导师。曾先后赴英国伦敦大学亚非学院、德国图宾根大学访学进修。主要研究领域为古代外来宗教文化史。发表中英日文学术论文60余篇，出版学术专著四部、译著三部（合译）。主持国家社科基金冷门“绝学”研究专项等项目多项。",
-      "llmTextEnhanced": true
+      "llmTextEnhanced": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://module.scnu.edu.cn/article-3685-10952-1.html",
@@ -10166,7 +10171,8 @@
       "timeUnknown": false,
       "abstract": "在人类社会的历史长河中，巫术无远弗届，源远流长，后来逐渐分为两途，一是凝聚为某种宗教，一是继续其巫术面相。时至今日，巫术依然是世界上诸多民族中的一种常见现象。在中国历史上、现实中，通灵术包含萨满、扶乩、降童、关亡、出马仙、卜紫姑、看米、看香等种类。讲者近年关注通灵，开展过多次田野考察，认为对通灵这类民间信仰的研究，可以为人们认识、处理“封建迷信”现象、提倡正序良俗提供理论依据，能更好地推动历史学、民俗学、人类学、宗教学、民间文学等学科的深入研究。",
       "speakerBio": "刘平，复旦大学历史系教授、博士生导师。中国人民大学历史学博士，南京大学博士后，曾任山东大学教授、博导，哈佛燕京学社访问学者，兼任上海炎黄文化研究会副会长等职。代表作有《文化与叛乱：清代秘密社会研究》《被遗忘的战争：咸丰同治年间广东土客大械斗研究》《中国秘密宗教史研究》；译有《华南海盗，1790-1810》《上海罢工：中国工人政治研究》等多部。",
-      "llmTextEnhanced": true
+      "llmTextEnhanced": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251203/8550.html",
@@ -10311,14 +10317,14 @@
       "title": "周一午餐会报告（第224次-李玉轩）",
       "topic": "Emergent and Tunable Higher-Order Topology in Altermagnets",
       "lectureStart": "2025-12-01 12:15:00",
-      "lectureEnd": "2025-12-01 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "李玉轩",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2025-11-28 11:04:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第224次-李玉轩）",
       "sources": [],
       "merged": false,
@@ -10408,7 +10414,8 @@
       "timeUnknown": false,
       "abstract": "帮助历史学背景的研究者掌握基本的生成式人工智能（GenAI）本地应用环境部署和工具安装。包括以下学习模块：1.基线RAG：大模型本地化部署，安装ollama，至少下载一个大模型如deep seek r1：7b，AnythingLLM 2.KG-RAG：知识图谱存储与检索，安装Neo4J5.20.x，Python3.9及以上版本 3.AI编程：VsCode+通义灵码/CodeGeeX 以文本和图像的处理为例，引导如何对历史学文本进行智能处理，进而构建知识图谱，实现KG-RAG 4.无代码构建智能体",
       "speakerBio": "夏翠娟，上海图书馆三级研究员，中国人民大学数字人文研究院研究员。上海市图书馆学会学术委员会数字人文专业委员会主任，上海市图形图像学会文化数智化专业委员会副主任。研究方向：元数据与数字人文。主持国家哲社课题2项，参与国家级科研项目10余项。在DSH、DIM、图书馆学与资讯科学、图书馆论坛、图书馆杂志等国内外学术期刊发表论文90余篇。",
-      "llmTextEnhanced": true
+      "llmTextEnhanced": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251130/8553.html",
@@ -10491,7 +10498,8 @@
       "timeUnknown": false,
       "abstract": "当16世纪末西方传教士入华后，他们一定会关注到中国的“四书五经”。不过，他们需要考虑，究竟什么经典最有权威和代表性？哪些注释家真正诠释了经典的本意？他们反复阅读儒家经典和各种各样的注释评论，跟士大夫们进行了广泛交流，力图理解儒家经典的价值，并按照耶稣会士自己的标准去判断。在此，我们试图理解耶稣会士的“四书”译文与中国传统诠释学的关系。耶稣会士对《大学》《中庸》《论语》所做的是翻译还是背叛？简略地介绍耶稣会的翻译工作之后，我们还要追踪中国传统内部的两条线索，去理解它们如何影响了耶稣会士对“四书”的解读。",
       "speakerBio": "中山大学逸仙学者、哲学系教授、博士生导师。主要研究领域为西学东渐、中学西传、中西哲学比较，代表性研究成果有《中国哲学家孔夫子》《从邂逅到相识:孔子与亚里士多德相遇在明清》等。",
-      "llmTextEnhanced": true
+      "llmTextEnhanced": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20251128/6620.html",
@@ -10722,14 +10730,14 @@
       "title": "周一午餐会报告（第223次-阮英伟）",
       "topic": "少周期强光脉冲激发ENZ材料的非线性光学",
       "lectureStart": "2025-11-24 12:15:00",
-      "lectureEnd": "2025-11-24 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "阮英伟",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2025-11-21 15:02:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第223次-阮英伟）",
       "sources": [],
       "merged": false,
@@ -11537,14 +11545,14 @@
       "title": "周一午餐会报告（第222次-江捷）",
       "topic": "谱方法格点模拟与多流暴胀",
       "lectureStart": "2025-11-17 12:15:00",
-      "lectureEnd": "2025-11-17 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "江捷",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2025-11-13 17:27:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第222次-江捷）",
       "sources": [],
       "merged": false,
@@ -11699,7 +11707,8 @@
       "timeUnknown": false,
       "abstract": "本讲座以新加坡与马来西亚的土生华人（又称海峡华人或峇峇娘惹）为研究对象，探讨其在海外华人历史书写中所处的“双重边缘化”困境。一方面，海外华人在宏观的中国史叙事中常居边缘位置；另一方面，融合了马来血统，并在文化上深度本地化与西化的土生华人，在海外华人研究内部也常被视为“非典型”或“被同化”的群体。讲座将梳理土生华人的历史形成与社会变迁，分析其在语言、宗教、服饰、饮食等方面所呈现的中马文化融合特征，并深入探讨他们族群身份与文化认同的内在张力。通过这一案例，旨在反思“华人性”（Chineseness）与“在地性”（locality）之间的复杂互动。重新审视这些“边缘”群体，对于我们理解东南亚海外华人历史的复杂性与文化解释的局限性，具有至关至关重要的启示。",
       "speakerBio": "王纯强（ONG SOON KEONG），土生土长的新加坡人。本科毕业于新加坡国立大学中文系，后赴美国学习，先后获伊利诺伊大学厄巴纳—香槟分校硕士、康奈尔大学历史学硕士及博士学位。曾任教于美国密苏里大学哥伦比亚校区，2014年返回新加坡后执教于南洋理工大学，现为中文系系主任、高级讲师。主要研究领域包括近代中国港口城市史、海外华人史及新加坡史等。代表性专著为Coming Home to a Foreign Country: Xiamen and Returned Overseas Chinese, 1843-1938，相关研究成果亦发表于China and Asia: A Journal in Historical Studies, Journal of Chinese Overseas, China Review, 《华人研究国际学报》《南洋学报》等学术期刊。",
-      "llmTextEnhanced": true
+      "llmTextEnhanced": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251114/8530.html",
@@ -12761,7 +12770,8 @@
         "http://statics.scnu.edu.cn/pics/aol/2025/1030/1761806280239166.jpg"
       ],
       "timeUnknown": true,
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251029/13116.html",
@@ -12770,14 +12780,14 @@
       "title": "周一午餐会报告（第221次-涂海涛）",
       "topic": "单微波光子的探测与转换",
       "lectureStart": "2025-11-03 12:15:00",
-      "lectureEnd": "2025-11-03 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "涂海涛",
       "speakerAffiliation": "量子所",
       "organizer": "物理学院",
       "publishTime": "2025-10-29 11:32:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第221次-涂海涛）",
       "sources": [],
       "merged": false,
@@ -12982,7 +12992,7 @@
       "campus": "汕尾",
       "title": "渔火相传— 汕尾渔歌的历史与现代演绎",
       "topic": "渔火相传— 汕尾渔歌的历史与现代演绎",
-      "lectureStart": "2025-10-30 19:00:00",
+      "lectureStart": "2024-10-30 19:00:00",
       "lectureEnd": null,
       "location": "汕尾校区南教学楼102",
       "speaker": "李香桂",
@@ -12990,10 +13000,10 @@
       "speakerAffiliation": "",
       "inviter": "",
       "organizer": "行知书院",
-      "publishTime": "2024-10-30 00:00",
-      "publishTimeSource": "position",
+      "publishTime": "2025-01-09 16:20:00",
+      "publishTimeSource": "label",
       "vlmExtracted": true,
-      "timeNote": ";cv-url-date-mismatch",
+      "timeNote": "cv-url-date-mismatch;cv-publish-after-lecture",
       "listTitle": "渔火相传— 汕尾渔歌的历史与现代演绎",
       "imageParseMethod": "vlm",
       "hasPosterImage": true,
@@ -13197,14 +13207,14 @@
       "title": "周一午餐会报告（第220次-李天宇）",
       "topic": "具有临界相的一维自对偶准晶",
       "lectureStart": "2025-10-27 12:15:00",
-      "lectureEnd": "2025-10-27 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "李天宇",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2025-10-24 15:35:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第220次-李天宇）",
       "sources": [],
       "merged": false,
@@ -13865,7 +13875,8 @@
       "speakerBio": "李红岩，华南师范大学兼职特聘教授。中国编辑学会副会长，国务院特殊津贴专家，中国史学会理事、史学理论分会副会长，曾任中国社会科学杂志社副总编辑，兼任《历史研究》《中国社会科学文摘》《中国社会科学评价》主编，《中国社会科学报》编辑部主任。主要研究阐释学、史学理论、史学史。在《历史研究》《近代史研究》《文史哲》《人民日报》《光明日报》等刊物发表各类文章200余篇。出版《阐释生成与历史阐释》《中国近代史学史论》《新中国马克思主义史学思想》《钱锺书与近代学人》《史学的光与影》等专著十余部。",
       "llmTextEnhanced": null,
       "lectureCount": 4,
-      "qaRepaired": "2026-09-10.2"
+      "qaRepaired": "2026-09-10.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20251014/8488.html",
@@ -13926,7 +13937,8 @@
       "isMultiLecture": true,
       "speakerBio": "李红岩，华南师范大学兼职特聘教授。中国编辑学会副会长，国务院特殊津贴专家，中国史学会理事、史学理论分会副会长，曾任中国社会科学杂志社副总编辑，兼任《历史研究》《中国社会科学文摘》《中国社会科学评价》主编，《中国社会科学报》编辑部主任。主要研究阐释学、史学理论、史学史。在《历史研究》《近代史研究》《文史哲》《人民日报》《光明日报》等刊物发表各类文章200余篇。出版《阐释生成与历史阐释》《中国近代史学史论》《新中国马克思主义史学思想》《钱锺书与近代学人》《史学的光与影》等专著十余部。",
       "lectureCount": 4,
-      "qaRepaired": "2026-09-10.2"
+      "qaRepaired": "2026-09-10.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20251013/65.html",
@@ -13961,7 +13973,8 @@
       "isMultiLecture": true,
       "speakerBio": "李红岩，华南师范大学兼职特聘教授。中国编辑学会副会长，国务院特殊津贴专家，中国史学会理事、史学理论分会副会长，曾任中国社会科学杂志社副总编辑，兼任《历史研究》《中国社会科学文摘》《中国社会科学评价》主编，《中国社会科学报》编辑部主任。主要研究阐释学、史学理论、史学史。在《历史研究》《近代史研究》《文史哲》《人民日报》《光明日报》等刊物发表各类文章200余篇。出版《阐释生成与历史阐释》《中国近代史学史论》《新中国马克思主义史学思想》《钱锺书与近代学人》《史学的光与影》等专著十余部。",
       "lectureCount": 4,
-      "qaRepaired": "2026-09-10.2"
+      "qaRepaired": "2026-09-10.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20251010/13094.html",
@@ -13970,14 +13983,14 @@
       "title": "周一午餐会报告（第218次-罗浩）",
       "topic": "基于超构材料的电磁阻抗匹配研究",
       "lectureStart": "2025-10-13 12:15:00",
-      "lectureEnd": "2025-10-13 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "罗浩",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2025-10-10 11:15:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第218次-罗浩）",
       "sources": [],
       "merged": false,
@@ -14017,7 +14030,8 @@
       "isMultiLecture": true,
       "speakerBio": "李红岩，华南师范大学兼职特聘教授。中国编辑学会副会长，国务院特殊津贴专家，中国史学会理事、史学理论分会副会长，曾任中国社会科学杂志社副总编辑，兼任《历史研究》《中国社会科学文摘》《中国社会科学评价》主编，《中国社会科学报》编辑部主任。主要研究阐释学、史学理论、史学史。在《历史研究》《近代史研究》《文史哲》《人民日报》《光明日报》等刊物发表各类文章200余篇。出版《阐释生成与历史阐释》《中国近代史学史论》《新中国马克思主义史学思想》《钱锺书与近代学人》《史学的光与影》等专著十余部。",
       "lectureCount": 4,
-      "qaRepaired": "2026-09-10.2"
+      "qaRepaired": "2026-09-10.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20250925/6577.html",
@@ -14289,14 +14303,14 @@
       "title": "周一午餐会报告（第217次-李畅）",
       "topic": "环形腔中的自旋分组",
       "lectureStart": "2025-09-29 12:15:00",
-      "lectureEnd": "2025-09-29 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "李畅",
       "speakerAffiliation": "量子所",
       "organizer": "物理学院",
       "publishTime": "2025-09-26 15:01:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第217次-李畅）",
       "sources": [],
       "merged": false,
@@ -14700,14 +14714,14 @@
       "title": "周一午餐会报告（第215次-张笑鸣）",
       "topic": "关于Lindblad 方程的稳态稳定性",
       "lectureStart": "2025-09-15 12:15:00",
-      "lectureEnd": "2025-09-15 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "张笑鸣",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2025-09-12 11:33:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第215次-张笑鸣）",
       "sources": [],
       "merged": false,
@@ -16169,7 +16183,8 @@
       "speakerTitle": "副教授",
       "inviter": "徐小志报告",
       "qaRepaired": "2026-09-05.3",
-      "timeUnknown": true
+      "timeUnknown": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20250624/13038.html",
@@ -16178,14 +16193,14 @@
       "title": "周一午餐会报告（第214次-朱诗亮）",
       "topic": "路径积分传播子的实验测量：方法、应用和展望",
       "lectureStart": "2025-06-30 12:15:00",
-      "lectureEnd": "2025-06-30 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "朱诗亮",
       "speakerAffiliation": "华南师范大学物理学院",
       "organizer": "物理学院",
       "publishTime": "2025-06-24 10:46:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第214次-朱诗亮）",
       "sources": [],
       "merged": false,
@@ -16487,14 +16502,14 @@
       "title": "周一午餐会报告（第213次-陈仲佳）",
       "topic": "拓扑材料：对称性与第一性原理计算",
       "lectureStart": "2025-06-23 12:15:00",
-      "lectureEnd": "2025-06-23 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "陈仲佳",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2025-06-19 10:24:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第213次-陈仲佳）",
       "sources": [],
       "merged": false,
@@ -16550,7 +16565,8 @@
       "timeUnknown": false,
       "abstract": "In this talk, we investigate the ill-posedness of the non-strictly hyperbolic compressible ideal MHD (IMHD) system in two dimensions, which exhibits multiple propagation speeds. For scalar quasilinear wave equation, Smith-Tataru showed its local well-posedness in $H^{\\frac{11/4}+} \\times H^{\\frac{7/4}+}$. Here, we construct a counterexample to the local existence of low-regularity solutions to the IMHD system in the borderline space $H^{\\frac{7/4}}$. Our proof is based on a coalition of a carefully designed algebraic approach and Christodoulou's geometric approach. We give a complete description of solutions' dynamics up to the earliest singular event, when a shock forms. This talk is based on a joint work with Xinliang An (NUS) and Haoyang Chen (NUS).",
       "speakerBio": "尹思露,杭州师范大学副教授。博士毕业于复旦大学数学系,师从周忆教授。主要研究双曲型偏微分方程解的适定性及奇性理论。在Amer. J. Math、SIAM JMA、JDE等杂志发表多篇论文。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250620/8392.html",
@@ -16627,7 +16643,8 @@
       "timeUnknown": true,
       "speakerBio": "现为中国人民大学中国书法与传统文化融合创新中心主任,中国人民大学文化产业研究院首席专家,国家二级教授。上海交通大学长聘教授、博士生导师,中国书法文化国际传播研究所所长,同时兼任教育部中国书法教育指导委员会委员、 \"书法小联合国\"(联合国NGO)主席、国际儒学联合会理事,中华文化发展促进会理事,上海市民俗文化学会会长、中国书法家协会会员、上海市书法家协会常务理事等。 书法作品入展全国第四届、第八届书法篆刻展,第八届全国中青年书法篆刻展、当代书坛名家系统工程 -五百家书法精品展,应邀参加第十三届中国艺术节全国优秀书法篆刻作品展等,并在\"当代书法创作研究暨中国书法如何走向世界\"国际论坛、\"谢稚柳书法艺术提名展\"中获奖。 2009年入选教育部新世纪优秀人才支持计划。担任教育部哲学社会科学研究重大课题攻关项目、\"国家精品视频公开课\"首席专家,主持国家、教育部与上海市哲学与社会科学课题10余项。发表学术论文80余篇,出版专著与教材近50种。2015年获得\"汉字文化传播杰出贡献奖\"。 在美国耶鲁大学、联合国等重要机构讲学,被联合国秘书长潘基文誉为: \"周斌教授不仅是书法大师,更是书法文化大使,将书法艺术作为中西方文化交流的纽带,加强了世界各国人民的交流与理解,为世界和平做出了独特的贡献。\"",
       "abstract": "",
-      "qaRepaired": "2026-09-05.2"
+      "qaRepaired": "2026-09-05.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20250619/8397.html",
@@ -16739,14 +16756,14 @@
       "title": "周一午餐会报告（第212次-魏文娅）",
       "topic": "二维材料可控生长机理研究",
       "lectureStart": "2025-06-16 12:15:00",
-      "lectureEnd": "2025-06-16 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "魏文娅",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2025-06-13 10:30:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第212次-魏文娅）",
       "sources": [],
       "merged": false,
@@ -18179,14 +18196,14 @@
       "title": "周一午餐会报告（第208次-肖晓亮）",
       "topic": "非常规手性费米子的理论研究及其材料设计",
       "lectureStart": "2025-05-12 12:15:00",
-      "lectureEnd": "2025-05-12 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "肖晓亮",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2025-05-12 09:26:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第208次-肖晓亮）",
       "sources": [],
       "merged": false,
@@ -18304,7 +18321,7 @@
       "title": "在生命的时间树上探寻鱼类物种多样性的演化",
       "topic": "在生命的时间树上探寻鱼类物种多样性的演化",
       "lectureStart": "2025-05-09 10:00:00",
-      "lectureEnd": "2025-05-09 10:00:00",
+      "lectureEnd": null,
       "location": "生命科学学院昆虫所110会议室",
       "speaker": "何舜平",
       "speakerTitle": "研究员",
@@ -18314,7 +18331,7 @@
       "publishTime": "2025-05-07 16:13:00",
       "publishTimeSource": "label",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "ocrExtracted": true,
       "listTitle": "学术讲座：在生命的时间树上探寻鱼类物种多样性的演化",
       "imageParseMethod": "vlm",
@@ -18653,14 +18670,14 @@
       "title": "周一午餐会报告（第207次-江浩湘）",
       "topic": "手性异常点调控局域态密度",
       "lectureStart": "2025-04-28 12:30:00",
-      "lectureEnd": "2025-04-28 12:30:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "江浩湘",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2025-04-24 09:15:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第207次-江浩湘）",
       "sources": [],
       "merged": false,
@@ -18950,8 +18967,8 @@
       "speakerAffiliation": "国防科技大学智能科学学院",
       "inviter": "",
       "organizer": "行知书院",
-      "publishTime": "2024-04-24 00:00",
-      "publishTimeSource": "position",
+      "publishTime": "2025-04-29 12:11:00",
+      "publishTimeSource": "label",
       "vlmExtracted": true,
       "listTitle": "复杂非结构化环境中机器人鲁棒感知与定位",
       "imageParseMethod": "vlm",
@@ -18963,7 +18980,8 @@
       ],
       "abstract": "环境感知与鲁棒定位是提升机器人自主能力的关键技术，但目前还面临着许多挑战，例如在荒漠、丛林、废墟、草地等复杂非结构化环境中，机器人还无法全自主运行，包括两个难题，一是部分场景卫星拒止，机器人自主定位难；二是部分目标未知，机器人识别目标难。针对这两个难题，开展了一系列机器人语义定位和目标自主识别方法的研究，能提升机器人在复杂动态环境中自主定位精度和对未知动态目标识别能力，加速机器人在更多复杂场景中落地应用。",
       "speakerBio": "国防科技大学智能科学学院副教授，长期从事机器人感知，定位，建图等方向的研究，博士毕业于德国波恩大学，获德国优秀博士学位，受邀担任机器人领域国际著名期刊IEEE RA-L，国际旗舰会议ICRA和IROS编委，以一作或通讯在 TRO、TITS、RA - L、RSS、ICRA、IROS、CVPR等国际期刊和会议发表论文30余篇，谷歌学术被引3000余次，入选2024年度斯坦福大学全球前2%科学家、中国科协青年人才托举工程、国防科大拔尖人才，获机器人旗舰会议RSS最佳论文荣誉提名奖、RSS先锋荣誉称号、6项国际机器人大赛冠军。",
-      "llmTextEnhanced": true
+      "llmTextEnhanced": true,
+      "timeNote": "cv-publish-after-lecture"
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20250417/59.html",
@@ -19157,14 +19175,14 @@
       "title": "周一午餐会报告（第206次-王振宇）",
       "topic": "基于相移的受激拉曼跃迁",
       "lectureStart": "2025-04-21 12:15:00",
-      "lectureEnd": "2025-04-21 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "王振宇",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2025-04-21 10:13:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第206次-王振宇）",
       "sources": [],
       "merged": false,
@@ -19653,14 +19671,14 @@
       "title": "周一午餐会报告（第205次-张定伟）",
       "topic": "RHIC能量扫描中轻核产生的实验研究",
       "lectureStart": "2025-04-14 12:30:00",
-      "lectureEnd": "2025-04-14 12:30:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "张定伟",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2025-04-10 11:16:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第205次-张定伟）",
       "sources": [],
       "merged": false,
@@ -20068,14 +20086,14 @@
       "title": "周一午餐会报告（第203次-梁景程）",
       "topic": "Luttinger液体的非厄米线性响应",
       "lectureStart": "2025-03-31 12:15:00",
-      "lectureEnd": "2025-03-31 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "梁景程",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2025-03-27 09:54:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第203次-梁景程）",
       "sources": [],
       "merged": false,
@@ -20564,14 +20582,14 @@
       "title": "周一午餐会报告（第202次-岳成凤）",
       "topic": "基于“ARCS”动机模型的《现代光学》教学创新探究",
       "lectureStart": "2025-03-24 12:15:00",
-      "lectureEnd": "2025-03-24 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "岳成凤",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2025-03-20 09:40:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第202次-岳成凤）",
       "sources": [],
       "merged": false,
@@ -20801,14 +20819,14 @@
       "title": "周一午餐会报告（第201次-章建高）",
       "topic": "：超导电流在并联电路中的分配研究",
       "lectureStart": "2025-03-17 12:15:00",
-      "lectureEnd": "2025-03-17 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "章建高",
       "speakerAffiliation": "物理教育研究所",
       "organizer": "物理学院",
       "publishTime": "2025-03-17 11:13:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第201次-章建高）",
       "sources": [],
       "merged": false,
@@ -21317,14 +21335,14 @@
       "title": "周一午餐会报告（第200次-赵纪军）",
       "topic": "原子级制造及其基础理论研究",
       "lectureStart": "2025-03-10 12:15:00",
-      "lectureEnd": "2025-03-10 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "赵纪军",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2025-03-10 11:32:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第200次-赵纪军）",
       "sources": [],
       "merged": false,
@@ -23601,14 +23619,14 @@
       "title": "学术讲座：Environmental DNA: understanding aquatic  ecosystems through collecting water",
       "topic": "Environmental DNA: understanding aquatic  ecosystems through collecting water",
       "lectureStart": "2024-12-11 10:00:00",
-      "lectureEnd": "2024-12-11 10:00:00",
+      "lectureEnd": null,
       "location": "生命科学学院102会议室",
       "speaker": "Minamoto Toshifumi",
       "speakerAffiliation": "源利文",
       "organizer": "生命科学学院",
       "publishTime": "2024-12-11 11:08:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "学术讲座：Environmental DNA: understanding aquatic  ecosystems through collecting water",
       "sources": [],
       "merged": false,
@@ -24403,14 +24421,14 @@
       "title": "周一午餐会报告（第195次-尹承平）",
       "topic": "含Weyl半金属微纳结构的光学特性研究",
       "lectureStart": "2024-12-02 12:30:00",
-      "lectureEnd": "2024-12-02 12:30:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "尹承平",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2024-12-02 09:14:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第195次-尹承平）",
       "sources": [],
       "merged": false,
@@ -25167,7 +25185,8 @@
         "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740623356857086.jpg",
         "http://statics.scnu.edu.cn/statics/images/xingzhi/xzqrcode.jpg"
       ],
-      "speakerBio": "导演、制作人、戏剧教育工作者，FullyPLAY赋力戏剧工作室创始人。英国皇家中央演讲戏剧学院应用戏剧在读博士，2024和的基金会“和在创”社区美育人才培养计划导师。应用戏剧项目及编导作品含：2024上海YOUNG剧场构特别剧展特别解化作品《普罗米修斯实验》、“我的儿童公园”乐从居民艺术节作品素人戏剧《家在乐从》、2024广州市中小学语言艺术大赛戏剧中学组一等奖作品《奥楚蔑洛夫的真相》、主导演华南师范大学音乐学院儿童歌舞剧作品《孙悟空打妖精》等。曾获2023广州教育学会戏剧教育专委会中小学戏剧教育教学评比活动教学论文一等奖，其导演英国华人历史纪实剧作品《埠.Bu》曾获中新社报道，论文《集体编创在中小学〈戏剧〉课程的应用探究》拟刊于《艺术教育》杂志2025年12期。"
+      "speakerBio": "导演、制作人、戏剧教育工作者，FullyPLAY赋力戏剧工作室创始人。英国皇家中央演讲戏剧学院应用戏剧在读博士，2024和的基金会“和在创”社区美育人才培养计划导师。应用戏剧项目及编导作品含：2024上海YOUNG剧场构特别剧展特别解化作品《普罗米修斯实验》、“我的儿童公园”乐从居民艺术节作品素人戏剧《家在乐从》、2024广州市中小学语言艺术大赛戏剧中学组一等奖作品《奥楚蔑洛夫的真相》、主导演华南师范大学音乐学院儿童歌舞剧作品《孙悟空打妖精》等。曾获2023广州教育学会戏剧教育专委会中小学戏剧教育教学评比活动教学论文一等奖，其导演英国华人历史纪实剧作品《埠.Bu》曾获中新社报道，论文《集体编创在中小学〈戏剧〉课程的应用探究》拟刊于《艺术教育》杂志2025年12期。",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241125/6339.html",
@@ -25233,7 +25252,8 @@
         }
       ],
       "merged": true,
-      "sourceCount": 2
+      "sourceCount": 2,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://aol.scnu.edu.cn/a/20241124/1029.html",
@@ -25461,7 +25481,8 @@
       "timeUnknown": true,
       "abstract": "光学的基础知识及其技术应用层出不穷,日新月异,为推动人类社会的发展做出了巨大的贡献。单分子水平灵敏探测和传感、纳米及原子尺度显微成像、极宽带激光和光谱检测等为当前光学乃至自然科学的若干重大前沿问题。本报告将介绍我团队近年来在全谱段白光飞秒激光这一个重要前沿科学问题上的研究进展 。我们基于独特设计的啁啾铌酸锂非线性晶体 (CPPLN) ,结合二阶和三阶非线性协同作用机制,渐进式地提升白光飞秒激光的转换效率、频谱带宽、脉冲能量、光谱平坦度等重要技术指标,直至成功实现单脉冲能量 1 mJ 量级,带宽涵盖 200-5000nm 的深紫外 - 可见 - 中红外全谱段白光飞秒激光,有望开辟高速摄谱技术的新天地 。",
       "speakerBio": "李志远教授 1994 年本科毕业于中国科技大学物理系, 1999 年博士毕业于中科院物理所。 2004 年入选中国科学院\"百人计划\", 2005 年获国家杰出青年科学基金, 2011 年度获中国光学学会\"王大珩光学奖\",入选 2014 和 2018 年全球高被引科学家以及 2016-202 3 年中国高被引科学家。 2004-2016 年任中科院物理研究所研究员、课题组组长, 2016 年 10 月起任华南理工大学物理与光电学院教授,副院长。从事微纳光子学、非线性光学、激光技术、拓扑光子学和量子物理中的理论、实验和应用研究近 30 年,已在 PRL, Sci . Adv . , Nat. Commun., JACS, Adv. Mater., Nano Lett., ACS Nano, Light 等物理学、光学、化学和材料学期刊上发表 SCI 论文 5 0 0 余篇,被 SCI 引用 34 , 0 00 次, H-index 为 8 7 ,在国际国内重要的学术会议上做邀请报告 1 3 0 多次。现任《光子学报》副主编。",
-      "qaRepaired": "2026-09-05.1-salvage"
+      "qaRepaired": "2026-09-05.1-salvage",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241118/6328.html",
@@ -25736,7 +25757,8 @@
       "timeUnknown": true,
       "speakerBio": "上海师范大学世界史系教授,现任上海师范大学副校长。研究领域为西方史学史与史学理论、西方城市史。马克思主义理论研究和建设工程重点教材《外国史学史》首席专家、国家社科基金重大项目 \"多卷本《西方城市史》\"首席专家。教育部新世纪人才、\"万人计划\"哲学社会科学领军人才、教育部高等学校教学指导委员会委员(历史学);上海市曙光学者、上海市学位委员会学科评议组成员(历史学)、上海市世界史学会副会长、上海市社联副主席等。 著译(合译)有《历史是什么》《多面的历史》等多部学术著作;《辞海》( 2009 版)、《大辞海·世界历史》世界古代史、外国史学史撰稿人。在《中国社会科学》《历史研究》《世界历史》《新华文摘》等刊物上发表文章多篇,承担多种国家项目,多种项目获奖。主编的《世界历史评论》《新史学》《都市文化研究》等杂志常年与域外重要学术杂志合作,开展学术交流。主编\"历史学研究入门丛书\"(北京大学出版社)、\"三联经典人文书库\"(上海三联书店,国家出版基金项目)、\"二十世纪人文译丛\"(商务印书馆)、\"光启文库\"(商务印书馆)、\"大象学术译丛\"(大象出版社)、\"格致人文读本\"(格致出版社、上海人民出版社)等丛书。",
       "abstract": "",
-      "qaRepaired": "2026-09-05.2"
+      "qaRepaired": "2026-09-05.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20241118/6327.html",
@@ -25833,7 +25855,7 @@
       "title": "学术讲座：相分离作为植物应对环境变化的一种机制",
       "topic": "相分离作为植物应对环境变化的一种机制",
       "lectureStart": "2024-11-18 16:00:00",
-      "lectureEnd": "2024-11-18 16:00:00",
+      "lectureEnd": null,
       "location": "生命科学学院102会议室",
       "speaker": "方晓峰",
       "speakerTitle": "副教授",
@@ -25843,7 +25865,7 @@
       "publishTime": "2024-11-14 09:47:00",
       "publishTimeSource": "label",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "学术讲座：相分离作为植物应对环境变化的一种机制",
       "speakerBio": "方晓峰，博士，清华大学生命科学学院副教授、博士生导师。2009年获西北农林科技大学理学学士学位，2015年获北京生命科学研究所&北京协和医学院博士学位，2015和2017年分别于清华大学和英国John Innes Centre从事博士后研究。2020年加入清华大学生命科学学院。实验室主要研究相分离和相转变在植物对胁迫的感受、应答和记忆过程中的作用及机制。以（共同）通讯作者身份先后在Nature、Cell、Nature Chemical Biology、Molecular Plant等国际期刊发表学术论文多篇。获2021北京市“杰青”和2022国家自然科学基金“优青”资助，入选2022农业农村部“神农英才计划”，获2023年清华大学“学术新人奖”和2024年“Rising Stars in Plant Sciences”奖。",
       "llmTextEnhanced": false
@@ -26860,14 +26882,14 @@
       "title": "周一午餐会报告（第192次-明磊）",
       "topic": "暴胀与未来CMB实验",
       "lectureStart": "2024-11-11 12:15:00",
-      "lectureEnd": "2024-11-11 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "明磊",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2024-11-08 09:03:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第192次-明磊）",
       "sources": [],
       "merged": false,
@@ -27914,7 +27936,7 @@
       "title": "学术讲座：细胞自噬调控植物逆境胁迫耐受性的分子机制",
       "topic": "细胞自噬调控植物逆境胁迫耐受性的分子机制",
       "lectureStart": "2024-10-29 09:00:00",
-      "lectureEnd": "2024-10-29 09:00:00",
+      "lectureEnd": null,
       "location": "生命科学学院102会议室",
       "speaker": "杨超",
       "speakerTitle": "副研究员",
@@ -27924,7 +27946,7 @@
       "publishTime": "2024-10-25 09:38:00",
       "publishTimeSource": "label",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "学术讲座：细胞自噬调控植物逆境胁迫耐受性的分子机制",
       "speakerBio": "杨超，中国科学院华南植物园副研究员，中国科学院青年创新促进会会员，硕士生导师，中国植物生理与植物分子生物学学会-植物与环境互作专业委员会委员，Advanced Biotechnology期刊青年编委。主要从事植物逆境生物学研究，揭示了环境胁迫激活细胞自噬的转录调控机制，发现了ATG8介导的选择性自噬和非经典自噬在植物逆境胁迫响应过程中的全新功能。近五年以第一/通讯（含共同）作者在Molecular Plant（2020、2023）、Nature Plants（2023）、Trends in Genetics（2020）、Autophagy（2023）、Plant Communiaitons（2023）和New Phytologist（2024）等植物科学重要学术期刊发表论文10篇，其中3篇论文入选ESI高被引文，被专文评述7次。目前，在中国科学院战略性先导A专项和中国科学院重大科技攻关专项等项目资助下，以黑果枸杞为研究对象，进行耐盐碱遗传基础解析和种质创新相关研究工作。",
       "llmTextEnhanced": false
@@ -28279,14 +28301,14 @@
       "title": "周一午餐会报告（第189次-赵鹏程）",
       "topic": "涡旋粒子特性介绍",
       "lectureStart": "2024-10-21 12:15:00",
-      "lectureEnd": "2024-10-21 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "赵鹏程",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2024-10-21 08:51:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第189次-赵鹏程）",
       "sources": [],
       "merged": false,
@@ -28508,14 +28530,14 @@
       "title": "周一午餐会报告（第188次-杜炎雄）",
       "topic": "单原子系统中的非常规几何量子计算",
       "lectureStart": "2024-10-14 12:15:00",
-      "lectureEnd": "2024-10-14 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "杜炎雄",
       "speakerAffiliation": "量子科学与技术所",
       "organizer": "物理学院",
       "publishTime": "2024-10-10 09:45:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第188次-杜炎雄）",
       "sources": [],
       "merged": false,
@@ -28753,14 +28775,14 @@
       "title": "周一午餐会报告（第187次-李赛）",
       "topic": "基于超导量子线路的量子精密测量",
       "lectureStart": "2024-09-30 12:15:00",
-      "lectureEnd": "2024-09-30 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "李赛",
       "speakerAffiliation": "量子科学与技术所",
       "organizer": "物理学院",
       "publishTime": "2024-09-30 10:56:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第187次-李赛）",
       "sources": [],
       "merged": false,
@@ -28880,14 +28902,14 @@
       "title": "周一午餐会报告（第186次-刘美壮）",
       "topic": "二维过渡金属硫化物的相结构调控与物性研究",
       "lectureStart": "2024-09-23 12:15:00",
-      "lectureEnd": "2024-09-23 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "刘美壮",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2024-09-23 11:20:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第186次-刘美壮）",
       "sources": [],
       "merged": false,
@@ -29394,14 +29416,14 @@
       "title": "周一午餐会报告（第185次-王金焕）",
       "topic": "低维材料的表界面调控生长与光谱学研究",
       "lectureStart": "2024-09-09 12:15:00",
-      "lectureEnd": "2024-09-09 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "王金焕",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2024-09-06 09:11:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第185次-王金焕）",
       "sources": [],
       "merged": false,
@@ -31406,14 +31428,14 @@
       "title": "周一午餐会报告（第184次-黄家辉）",
       "topic": "高维带点黑洞的超辐射稳定性",
       "lectureStart": "2024-06-17 12:15:00",
-      "lectureEnd": "2024-06-17 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "黄家辉",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2024-06-17 09:55:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第184次-黄家辉）",
       "sources": [],
       "merged": false,
@@ -32003,14 +32025,14 @@
       "title": "周一午餐会报告（第183次-阮英伟）",
       "topic": "Photoluminescence of non-thermal electrons in metals",
       "lectureStart": "2024-06-03 12:15:00",
-      "lectureEnd": "2024-06-03 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "阮英伟",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2024-06-03 09:28:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第183次-阮英伟）",
       "sources": [],
       "merged": false,
@@ -32384,14 +32406,14 @@
       "title": "周一午餐会报告（第182次-杨梓衍）",
       "topic": "QCD求和规则在强子物理中的应用",
       "lectureStart": "2024-05-27 12:15:00",
-      "lectureEnd": "2024-05-27 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "杨梓衍",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2024-05-24 22:26:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第182次-杨梓衍）",
       "sources": [],
       "merged": false,
@@ -32822,14 +32844,14 @@
       "title": "周一午餐会报告（第181次-梁锦汉）",
       "topic": "在Belle II 上寻找暗物质",
       "lectureStart": "2024-05-20 12:15:00",
-      "lectureEnd": "2024-05-20 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "梁锦汉",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2024-05-17 09:18:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第181次-梁锦汉）",
       "sources": [],
       "merged": false,
@@ -34120,14 +34142,14 @@
       "title": "周一午餐会报告（第179次-杨谋）",
       "topic": "外尔结界面上的反射位移",
       "lectureStart": "2024-05-06 12:15:00",
-      "lectureEnd": "2024-05-06 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "杨谋",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2024-05-06 11:31:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第179次-杨谋）",
       "sources": [],
       "merged": false,
@@ -34192,14 +34214,14 @@
       "title": "周一午餐会报告（第178次-冀丽娜）",
       "topic": "非绝热和乐量子门的鲁棒性提升研究",
       "lectureStart": "2024-04-29 12:15:00",
-      "lectureEnd": "2024-04-29 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "冀丽娜",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2024-04-26 17:20:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第178次-冀丽娜）",
       "sources": [],
       "merged": false,
@@ -34569,14 +34591,14 @@
       "title": "周一午餐会报告（第177次-许坤远）",
       "topic": "多层结构的光学非互易研究",
       "lectureStart": "2024-04-22 12:15:00",
-      "lectureEnd": "2024-04-22 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "许坤远",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2024-04-19 15:36:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第177次-许坤远）",
       "sources": [],
       "merged": false,
@@ -35510,14 +35532,14 @@
       "title": "周一午餐会报告（第175次-廖开宇）",
       "topic": "Recent work on Rydberg electrometers",
       "lectureStart": "2024-04-01 12:15:00",
-      "lectureEnd": "2024-04-01 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "廖开宇",
       "speakerAffiliation": "量子科学与技术所",
       "organizer": "物理学院",
       "publishTime": "2024-03-28 11:09:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第175次-廖开宇）",
       "sources": [],
       "merged": false,
@@ -35792,7 +35814,8 @@
       "timeUnknown": false,
       "abstract": "We study a dynamic optimal reinsurance and dividend-payout problem for an insurance company in a finite time horizon. The goal of the company is to maximize the expected cumulative discounted dividend payouts until bankruptcy or maturity which comes earlier. The company is allowed to buy reinsurance contracts dynamically over the whole time horizon to cede its risk exposure with other reinsurance companies. This is a mixed singular-classical control problem and the corresponding Hamilton-Jacobi-Bellman equation is a variational inequality with a fully nonlinear operator and subject to a gradient constraint. We obtain the C2,1 smoothness of the value function and a comparison principle for its gradient function by the penalty approximation method so that one can establish an efficient numerical scheme to compute the value function. We find that the surplus-time space can be divided into three non-overlapping regions by a risk-magnitude and time-dependent reinsurance barrier and a time-dependent dividend-payout barrier. The insurance company should be exposed to a higher risk as its surplus increases; be exposed to the entire risk once its surplus upward crosses the reinsurance barrier; and pay out all its reserves exceeding the dividend-payout barrier. The estimated localities of these regions are also provided. This is a joint work with Guan Chonghu and Zhou Rui.",
       "speakerBio": "许左权教授先后于南开大学、北京大学、香港中文大学获得本科、硕士、博士学位,曾任英国牛津大学数学研究所任野村金融数学研究员,并兼任牛津Oxford-Man研究所通讯研究员。现任教于香港理工大学应用数学系,主要从事金融数学理论研究,包括量化行为金融学、投资组合、保险契约理论等研究领域,多次于世界著名学术机构及学术会议上作学术报告,主持过多项国家自然科学基金及香港研究资助局项目。其主要学术成果发表在《Mathematical Finance》,《Anna ls of Applied Probability》,《Finance and Stochastics》,《Mathematics of Operations Research》,《SIAM Journal on Financial Mathematics》,《Quantitative Finance》,《Insurance: Mathematics and Economics》等著名国际学术期刊上。现为著名国际期刊《Mathematics of Operations Research》编委。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20240325/197.html",
@@ -35963,14 +35986,14 @@
       "title": "周一午餐会报告（第174次-李畅）",
       "topic": "基于中性原子阵列中的量子信息",
       "lectureStart": "2024-03-25 12:15:00",
-      "lectureEnd": "2024-03-25 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "李畅",
       "speakerAffiliation": "量子科学与技术所",
       "organizer": "物理学院",
       "publishTime": "2024-03-22 15:25:00",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第174次-李畅）",
       "sources": [],
       "merged": false,
@@ -36214,14 +36237,14 @@
       "title": "周一午餐会报告（第173次-蒋雪）",
       "topic": "Computational Design of 2D Non-van der Waals Magnets",
       "lectureStart": "2024-03-18 12:15:00",
-      "lectureEnd": "2024-03-18 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "蒋雪",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2024-03-14 15:23:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第173次-蒋雪）",
       "sources": [],
       "merged": false,
@@ -36395,14 +36418,14 @@
       "title": "周一午餐会报告（第172次-金元俊）",
       "topic": "中心反演破缺的二维Dirac半金属",
       "lectureStart": "2024-03-11 12:15:00",
-      "lectureEnd": "2024-03-11 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "金元俊",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2024-03-07 11:27:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第172次-金元俊）",
       "sources": [],
       "merged": false,
@@ -36532,14 +36555,14 @@
       "title": "周一午餐会报告（第171次-张笑鸣）",
       "topic": "一般矩阵的本征值求解量子算法",
       "lectureStart": "2024-03-04 12:15:00",
-      "lectureEnd": "2024-03-04 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "张笑鸣",
       "speakerAffiliation": "理论物理所",
       "organizer": "物理学院",
       "publishTime": "2024-03-01 10:53:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第171次-张笑鸣）",
       "sources": [],
       "merged": false,
@@ -38988,14 +39011,14 @@
       "title": "周一午餐会报告（第169次-陈溢杭）",
       "topic": "纳米光学结构的大面积制备及其应用",
       "lectureStart": "2023-12-18 12:15:00",
-      "lectureEnd": "2023-12-18 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "陈溢杭",
       "speakerAffiliation": "现代光学所",
       "organizer": "物理学院",
       "publishTime": "2023-12-15 10:51:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第169次-陈溢杭）",
       "sources": [],
       "merged": false,
@@ -39966,14 +39989,14 @@
       "title": "周一午餐会报告（第168次-牛鹏宇）",
       "topic": "奇特强子态与s矩阵",
       "lectureStart": "2023-12-11 12:15:00",
-      "lectureEnd": "2023-12-11 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "牛鹏宇",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2023-12-11 12:02:00",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "same-day-normal;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第168次-牛鹏宇）",
       "sources": [],
       "merged": false,
@@ -40005,7 +40028,8 @@
       "timeUnknown": false,
       "abstract": "We study a continuous time dynamic optimal stopping problem with a flow of preferences, which can be in non-expectation form and can depend on both the current time and state of the system in general. We will define a solution to the problem by the rationality of the agent, and compare it with other solutions appeared in literature.",
       "speakerBio": "金含清,牛津大学教授,彼得学院应用数学导师,牛津NIE金融大数据实验室主任。主要从事金融统计、金融数学、行为金融学等方面的研究,在Journal of Economic Theory、Mathematical Finance、SIAM Journal on Control and Optimization、Mathematics of Operations Research等高水平杂志上发表了数十篇高水平的论文,其中有多篇被高引,担任多个高级别金融数学杂志的编委。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20231211/7724.html",
@@ -40452,14 +40476,14 @@
       "title": "周一午餐会报告（第167次-黄巍）",
       "topic": "基于里德堡原子的太赫兹技术",
       "lectureStart": "2023-12-04 12:15:00",
-      "lectureEnd": "2023-12-04 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "黄巍",
       "speakerAffiliation": "量子科学与技术所",
       "organizer": "物理学院",
       "publishTime": "2023-12-04 10:31:00",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "same-day-normal;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第167次-黄巍）",
       "sources": [],
       "merged": false,
@@ -41410,14 +41434,14 @@
       "title": "周一午餐会报告（第166次-梁锦汉）",
       "topic": "直接探测实验对低质量暗物质的寻找",
       "lectureStart": "2023-11-20 12:15:00",
-      "lectureEnd": "2023-11-20 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "梁锦汉",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2023-11-16 09:43:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第166次-梁锦汉）",
       "sources": [],
       "merged": false,
@@ -42452,14 +42476,14 @@
       "title": "周一午餐会报告（第164次-周思）",
       "topic": "手性量子点的光学性质",
       "lectureStart": "2023-11-06 12:15:00",
-      "lectureEnd": "2023-11-06 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "周思",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2023-11-02 09:05:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第164次-周思）",
       "sources": [],
       "merged": false,
@@ -43071,7 +43095,8 @@
       "timeUnknown": true,
       "abstract": "1.华南师范大学第四届教师教学大赛汕尾校区参赛教师示范课展示; 2.校区教师说课磨课。华南师范大学汕尾校区作为贯彻落实广东省委省政府重大决策部署的重点工程，由广东省教育厅、汕尾市人民政府、华南师范大学、深圳大学四方共建，是华南师范大学“一校三地四校区”办学体系的重要组成部分，也是粤东西北地区第一个国家“双一流”大学和“211工程”大学扎根办学的校区。汕尾校区位于美丽的海滨城市汕尾市城区，毗邻深汕特别合作区，校园滨海而建，自然风光秀美，交通位置便利，总占地面积约2000亩，总建筑面积约540900m^2，其中一期约948亩，建筑面积约为373300m^2，二期、三期约1000亩。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20231030/6025.html",
@@ -43111,14 +43136,14 @@
       "title": "周一午餐会报告（第163次-郎利君）",
       "topic": "Exploring unique phenomena arising from non-Hermiticity",
       "lectureStart": "2023-10-30 12:15:00",
-      "lectureEnd": "2023-10-30 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "郎利君",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2023-10-30 09:32:00",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "same-day-normal;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第163次-郎利君）",
       "sources": [],
       "merged": false,
@@ -44037,14 +44062,14 @@
       "title": "周一午餐会报告（第161次-郑克志）",
       "topic": "稀土上转换发光：机理及应用",
       "lectureStart": "2023-10-16 12:15:00",
-      "lectureEnd": "2023-10-16 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "郑克志",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2023-10-12 10:16:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第161次-郑克志）",
       "sources": [],
       "merged": false,
@@ -44269,14 +44294,14 @@
       "title": "周一午餐会报告（第160次-姜小芳）",
       "topic": "飞秒激光调控钙钛矿的光物理特性",
       "lectureStart": "2023-10-09 12:15:00",
-      "lectureEnd": "2023-10-09 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "姜小芳",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2023-10-08 08:48:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第160次-姜小芳）",
       "sources": [],
       "merged": false,
@@ -44419,14 +44444,14 @@
       "title": "周一午餐会报告（第159次-刘国明）",
       "topic": "LHCb零角度量能器的初步研究",
       "lectureStart": "2023-09-25 12:15:00",
-      "lectureEnd": "2023-09-25 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "刘国明",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2023-09-25 09:15:00",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "same-day-normal;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第159次-刘国明）",
       "sources": [],
       "merged": false,
@@ -44785,14 +44810,14 @@
       "title": "周一午餐会报告（第158次-郭星雨）",
       "topic": "核子结构的量子模拟",
       "lectureStart": "2023-09-18 12:15:00",
-      "lectureEnd": "2023-09-18 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "郭星雨",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2023-09-13 09:04:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第158次-郭星雨）",
       "sources": [],
       "merged": false,
@@ -44976,14 +45001,14 @@
       "title": "周一午餐会报告（第157次-吕庆先）",
       "topic": "超导与冷原子复合量子系统",
       "lectureStart": "2023-09-11 12:15:00",
-      "lectureEnd": "2023-09-11 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "吕庆先",
       "speakerAffiliation": "量子科学与技术所",
       "organizer": "物理学院",
       "publishTime": "2023-09-06 18:06:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第157次-吕庆先）",
       "sources": [],
       "merged": false,
@@ -45191,7 +45216,8 @@
       ],
       "abstract": "黎夏 ，华东 师范大学地理科学学院教授、博士生导师、国际欧亚科学院院士，英国社会科学院院士、教育部“长江学者”特聘教授、国家杰出青年科学基金获得者、 国家重点基础研究发展计划首席专家、国家人事部首批新世纪百千万人才工程国家级人选。中国地理信息系统协会理论与方法专业委员会副主任、中国地理学会地理模型与地理信息分析专业委员会副主任、中国可持续发展研究会时空信息专业委员会副主任。 黎 夏教 授长期从 事地理元胞自动机、多智能体与空间优化、高精度全球土地利用变化建模与环境影响分析等方面的研究。提出了地理模拟系统理论，研发了GeoSOS系列地理模拟与优化软件，应用于城市规划、国土空间优化等领域。出版著作8部,在Nature Communications、Nature Sustainability等国内外刊物发表学术论文300余篇，多篇论文成果位列SCI地理学领域引用前1%，多次入选 Elsevier 中国高被引学者、科睿唯安全球高被引科学家。入选“中国百篇最具影响国际学术论文”、“中国地理科学十大研究进展”。有关研究被同行评价为先驱研究；获发展中国家科学院(TWAS)地球科学奖。",
       "speakerBio": "EXPERT PROFILES 黎夏教授长期从事地理元胞自动机、多智能体与空间优化 、高精度全球土地利用变化建模与环境影响分析等方面的研究。提出了地理模拟系统理论,研发了GeoSOS系列地理模拟与优化软件,应用于城市规划、国土空间优化等领域。出版著作8部,在NatureCommunications、Nature Sustainability等国内外刊物发表学术论文300余篇,多篇论文成果位列SCl地理学领域引I用前1%,多次入选Elsevier 中国高被引学者、科睿唯安全球高被引科学家。入选\"中国百篇最具影响国际学术论文\"、\"中国地理科学十大研究进展\"。有关研究被同行评价为先驱研究;获发展中国家科学院(TWAS)地球科学奖。 工学部北斗研究院 Beidou Researeh Institate,/Faculty ofEngineering",
-      "vlmBackfilled": true
+      "vlmBackfilled": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20230725/7626.html",
@@ -46103,7 +46129,8 @@
       "timeUnknown": false,
       "abstract": "Subsampling reduces computational burden and maintains statistical efficiency for big data. We review subsampling techniques for different models. If data volume is too large, nonuniform subsampling with replacement is infeasible. Poisson subsampling solves this problem. A distributed subsampling framework computes statistics on smaller data partitions. Strategies are evaluated through numerical experiments. 学术",
       "speakerBio": "北京大学数学科学学院统计学二级教授、博士生导师。兼任全国应用统计专业学位研究生教育指导委员会委员,中国现场统计研究会副理事长,试验设计分会理事长,高维数据统计分会副理事长,统计调查分会副理事长。中国数学会理事,普及与传播工作委员会委员,均匀设计分会副主任,中国概率统计学会第十一届理事会秘书长。中国统计学会常务理事。担任四个国际重要SCI期刊Statistica Sinica、JSPI、SPL和Stat的副主编,国内核心期刊 《系统科学与数学》、《数理统计与管理》、《数学进展》编委,科学出版社《统计与数据科学丛书》编委。主要从事大数据采样理论与算法、试验设计与分析、计算机仿真试验与建模、应用统计的教学和研究工作,在AoS、JASA、Biometrika、《中国科学》等国内外重要期刊发表学术论文八十余篇。主持国家自然科学基金重点项目1项、面上项目5项,另参与完成多项科技部重点研发计划项目。曾获得北京大学优秀博士学位论文指导教师和北京市高等学校优秀教学成果奖二等奖。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "human"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20230615/9625.html",
@@ -46576,14 +46603,14 @@
       "title": "周一午餐会报告（第155次- 赵锦柱）",
       "topic": "二维铁电材料的第一性原理研究",
       "lectureStart": "2023-06-05 12:15:00",
-      "lectureEnd": "2023-06-05 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "赵锦柱",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2023-06-02 09:14:00",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第155次- 赵锦柱）",
       "sources": [],
       "merged": false,
@@ -46851,7 +46878,8 @@
         "http://statics.scnu.edu.cn/pics/xingzhi/2024/0304/1709541493331756.jpg",
         "http://statics.scnu.edu.cn/statics/images/xingzhi/xzqrcode.jpg"
       ],
-      "speakerBio": "主讲专家：包雷，美国俄亥俄州立大学物理系和教育学院双聘教授，国际华人物理及天文学会会长。研究领域包括:科学及物理学科教育，科学思维模型和测评，知识整合深度学习模型和测评，中美教育比较，认知理论模型，复杂系统模型，等等。包雷教授主持多项美国国家科学基金项目，主要研究成果发表于SCIENCE等国际著名期刊。"
+      "speakerBio": "主讲专家：包雷，美国俄亥俄州立大学物理系和教育学院双聘教授，国际华人物理及天文学会会长。研究领域包括:科学及物理学科教育，科学思维模型和测评，知识整合深度学习模型和测评，中美教育比较，认知理论模型，复杂系统模型，等等。包雷教授主持多项美国国家科学基金项目，主要研究成果发表于SCIENCE等国际著名期刊。",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230526/12310.html",
@@ -47756,14 +47784,14 @@
       "title": "周一午餐会报告（第152次- 王振宇）",
       "topic": "跳跃式量子绝热操控及其应用",
       "lectureStart": "2023-05-15 12:15:00",
-      "lectureEnd": "2023-05-15 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "王振宇",
       "speakerAffiliation": "理论所",
       "organizer": "物理学院",
       "publishTime": "2023-05-11 14:47:05",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第152次- 王振宇）",
       "sources": [],
       "merged": false,
@@ -48268,14 +48296,14 @@
       "title": "周一午餐会报告（第151次- 顾敏）",
       "topic": "超导单光子探测器制备及应用研究",
       "lectureStart": "2023-05-08 12:15:00",
-      "lectureEnd": "2023-05-08 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "顾敏",
       "speakerAffiliation": "光学所",
       "organizer": "物理学院",
       "publishTime": "2023-05-04 08:43:41",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第151次- 顾敏）",
       "sources": [],
       "merged": false,
@@ -49997,14 +50025,14 @@
       "title": "周一午餐会报告（第146次-华俊）",
       "topic": "格点QCD、大动量有效理论与核子结构",
       "lectureStart": "2023-03-27 12:15:00",
-      "lectureEnd": "2023-03-27 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "华俊",
       "speakerAffiliation": "量子物质研究院",
       "organizer": "物理学院",
       "publishTime": "2023-03-24 09:20:27",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第146次-华俊）",
       "sources": [],
       "merged": false,
@@ -50364,14 +50392,14 @@
       "title": "周一午餐会报告（第145次-徐小志）",
       "topic": "非中心反演对称二维单晶材料通用制备研究",
       "lectureStart": "2023-03-20 12:15:00",
-      "lectureEnd": "2023-03-20 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "徐小志",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2023-03-20 09:17:03",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "same-day-normal;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第145次-徐小志）",
       "sources": [],
       "merged": false,
@@ -50655,14 +50683,14 @@
       "title": "周一午餐会报告（第144次-周涛）",
       "topic": "Topological states in high-Tc superconductor heterostructures",
       "lectureStart": "2023-03-13 12:15:00",
-      "lectureEnd": "2023-03-13 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "周涛",
       "speakerAffiliation": "凝聚态所",
       "organizer": "物理学院",
       "publishTime": "2023-03-09 09:08:40",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第144次-周涛）",
       "sources": [],
       "merged": false,
@@ -50938,7 +50966,8 @@
       "abstract": "Kramers定理告诉我们,",
       "speakerBio": "陈宇,现就职于中国工程物理学院研究生院。陈宇于2012年在北京大学物理学院获得博士学位,后在清华大学高等研究中心作博士后研究工作,2015年加入首都师范大学物理系,后于2020年2月加入中国工程物理学院研究生院至今。主讲人主要从事量子开放系统,量子混沌,拓扑与无序的研究。主要贡献有发现费米子超辐射的密度依赖性质并帮助实验发现了费米子超辐射中的Pauli阻塞效应,发现量子混沌系统中由有效Plank常数驱动的量子霍尔效应,提出非厄米线性响应理论,贡献了一个普适的熵产生公式,以及发现了开放系统中时间反演对称性的脆弱性与拓扑边界态失效之间的关系。",
       "inviter": "张善超报告内容: Kramers定理告诉我们,",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20230303/12202.html",
@@ -51118,14 +51147,14 @@
       "title": "周一午餐会报告（第142次-陈涛）",
       "topic": "基于路径优化的超导容错操控研究",
       "lectureStart": "2023-02-27 12:15:00",
-      "lectureEnd": "2023-02-27 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "陈涛",
       "speakerAffiliation": "理论物理所",
       "organizer": "物理学院",
       "publishTime": "2023-02-22 14:38:07",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第142次-陈涛）",
       "sources": [],
       "merged": false,
@@ -51615,7 +51644,8 @@
       "timeNote": "authoritative-label;cv-url-date-mismatch",
       "timeUnknown": true,
       "vlmBackfilled": true,
-      "qaRepaired": "2026-09-05.2-marker"
+      "qaRepaired": "2026-09-05.2-marker",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20221216/9338.html",
@@ -51764,14 +51794,14 @@
       "title": "周一午餐会报告（第141次-王洁琳）",
       "topic": "黑磷介导Photoporation技术研究及其应用",
       "lectureStart": "2022-12-12 12:15:00",
-      "lectureEnd": "2022-12-12 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "王洁琳",
       "speakerAffiliation": "现代光学所",
       "organizer": "物理学院",
       "publishTime": "2022-12-09 09:31:05",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第141次-王洁琳）",
       "sources": [],
       "merged": false,
@@ -52133,14 +52163,14 @@
       "title": "周一午餐会报告（第140次-陆延欣）",
       "topic": "光学拓扑绝缘体的相变方法和边缘态",
       "lectureStart": "2022-12-05 12:15:00",
-      "lectureEnd": "2022-12-05 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "陆延欣",
       "speakerAffiliation": "现代光学所",
       "organizer": "物理学院",
       "publishTime": "2022-12-01 09:43:08",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第140次-陆延欣）",
       "sources": [],
       "merged": false,
@@ -52898,14 +52928,14 @@
       "title": "周一午餐会报告（第140次-王洁琳）",
       "topic": "黑磷介导Photoporation技术研究及其应用",
       "lectureStart": "2022-11-14 12:15:00",
-      "lectureEnd": "2022-11-14 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "王洁琳",
       "speakerAffiliation": "现代光学所",
       "organizer": "物理学院",
       "publishTime": "2022-11-13 09:29:08",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第140次-王洁琳）",
       "sources": [],
       "merged": false,
@@ -53032,7 +53062,8 @@
       "abstract": "论坛计划每两周举办一次,每次一到两个报告,时间一般安排在周四下午的15:00-17:00。论坛邀请校内外师生报告各种与人工智能相关的学术研究,既可以是原创性的工作,也可以是当前领域所关注的问题。论坛近期的活动请参见下表,同时欢迎",
       "speakerBio": "",
       "qaGate": "speakerBio:emptied",
-      "qaRepaired": "2026-09-05.1-gate"
+      "qaRepaired": "2026-09-05.1-gate",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20221108/4096.html",
@@ -53569,7 +53600,8 @@
       "abstract": "论坛计划每两周举办一次,每次一到两个报告,时间一般安排在周四下午的15:00-17:00。论坛邀请校内外师生报告各种与人工智能相关的学术研究,既可以是原创性的工作,也可以是当前领域所关注的问题。论坛近期的活动请参见下表,同时欢迎",
       "speakerBio": "",
       "qaGate": "speakerBio:emptied",
-      "qaRepaired": "2026-09-05.1-gate"
+      "qaRepaired": "2026-09-05.1-gate",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://ai.scnu.edu.cn/a/20220928/163.html",
@@ -53602,7 +53634,8 @@
       "abstract": "论坛计划每两周举办一次,每次一到两个报告,时间一般安排在周四下午的15:00-17:00。论坛邀请校内外师生报告各种与人工智能相关的学术研究,既可以是原创性的工作,也可以是当前领域所关注的问题。论坛近期的活动请参见下表,同时欢迎",
       "speakerBio": "",
       "qaGate": "speakerBio:emptied",
-      "qaRepaired": "2026-09-05.1-gate"
+      "qaRepaired": "2026-09-05.1-gate",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20221027/66.html",
@@ -53877,14 +53910,14 @@
       "title": "周一午餐会报告（第137次-李建锋）",
       "topic": "基于冷原子的无磁光学环形器",
       "lectureStart": "2022-10-24 12:15:00",
-      "lectureEnd": "2022-10-24 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "李建锋",
       "speakerAffiliation": "量子科学与技术所",
       "organizer": "物理学院",
       "publishTime": "2022-10-20 15:27:50",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第137次-李建锋）",
       "sources": [],
       "merged": false,
@@ -54339,7 +54372,8 @@
       "abstract": "论坛计划每两周举办一次,每次一到两个报告,时间一般安排在周四下午的15:00-17:00。论坛邀请校内外师生报告各种与人工智能相关的学术研究,既可以是原创性的工作,也可以是当前领域所关注的问题。论坛近期的活动请参见下表,同时欢迎",
       "speakerBio": "",
       "qaGate": "speakerBio:emptied",
-      "qaRepaired": "2026-09-05.1-gate"
+      "qaRepaired": "2026-09-05.1-gate",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20221013/9186.html",
@@ -54725,7 +54759,8 @@
       "timeUnknown": false,
       "abstract": "In this topic, we discuss a dynamic optimal reinsurance and dividend-payout problem for an insurance company in a infinite time horizon. 学术",
       "speakerBio": "管崇虎, 嘉应大学数学学院副教授。从事偏微分方程,金融数学和随机控制相关研究。分别主持一项国家自然科学基金天元基金项目、一项国家自然科学基金青年项目、一项广东省自然科学基金面上项目和一项嘉应大学高层次人才项目。在JDE、MOR、SICON、SIFIN等高水平SCI期刊上发表论文十余篇。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220923/12102.html",
@@ -55202,7 +55237,8 @@
       "timeUnknown": false,
       "abstract": "Ban et al.在MS提出了绩效正则化法,通过向均值-方差模型、均值-CVaR模型中加入PBR约束条件,从而减小参数估计误差,提高模型的样本外表现。本文则将他们的PBR约束条件推广到更一般化的均值-下偏矩模型中。具体地,我们证明了含PBR约束条件的均值-下偏矩模型的凸性,从而保证优化问题的解是全局最优解。进一步地,我们证明了该优化问题解的渐近一致性。此外,我们改造了标准的k-折交叉检验法,并用机器学习的方法,通过线性回溯法实时更新PBR约束条件的最优参数取值。 学术",
       "speakerBio": "姚海祥,广东外语外贸大学金融学院教授、博士生导师、云山杰出学者、广东省珠江学者(设岗学科为金融学),广州市金融高级专业人才。从事金融资产配置和风险管理、非参数估计及应用、资产-负债管理和养老基金投资管理等方面的研究工作,近年来已在国内外重要期刊上发表学术论文60余篇。主持了国家社科基金重点项目(重大转重点)、国家自然科学基金面上项目多项。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2022/0920/29.html",
@@ -55224,7 +55260,8 @@
       "timeUnknown": true,
       "speakerBio": "曾路,男,1962年生,广东阳江人,现任广东省基础与应用基础研究基金委员会主任(副厅级)。1984年获华中科技大学电子材料与器件专业工学学士,1992年获华南师范大学现代光学专业理学硕士,2002-2003年英国莱斯特大学管理中心进修生,2005年获暨南大学国际关系专业法学博士。曾任广东省科技厅发展规划处调研员兼广东省科学技术发展战略研究院院长,科技交流合作处处长、广东省科技服务业研究院院长。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20220919/7398.html",
@@ -55251,7 +55288,8 @@
       "timeUnknown": false,
       "abstract": "The talk is a mixture of analysis, geometry, topology and algebra. Linear operators from calculus contain (infinite-dimensional) function spaces with extra smooth structures. Under the framework of diffeology, one gets short exact sequences which do not split smoothly. Smooth homological algebra is thus established to capture such phenomena. In the process, concrete projective diffeological vector spaces are produced from classical vector bundle theory via the pushforward operation, and some curious isomorphisms are derived. Many open questions, especially those related to characteristic classes, will be proposed during the talk. 学术",
       "speakerBio": "邬恩信,2012年毕业于加拿大西安大略大学,现任汕头大学数学系副教授。主要从事广义微分几何和代数拓扑的研究。在Adv. Math., Israel J. Math., Pacific J. Math.等杂志发表相关论文10篇。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220914/12086.html",
@@ -55260,14 +55298,14 @@
       "title": "周一午餐会报告（第132次-王振宇）",
       "topic": "容错量子绝热捷径",
       "lectureStart": "2022-09-19 12:15:00",
-      "lectureEnd": "2022-09-19 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "王振宇",
       "speakerAffiliation": "理论物理所",
       "organizer": "物理学院",
       "publishTime": "2022-09-14 16:17:07",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第132次-王振宇）",
       "sources": [],
       "merged": false,
@@ -55636,14 +55674,14 @@
       "title": "周一午餐会报告（第132次-刘佳）",
       "topic": "Robust and Fast Quantum State Transfer on Superconducting Circuits",
       "lectureStart": "2022-09-05 12:15:00",
-      "lectureEnd": "2022-09-05 12:15:00",
+      "lectureEnd": null,
       "location": "理6栋302",
       "speaker": "刘佳",
       "speakerAffiliation": "理论物理所",
       "organizer": "物理学院",
       "publishTime": "2022-09-05 09:17:46",
       "timeConfidence": "high",
-      "timeNote": "same-day-normal",
+      "timeNote": "same-day-normal;cv-end-eq-start-cleared",
       "listTitle": "周一午餐会报告（第132次-刘佳）",
       "sources": [],
       "merged": false,
@@ -56016,7 +56054,8 @@
       "timeUnknown": true,
       "abstract": "面对新时代的挑战,人才资源需要有效培养,其核心是提升人才多元化能力培养。报告将探讨国际上对新时代教育目标的关注方向,其核心认知能力培养目标包括构建深度理解(深度学习)和广度融合的知识体系,已及提升科学思维和创造力等高端思维能力。通过案例分析,报告将重点介绍知识整合和科学思维方面的最新研究发展,并讨论其对中国教育创新发展可以有的启示,通过借鉴融合的自主开发优化,更好地服务中国的教育目标。 华南师范大学汕尾校区作为贯彻落实广东省委省政府重大决策部署的重点工程，由广东省教育厅、汕尾市人民政府、华南师范大学、深圳大学四方共建，是华南师范大学“一校三地四校区”办学体系的重要组成部分，也是粤东西北地区第一个国家“双一流”大学和“211工程”大学扎根办学的校区。汕尾校区位于美丽的海滨城市汕尾市城区，毗邻深汕特别合作区，校园滨海而建，自然风光秀美，交通位置便利，总占地面积约2000亩，总建筑面积约540900m^2，其中一期约948亩，建筑面积约为373300m^2，二期、三期约1000亩。",
       "speakerBio": "包雷,美国俄亥俄州立大学物理系和教育学院双聘教授,国际华人物理及天文学会副会长。研究领域包括:科学思维模型和测评,科学教育的知识整合深度学习模型和测评,中美教育比较,信息和复杂系统理论模型及社会过程演变模型,智能学习机制,认知理论和教育模型,科学哲学及认识论模型等。包雷教授主持多项美国国家自然科学基金项目,主要研究成果发表在SCIENCE等国际著名期刊。",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20220620/2322.html",
@@ -56950,7 +56989,8 @@
       "abstract": "",
       "speakerBio": "张修玉研究员,广东环科院生态文明与绿色发展研究所所长,中国农工民主党广东省委人口与资源环境工作委员会副主任,中国生态文明研究与促进会理事。近年来张修玉主持完成国家与地方课题100余项,技术支撑汕尾、惠州、深圳、珠海等几十个地市(县区)成功创建国家生态文明建设示范区。主编(或翻译)出版专著《牢固树立社会主义生态文明观》、《绿水青山就是金山银山:中国路径与实践》、《文明",
       "qaRepaired": "2026-09-05.2",
-      "speakerTitle": "研究员"
+      "speakerTitle": "研究员",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20220518/11943.html",
@@ -58772,7 +58812,8 @@
       "abstract": "本次讲座中,景庆虹教授将与与会教师",
       "speakerBio": "景庆虹,男,1958年7月生于重庆,汉族,中共党员。现任北京林业大学人文学院社会科学学院公共关系文化传播与应用研究所所长、教授、硕士生导师。兼任中国国际公共关系协会理事;中国公共关系协会理事、学术委员会委员,培训中心客座教授;《中华儿女》、《公关世界》杂志特邀记者,栏目撰稿人;北京市写作协会会员。2006年被评为\"中国公关教育20年十大杰出人物\"。自1993年至今,主撰、主编、参编并出版《中国古文化博览》、《走进21世纪的中国两性关系》、《生态危机管理公共关系》、《公共关系学》、《大学生社交礼仪》、《公关员》、《口才学教程》、《公关经理教程》、《市民文明礼仪读本》、《农民文明礼仪读本》、《舌战京城》等专著、教材、指导书、论文集30余部;公开发表《从非典危机看危机公关》、《\"虎照门事件\"与政府公共关系危机的思考》、《中国危机管理公共关系之得失》、《大学生人际关系危机的调查分析及对策》、《生态危机管理中的公共关系》、《关于公共关系本质的思考》等学术论文90余篇,近400万字。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2021/1203/2993.html",
@@ -60045,7 +60086,8 @@
       "timeNote": "same-day-normal",
       "listTitle": "张宏宝——2022年国家社科基金项目政策解读",
       "timeUnknown": true,
-      "abstract": "社科处处长张宏宝对近期学校文科科研工作进行总结,详细介绍了科研工作的有关政策及近期科研主要工作安排和部署,尤其对2022年国家社科基金项目的申报和组织工作进行详细指导。"
+      "abstract": "社科处处长张宏宝对近期学校文科科研工作进行总结,详细介绍了科研工作的有关政策及近期科研主要工作安排和部署,尤其对2022年国家社科基金项目的申报和组织工作进行详细指导。",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20211104/8676.html",
@@ -60227,7 +60269,8 @@
       "timeUnknown": true,
       "abstract": "大学物理是一门自然科学的基础课,在为学生打好科学基础、培养学生科学素养和创新潜能中具有重要作用。本门讲座由中国民航学院理学院宋庆功教授",
       "speakerBio": "宋庆功,硕士生导师,中国民航大学理学院教授。主讲《普通物理》、《材料物理导论》、《材料设计概论》、《物理学与高新技术》、《固体物理学》等课程。天津市精品课程《普通物理》课程组组长。主要从事材料物理与化学方面的科学研究。主持完成省级自然科学基金项目,成果达到国际先进水平。在《Journal of Applied Physics》等国际国内学术期刊发表论文20余篇,被国际著名检索工具SCI、EI等收录10余篇。编著《大学物理教程》等著作6部。获得河北省第二届青年科技奖;天津市教学成果二等奖等多项奖励。",
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20211029/11747.html",
@@ -60429,7 +60472,9 @@
       "llmTextEnhanced": false,
       "llmVerdict": null,
       "llmSpeakerSource": null,
-      "listTitle": "● （时间更改为10月28日）华师经管学术讲座第381期（经济）"
+      "listTitle": "● （时间更改为10月28日）华师经管学术讲座第381期（经济）",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "https://swc.scnu.edu.cn/collaborative/2021/1026/28.html",
@@ -61365,7 +61410,8 @@
       "timeUnknown": true,
       "abstract": "自古即有\"因材施教\"的教育理念和教学规程,在教学改革如火如荼的今天,应当更加重视并大力倡导\"因学施教\"的课程活动模式。两者虽一字之差,却有着更加丰富、具体的实在意义——强调根据学生个体和群体的综合学情,积极开展行之有效的课程教学活动。本次讲座中,中共中央党校的张玉杰教授将围绕\"怎样因学施教\"这一主题,为大家",
       "speakerBio": "张玉杰,清华大学经济管理学院博士后、美国关岛大学客座教授、澳大利亚梅铎大学客座教授、清华大学21世纪发展研究院特聘研究员。出版著作6部,国内外发表学术论文80多篇。主持完成国家社科基金项目、省部级项目、政府项目企业项目多项。曾主持大唐集团竞争策略、北京将台地产公司CIS设计、成山集团发展战略、将军集团技术中心设计、将军集团发展战略、北京工业发展规划、北京光机电产业基地设计与发展规划、长江三角洲经济发展等多项研究课题。",
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210906/11691.html",
@@ -62132,7 +62178,8 @@
       "publishTimeSource": "position",
       "listTitle": "POA在大学英语教学中的应用",
       "timeUnknown": true,
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://swc.scnu.edu.cn/collaborative/2021/0705/34.html",
@@ -63271,7 +63318,8 @@
       "abstract": "\"后真相\"是指人们只在意情绪或主张而不管事实和道理的现象,反映了民众态度的形成和决定,在社交媒体时代具有鲜明的集体非理性特点。\"媒介素养\"是指社会公众对于媒介信息的解读和批判能力,以及使用所获得的媒介信息为其个人生活乃至社会发展所用的综合能力。本次讲座中,金兼斌教授将从后真相时代媒体社会面临的挑战出发,从几个维度阐述媒介素养的概念,探析后真相时代下的媒介素养问题以及如何培养自身媒介素养。 【每周一课】后真相时代的媒介素养课程名称：后真相时代的媒介素养授课对象：华南师范大学在职教工授课",
       "speakerBio": "金兼斌,男,浙江诸暨人,清华大学新闻与传播学院教授,博士生导师,院学术委员会主任。先后在清华大学获得工学士、文学士、工学硕士,在香港浸会大学获得传播学博士学位,牛津大学互联网研究所访问学者(",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210525/11626.html",
@@ -63858,7 +63906,8 @@
       "abstract": "党旗是中国共产党的象征和标志，从一个侧面记录了中国共产党人披荆斩棘、求索奋进的苦难辉煌。本次讲座中，主讲人郑彦良教授将以党旗诞生历程为主脉，结合“中国共产党党旗诞生历程珍贵档案展”的资料、照片和文献，带领党员同志们从“高高打出共产党的旗子”、“战斗的旗帜”、“高举团结抗战的大旗”、“七大期间的公开征集”、“历时八十一载写入党章”等五个方面回顾党旗漫长、曲折的诞生历程，通过一百多张珍贵的历史照片，展示中国共产党自诞生至今近一个世纪里的各个重要历史节点上的党旗样貌。通过党旗的演进确立过程，回顾中国共产党百年的发展历程，普及党史关键节点的知识，教育广大党员、群众坚定跟党走的信心。",
       "speakerBio": "郑彦良,中共党员,研究员,曾任北京航空航天大学人文学院党总支书记。研究方向为政府管理研究、高校教育管理、党务管理研究。长期从事高校教育管理工作,先后主持省部级课题五项。在《中国教育报》《教育管理研究》《清华大学学报(社科版)》等发表论文多篇。主持编写\"走进北航\"系列丛书。曾获北京市优秀教学成果二等奖、北京市优秀报告一等奖、北京市优秀党务工作者,曾任北京市高校文明校园评估验收专家组成员、校党建研究会秘书长、北京市高校精品课评审专家。主编《探索与实践-北航党建与思想政治工作论文集》;中国航空工业总公司思想政治工作成果(实践)一等奖;主持完成北京市社科规划项目-邪教对策研究;主持完成\"公务员道德建设现状及对策研究\"(报告与论文);主持完成二项北京市教育科研基金资助课题。获2001-2005年国防科工委系统和北京市普法教育先进个人。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20210510/5492.html",
@@ -63986,7 +64035,8 @@
       "timeUnknown": true,
       "abstract": "教师本职工作应是“教书育人”、“立德树人”，信息化的发展带来的生活越便捷，就越要时刻谨记坚守师德底线，教师们的职责不仅仅是传授学识，更要给学生们带来以身作则的好习惯和老师这个称谓所带来的责任感。本次讲座中，主讲人王新农教授将从《天津大学师德公约》作为新时代天大师德文化符号的作用谈起，以“跨界”和“细节”两个关键词为线索，结合自身多年教书育人经验，和现场教师展开互动，传递对《师德公约》的深刻理解。",
       "speakerBio": "王新农,1945年2月出生,江苏东台人,中共党员,教授,专长经济社会学。原天津大学社会科学与外国语学院人文社会科学系主任。曾承担国家社科基金项目1项、参与国家社科基金、国家部委研究项目10余项。承担天津社科规划重点项目1项、承担市级人文社会科学项目10余项。承担天津大学985建设项目5项。主编专著、教材、工具书、参著、参编各10余部。发表论文30余篇,为国家部委多部门及天津市委市政府多部门提供调研报告10余篇,其研究成果曾多次获奖。",
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20210429/8363.html",
@@ -64016,7 +64066,9 @@
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
       "llmAdopted": "speakerTitle|speakerAffiliation",
-      "listTitle": "● (时间更改）华师经英seminar第25期"
+      "listTitle": "● (时间更改）华师经英seminar第25期",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20210423/2094.html",
@@ -64537,7 +64589,8 @@
       "abstract": "本次讲座中,杨教授将从自身多年思想政治教育创新与实践的教学经验出发,深入结合习近平新时代中国特色社会主义思想,全面落实全国教育大会、全国高校思想政治工作会议和思想政治理论课教师座谈会精神,结合当今时政热点问题",
       "speakerBio": "杨志成,男,东北师范大学毕业,博士,研究员。兼任第十一届国家督学、北京市教育督导学会副会长,北京市学校德育研究会副会长。曾任北京市第109中学教师、副校长;北京市崇文区教委副主任;北京奥组委新闻宣传部奥林匹克教育处处长;北京市崇文区教委主任;北京市崇文区人民政府教育督导室主任;北京市东城区教委主任;北京市教委基础教育一处处长;北京教育学院副院长等职务。主要研究领域:教育哲学、思想政治教育、基础教育行政、学校管理 、课程与教学、奥林匹克教育等。主持国家社科基金项目和北京市教育规划课题等省部级以上课题5项。在《教育研究》《中国教育学刊》《课程教材教法》等学术期刊发表相关学术文章近百篇;出版专著《新中国基础教育政策价值取向演变——政策生态学视角》《教育实践的学思足迹》《学校教育品牌:案例与分析》《教育走向未来》等。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210407/11565.html",
@@ -64739,7 +64792,8 @@
       "abstract": "十三届全国人大四次会议3月11日表决通过了《中华人民共和国国民经济和社会发展第十四个五年规划和2035年远景目标纲要》,作为起草工作参与者,张力秘书长将结合相关背景资料,对我国教育形势和国家政策导向进行深入解析。 【每周一课】对“十四五”教育改革和规划的展望与分析：“十四五”时期建设高质量教育体系的形势和政策导向课程名称：对“十四五”教育改革",
       "speakerBio": "张力,国家教育咨询委员会秘书长,教育部教育发展研究中心原主任、研究员、博导,国家督学,北京、上海、江苏、福建、江西等五省市政府咨询专家、多所大学兼职教授。30多年来专职从事公共政策研究,经常参与党和国家重大政策文件和规划的调研起草工作。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20210326/11560.html",
@@ -66132,7 +66186,8 @@
       "abstract": "Quantum probes using N uncorrelated particles give a limit on the measurement sensitivity referred to as the standard quantum limit (SQL). The SQL, however, can be overcome by exploiting quantum entangled states, such as spin squeezed states. We report generation of a quantum state, that surpasses the SQL for probing of the collective spin of 1011 Rb atoms contained in a vapor cell. The state is prepared and veri?ed by sequences of stroboscopic quantum non-demolition (QND) measurements, and we apply the theory of past quantum states to obtain the spin state information from the outcomes of both earlier and later QND measurements. In this way, we obtain a conditional noise reduction of 5.6 dB, and a metrologically-relevant squeezing of 4.5±0.40 dB. The past quantum state yields tighter information on the spin component than we can obtain by a conventional QND measurement. Our squeezing results are obtained with 1000 times more atoms than in any previous experiments with a corresponding record 4.6 × 10?13rad2 variance of the angular ?uctuations of a squeezed collective spin. We have applied the protocol to experimentally demonstrate a quantum-enhanced atomic magnetometer.",
       "speakerBio": "申恒本科毕业于南开大学天津大学合办光电子技术科学专业。 2015年在丹麦哥本哈根大学尼尔斯玻尔研究所获得博士学位。之后在奥地利因斯布鲁克国家科学院量子信息与量子光学中心从事基于离子阵列的量子模拟与计算实验博士后研究，并于2017年获得英国皇家学会牛顿国际基金支持在牛津大学从事光力原子混合系统的研究。现为山西大学量子光学与光量子器件国家重点实验室教授。以通信作者或第一作者在国际著名刊物发表多篇论文，包括自然主刊，自然物理及物理评论快报等。研究方向包括量子模拟与计算、量子精密测量及新型量子材料等。",
       "speakerTitle": "教授",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20201127/8110.html",
@@ -66485,7 +66540,8 @@
       "listTitle": "首届“华南公共治理高峰论坛暨公共管理学科建设”研讨会",
       "timeUnknown": false,
       "abstract": "10:00- 10:45 议题二: 中国共产党与中国之治陈潭 (主持人) 肖滨、金太军、 赵成根、胡元梓、黄新华 (发言嘉宾) 10:45- 11:00 茶歇 11:00- 11:30 议题三: 改革开放40年与中国特色的公共管理创新杨爱平 (主持人) 彭勃、马卫红、 彭未名、史传林 (发言嘉宾) 11:30- 12:30 议题四: 中国公共管理学科建设的经验与展望 (线上会议) 倪星 (主持人) 姜晓萍、张贤明、彭宗超、 张雷、章文光、郅庭瑾 (发言嘉宾) 15:00- 17:30 公共管理学科建设闭门会议 (208会议室)",
-      "qaRepaired": "2026-09-23.1-agenda"
+      "qaRepaired": "2026-09-23.1-agenda",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://ggy.scnu.edu.cn/a/20201117/5322.html",
@@ -67713,7 +67769,8 @@
       "abstract": "随着互联网和移动设备的普及，数据收集和分析变得更加容易和广泛。大数据分析已经成为许多行业的关键工具，从商业决策到科学研究，再到社会政策制定，都在利用数据分析来获得洞察力并做出更好的决策。",
       "speakerBio": "陈景文教授，现任大连理工大学环境学院院长，国家杰出青年科学基金获得者；国务院特殊津贴获得者。面向化学品风险管理与控制的需求，在环境计算化学与毒理学、污染生态化学领域开展研究工作。发表论文300余篇，出版著作3部，SCI他引7000余次。研究成果获国家自然科学二等奖、教育部自然科学二等奖。获首届“高校优秀青年教师奖”和辽宁“十大科技英才奖”。 任国家精品资源共享课“环境化学及实验”的主讲和负责人、教育部环境科学与工程类专业教学指导委员会委员，SCI期刊“ACS Sustain. Chem. Eng.”副主编，“生态毒理学报”副主编，“Ecotox. Environ. Safe.” “J. Environ. Sci.”和核心期刊“环境化学” “海洋环境科学”“环境科学”编委，以及中国毒理学会理事、中国化学会环境化学专业委员会副主任、中国毒理学会计算毒理学专业委员会副主任、中国环境科学学会持久性有机污染物专业委员会委员、中国毒理学会环境与生态毒理学专业委员会常委。",
       "speakerTitle": "教授",
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2020/1020/43.html",
@@ -67737,7 +67794,8 @@
       "timeUnknown": false,
       "abstract": "",
       "speakerBio": "张礼知，国家杰出青年科学基金获得者，科技部中青年科技创新领军人才计划，教育部长江学者特聘教授，中组部万人计划科技创新领军人才。现任华中师范大学教授、化学学院副院长、环境与应用化学研究所所长。主要研究污染控制化学、光催化、纳米环境催化材料。已获授权专利30余项。在Chem、Acc. Chem. Res.、Nature Commun.、JACS、Angew. Chem.、Adv. Mater.、ES&T等SCI论文280多篇，其中25篇入选ESI高被引论文。截至2020年9月论文已被引用26410多次，其中他引25579多次，H因子91。2008年获得湖北省自然科学二等奖（第一完成人），2014年起连续入选Elsevier化学领域中国高被引学者，2015年获教育部高等学校科学研究优秀成果奖（科学技术）自然科学二等奖（第一完成人），2018年起入选Clarivate（Web of Science）全球高被引科学家，2019年获得湖北省自然科学一等奖（第一完成人）。",
-      "qaRepaired": "2026-09-05.2"
+      "qaRepaired": "2026-09-05.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20201023/8006.html",
@@ -70228,7 +70286,8 @@
       "abstract": "中国大学MOOC 華南師花大学疫情时期在线教学疫情就是命令,防控就是责任。本课程彰显华南师范大学国家\"211工程\"和\"双一流\"重点建设大学的社会责任担当,依托教育技术学国家重点学科,直击解决一线教师对在线教学价值的认识不到位、在线教学创新的理论指导匮乏、 在线教学能力的培训缺失等问题,保障\"停课不停学\"线上教学高效开展。 课程团队课程特色直击解决当下在线教学问题为一线教师在线教学\"减负\" 对在线教学价值的认识不到位对在线教学创新的理论指导匮乏对在线教学能力的培训缺失 2周8学时,轻松个性学浓缩精华,学习体验\"短平快\" 自定步调,学习内容\"个性化\" 丰富一线案例,助你落地实践粤港澳大湾区高校在线开放课程联盟、地方高校优课联盟联合抗击疫情公益课(节选) 广东省本科高校在线开放课程指导委员会征集评选出119件案例课程内容 01在线教学基本原理 1.1战\"疫\"与在线教学 1.2在线教学基本理论 1.3疫情时期在线教学特点 1.4疫情时期基于慕课\"1+3\"在线教学典型案例 02疫情时期在线教学设计 2.1在线教学设计概述 2.2在线课程资源设计 2.3在线学习支持服务设计 03疫情时期在线教学模式 3.1在线教学模式概述 3.2疫情时期四种在线教学模式 3.3在线直播同步教学模式案例 3.4在线课程异步教学模式案例 3.5在线双师协同教学模式案例 3.6在线混合多元教学模式案例 04疫情时期在线教学案例 4.1疫情时期在线教学案例分析维度 4.2疫情时期中小学在线教学典型案例 4.3疫情时期高等学校在线教学典型案例 4.4疫情时期高校专业在线教学典型案例 4.5疫情时期高校课程在线教学典型案例 3月20日开课,扫码加入课程！ 中国大学MOOC搜索疫情时期在线教学 https://www.icourse163.org/course/scnu-1455405166",
       "speakerBio": "为防控新型冠状病毒肺炎疫情,教育部倡议学校延期开学,利用网络平台开展在线教学,在线教育成为全社会关注的焦点话题。经过一段时间的在线教学实施,基本解决了\"开学不返校\"\"停课不停学\"问题。 但在实施过程中,由于存在对在线教学价值的认识不到位、对在线教学创新的理论指导匮乏、对在线教学能力的培训缺失等问题,导致不少地区或学校出现了在线教学行动\"一刀切\"、在线教学方式单一、在线教学负担超重、在线教学效果存疑等现象。 当前,疫情防控处于重要时期,教育部明确指出要进一步做好在线教育教学,开展教学内容改革和教学模式方法创新。华南师范大学是国家\"211工程\"和\"双一流\"重点建设大学,华南师范大学的教育技术学作为国家重点学科,为应对疫情在线教学的迫切需要,专门开发《疫情时期在线教学》慕课,以精准解决在线教学的有关问题,保障线上教学与线下教学同质等效。 本课程涵盖\"在线教学基本理论\"、\"疫情时期在线教学设计\"、\"疫情时期在线教学模式\"和\"疫情时期在线教学案例\"四个模块,直击疫情时期在线教学实施,深入浅出地带您了解在线教学基本理论,掌握疫情时期在线教学设计方法,为您提供落地可用的在线教学模式和丰富的在线教学案例,助您在疫情时期高效开展在线教学。 本课程可供广大高校教师、职业院校教师、中小学教师以及教师教育专业本科生更新教学理念,补充在线教学理论知识,快速掌握疫情时期在线教学方法。学习者需具备一定的教育学、心理学基础知识。 三、课程特色 1、课程团队实力雄厚本课程负责人谢幼如教授是全国教师教育课程资源专家委员会委员、国家精品资源共享课和国家精品在线开放课程负责人、广东省高校教学名师、广东省本科高校在线开放课程指导委员会主任委员、二级教授,在教育技术领域具有积极的学术影响力。 2、课程内容重构创新本课程强调\"互联网+教育\"思维,彰显疫情时期在线教育价值,创新教学理念和教学设计方法;本课程注重课程思政,将疫情变为教材,引导教师关注学生身心健康、提升学生知识水平、培育学生坚韧意志、勇于担当的品格和爱国爱民的家国情怀;本课程遵循学生居家学习规律,引导教师尊重不同学段不同年级不同群体学生的学习规律,保障线上教学与线下教学同质等效。 3、课程资源丰富实用本课程除根据教学目标和教学内容制作的精美视频外,还吸纳了\"粤港澳大湾区高校在线开放课程联盟\"抗击疫情公益课\"高校在线教学案例",
       "speakerSource": "title",
-      "qaRepaired": "title-extract"
+      "qaRepaired": "title-extract",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20200310/1128.html",
@@ -72342,7 +72401,8 @@
       "timeUnknown": true,
       "abstract": "随着高教系统改革的全面推行,给高校教师带来全新发展机遇的同时,也带来了更大的挑战和压力,这使得大学的教育对教师的综合素质、科研能力等带来了更高的要求与全新的挑战。一些教师由此产生了种种心理困扰。过高的压力会使人形成一种消极的心理状态,缺乏工作激情,教学科研工作效率低下。近年来,人们对大学生的心理健康状况日益关注,但对高校教师的心理健康问题却关注很少。徐花老师就目前高校教师的心理压力来源、教师心理问题的现状等方面给予专门的指导,来帮助教师有效地缓解压力,从而使教师能够自觉克服负面情绪、减轻和缓解不良情绪,自觉地提高心理素质修养及心理承受能力,促进自身的心理成熟,保持健康心态,以更好地促进教学与科研质量的提升和学校发展。 【每周一课】高校教师心理调试与压力缓解课程名称：高校教师心理调试与压力缓解课程类别：教育部高校教师网络培训中心公益讲座授课对象：华",
       "speakerBio": "徐花:南京大学心理健康教育与研究中心专职教师、副教授;中国心理学会注册心理师;国家二级心理",
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20191126/812.html",
@@ -73292,7 +73352,8 @@
       "timeUnknown": true,
       "abstract": "本次讲座，清华大学土木工程系的冯鹏教授将结合自身的从教经历，从“为什么要当教师”这一问题切入，分享自身对于教书、教学与教育的深刻感悟和思考，探讨教学中了解学生的重要性、以学生为中心的关键性及创新教学模式的重要性等问题，希望能够以这些实践经验启发和助力一线高校青年教师的教学成长。",
       "speakerBio": "冯鹏,1977年出生,清华大学土木工程系教授,主要从事新型混凝土结构和复合材料结构的教学和研究,曾任清华大学土木工程系副系主任、土木水利学院副院长,主管教学工作,现任土木工程系暨建设管理系教学委员会副主任委员、交通工程与地球空间信息研究所所长。发表期刊论文100余篇,获起波钢筋、碳纤维桥索、复材增强海水海砂结构等相关发明专利17项,主编《结构用纤维增强复合材料拉挤型材》等国家标准3部,主持完成通州北运河千荷泻露大桥曲面封护结构、首座茅以升公益桥暨国内首座拉挤复材结构桥等示范性工程。曾获国家科技进步奖创新团队(成员),国家科技进步奖二等奖,国际土木工程复合材料学会(IIFC)Fellow,中国标准创新贡献奖一等奖,教育部长江奖励计划青年学者,国家基金委优秀青年基金,北京市茅以升青年科技奖,中国复合材料青年科学家奖,中国硅酸盐学会青年科技奖,全国建设工程FRP材料及结构杰出青年学者奖,全国建设工程复材应用成果推广奖,全国建材行业标准创新先进个人等奖励和荣誉。",
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20191101/1837.html",
@@ -73672,7 +73733,9 @@
       },
       "llmAdopted": "location",
       "qaGate": "topic",
-      "listTitle": "● 第七届组织经济学研讨会议程安排"
+      "listTitle": "● 第七届组织经济学研讨会议程安排",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20191108/7403.html",
@@ -73887,7 +73950,8 @@
       "abstract": "在解析深度学习的要义和理论模型基础上，分析融合评价、教学法和技术环境的APT教学框架，提出基于APT的教学促进学生深度学习的模型，以“教育技术学研究方法”课程教学为例，介绍智慧教室环境中基于APT框架设计的几个典型教学案例，包括形成性评价的互动教学、PBL项目式教学、翻转课堂教学及基于交互式微视频的虚拟实验教学，分享智慧课堂中的教学研究方法和教研成果。",
       "speakerBio": "张屹,华东师范大学教育技术学博士,美国北德克萨斯大学访问学者。华中师范大学教育信息技术学院教授、博士生导师。湖北省第12届政协委员、武汉市洪山区第14届、第15届人大代表、中国农工党湖北省委员会委员、华中师范大学委员会主委。全国信息技术标准化技术委员会教育技术委员会委员、国际标准化组织ISO-JTC1/SC36的专家委员。长期从事教育信息化发展评测与发展规划、智慧教室环境下的教学理论与实践、教育信息化技术标准等教学和研究工作。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20191105/802.html",
@@ -74147,7 +74211,8 @@
       "abstract": "2018年 8 月 ,教育部《关于狠抓新时代全国高等学校本科教育工作会议精神落实的通知》正式发布,提出\"各高校要全面梳理各门课程的教学内容,淘汰'水课'、打造'金课',合理提升学业挑战度、增加课程难度、拓展课程深度,切实提高课程教学质量\"。整顿高等学校的教学秩序,\"淘汰水课、打造金课\"首次正式写入教育部的文件。嵩天教授将结合教学中存在的问题,从混合式金课和轻量级混合式教学的定义出发,介绍混合式金课的设计思路与建设方法。通过对混合学习设计与传统教学设计做出区别,指出影响混合式金课的因素和混合式教学的设计步骤,并给出了切实的建议。本次课程为推动信息技术与教育教学深度融合的课程改革和课堂革命,为混合式金课与混合式教学方法的深度融合提供新的路径与策略。 【每周一课】混合式金课与轻量级混合式教学方法探索 课程名称：混合式金课与轻量级混合式教学方法探索 课程类别：教育部高校教师网络",
       "speakerBio": "嵩天,博士,北京理工大学计算机学院副教授,先进网络与数据安全研究所副所长,美国华盛顿大学(Washington University)公派访问学者。中国计算机学会高级会员,中国计算机学会体系结构专委会、教育专委会委员,高等院校计算机基础教育研究会理工专委会秘书长。主持国家自然科学基金、科技部重大研发计划子项目等各类科研项目40余项,主要研究方向是网络体系结构、网络信息安全等,在国际顶级学术期刊和会议上发表论文50余篇。主讲:Python语言程序设计及系列课程、计算机网络、网络信息安全等课程,在中国大学MOOC开设多门Python语言相关课程,累计选课人数超过90万。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20191024/91.html",
@@ -74458,7 +74523,8 @@
       "abstract": "进入21世纪以来,应用型大学的转型与应用型人才的培养,成为我国高等教育领域的热点话题。本次讲座,甘教授将结合中国大学改革和转型中面临的种种问题,从人才培养、课程改革、流程管理等维度,对应用型大学转型的必要性、转型的关键策略,及地方高校转型的应对之策等问题展开深入探讨。 【每周一课】应用型大学的转型与人才培养方案的制定 课程名称：应用型大学的转型与人才培养方案的制定 课程类别：教育部高校教师网络",
       "speakerBio": "甘德安男,汉族,博士研究生学历,教授。中国家族企业研究的先驱者之一。现任北京德成经济研究院副理事长、《中国慈善家》特约撰稿人。武汉大学、上海交通大学、中南财经政法大学客座教授。中国管理科学与工程学会及中国民(私)营经济研究会理事及常务理事。曾任北京工业大学耿丹学院院长、江汉大学商学院院长、江汉大学文理学院院长;第十一届民革中央委员,第九届、第十届湖北省人大代表、第十一届湖北省政协常委、武汉市民革主委。主持了国家社科基金、国家城市发展基金课题、华夏英才基金课题等30余项课题。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20191018/81.html",
@@ -76102,7 +76168,7 @@
       "title": "第104期心理沙龙-黄婉怡 博士",
       "topic": "The time course of familiar face processing",
       "lectureStart": "2019-10-10 16:00:00",
-      "lectureEnd": "2019-10-10 16:00:00",
+      "lectureEnd": null,
       "location": "心理学院301会议室",
       "speaker": "黄婉怡",
       "speakerTitle": "博士",
@@ -76112,7 +76178,7 @@
       "publishTime": "2019-10-09 11:34:02",
       "publishTimeSource": "position",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "general-body-full;cv-end-eq-start-cleared",
       "listTitle": "第104期心理沙龙-黄婉怡 博士",
       "sources": [],
       "merged": false,
@@ -78983,7 +79049,9 @@
         "title": "(此讲座已列入五四青年论坛)谭春桥教授讲座"
       },
       "llmAdopted": "topic|speaker|speakerTitle|speakerBio",
-      "listTitle": "● (此讲座已列入五四青年论坛)谭春桥教授讲座"
+      "listTitle": "● (此讲座已列入五四青年论坛)谭春桥教授讲座",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20190429/22.html",
@@ -79034,7 +79102,8 @@
       "llmTextEnhanced": true,
       "llmVerdict": "rich-only",
       "qaGate": "speakerBio:emptied",
-      "qaRepaired": "2026-09-05.1-gate"
+      "qaRepaired": "2026-09-05.1-gate",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20190425/106.html",
@@ -82030,7 +82099,7 @@
       "publishTimeSource": "label",
       "hasPosterImage": true,
       "listTitle": "全英教学（EMI）理论与实践国际研讨会",
-      "timeConfidence": "medium",
+      "timeConfidence": "mid",
       "timeNote": "conference-first-day 2018-11-23；无具体时段，默认 08:00（Conference dates: Nov 23-25, 2018）",
       "timeUnknown": true,
       "images": [
@@ -82040,7 +82109,8 @@
       ],
       "abstract": "全英教学（EMI）理论与实践国际研讨会，2018年11月23–25日在华南师范大学举行（23日会前工作坊，24–25日正式大会）。",
       "ocrExtracted": null,
-      "qaRepaired": "2026-09-10.round7"
+      "qaRepaired": "2026-09-10.round7",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20181116/1633.html",
@@ -84765,7 +84835,7 @@
       "title": "(时间地点更改)岭南金融论坛第二十八期",
       "topic": "私募基金管理行业的财务报表与绩效评估",
       "lectureStart": "2018-04-23 19:00:00",
-      "lectureEnd": "2018-04-23 19:00:00",
+      "lectureEnd": null,
       "location": "大学城教学楼5-504",
       "speaker": "谢子鹏",
       "speakerTitle": "",
@@ -84776,7 +84846,7 @@
       "publishTime": "2018-04-17 16:53",
       "publishTimeSource": "companion",
       "timeConfidence": "high",
-      "timeNote": "same-year",
+      "timeNote": "same-year;cv-end-eq-start-cleared",
       "newsFilterBypass": true,
       "llmTextEnhanced": false,
       "llmVerdict": "rule",
@@ -85295,8 +85365,8 @@
       "campus": "大学城",
       "title": "华南经济论坛第255期：邹先强博士讲座",
       "topic": "The One-Child Policy and Intergenerational Mobility",
-      "lectureStart": "2018-03-28 10:00:00",
-      "lectureEnd": "2018-03-28 11:30:00",
+      "lectureStart": "2019-03-28 10:00:00",
+      "lectureEnd": "2019-03-28 11:30:00",
       "location": "经济与管理学院五楼会议室",
       "speaker": "邹先强",
       "speakerTitle": "博士",
@@ -85307,7 +85377,7 @@
       "publishTime": "2019-03-28 09:34",
       "publishTimeSource": "companion",
       "timeConfidence": "high",
-      "timeNote": "authoritative-label;cv-url-date-mismatch;cv-publish-after-lecture",
+      "timeNote": "authoritative-label",
       "abstract": "This paper theoretically and empirically examines how fertility decline induced by the one-child policy has affected intergenerational mobility in China. I present a human capital investment model incorporating fertility and credit constraints, and show that fertility decline narrows the educational attainment gap between children from credit-constrained families and non-credit-constrained families, thus increasing intergenerational mobility. I then empirically test the model's prediction using variation in the implementation intensity of the one-child policy across regions and cohorts addressing the endogeneity of the fertility decision. I confirm that lower fertility increases intergenerational mobility, and that the one-child policy played an under-appreciated role in changing intergenerational mobility in China.",
       "newsFilterBypass": true,
       "llmTextEnhanced": true,
@@ -86395,7 +86465,8 @@
       "abstract": "",
       "llmTextEnhanced": false,
       "qaGate": "abstract:emptied",
-      "qaRepaired": "2026-09-05.1-gate"
+      "qaRepaired": "2026-09-05.1-gate",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://seri.scnu.edu.cn/Resources_CN/xueshujiangzuo/2017/1209/4.html",
@@ -89159,7 +89230,8 @@
       "timeNote": "same-year",
       "listTitle": "“互联网+”混合式课堂教学系列工作坊",
       "__idx": 2704,
-      "timeUnknown": true
+      "timeUnknown": true,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20170927/5851.html",
@@ -89250,7 +89322,9 @@
         "title": "我院举办微观经济理论与实验经济学国际研讨会通知"
       },
       "needsHumanReview": "location|topic",
-      "listTitle": "● 我院举办微观经济理论与实验经济学国际研讨会通知"
+      "listTitle": "● 我院举办微观经济理论与实验经济学国际研讨会通知",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20170919/1350.html",
@@ -91328,7 +91402,8 @@
       "timeUnknown": true,
       "abstract": "作为项目负责人,获得香港研究资助局的 8 项资助,以及 2 项自然科学基金, 3 项香港环境保育基金和 2 项香港创新科技基金的资助。与他人合作的项目有 15 项,包括美国 NSF 国际研究与教育合作基金,斯坦福大学",
       "speakerBio": "－ X 种子基金,瑞士国家研究计划等。在 The ISME Journal , Environmental Science & Technology , Water Research , Bioinformatics 等学术期刊上发表相关学术论文 200 篇,其中 ESI 高被引论文 11 篇, H 指数 54 (Google Scholar) ,总引用 9300 次( Google Scholar )。获得中国和美国专利各一项,合著书籍一部。 2011 到 2014 年受聘兼任\"华大基因\"环境微生物和环境生物技术的特邀顾问。",
-      "llmTextEnhanced": false
+      "llmTextEnhanced": false,
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20170223/5443.html",
@@ -91575,7 +91650,9 @@
       "llmTextEnhanced": false,
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
-      "listTitle": "● （地点更改）华南师范大学经济与管理学院2017年新年学术论坛"
+      "listTitle": "● （地点更改）华南师范大学经济与管理学院2017年新年学术论坛",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20161229/1216.html",
@@ -91764,7 +91841,8 @@
       "timeNote": "authoritative-label",
       "speakerBio": "柴彦威,北京大学城市与环境学院教授,博士生导师,智慧城市研究与规划中心主任,日本广岛大学文学博士。中国地理学会常务理事及城市地理专业委员会主任,时间地理学与行为地理学学术带头人。主持国家级科研项目 20 余项,发表学术论文 200 度篇,出版专著译著 20 多部,担当国内外 10 多个学术期刊的编委或副主编。",
       "abstract": "",
-      "qaRepaired": "2026-09-05.2"
+      "qaRepaired": "2026-09-05.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20161219/1208.html",
@@ -92361,7 +92439,8 @@
       "timeNote": "authoritative-label",
       "abstract": "",
       "speakerBio": "Dietrich Soyez 教授, 1974 获得地理学科的博士学位; 1990 担任加拿大拉尔瓦大学客座教授; 1992-2007 在科隆大学的科学研究所工作,并在 2000-2004 期间担任德国 IGU 国家委员会的主席; 2003 担任法国巴黎大学客座教授; 2003 年、 2007 年、 2008 年担任中山大学客座教授。在《 Geoforum 》、《 The Canadian Geographer 》 、《 Geojournal 》等刊物上发表多篇论文。",
-      "qaRepaired": "2026-09-05.2"
+      "qaRepaired": "2026-09-05.2",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20161208/5295.html",
@@ -92560,7 +92639,8 @@
       "speakerBio": "",
       "abstract": "第一届认知控制学术研讨会 http://www.cognitivecontrol2016.cn 认知控制一直是心理学、认知神经科学研究的重点。过去 20 年中,认知控制领域中的实验(行为与脑成像)与理论(计算模型)研究都取得了长足的进步,这加深并拓展了我们对大脑认知功能的认识与理解。最近 2-3 年,世界范围内的脑科学研究正在进入快速发展时期,美国、欧洲与日本都启动了各自的脑研究计划,中国的脑计划 - 脑科学与类脑研究 - 也发布在即。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20161130/5299.html",
@@ -95132,7 +95212,9 @@
       "llmAdopted": "speakerTitle",
       "needsHumanReview": null,
       "qaGate": "speakerBio",
-      "listTitle": "● 珠江管理论坛第14期"
+      "listTitle": "● 珠江管理论坛第14期",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20160429/1024.html",
@@ -95880,7 +95962,9 @@
         "title": "华南师范大学经济与管理学院2016年新年经管学术论坛"
       },
       "needsHumanReview": "location",
-      "listTitle": "● 华南师范大学经济与管理学院2016年新年经管学术论坛"
+      "listTitle": "● 华南师范大学经济与管理学院2016年新年经管学术论坛",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20160108/4169.html",
@@ -97159,7 +97243,8 @@
       "llmTextEnhanced": true,
       "llmVerdict": "rich-only",
       "qaGate": "abstract:emptied",
-      "qaRepaired": "2026-09-05.1-gate"
+      "qaRepaired": "2026-09-05.1-gate",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20151217/928.html",
@@ -97653,7 +97738,8 @@
       "timeUnknown": true,
       "abstract": "事件相关光学脑成像技术 (Event-Related Optical Signals, EROS) 研讨会通知近年来 , 光学成像技术蓬勃发展 , 成为认知神经科学领域中一项重要的研究手段。光学成像技术可在不同层次揭示神经系统的结构和功能信息 , 从新的角度为解释认知活动提供重要的实验依据。光成像 (Optical Imaging) 的基本原理是神经元活动会引起某些物质 ( 如水、离子 ) 的改变 , 导致神经无光学的特性发生变化 , 这些变化在与外加的、某些特定波长的光量子相互作用后,可得到了相应的光信号。",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20151201/899.html",
@@ -99064,7 +99150,8 @@
       "timeUnknown": true,
       "abstract": "关于举办全省中小学心理教师心理咨询督导培训会的通知各地级以上市及顺德区教育局德育处(科),各地市中小学心理健康教育指导中心,省属中职学校,华南师范大学附属中学、广东实验中学、华南师范大学附属小学: 为进一步提高全省各地中小学心理健康教育骨干教师的专业技能和自身心理健康素养,更好地实践咨询技巧、监控咨询服务质量、改进咨询工作、提高自身专业水平,我中心决定在广东邮电职业技术学院举办省中小学心理教师心理咨询督导培训会。一、培训时间和地点培训会",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20150630/736.html",
@@ -100060,7 +100147,9 @@
       "llmSpeakerSource": null,
       "llmAdopted": "location",
       "host": "王贤彬",
-      "listTitle": "● 中大-暨大-华师三校青年经济学者联谊会(会议地点再次更改)"
+      "listTitle": "● 中大-暨大-华师三校青年经济学者联谊会(会议地点再次更改)",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://cs.scnu.edu.cn/a/20150429/1833.html",
@@ -100210,7 +100299,8 @@
       "timeUnknown": false,
       "abstract": "",
       "speakerBio": "Dr . Jin Fan is a Professor of Psychology at QueensCollege, the City University of New York. He received his PhD fromNew YorkUniversity, followed by post-doctoral training at Weill Medical College of Cornell University. Before joiningQueensCollege, he worked at Mount Sinai School of Medicine as an assistant professor of neuroscience and psychiatry. Dr. Fan's research focuses on human attentional processes conceptualized as a system of anatomical areas forming specialized networks. Through independent research and collaboration, he has conducted behavioral, developmental, and patient-based studies using fMRI, ERP, genetics, and computational modeling to investigate the anatomy, circuitry, pathology, and development of attentional networks. Dr. Fan has expertise in cognitive and affective neuroscience, specifically various neuroimaging methods. 更多范津教授的信息请参见: http://people.qc.cuny.edu/Faculty/Jin.Fan/Pages/People.aspx",
-      "qaRepaired": "2026-09-05.3"
+      "qaRepaired": "2026-09-05.3",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20150403/331.html",
@@ -101329,7 +101419,7 @@
       "publishTime": "2016-01-06 11:41",
       "publishTimeSource": "companion",
       "timeConfidence": "high",
-      "timeNote": "authoritative-label;cv-url-date-mismatch;cv-publish-after-lecture",
+      "timeNote": "authoritative-label;cv-url-date-mismatch;cv-publish-after-lecture;cv-verified-published-late",
       "speakerSource": "label",
       "newsFilterBypass": true,
       "llmTextEnhanced": true,
@@ -103508,7 +103598,9 @@
       "llmAdopted": "speaker|speakerTitle|location",
       "speakerSource": "llm",
       "needsHumanReview": "topic",
-      "listTitle": "● 第1期经济行为科学重点实验室午餐讨论会"
+      "listTitle": "● 第1期经济行为科学重点实验室午餐讨论会",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20140506/259.html",
@@ -104186,8 +104278,8 @@
       "speakerAffiliation": "香港中文大学心理学系",
       "inviter": "",
       "organizer": "心理学院",
-      "publishTime": "2011-12-23 00:00",
-      "publishTimeSource": "position",
+      "publishTime": "2013-12-25 15:10:00",
+      "publishTimeSource": "label",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
       "listTitle": "陳烜之教授学术讲座",
@@ -104232,7 +104324,9 @@
         "title": "第4期午餐学术沙龙通知"
       },
       "llmAdopted": "topic|speaker|location",
-      "listTitle": "● 第4期午餐学术沙龙通知"
+      "listTitle": "● 第4期午餐学术沙龙通知",
+      "timeUnknown": true,
+      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20131225/3706.html",
@@ -105430,8 +105524,8 @@
       "campus": "大学城",
       "title": "第5期午餐学术沙龙通知",
       "topic": "国家田赋、地租与中国传统社会结构变迁",
-      "lectureStart": "2013-01-10 12:00:00",
-      "lectureEnd": "2013-01-10 13:00:00",
+      "lectureStart": "2014-01-10 12:00:00",
+      "lectureEnd": "2014-01-10 13:00:00",
       "location": "学院院楼301会议室",
       "speaker": "刘愿",
       "speakerTitle": "副教授",
@@ -105442,7 +105536,7 @@
       "publishTime": "2014-01-10 11:07",
       "publishTimeSource": "companion",
       "timeConfidence": "high",
-      "timeNote": "authoritative-label;cv-url-date-mismatch;cv-publish-after-lecture",
+      "timeNote": "authoritative-label",
       "newsFilterBypass": true,
       "llmTextEnhanced": true,
       "llmVerdict": "llm",
@@ -105599,7 +105693,8 @@
       "timeUnknown": false,
       "abstract": "1. High efficient thermal conductivity micro/nano fluids: An Enabling Energy Management 2. Molecule engineering of organic solar cell: DFT calculation",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20101124/788.html",
@@ -105648,7 +105743,8 @@
       "speakerSource": "llm",
       "speakerTitle": "",
       "affiliation": "",
-      "qaRepaired": "2026-09-05.1"
+      "qaRepaired": "2026-09-05.1",
+      "timeUnknownSource": "legacy"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20090331/785.html",

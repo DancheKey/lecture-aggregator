@@ -165,6 +165,14 @@ jobs:
       - name: Run timeUnknown auto-tag tests
         run: python tests/test_time_unknown_autotag.py
 
+      # 时间链路方案 A 守卫（2026-10-04）：CV3/hybrid 两处 end 守卫（end==start 置空、
+      # 采纳 LLM 的 end 必须 > start）、占位口径收敛到 field_vocab.is_placeholder_time
+      # （is_news_record 与地点回填两处旁路）、timeConfidence 词表归一、
+      # timeUnknownSource 溯源与全量重抓人工标注回填、体检新增「end==start」与
+      # 「high 却命中错年信号」两档、展示层「日期待核」角标三处同步。
+      - name: Run time chain fix guards (2026-10-04)
+        run: python tests/test_time_fixes_20261004.py
+
       # 前端 computed 行为门禁（2026-10-02）：论坛卡 total 口径 + clamp 签名覆盖。
       # 两处缺陷都只在**运行时数据流**上暴露（total≡recs.length、签名漏三维），
       # 既有 node 门禁只做组装冒烟与 clamp 类名一致性，看不到这两类语义错误。
