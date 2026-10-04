@@ -22,7 +22,9 @@ import collections
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
+sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 import field_vocab as _fv  # noqa: E402  多人/判脏词表单一事实源（C2 收敛）
+from excluded_urls import load_excluded, is_excluded, record_urls  # noqa: E402
 
 
 def get(r, *keys):
@@ -157,6 +159,8 @@ FIX_RULES = [
     (r'^地点过长', 'manual', '人工截断（正文边界不固定，自动截断易截错）'),
     (r'^地点偏长', 'manual', '人工确认是否为完整地址'),
     (r'^发布日期晚于讲座日', 'manual', '疑似回顾稿/新闻稿：按规则应删除而非修复，需人工确认'),
+    (r'^隐形记录', 'manual', '确认无需展示后从主库删除该条（排除名单的语义即「删过的不再回来」，'
+                            '合并中间态漏删的存量会长期占位）；若属名单误登，则复议名单'),
 ]
 
 FIX_LABEL = {'auto': ('可自动修', 'fx-a'),
@@ -260,8 +264,12 @@ def _load_verify_map():
         return {}
 
 
-def scan(recs):
-    """返回 issues: [(分类, 字段, 严重度, 问题描述, 当前值, 记录)]"""
+def scan(recs, excluded=None):
+    """返回 issues: [(分类, 字段, 严重度, 问题描述, 当前值, 记录)]
+
+    :param excluded: 排除名单（load_excluded() 的返回值）；缺省现读
+        data/excluded_urls.json。供测试注入合成名单。
+    """
     issues = []
 
     for i, r in enumerate(recs):
@@ -441,6 +449,21 @@ def scan(recs):
                                    f'发布日期晚于讲座日 {d} 天（疑似回顾稿/新闻）', f'{pt[:10]} vs {st[:10]}', r))
             except Exception:
                 pass
+
+        # ---------- 排除（隐形记录，2026-10-04 新增）----------
+        # 排除名单的维护流程是「本地删记录 + URL 进名单」，但跨源合并的中间态会
+        # 绕过它：合并发生时来源 URL 尚未入名单，之后该 URL 被删/拉黑，已挂上它的
+        # 存量记录就变成「前端永不上站、主库却占条数」的隐形记录（实测 ctld1436
+        # 工作坊两场，lectureCount 因此 3810 vs 3808 长期对不上）。此档把它显式化：
+        # 每条隐形记录都报出来，督促走完「从主库删除」这半步流程。
+        if excluded is None:
+            excluded = load_excluded()
+        if excluded:
+            _hits = [u for u in record_urls(r) if is_excluded(u, excluded)]
+            if _hits:
+                issues.append(('排除', 'sourceUrl', '低',
+                               '隐形记录：关联 URL 命中排除名单，前端不展示但占用主库条数',
+                               ' ; '.join(_hits), r))
 
     return issues
 

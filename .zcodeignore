@@ -1,0 +1,169 @@
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+# pytest 运行时缓存（自动重建，仅加速 --lf；显式列出以免依赖它自带的 .gitignore）
+.pytest_cache/
+
+# ===== 运行时日志（不入库） =====
+*.log
+server.log
+
+# ===== 手动备份（不入库） =====
+data/*.backup.json
+data/*.bak
+data/*.bak.*
+data/*.bak*
+*.bak.json
+data/.backups/
+# 批量修复前的全量快照（pre_ 前缀，单文件 ~6MB，26 个即上百 MB），不入库
+data/lectures.json.pre_*
+
+# ===== 本地校验/批量修复脚本（仅本地用，公网 CI 不依赖，不推送） =====
+# 2026-09-22（G2）：清掉指向已不存在脚本的显式行（fill_affiliation_batch2 /
+# gen_aff_report / truncate_polluted_aff / fix_physical_nbsps / powershell.txt
+# 均已不在磁盘）——规则与注释须与实际忽略清单对齐，避免后来者照单找不到文件。
+# 根目录一次性修复脚本（如 fix_5708.py）不入库：
+# 必须写成 /fix_*.py 限定根目录——旧写法 fix_*.py 会把 scripts/ 下同期新建的
+# 修复脚本一并静默忽略（曾吞掉 scripts/fix_physical_nbsps.py，git status 不显示、无从察觉）。
+/fix_*.py
+
+# ===== 本地调试/开发工具（仅本地使用，不推送公网） =====
+# （原 tools/ 规则已移除：该目录已不存在，2026-09-29 清理时对齐注释与实际清单）
+# 本地预览启动/停止脚本，公网不需要
+start_local.bat
+stop_local.bat
+# Playwright MCP 工具产物（快照/控制台日志），仅本地调试用
+.playwright-cli/
+
+# ===== 截图 =====
+site/screenshots/
+
+# ===== 内部资料（不公开，避免推到公网仓库） =====
+信息源网址清单.md
+EVALUATION.md
+需求规格说明书.md
+# 本地安全审查报告：不公开（D+E）
+docs/SECURITY.md
+代码审查报告*.html
+
+# ===== docs/ 个人学习/测试/评审产物（不公开，避免推到公网仓库） =====
+# 2026-09-29 起全部 docs/ 均不入库（含解析规则/踩坑 SOP 等内部资料），
+# 公网仓库只保留 Pages + Action 必需文件；文档仅在本地维护。
+docs/
+
+# ===== 运行时 / 增量状态 =====
+# 注意：data/last_scrape.json 必须入库！GitHub Actions 每日定时抓取依赖它在
+# 仓库中持久化，才能「接着上一次」做增量更新，而非每次全量重扫。
+# （data/lectures.json 为公开讲座数据，本就入库。）
+#
+# 以下为本机 server.py 运行时生成的访问量/点赞统计状态，属本地运行时数据，
+# 不应提交到仓库（公网为静态托管也不读取）。
+data/visits.json
+data/lecture_stats.json
+# VLM（智谱等）海报结构化提取结果缓存：按图片 URL 哈希存，重跑幂等、省额度，不入库
+data/.vlm_cache.json
+
+# 访问量报告：均为 scripts/gen_visits_trend.py / gen_visits_report.py 的生成产物，
+# 随时可重跑得到，不入库（2026-09-29 起整个 reports/ 都不再入库——过程性审计/验证
+# 报告属内部资料，公网仓库只保留 Pages + Action 必需文件）。数据来源 data/visits.json 本身已 gitignore。
+# ⚠ 例外（2026-09-30）：访问量趋势报告已移出本目录、出片到 site/visits-trend.html
+#   （用户要求公网可看；此前 reports/ 与 daily.yml 的 git add 冲突导致 run #136 整班失败）。
+reports/
+
+# ===== scripts/ 一次性修复/审计脚本（内部资料，不入库） =====
+# 2026-09-29 起公网仓库只保留 CI 依赖的 8 个核心脚本 + tailwind 配置；
+# 以下均为历史数据修复/排查用过的一次性脚本，本地保留、不再跟踪。
+# 注意：此处是刻意忽略 scripts/ 下的 fix_*（与根目录 /fix_*.py 规则不同，那是防误伤）。
+scripts/fix_*.py
+scripts/probe_*.py
+scripts/find_*.py
+scripts/backfill_*.py
+scripts/reparse_*.py
+scripts/repair_*.py
+scripts/reverify_*.py
+scripts/purge_*.py
+scripts/verify_*.py
+scripts/audit_data_quality.py
+scripts/clean_data_issues.py
+scripts/dedup_existing.py
+scripts/demo_sameunit_fusion.py
+scripts/gen_visits_report.py
+scripts/lectures_writer.py
+scripts/merge_remote.py
+
+# ===== 本地开发记忆与内部资料（不公开，避免推到公网仓库） =====
+.workbuddy/
+wechat_accounts.md
+
+# ===== 本地专用后台页面：不部署到公网 =====
+# 信息源管理依赖本地后端，公网不提供该功能。保留在本地开发用，
+# 但绝不推送到仓库/Pages，避免暴露信息源结构与新增入口。
+site/sources.html
+
+# ===== 可能含凭据的本地环境文件（务必不要提交） =====
+.env
+.env.*
+*.local
+secrets.*
+*token*.txt
+
+# ===== 临时调试/测试/备份文件（务必不要提交，避免泄露内部数据） =====
+_*.py
+_*.txt
+_*.md
+data/_*
+data/*.backup.json
+data/*.bak.*
+*.tmp
+# golden 测试的直播 HTML 缓存目录（密封化后测试改用 tests/fixtures/，
+# 此目录若被旧流程生成，不得入库——内含外部站点抓取的网页）
+tmp_diag/
+verify_sandbox/
+# 本地调试/测试临时目录（dom.html、filter_test、mobile_test 等），不入库
+tmp/
+
+# ===== 手工备份与抓取缓存目录（体积大，绝不入库） =====
+# 形如 _bak_20260908/（存放清洗前的数据快照，本地可回溯即可）、
+# _scraped/（增量抓取的页面快照）。均为本机产物，公网无需。
+# 2026-09-29 大清理：_bak_*/、data 备份快照已全部移入 _trash_20260929/，确认后清空。
+_trash_*/
+_scraped/
+
+# ===== 内部评审/清理过程文档（不公开） =====
+docs/code-review-2026-*.html
+docs/_data_cleanup_review.html
+docs/feedback-analysis-plan.html
+data/admin_token.json
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+node_modules/
+bower_components/
+jspm_packages/
+site-packages/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）
