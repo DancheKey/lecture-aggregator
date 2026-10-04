@@ -175,8 +175,9 @@ jobs:
 
       # 隐形记录守卫（2026-10-04 方案 B）：主库中不得存在「任一关联 URL 命中排除
       # 名单」的记录（前端永不上站却占条数，lectureCount 曾因此 3808 vs 主库 3810
-      # 长期对不上）。实库回归 + 主库==前端 lectureCount 两条红线；故意不进
-      # deploy.yml 的 GATE_TESTS——清理需人工判断，报红阻断推送即可，不阻断部署。
+      # 长期对不上）。实库回归 + 主库==前端 lectureCount 两条红线。同步登记进
+      # deploy.yml 的 GATE_TESTS（test_ci_gate_coverage 反漂移强制两侧一致）——
+      # 带隐形记录的状态部署上线会重现计数分歧，阻断是保护性的。
       - name: Run excluded-record guard tests
         run: python tests/test_audit_excluded_records.py
 

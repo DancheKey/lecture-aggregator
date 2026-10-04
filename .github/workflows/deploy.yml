@@ -90,6 +90,7 @@ jobs:
             tests/test_module_compile.py
             tests/test_time_unknown_autotag.py
             tests/test_time_fixes_20261004.py
+            tests/test_audit_excluded_records.py
             tests/test_llm_cache.py
             tests/test_audit_html_escape.py
             tests/test_title_vocab_convergence.py
