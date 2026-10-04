@@ -14,6 +14,7 @@ VOCAB_VERSION：词表内容版本号。llm_provider 的文本缓存按此失效
 截断逻辑变更后递增，已缓存的模型提取结果自动作废重提，修复得以重放。
 """
 
+import datetime
 import re
 
 # 词表/边界逻辑版本。变更本文件任何影响提取结果的词表后必须递增。
@@ -523,6 +524,72 @@ def is_title_only(value):
     if not value:
         return False
     return bool(TITLE_ONLY_RE.fullmatch(str(value).strip()))
+
+
+# ---------------------------------------------------------------------------
+# 「讲座时刻是否只是占位」的单一事实源（2026-10-03）
+# ---------------------------------------------------------------------------
+#
+# ## 背景：同一个问题，后端与前端原本各答一套
+#
+# `08:00` / `00:00` 不是真实时刻，而是本项目的**占位约定**——源页面只给日期、
+# 不给几何时，解析器统一填 08:00（见 parsers.py 里「铁律占位 08:00:00」的注释）。
+#
+# 但确实存在真有讲座在早上 8:00 开始的情况（2026-10-03 核实到 2 例，原文
+# 「时 间：6月16日 08：00-08：45」）。这类记录靠**人工标注** `timeUnknown`
+# 区分：标 true = 08:00 是占位、显示「时间待定」；标 false = 08:00 是真时间。
+#
+# 问题在于两侧对「什么算占位」的口径不一致：
+#
+#   前端 site/app.display.js::isTimeTBD
+#       timeUnknown===true            -> 待定
+#       timeUnknown===false           -> 具体时间
+#       未标注时：08:00 或 00:00       -> 待定
+#   后端 hybrid.py 的时间守卫
+#       仅 00:00                        -> 视为占位，模型可覆盖
+#       08:00                          -> 视为**真实时刻**，模型不许改
+#
+# 于是「08:00 且 timeUnknown 未设」的记录，前端说待定、后端说是真时间——同一份数据
+# 两套答案。实测当前库里这种记录为 0 条（37 条 08:00 全带标注），所以尚未出事，
+# 但那是运气而非设计。
+#
+# ## 口径（本函数 = 唯一定义）
+#
+#   1) timeUnknown 显式为 True  -> 占位（人工标注，最高优先级）
+#   2) timeUnknown 显式为 False -> **不占位**（人工已确认是真时间）
+#   3) 未标注时，08:00 或 00:00  -> 占位（沿用解析器的填充约定）
+#   4) 其余                       -> 不占位
+#
+# 前后端都改为调用本函数，语义从此只有一处定义。
+# ⚠ 依赖 Python 3.7+ 的 datetime.fromisoformat；本项目要求 3.12，无兼容问题。
+
+PLACEHOLDER_HOURS = (0, 8)     # 被解析器当作占位填充的时刻（00:00 / 08:00）
+
+
+def is_placeholder_time(record):
+    """该条记录的 lectureStart 是否只是占位（而非真实开始时刻）。
+
+    :param record: 讲座记录 dict，需含 lectureStart，可选 timeUnknown
+    :return: True 表示「08:00/00:00 是占位」，应向用户展示「时间待定」
+
+    与前端 site/app.display.js::isTimeTBD 的判断顺序**逐条对应**
+    （前端亦已改为调用本口径，见 tests/js/app_time_placeholder.js）。
+    """
+    if not record:
+        return True
+    flag = record.get('timeUnknown')
+    if flag is True:
+        return True                      # 人工标注：未知
+    if flag is False:
+        return False                     # 人工标注：真实（哪怕就是 08:00）
+    raw = record.get('lectureStart')
+    if not raw or not isinstance(raw, str):
+        return True
+    try:
+        dt = datetime.datetime.fromisoformat(raw.replace(' ', 'T'))
+    except (ValueError, TypeError):
+        return True
+    return dt.hour in PLACEHOLDER_HOURS and dt.minute == 0
 
 
 # ---------------------------------------------------------------------------

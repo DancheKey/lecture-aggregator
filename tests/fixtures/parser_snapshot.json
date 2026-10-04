@@ -1,5 +1,5 @@
 {
-  "_note": "解析器行为基线 —— 由 tests/test_parser_snapshot.py --bless 生成。锁纯规则基线（LLM A/B 关闭）。含已知缺陷，由 KnownDefectTest xfail 背书。重构期间不得刷新；仅在确认变更预期时刷新。",
+  "_note": "解析器行为基线 —— 由 tests/test_parser_snapshot.py --bless 生成。锁纯规则基线（LLM A/B 关闭）。含已知缺陷，由 KnownDefectTest xfail 背书。重构期间不得刷新；仅在确认变更预期时刷新。（2026-10-03：新增 timeUnknown 字段——解析器自动产出「时刻是否已知」。 本次刷新经 _bless_precise 走与用例断言完全相同的 setUp 桩环境， 避免 --bless 路径缺桩导致基线与断言环境不一致。）",
   "cases": [
     {
       "fixture": "ctld4391.html",
@@ -31,6 +31,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "same-year",
+          "timeUnknown": false,
           "title": "人工智能驱动教育革新—高校课堂教学创新与实践",
           "topic": "人工智能在教育技术中的应用与发展趋势"
         },
@@ -61,6 +62,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "same-year",
+          "timeUnknown": false,
           "title": "人工智能驱动教育革新—高校课堂教学创新与实践",
           "topic": "基于人工智能的个性化学习路径设计构建智能化教学环境与教学策略"
         }
@@ -89,6 +91,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "general-body-full",
+          "timeUnknown": false,
           "title": "华南师范大学90周年校庆系列学术活动——砺儒讲坛（第19场）：中国关键核心技术测度——基于机器学习的方法",
           "topic": "中国关键核心技术测度——基于机器学习的方法"
         }
@@ -117,6 +120,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "general-body-full",
+          "timeUnknown": false,
           "title": "华南师范大学90周年校庆系列学术活动——砺儒讲坛（第二场）：国际中文教育需要关切中文的人性及其背后的思维模式",
           "topic": "国际中文教育需要关切中文的人性及其背后的思维模式"
         }
@@ -152,6 +156,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "蔡清副教授、库逸轩副教授",
           "topic": "What is atypical in an atypical brain？"
         },
@@ -181,6 +186,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "蔡清副教授、库逸轩副教授",
           "topic": "Neural mechanisms underlying working memory representations and processes (工作记忆表征和加工的神经机制)"
         }
@@ -217,6 +223,7 @@
           "splitMode": "bare-topic",
           "timeConfidence": "high",
           "timeNote": "same-year",
+          "timeUnknown": false,
           "title": "一流课程与课程思政建设",
           "topic": "数智赋能课程教学创新"
         },
@@ -247,6 +254,7 @@
           "splitMode": "bare-topic",
           "timeConfidence": "high",
           "timeNote": "same-year",
+          "timeUnknown": false,
           "title": "一流课程与课程思政建设",
           "topic": "课程思政的教学设计与教学实践"
         }
@@ -283,6 +291,7 @@
           "splitMode": "bare-topic",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "智能升级 何以为师：华师教育人工智能系列通识课",
           "topic": "DeepSeek与人工智能技术前沿"
         },
@@ -313,6 +322,7 @@
           "splitMode": "bare-topic",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "智能升级 何以为师：华师教育人工智能系列通识课",
           "topic": "中小学校如何开好人工智能课"
         }
@@ -349,6 +359,7 @@
           "splitMode": "bare-topic",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "智能升级 何以为师：华师教育人工智能系列通识课",
           "topic": "价值引领的人工智能教育应用"
         },
@@ -379,6 +390,7 @@
           "splitMode": "bare-topic",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "智能升级 何以为师：华师教育人工智能系列通识课",
           "topic": "人工智能助力教师队伍新发展"
         }
@@ -411,6 +423,7 @@
           "speakerBio": "英国帝国理工学院助理研究员 悉尼科技大学—西北工业大学双博士学位 IEEE会员，中国图形图像学会会员，中国人工智能学会会员 现任城市之光（深圳）无人驾驶有限公司研发总监，研究方向为计算机视觉和人工智能机器系统。在国内外科技创新创业大赛中荣获国际、国内部省级以上规格大赛大奖三十余次；多次荣获IEEE国际视觉挑战赛等优异名次，曾作为主要人员主持或参与省部级课题研究多项，国家自然科学基金多项，在国际高水平期刊和会议发表文章多篇，个人专利十多项。研发的若干视觉解决方案进入新一代人工智能专项名录中。",
           "speakerTitle": "助理研究员",
           "splitMode": "vlm-poster",
+          "timeUnknown": false,
           "title": "低俗自动驾驶产业化和未来——以城市之光为例",
           "topic": ""
         },
@@ -437,6 +450,7 @@
           "speakerBio": "",
           "speakerTitle": "",
           "splitMode": "vlm-poster",
+          "timeUnknown": false,
           "title": "低俗自动驾驶产业化和未来——以城市之光为例",
           "topic": ""
         },
@@ -463,6 +477,7 @@
           "speakerBio": "",
           "speakerTitle": "",
           "splitMode": "vlm-poster",
+          "timeUnknown": false,
           "title": "低俗自动驾驶产业化和未来——以城市之光为例",
           "topic": ""
         },
@@ -489,6 +504,7 @@
           "speakerBio": "",
           "speakerTitle": "",
           "splitMode": "vlm-poster",
+          "timeUnknown": false,
           "title": "低俗自动驾驶产业化和未来——以城市之光为例",
           "topic": ""
         },
@@ -515,6 +531,7 @@
           "speakerBio": "",
           "speakerTitle": "",
           "splitMode": "vlm-poster",
+          "timeUnknown": false,
           "title": "低俗自动驾驶产业化和未来——以城市之光为例",
           "topic": ""
         }
@@ -550,6 +567,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "same-year",
+          "timeUnknown": false,
           "title": "研究生教育",
           "topic": "More Efficient Zero-Knowledge Protocols over ℤ _{2^k} via Galois Rings"
         },
@@ -579,6 +597,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "same-year",
+          "timeUnknown": false,
           "title": "研究生教育",
           "topic": "Generic Construction of Trace-and-Revoke Inner Product Functional Encryption"
         }
@@ -619,6 +638,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "general-body-full",
+          "timeUnknown": false,
           "title": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流",
           "topic": "新时期督查体制与国家治理"
         },
@@ -653,6 +673,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "general-body-full",
+          "timeUnknown": false,
           "title": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流",
           "topic": "中国政治研究的议题、理论与方法"
         },
@@ -690,6 +711,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "general-body-full",
+          "timeUnknown": false,
           "title": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流",
           "topic": "学术研究方法与能力提升座谈会"
         },
@@ -724,6 +746,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "general-body-full",
+          "timeUnknown": false,
           "title": "预告 | 政管学院第5-8期南粤政治学讲坛暨政治学社第21-24期理想国大讲堂：徐湘林教授系列讲座交流",
           "topic": "地方治理中的科层制与政治动员"
         }
@@ -759,6 +782,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "双创周学术讲座",
           "topic": "浅谈物理学与对称性"
         },
@@ -788,6 +812,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "双创周学术讲座",
           "topic": "\"物理学——不断推动人类社会进步的科学\""
         },
@@ -816,6 +841,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "双创周学术讲座",
           "topic": "当今物理学面临的挑战与机遇—以高能物理为例"
         }
@@ -843,6 +869,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "砺儒讲坛第76讲：“抓住基金”——个人学术成长的自我叙事（白凯）",
           "topic": "\" 抓住基金 \" :个人学术成长的自我叙事"
         }
@@ -873,6 +900,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "历史学田野实践教学的理论和方法",
           "topic": "历史学田野实践教学的理论和方法"
         }
@@ -900,6 +928,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "general-body-full",
+          "timeUnknown": false,
           "title": "周一午餐会报告（第199次-温永立）",
           "topic": "周一午餐会报告（第199次-温永立）"
         }
@@ -929,6 +958,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "物理学拔尖人才培养基地学术前沿讲座",
           "topic": "物理学拔尖人才培养基地学术前沿"
         }
@@ -957,6 +987,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "物理学拔尖人才培养基地学术前沿讲座",
           "topic": "物理学拔尖人才培养基地学术前沿"
         }
@@ -986,6 +1017,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "物理学拔尖人才培养基地学术前沿讲座",
           "topic": "物理学拔尖人才培养基地学术前沿"
         }
@@ -1015,6 +1047,7 @@
           "speakerTitle": "",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "物理学院学术报告（第34期）北京师范大学涂展春教授",
           "topic": "AI 辅助研究非线性系统:构造广义李雅普诺夫函数和首次积分"
         }
@@ -1051,6 +1084,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "刘贤臣教授砺儒讲坛、座谈会--心理系建系三十周年暨建院三周年系列学术活动",
           "topic": "心理学英文论文写作及投稿技巧"
         },
@@ -1081,6 +1115,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "刘贤臣教授砺儒讲坛、座谈会--心理系建系三十周年暨建院三周年系列学术活动",
           "topic": "自伤自杀研究专题讨论"
         }
@@ -1117,6 +1152,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "台湾政治大学杨启正副教授、杨立行副教授学术讲座",
           "topic": "Post-Concussion Syndrome: A Neuro-Psychological Disorder"
         },
@@ -1146,6 +1182,7 @@
           "splitMode": "repeated-label",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "台湾政治大学杨启正副教授、杨立行副教授学术讲座",
           "topic": "Individual differences in categorization strategy and working memory capacity"
         }
@@ -1182,6 +1219,7 @@
           "splitMode": "report-n",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "乐国安沈模卫学术讲座",
           "topic": "基于网络平台的社会心理与行为研究"
         },
@@ -1212,6 +1250,7 @@
           "splitMode": "report-n",
           "timeConfidence": "high",
           "timeNote": "authoritative-label",
+          "timeUnknown": false,
           "title": "乐国安沈模卫学术讲座",
           "topic": "论心理学原理与应用"
         }

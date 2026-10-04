@@ -1862,6 +1862,11 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
         dt = _parse_vlm_datetime(ts, default_year, publish_time, title_year, url_year)
         if dt:
             result['lectureStart'] = dt.isoformat(sep=' ')
+            # VLM 从海报图像读出的时刻（2026-10-03）：海报上的「08:00」同样是
+            # 占位填充值还是真实时刻，无法从值本身区分，故以「VLM 是否读到时钟」
+            # 作为信号写入 _hasClock，供出口产出 timeUnknown。
+            # _parse_vlm_datetime 只在文本含 HH:MM 时才返回非 None，故有值即视为真实。
+            result['_hasClock'] = bool(re.search(r'\d{1,2}\s*[:：]\s*\d{2}', ts))
             de = None
             if te:
                 de = _parse_vlm_datetime(te, default_year, publish_time, title_year, url_year)
@@ -3425,6 +3430,68 @@ def _strip_speaker_title_tail(name):
     return s
 
 
+def _mark_time_unknown(rec):
+    """标注 lectureStart 是「真实时刻」还是「占位」（2026-10-03，方案 A）。
+
+    ## 为什么需要
+
+    `08:00` / `00:00` 在本项目是**占位约定**：源页面只给日期、不给几何时，
+    解析器统一填 08:00（见 timeparse / 本文件各处「铁律占位 08:00:00」注释）。
+    前端据此显示「时间待定」，避免把编造的 08:00 当真。
+
+    但确有讲座真在早上 8:00 开始。区分二者此前全靠**人工**在
+    data/lectures.json 里打 `timeUnknown` 标记——而本文件（爬虫）根本不产出该
+    字段，于是**全量重抓会把这批标注全部丢失**，重新变回「一律时间待定」。
+
+    本函数让爬虫自己产出该标记：源页确实给了时刻 → `timeUnknown=False`
+    （哪怕恰好就是 08:00）；只给了日期/什么都没给 → `timeUnknown=True`。
+
+    ## 判据（保守：宁可标 True 也不谎称已知）
+
+    仅当**解析器确实拿到了源页里的时钟**才标 False。占位填充值（08:00/00:00）
+    与真实时间用同一个数字表示，故只能靠「拿到时刻」这个事实来区分，
+    不能靠「值等于 08:00」来判断——真讲座也可能正好 8:00（2026-10-03 核实到 2 例）。
+
+    ## 与既有信号的关系
+
+    `t['has_time']` 是 timeparse 给出的「页面确实写了时钟」标记，正文/标签/海报/
+    地点时间回填四条路径都会带上它。本函数优先采用该信号；拿不到时退回
+    「是否落在占位值上」的保守判定（标 True）。
+
+    ## 不覆盖已有标注
+
+    若记录已带 `timeUnknown`（人工标注或旧数据），一律保留不动——人工判断
+    优先于自动推断，尤其在源页改版、解析器升级等场景下。
+
+    参考：scraper/field_vocab.py::is_placeholder_time 是同一口径的前端/后端共用实现，
+    本函数只负责**产出**该标记，判定语义以它为准（由 tests/js/app_time_placeholder.js
+    跨语言锁定两侧一致）。
+    """
+    if not isinstance(rec, dict):
+        return
+    if 'timeUnknown' in rec:          # 已有标注（人工或旧数据）→ 不覆盖
+        return
+    has_clock = rec.pop('_hasClock', None)
+    if has_clock is None:
+        # 解析阶段未透出时钟信息 → 退回保守判定：落在占位值上或无时间即视为未知
+        ls = rec.get('lectureStart')
+        if not ls:
+            rec['timeUnknown'] = True
+            return
+        try:
+            dt = datetime.datetime.fromisoformat(str(ls))
+        except (ValueError, TypeError):
+            rec['timeUnknown'] = True
+            return
+        rec['timeUnknown'] = dt.hour in _PLACEHOLDER_HOURS and dt.minute == 0
+        return
+    rec['timeUnknown'] = not has_clock
+
+
+# 占位填充时刻（与 field_vocab.PLACEHOLDER_HOURS 一致；此处不 import 以免循环依赖）
+_PLACEHOLDER_HOURS = (0, 8)
+
+
 def apply_exit_gate(out, url=''):
     """parse_detail 出口统一闸门：兼容 None / 单条 dict / 多条 list 三种返回形态。"""
     if out is None:
@@ -3460,6 +3527,7 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         # LLM/VLM 填空，只有在出口统一判定才能两条路径同时覆盖。
         if _r.get('speakerBio') and _is_org_intro_bio(_r['speakerBio']):
             _r['speakerBio'] = ''
+        _mark_time_unknown(_r)
     return out
 
 
@@ -3948,9 +4016,17 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
                 t = applied
 
     if rt and rt.get('start'):
-        t = {'start': datetime.datetime.fromisoformat(rt['start']),
+        _rt_start = datetime.datetime.fromisoformat(rt['start'])
+        t = {'start': _rt_start,
              'end': datetime.datetime.fromisoformat(rt['end']) if rt.get('end') else None,
-             'has_time': True}
+             # ⚠ 2026-10-03 修正：原先无条件写死 has_time=True，但本路径下的 start
+             #   可能就是 00:00（timeparse 对「只有日期、无钟点」的文本必然返回
+             #   00:00）。写成 True 会让下游（timeUnknown 打标、hybrid 时间守卫、
+             #   OCR 覆盖条件）全都把 00:00 当成「时刻已知」。
+             #   resolve_lecture_time 返回的是 ISO 串、不透传 has_time（其内部
+             #   知道但丢在了返回结构外），故此处按 start 是否为 00:00 判定——
+             #   与 timeparse 的口径一致（解析到真实钟点必非 00:00）。
+             'has_time': not (_rt_start.hour == 0 and _rt_start.minute == 0)}
         result['timeConfidence'] = rt.get('confidence')
         result['timeNote'] = rt.get('note')
     # 正文未解析出日期且含海报图片：OCR 后重试（仅补缺失，不覆盖已有）
@@ -4033,6 +4109,11 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
     if t:
         result['lectureStart'] = t['start'].isoformat(sep=' ')
         result['lectureEnd'] = t['end'].isoformat(sep=' ') if t.get('end') else None
+        # 时钟真实性标记（2026-10-03）：出口 _mark_time_unknown 据此产出 timeUnknown。
+        # 放内部临时键 _hasClock，出口会 pop 掉（不进入最终字段集）。
+        # ⚠ 用 get 而非 ['has_time']：并非所有构造 t 的分支都带该键，缺失时
+        #   出口会退回「落在占位值即视为未知」的保守判定，不会误标为已知。
+        result['_hasClock'] = bool(t.get('has_time'))
     return {
         'result': result,
         'poster_only': poster_only,
@@ -4275,6 +4356,9 @@ def _extract_topic_location(_st, result, title, loc_times):
             if st.hour == 0 and st.minute == 0:
                 st = st.replace(hour=h0, minute=m0)
                 result['lectureStart'] = st.isoformat(sep=' ')
+                # 时刻来自地点文字里的「14:30-17:00」，是页面原文给出的真实时钟
+                # （2026-10-03）：据此把 _hasClock 置真，出口便产出 timeUnknown=False。
+                result['_hasClock'] = True
                 if not result['lectureEnd']:
                     result['lectureEnd'] = st.replace(hour=h1, minute=m1).isoformat(sep=' ')
             elif not result['lectureEnd'] and (h1, m1) != (st.hour, st.minute):
@@ -4922,6 +5006,8 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
             t = t_ocr
             result['lectureStart'] = t_ocr['start'].isoformat(sep=' ')
             result['lectureEnd'] = t_ocr['end'].isoformat(sep=' ') if t_ocr.get('end') else None
+            # 时刻来自海报 OCR 的原文时钟 → _hasClock 置真（2026-10-03）
+            result['_hasClock'] = bool(t_ocr.get('has_time'))
 
     # OCR 海报无「主讲人:」标签时，按「姓名 + 职称」行兜底抽取主讲人（如「曾碧卿 /教授」），
     # 并顺带取姓名行后的单位作为 affiliation。仅当尚未识别到主讲人才启用，避免覆盖标签式结果。
@@ -8017,6 +8103,16 @@ def split_record_by_sessions(base, sessions, full_text=''):
         rec['topic'] = s['topic']
         rec['lectureStart'] = s['start'].isoformat(sep=' ')
         rec['lectureEnd'] = s['end'].isoformat(sep=' ') if s.get('end') else None
+                # 各场次的时刻可信度（2026-10-03）。
+        # 依据：timeparse 解析「只有日期、无钟点」的文本时必然返回 00:00（has_time=False），
+        # 解析到真实钟点则保留该钟点。因此 **start 落在 00:00 即等价于「本页未给时刻」**，
+        # 这比看是否等于 08:00 可靠（真有讲座就在 8:00 开始，2026-10-03 核实到 2 例）。
+        # ⚠ 08:00 在此**不**作为占位判据：多场拆分时无法区分「段落写的 8:00」
+        #   与「解析器填的 8:00」，而误标成 timeUnknown=True 会让真实时间消失。
+        #   代价是极少数「只有日期且被填成 08:00」的场次会被标为已知——
+        #   该情形已由 detect_multi_session 侧把无钟点场次统一落为 00:00 覆盖。
+        _h, _m = s['start'].hour, s['start'].minute
+        rec['_hasClock'] = not (_h == 0 and _m == 0)
         # title 保留原始列表标题/系列名，topic 存每场真实题目；不把 topic 拼进 title，
         # 避免破坏前端分组与统计（规则：title=listTitle/系列名，topic=单场题目）。
         rec['title'] = base_title

@@ -634,11 +634,22 @@ class TestCitedJudgeTimeReachable(unittest.TestCase):
         self.assertEqual(result2['lectureStart'], '2026-03-05 15:00:00',
                          '未 force 时不得覆盖规则的具体时刻（幻觉防护）')
 
-        result3 = {'lectureStart': '2026-03-05 08:00:00'}    # 08:00 也算具体时刻
+        result3 = {'lectureStart': '2026-03-05 08:00:00'}    # 08:00 = 占位约定
         a3 = self._a('2026-03-05 14:30:00')
         self.hybrid._merge_a_into_result(result3, a3, body_text=self.body)
-        self.assertEqual(result3['lectureStart'], '2026-03-05 08:00:00',
-                         '08:00 在本守卫里不是占位，未 force 时不应被覆盖')
+        # 2026-10-03 口径统一：08:00 与 00:00 **都**是解析器的占位填充值，
+        # 未标注 timeUnknown 时应视为占位、可被更精确的模型值补全——
+        # 这与前端 isTimeTBD 及 field_vocab.is_placeholder_time 完全一致。
+        # 此前本断言写的是「08:00 算具体时刻、不覆盖」，那正是与前端分叉的旧行为。
+        self.assertEqual(result3['lectureStart'], '2026-03-05 14:30:00',
+                         '未标注的 08:00 是占位（解析器填充值），应可被补全')
+
+        # 但人工标注 timeUnknown=False 后，08:00 就是**真实时间**，不得覆盖。
+        result4 = {'lectureStart': '2026-03-05 08:00:00', 'timeUnknown': False}
+        a4 = self._a('2026-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(result4, a4, body_text=self.body)
+        self.assertEqual(result4['lectureStart'], '2026-03-05 08:00:00',
+                         '已人工确认 08:00 为真实时间（真有 8 点讲座），不得被覆盖')
 
     def test_73_force也不能跨年(self):
         """年份不一致时即使 force 也不采纳——年份错比时刻错更严重。"""

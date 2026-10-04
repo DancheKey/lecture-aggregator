@@ -85,8 +85,10 @@ jobs:
             tests/js/app_topic_session.js
             tests/js/app_ltkey_consistency.js
             tests/js/app_merge_chunk.js
+            tests/js/app_time_placeholder.js
             tests/test_main_water_gate.py
             tests/test_module_compile.py
+            tests/test_time_unknown_autotag.py
             tests/test_llm_cache.py
             tests/test_audit_html_escape.py
             tests/test_title_vocab_convergence.py

@@ -921,7 +921,11 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
         try:
             _rs = datetime.datetime.fromisoformat(str(_rule_start))
             _rule_year = _rs.year
-            _rule_has_time = not (_rs.hour == 0 and _rs.minute == 0 and _rs.second == 0)
+            # 2026-10-03 口径统一：原先只把 00:00 当占位，08:00 被当成「真实时刻」，
+            # 与前端 isTimeTBD（08:00/00:00 都算占位）相反——同一份数据两套答案。
+            # 现改引 field_vocab.is_placeholder_time（单一事实源，两侧逐条一致）：
+            # 人工标注 timeUnknown 优先，其次按解析器的占位约定（08:00/00:00）判定。
+            _rule_has_time = not _fv.is_placeholder_time(result)
         except Exception:
             pass
     _ls_raw = a.get('lectureStart') or a.get('start')

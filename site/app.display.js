@@ -43,11 +43,20 @@ Object.assign(APP_METHODS, {
       const m = (l.publishTime || '').match(/^(\d{4})/) || (l.title || '').match(/(\d{4})/);
       return m ? m[1] : '';
     },
-    // 判断是否「时间待定」：
-    // 优先使用结构化标记 timeUnknown；未设置时回落旧启发式
-    // （占位哨兵 08:00 / 00:00 表示页面未抽取到具体时刻）。
-    // timeUnknown===false 时即使时刻为 08:00 也按真实时间展示，
-    // 杜绝「真 8 点讲座」被误判为时间待定。
+    // 判断是否「时间待定」。
+    //
+    // ⚠ 本口径必须与 scraper/field_vocab.py::is_placeholder_time **逐条一致**
+    //   （单一事实源，2026-10-03 建立）。此前后端（hybrid 时间守卫）只把 00:00
+    //   当占位、本前端连 08:00 一起当占位，同一份数据两套答案；实测当时
+    //   「08:00 且未标注 timeUnknown」的记录为 0 条才没出事——那是运气不是设计。
+    //
+    // 口径（顺序即优先级）：
+    //   1) timeUnknown === true  → 占位（人工标注：源页未给时刻）
+    //   2) timeUnknown === false → **不占位**（人工已确认是真时间，哪怕就是 08:00）
+    //   3) 未标注时，08:00 / 00:00 → 占位（解析器的填充约定，见 parsers.py「铁律占位」）
+    //   4) 其余                  → 不占位
+    //
+    // 一致性由 tests/js/app_time_placeholder.js 锁定（两侧对同一批样例给出相同结论）。
     isTimeTBD(l) {
       if (!l) return true;
       if (l.timeUnknown === true) return true;
@@ -57,7 +66,7 @@ Object.assign(APP_METHODS, {
       const d = new Date(iso.replace(' ', 'T'));
       if (isNaN(d)) return true;
       const hh = d.getHours(), mm = d.getMinutes();
-      return (hh === 8 && mm === 0) || (hh === 0 && mm === 0);
+      return (hh === 8 || hh === 0) && mm === 0;
     },
     fmtDateTime(l) {
       if (!l) return '待定';

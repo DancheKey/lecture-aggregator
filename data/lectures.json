@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-02T10:28:24+08:00",
+  "updatedAt": "2026-10-03T23:01:54+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260925/8850.html",
@@ -8386,7 +8386,7 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "timeUnknown": true,
+      "timeUnknown": false,
       "abstract": "我们研究量子力学中的一类非线性Klein-Gordon-Dirac方程组的非相对论极限问题。在量子力学理论研究中有不同尺度的模型,其经典模型是线性或非线性薛定谔方程,其相对论复杂模型为非线性Klein-Gordon方程组、Dirac方程组,或通过Yukawa作用下的非线性耦合Klein-Gordon-Dirac方程组,更一般的情形是电磁场作用下的Klein-Gordon-Dirac方程组。为了判别该理论的重要性和模型的有效性,建立电磁场作用下的量子力学模型到经典的薛定谔方程是量子力学理论的基本问题,其在凝聚态物理和非线性几何光学理论中有重要应用。本报告将报告在数学理论和计算方法上关于这一理论的最新进展,并报告我们的最新进展,我们从数学上严格证明了电磁场作用下的非线性Klein-Gordon-Dirac方程组的非相对论极限,在适当的振荡初值的光滑假设下,获得了电磁场作用下的高维非线性Klein-Gordon-Dirac方程组的解到带电势原项的线性Schrodinger方程解在Sobolev范数意义下的收敛速率。",
       "speakerBio": "王术,现为北京工业大学二级教授、博士生导师。1998年南京大学博士毕业,后在中科院数学所和奥地利维也纳大学做博士后。主要研究方向:偏微分方程及其应用。曾主持国家自然科学基金重点项目,曾获得北京市科学技术奖二等奖1项。",
       "qaRepaired": "2026-09-05.1"
@@ -46100,7 +46100,7 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "timeUnknown": true,
+      "timeUnknown": false,
       "abstract": "Subsampling reduces computational burden and maintains statistical efficiency for big data. We review subsampling techniques for different models. If data volume is too large, nonuniform subsampling with replacement is infeasible. Poisson subsampling solves this problem. A distributed subsampling framework computes statistics on smaller data partitions. Strategies are evaluated through numerical experiments. 学术",
       "speakerBio": "北京大学数学科学学院统计学二级教授、博士生导师。兼任全国应用统计专业学位研究生教育指导委员会委员,中国现场统计研究会副理事长,试验设计分会理事长,高维数据统计分会副理事长,统计调查分会副理事长。中国数学会理事,普及与传播工作委员会委员,均匀设计分会副主任,中国概率统计学会第十一届理事会秘书长。中国统计学会常务理事。担任四个国际重要SCI期刊Statistica Sinica、JSPI、SPL和Stat的副主编,国内核心期刊 《系统科学与数学》、《数理统计与管理》、《数学进展》编委,科学出版社《统计与数据科学丛书》编委。主要从事大数据采样理论与算法、试验设计与分析、计算机仿真试验与建模、应用统计的教学和研究工作,在AoS、JASA、Biometrika、《中国科学》等国内外重要期刊发表学术论文八十余篇。主持国家自然科学基金重点项目1项、面上项目5项,另参与完成多项科技部重点研发计划项目。曾获得北京大学优秀博士学位论文指导教师和北京市高等学校优秀教学成果奖二等奖。",
       "qaRepaired": "2026-09-05.1"
