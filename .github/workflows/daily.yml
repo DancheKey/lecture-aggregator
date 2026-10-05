@@ -245,7 +245,9 @@ jobs:
           else
             echo "存在变更，准备提交..."
             git status --short
-            git commit -m "chore: 自动更新讲座数据 $(date +'%Y-%m-%d %H:%M')" \
+            # 标题用北京时间：runner 本地时区是 UTC，裸 date 会比 data/lectures.json
+            # 的 updatedAt（Asia/Shanghai）慢 8 小时（2026-10-05 修正，写法同上 223 行）。
+            git commit -m "chore: 自动更新讲座数据 $(date -u -d '+8 hours' +'%Y-%m-%d %H:%M')" \
               || { echo "::error::git commit 失败（查 git status 输出与仓库 hooks）"; exit 1; }
             # 防线（2026-09-12）：同步/推送对未暂存改动零容忍，残留会以 exit 128 整班失败。
             # 若仍有未落入上面目录级 add 的改动（例如此后新增到其他目录的产物），补入本次提交。

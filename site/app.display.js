@@ -70,8 +70,8 @@ Object.assign(APP_METHODS, {
     },
     // 时间置信度角标（2026-10-04 方案 A 第 5 步）。
     //
-    // timeConfidence ∈ {high, mid, low}（单一规格见 scraper/timeparse.py::_cross_year，
-    // 由 scripts/fix_time_known_issues.py 把历史孤儿值 medium 归一为 mid）。
+    // timeConfidence ∈ {high, mid, low}（单一规格见 scraper/timeparse.py::_cross_year；
+    // 解析器出口把越界取值归一为 mid，体检另有「词表越界」档兜底）。
     //   high 权威标签/同日/同年；mid 补年源可靠但非权威；**low 年份本身存疑**
     //   （crossyear-uncertain 跨年窗口无法判定、publish-unparseable 发布时间不可解析）。
     //
