@@ -157,9 +157,14 @@ Object.assign(APP_METHODS, {
         countdown = `还有 ${dayGap} 天`;
         countdownShort = `${dayGap} 天`;
       }
+      // 颜色（2026-10-06 用户裁定）：**所有未开始的讲座统一用预告橙**，
+      // 差别只在文案——7 天内带倒计时（即将开始 · 还有 N 天），7 天外只写「未开始」。
+      // 此前 >7 天走灰底（bg-slate-100 text-slate-600），与「已结束/时间待定」同色系，
+      // 十天后的预告看起来像过期条目（10-13 的讲座被误读成灰的）。
+      // 灰色从此只属于 tbd/已结束：橙=预告、蓝=进行中、灰=已结束/待定，语义更干净。
       return diffMs <= 7 * DAY
         ? { label: '即将开始 · ' + countdown, labelShort: '还有 ' + countdownShort, cls: 'bg-orange-100 text-orange-600', dot: false }
-        : { label: '未开始', labelShort: '未开始', cls: 'bg-slate-100 text-slate-600', dot: false };
+        : { label: '未开始', labelShort: '未开始', cls: 'bg-orange-100 text-orange-600', dot: false };
     },
     truncate(s, maxLen) {
       if (!s) return '';

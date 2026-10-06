@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-05T14:43:05+08:00",
+  "updatedAt": "2026-10-06T09:48:39+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261013/8854.html",
@@ -41,7 +41,7 @@
       "lectureStart": "2026-10-06 14:00:00",
       "lectureEnd": "2026-10-06 15:00:00",
       "location": "数科院西楼111报告厅",
-      "speaker": "",
+      "speaker": "Quoc-Hung NGUYEN",
       "speakerTitle": "副研究员",
       "speakerAffiliation": "中国科学院数学与系统科学研究院",
       "inviter": "袁源",
@@ -55,12 +55,13 @@
       "llmTextEnhanced": true,
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
-      "llmRejected": "speaker",
+      "llmRejected": null,
       "llmAdopted": "speakerTitle|speakerAffiliation",
       "qaGate": "inviter",
       "timeUnknownSource": "auto",
       "timeUnknown": false,
-      "listTitle": "勷勤数学•专家报告-Quoc-Hung NGUYEN"
+      "listTitle": "勷勤数学•专家报告-Quoc-Hung NGUYEN",
+      "speakerSource": "label"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20260925/8850.html",

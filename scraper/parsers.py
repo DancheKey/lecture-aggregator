@@ -314,16 +314,21 @@ def _looks_like_real_name(s):
     # 修复：量词改占有型（++ / *+，Python 3.11+，本地与 CI 均 3.12）——贪婪匹配后
     # 绝不交还字符，失败即失败、线性时间，匹配语义与原正则完全一致（全库 171 条
     # 英文 speaker 值逐一比对零分歧），仅消除回溯。
-    if re.fullmatch(r"[A-Za-z]++(?:[.'·]?\s?[A-Za-z]++)*+", s_fold):
+    # 2026-10-06：分隔符集补 `-`（连字符名「Quoc-Hung NGUYEN」，maths8855 主讲人
+    # 因此被判非人名、F3 终检清空）。占有量词原样保留 → 回溯安全性不变；
+    # 词级拦截表的分词同步补 `-`（见下），连写职位词仍能逐词命中。
+    if re.fullmatch(r"[A-Za-z]++(?:[.'·\-]?\s?[A-Za-z]++)*+", s_fold):
         if s.lower().strip('.') in _EN_NON_NAME:
             return False
         # 词级拦截：机构名/题目整串混入 speaker（见 _EN_NAME_STOPWORD 说明）
-        if {w.lower().strip('.') for w in re.split(r"[\s.'·]+", s_fold) if w} \
+        if {w.lower().strip('.') for w in re.split(r"[\s.'·\-]+", s_fold) if w} \
                 & _EN_NAME_STOPWORD:
             return False
         # ⛔ 新增（2026-09-05）：英文职位/头衔词拦截——防 "Postdoctoral Associate"
         # 等复合职位被当作人名。用词级集合拦截，命中任一词即判非人名。
-        if {w.lower().strip('.:,;') for w in re.split(r"[\s.'·]+", s_fold) if w} \
+        # 2026-10-06：分词分隔符补 `-`——连字符名（Quoc-Hung）放开后，
+        # "Postdoctoral-Fellow" 这类连写职位必须仍能按词命中拦截表。
+        if {w.lower().strip('.:,;') for w in re.split(r"[\s.'·\-]+", s_fold) if w} \
                 & _EN_NON_NAME:
             return False
         return True
@@ -6963,14 +6968,22 @@ def _split_english_speaker(sp):
                   r'Department|Faculty|Laboratory|Centre|Center|Corporation|Corp|Company|'
                   r'Hospital|Research|Group|Foundation|Association')
     # 兼容 "ES&T副主编、加州大学河滨分校Daniel Schlenck教授" 等中文前缀+英文姓名
+    # 2026-10-06（maths8855「报告人: Quoc-Hung NGUYEN 副研究员」）两处放开：
+    #   ① 姓名 token 允许连字符（Quoc-Hung）与全大写词（NGUYEN，越南等拉丁化姓氏
+    #      常见全大写）——原 `[A-Z][a-z]+` 对二者都失配，整条姓名匹配不到 → speaker 空；
+    #   ② lookahead 追加职称主表 NAME_TITLE_SUFFIX_RE，补齐「副研究员/助理研究员」等
+    #      ——原枚举只列 教授/副教授/助理教授/研究员，值后跟「副研究员」时匹配不上。
+    # 与下方 aff 分支同理收敛到主表，职称词表不再手抄（tests/test_title_vocab_convergence 锁）。
     m = re.search(
         r'(?<![A-Za-z])'
-        r'([A-Z][a-z]+(?:\s+(?!(?:' + _EN_ORG_KW + r')\b)[A-Z][a-z\.]+){1,3})'
+        r'([A-Z][a-z]+(?:-[A-Z][a-z]+)*'
+        r'(?:\s+(?!(?:' + _EN_ORG_KW + r')\b)[A-Z][a-zA-Z\.]+){1,3})'
         r'(?=\s*(?:的|之)?'
         r'(?:学术讲座|讲座|报告|学术报告|演讲|专场|工作坊|沙龙|讲坛|论坛|会议|'
         r'研讨会|分享会|座谈会|讨论会|大讲堂|开讲|讲座预告|通知|启事|预告|'
         r'教授|副教授|助理教授|研究员|博士|院士|老师|导师|先生|女士|'
         r'Professor|Associate\s+Professor|Full\s+Professor|Dr\.?|Ph\.?D\.?|'
+        + _fv.NAME_TITLE_SUFFIX_RE.pattern + '|'
         # 2026-09-24 补全角/半角左括号：经管 4014「Yi Zhou（University of California,
         # Berkeley）」姓名后紧跟「（」，原 lookahead 无括号 → 整条漏抓（speaker 空）。
         r'[（(]|'
@@ -7009,6 +7022,12 @@ def _split_english_speaker(sp):
         # 允许职称后跟句号/逗号等标点（seri 11 "Daniel Schlenck教授。"）。
         # 2026-10-02 收敛：原内联 14 词，改引主表 _fv.NAME_TITLE_SUFFIX_RE
         #（_alt 已按长度降序，保证「特聘教授」先于「教授」命中）。
+        # 2026-10-06：剥离下来的职称若此前没拿到（前导荣誉头衔缺位），就地回填为
+        # speakerTitle——「Quoc-Hung NGUYEN 副研究员」此前白白丢掉这个职称，
+        # 只能靠 LLM 补（纯规则路径下恒为空，CI 无密钥时即环境漂移）。
+        _mt = re.search(r'(' + _fv.NAME_TITLE_SUFFIX_RE.pattern + r')\s*[。，.,]?$', aff)
+        if _mt and not _title:
+            _title = _mt.group(1)
         aff = re.sub(r'(?:' + _fv.NAME_TITLE_SUFFIX_RE.pattern
                      + r')\s*[。，.,]?$', '', aff).strip()
         # 去职称后只剩标点/空白 → 清空

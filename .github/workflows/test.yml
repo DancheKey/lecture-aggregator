@@ -149,6 +149,16 @@ jobs:
       - name: Run speaker name cut-point tests
         run: python tests/test_speaker_title_cut.py
 
+      # 英文主讲人姓名形态（2026-10-06，maths8855 回归）：源页
+      # 「报告人: Quoc-Hung NGUYEN 副研究员」抓回后 speaker 为空——姓名校验的
+      # 分隔符集不认连字符、英文姓名切分正则不认连字符段与全大写姓（NGUYEN），
+      # 职称 lookahead 也没有「副研究员」，三处同时挡死；LLM 提的名字又被
+      # 溯源闸门拒掉（llmRejected: speaker），于是落库为空。
+      # 本门锁：连字符+全大写姓可通过、职位词仍被拦、正文/标题两种入参都能取名、
+      # 同构页面端到端 speaker 正确，且断言在**纯规则**下成立（不依赖 LLM 密钥）。
+      - name: Run latin speaker name tests
+        run: python tests/test_speaker_latin_name.py
+
       # 2026-10-02 引入：核心模块**可编译性**门禁。
       # 起因是一次批量编辑把 `_stats_dirty = {...}` 误写成 `def _stats_dirty = {...}`，
       # server.py 直接 SyntaxError 而无人察觉——CI 从不 import 它（公网部署用不到，
