@@ -172,6 +172,12 @@ jobs:
       - name: Run gate reject evidence alarm
         run: python tests/test_gate_reject_evidence.py
 
+      # 标题日期前缀剥离回归（2026-10-07，psy283）：日期区间「7月2日-7月4日」
+      # 只被剥掉首段，残留「-7月4日…」再被导航噪声剥离的「去前导孤立数字」
+      # 误吃，标题剩「月4日…」。修复为整段区间剥离。
+      - name: Run title date prefix clean tests
+        run: python tests/test_title_clean.py
+
       # 2026-10-02 引入：核心模块**可编译性**门禁。
       # 起因是一次批量编辑把 `_stats_dirty = {...}` 误写成 `def _stats_dirty = {...}`，
       # server.py 直接 SyntaxError 而无人察觉——CI 从不 import 它（公网部署用不到，

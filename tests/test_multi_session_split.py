@@ -315,3 +315,35 @@ class Ms5RenumberTest(unittest.TestCase):
         self.assertIsNone(r.get('lectureIndex'))
         self.assertIsNone(r.get('lectureCount'))
         self.assertFalse(r.get('isMultiLecture'))
+
+
+class PlainNumberedLongTopicTest(unittest.TestCase):
+    """候选7 回归（2026-10-07，psy283）：topic 上限 60→90 字。
+
+    根因：三场英文题目带「工作坊：/讨论会：」前缀均超 60 字（最长约 84），
+    `[^\n]{2,60}?` 够不到「时间」lookahead，三场全被丢弃、整页退回单场，
+    时间误取第 1 场（2014-07-02 14:30）而主讲人（第 3 场 Bethany C. Bray）
+    被后续 VLM/补全挂到同一条——时间与主讲人分属不同场的混装记录。
+    """
+
+    TEXT = ('日程安排 '
+            '1. 工作坊： Introduction to Latent Class and Latent Profile Analysis '
+            '时间： 7 月 2 日下午 2:30-5:30 地点：华南师范大学心理学院 711 室 '
+            '2. 讨论会： Latent Class and Latent Transition Analysis: Applied and '
+            'Simulation Study 时间： 7 月 3 日下午 7:00-8:30 地点：华南师范大学心理学院 301 室 '
+            '3. 工作坊： A Practical Guide to Causal Inference with Propensity Scores '
+            '时间： 7 月 4 日上午 8:30-11:30 地点：华南师范大学心理学院 214 室')
+
+    def test_01_长英文题目三场全拆出(self):
+        sessions = parsers.detect_multi_session(self.TEXT, title='工作坊', default_year=2014)
+        self.assertEqual(len(sessions), 3,
+                         '长题目编号列表应拆出 3 场（psy283 回归）')
+        starts = [s['start'].strftime('%m-%d %H:%M') for s in sessions]
+        self.assertEqual(starts, ['07-02 14:30', '07-03 19:00', '07-04 08:30'])
+
+    def test_02_单场编号列表不误拆(self):
+        """守卫：单条编号 + 单时间仍不拆（候选7 触发需 ≥2 段含独立时间）。"""
+        text = ('日程安排 1. 工作坊： Introduction to Latent Class Analysis '
+                '时间： 7 月 2 日下午 2:30-5:30 地点：心理学院 711 室')
+        sessions = parsers.detect_multi_session(text, title='工作坊', default_year=2014)
+        self.assertEqual(len(sessions), 0)

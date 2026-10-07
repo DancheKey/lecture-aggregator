@@ -2847,7 +2847,10 @@ def _clean_title(t):
     # 去掉 8 位连写日期前缀，如「20250911 讲座标题」
     t = re.sub(r'^\s*(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s+', '', t).strip()
     # 去掉无前导年份的「10月29日」「6月6日」等日期前缀（常见于 skc 砺儒讲坛列表页）。
-    t = re.sub(r'^\s*\d{1,2}\s*月\s*\d{1,2}\s*日\s*', '', t).strip()
+    # 2026-10-07 补日期区间形态「7月2日-7月4日」「7月2日-4日」（psy283 实测）：
+    # 原单日剥离只吃掉「7月2日」，残留「-7月4日…」随后被 _strip_nav_noise 当
+    # 「前导横杠+孤立数字」二次误吃，标题只剩「月4日…」。
+    t = re.sub(r'^\s*\d{1,2}\s*月\s*\d{1,2}\s*日(?:\s*[-–—~至]\s*(?:\d{1,2}\s*月\s*)?\d{1,2}\s*日?)?\s*', '', t).strip()
     # 多场拆分偶发把首个章节头粘进标题（如教师发展中心「— 一、工作坊安排」「— 一、培训安排」
     # 「— 一、沙龙安排」），去掉标题尾部这种非标题的章节安排标记。
     t = re.sub(r'\s*[—\-－]\s*一、[一二三四五六七八九十百零0-9]*期?\s*(?:工作坊|培训|沙龙|讲坛|报告|讲座)?安排\s*$', '', t).strip()
@@ -6857,8 +6860,12 @@ def _detect_plain_numbered_sessions(text, default_year=None, publish_time=None,
     cand = []
     for i, mk in enumerate(markers):
         seg = text[mk.end(): markers[i + 1].start() if i + 1 < len(markers) else len(text)]
+        # topic 上限 2026-10-07 由 60 放宽到 90：psy283 三场英文题目
+        # 「工作坊： Introduction to Latent Class and Latent Profile Analysis」约 63 字，
+        # 60 字内够不到「时间」lookahead，三场全被丢弃、整页退回单场（时间误取第 1 场）。
+        # 放宽仍有「≥2 段各含独立时钟」守卫兜底，误拆风险不变。
         tm = re.match(
-            r'\s*([^\n]{2,60}?)\s*'
+            r'\s*([^\n]{2,90}?)\s*'
             r'(?=\s*(?:时间|地点|主讲人|报告人|演讲人|讲者|简介|摘要|$|【))', seg)
         if not tm:
             continue
