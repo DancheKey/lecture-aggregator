@@ -209,6 +209,14 @@ _NON_NAME_TOKENS = [
     # 「周一峰」（经管101，'周一' in '周一峰' → F3 清空 speaker）。此处为整串匹配，
     # OCR 把孤立词「周一」当讲者仍被拦（L325 s in 集合），而「周一X」真名放行。
     '周一', '周二', '周三', '周四', '周五', '周六', '周日',
+    # 地名整串（2026-10-07 自 _NAME_FORBIDDEN 迁入，与「周一」同型消歧）：
+    # 子串形式误杀真名「吴重庆」（'重庆' in '吴重庆'，地理学院真实主讲人）；
+    # 整串匹配后孤立「重庆」仍被拦，姓+地名真名放行（首字非姓的脏串另有姓氏表兜底）。
+    '重庆',
+    # 叙事兜底实测脏值整串（2026-10-07 存量体检三连：psy 1251/283/221）。
+    # 这三个是「语义上明确不是人名」的硬否决项——姓氏表拆闸（doubt 降级）后，
+    # 若只靠姓表拦会被 LLM 路径带 speakerUnverified 标记放行上站。
+    '现为台北', '为喜迎华', '日程安排',
 ]
 _EN_NON_NAME = {'professor', 'dr', 'mr', 'ms', 'presenter', 'lecturer', 'speaker',
                 'university', 'college', 'institute', 'research', 'science', 'chair',
@@ -251,8 +259,10 @@ _NAME_FORBIDDEN = (
     # 因子串形式误杀真名「周一峰」（经管101 实测）；孤立词「周一」拦截改由整串名单承担。
     '星期',
     # 常见地名（首字多在姓氏集，如「广/周」）：广州/广东/北京/上海/深圳/中国/香港/美国…
+    # 「重庆」2026-10-07 迁至 _NON_NAME_TOKENS 整串匹配（子串形式误杀真名「吴重庆」，
+    # 与「周一→周一峰」同型；其余地名暂无已知撞名，维持子串口径）。
     '广州', '广东', '北京', '上海', '深圳', '中国', '香港', '美国', '广西', '杭州', '苏州',
-    '成都', '武汉', '南京', '西安', '重庆', '天津', '厦门', '东莞', '佛山', '珠海', '中山',
+    '成都', '武汉', '南京', '西安', '天津', '厦门', '东莞', '佛山', '珠海', '中山',
     # 主题/动词短语碎片：研究领域/发表论文/荣获/巴洛克/计学报/万人/陈的…
     '的', '学报', '研究领域', '发表论文', '荣获', '巴洛克', '万人',
     # 校区名（被当成孤立词讲者）：石牌/大学城/佛山/汕尾/校区
@@ -272,7 +282,10 @@ _SURNAME_RE = re.compile(
     # 「黄佩瑶」等真实主讲人被 _looks_like_real_name 误拒（xz65 第5场 VLM 值被清）。
     # 2026-09-24 补经管学院实测漏抓姓：初/化/盖/骈/卿/迟/帅/代 + 简体「华」（原仅繁體「華」）
     # ——初景利、化柏林、盖雯雯、骈文景、卿前恺、迟国泰、帅青红、代志新、华胜亚 均被误拒→清空。
-    r'^[初化盖骈卿迟帅代华刘黄严赵钱孙李周吴郑王冯陈陳褚卫蒋沈韩杨朱秦尤许何吕施张孔曹嚴華金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黃和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍万柯卢莫房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊于惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符劉景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍卻桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广库禄阙东欧阳肖闫揭覃冼禤邝亢付仝佐佘佟俎修公兰利南占台尧岳巩弭操攸敖敬於曾朴楼海涂渠游牟琚竺简管聂芦苑苟荆蒯虞袭西訾辛逯郅鄢隋鞠饶鹿麦保姆嵩布彦楚鼻]')
+    # 2026-10-07 补存量体检实测漏抓姓：关/奉/员——关淑华、奉国和、员巧云 被误拒
+    # （见 docs/主讲人闸门优化方案-20261006.md 实验三；同日起 LLM 路径此类失败
+    # 降级为 speakerUnverified 标记，不再清空，此处补表主要救规则路径）。
+    r'^[关奉员初化盖骈卿迟帅代华刘黄严赵钱孙李周吴郑王冯陈陳褚卫蒋沈韩杨朱秦尤许何吕施张孔曹嚴華金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康伍余元卜顾孟平黃和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍万柯卢莫房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊于惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符劉景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍卻桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广库禄阙东欧阳肖闫揭覃冼禤邝亢付仝佐佘佟俎修公兰利南占台尧岳巩弭操攸敖敬於曾朴楼海涂渠游牟琚竺简管聂芦苑苟荆蒯虞袭西訾辛逯郅鄢隋鞠饶鹿麦保姆嵩布彦楚鼻]')
 # 补充常见姓氏：肖（与「萧」同音常见姓）、闫（「阎」简化常用姓）。
 # 2026-09-01 扩：① 揭（13295 揭建文，漏姓曾误杀→speaker 清空）；② 广东姓 覃/冼/禤/邝 防华南师大主讲人被拒；
 # ③ 全库扫描补真实姓：曾岳聂涂佟佘敖饶游南隋荆海简牟利辛巩公亢西逯鄢訾鞠竺蒯台（标准百家姓漏补）+
@@ -282,29 +295,46 @@ _SURNAME_RE = re.compile(
 #   助理/首席/出版/网络/主要内容/基于/复杂的/现为/美国/陕西/四川/莱斯/弗吉尼亚/奥林巴斯/理论/量子/历史/
 #   与…，其内嵌真人首字（张/梁等）本已在集；含·/字母外文音译名走 _looks_like_real_name 中英文混合分支。
 
-def _looks_like_real_name(s):
+def _name_shape_verdict(s):
+    """人名形态三值判定（2026-10-07 拆闸）：'ok' 像人名 / 'doubt' 形态存疑 / 'reject' 语义性脏值。
+
+    原 `_looks_like_real_name` 单布尔把两类性质不同的失败焊在一起（8855 诊断结论：
+    「两道性质不同的闸被焊成了一道」）：
+    - reject：语义上明确不是人名——禁词子串、职位/机构词、OCR 尾字、超长题目串。
+      封闭但实证可靠，任何路径都保留否决权；
+    - doubt：只是「不像人名」——姓氏表查无、英文形态不匹配。封闭词表永远追不上
+      真实姓名分布（09-01/09-05/09-24/10-06 四轮人肉补漏；关淑华/奉国和/员巧云/
+      Quoc-Hung NGUYEN 均被误杀），LLM 采纳路径（hybrid）据此降级为
+      speakerUnverified='whitelist' 标记而非否决；规则路径仍按严格口径清空
+      （有 F3-EN 标题兜底/叙事兜底多层救）。
+    `_looks_like_real_name` = (verdict == 'ok')，语义不变，既有调用方无感。
+    """
     if not s:
-        return False
+        return 'reject'
     s = s.strip()
     if len(s) < 2:
-        return False
+        return 'reject'
     # OCR 字符混淆伪讲者拦截（2026-07-20，汕尾/行知海报）：
     # ① 结尾「题」=「师」误读（李题→李老师，整词非人名）；
     # ② 结尾「授」=「教授」截断（韩授→韩教授，孤立「授」绝不成人名）；
     # ③ 结尾「士」但非「博士/院士/硕士/学士」=「师」误读（贺萌士→贺萌老师）。
     if s[-1] == '题':
-        return False
+        return 'reject'
     if s[-1] == '授' and not s.endswith(('教授', '副教授')):
-        return False
+        return 'reject'
     if s[-1] == '士' and not s.endswith(('博士', '院士', '硕士', '学士')):
-        return False
+        return 'reject'
     # 含任何「绝不可能是人名」的子串（系列名/单位/职务/简介等）→ 非人名
     if any(bad in s for bad in _NAME_FORBIDDEN):
-        return False
+        return 'reject'
     # 含字母/· 的外文名（允许 First Last / Last, First / 带前缀）。
     # 支持变音符号（á/ö/ü/ñ/é 等）：先 NFKD 分解再去组合记号再校验，
     # 否则 'Tamás Dalmay' 因 á 不命中 [A-Za-z] 被拒，导致 poster 页主讲人被清洗守卫清空。
     s_fold = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
+    # 括号注记剥离（2026-10-07）：「Yiu Por (Vincent) Chen」类括号段不参与形态判定，
+    # 剥离后折叠空白再按普通空格分隔名匹配（生产库存量真名，此前因括号不在分隔符集被拒）。
+    s_fold = re.sub(r'\([^()]*\)|（[^（）]*）', ' ', s_fold)
+    s_fold = re.sub(r'\s+', ' ', s_fold).strip()
     # ⛔ ReDoS 修复（2026-09-05）：原写法
     #   re.fullmatch(r"[A-Za-z]+(?:[.'·]?\s?[A-Za-z]+)*", s_fold)
     # 在「长英文串 + 尾部含非字母字符」（如 B 类脏值
@@ -317,39 +347,62 @@ def _looks_like_real_name(s):
     # 2026-10-06：分隔符集补 `-`（连字符名「Quoc-Hung NGUYEN」，maths8855 主讲人
     # 因此被判非人名、F3 终检清空）。占有量词原样保留 → 回溯安全性不变；
     # 词级拦截表的分词同步补 `-`（见下），连写职位词仍能逐词命中。
-    if re.fullmatch(r"[A-Za-z]++(?:[.'·\-]?\s?[A-Za-z]++)*+", s_fold):
-        if s.lower().strip('.') in _EN_NON_NAME:
-            return False
+    # 2026-10-07：分隔符集补 `’`（弯引号「Timi O’Neill」，生产库存量真名），
+    # 词级拦截表分词同步补。
+    if re.fullmatch(r"[A-Za-z]++(?:[.'·\-’]?\s?[A-Za-z]++)*+", s_fold):
+        if s_fold.lower().strip('.') in _EN_NON_NAME:
+            return 'reject'
         # 词级拦截：机构名/题目整串混入 speaker（见 _EN_NAME_STOPWORD 说明）
-        if {w.lower().strip('.') for w in re.split(r"[\s.'·\-]+", s_fold) if w} \
+        if {w.lower().strip('.') for w in re.split(r"[\s.'·\-’]+", s_fold) if w} \
                 & _EN_NAME_STOPWORD:
-            return False
-        # ⛔ 新增（2026-09-05）：英文职位/头衔词拦截——防 "Postdoctoral Associate"
-        # 等复合职位被当作人名。用词级集合拦截，命中任一词即判非人名。
+            return 'reject'
+        # ⛔ 英文职位/头衔词拦截——防 "Postdoctoral Associate" 等复合职位被当作人名。
         # 2026-10-06：分词分隔符补 `-`——连字符名（Quoc-Hung）放开后，
         # "Postdoctoral-Fellow" 这类连写职位必须仍能按词命中拦截表。
-        if {w.lower().strip('.:,;') for w in re.split(r"[\s.'·\-]+", s_fold) if w} \
+        if {w.lower().strip('.:,;') for w in re.split(r"[\s.'·\-’]+", s_fold) if w} \
                 & _EN_NON_NAME:
-            return False
-        return True
-    # 中文名：2–5 个汉字，首字须为常见姓氏，且去除非人名 token 后仍有残留
+            return 'reject'
+        # 词数/长度上限（2026-10-07，硬否决）：论文题目长句不是人名（实验三实测脏样本
+        # 'The One-Child Policy and Intergenerational Mobility' 12 词 60+ 字符）。
+        # 生产库 192 个含字母 speaker 值最长 5 词/28 字符，阈值 7 词/40 字符留足边际
+        # ——这是宽松的结构上限，不是需要人肉维护的封闭枚举。
+        _words = [w for w in re.split(r"[\s.'·\-’]+", s_fold) if w]
+        if len(_words) > 7 or len(s_fold) > 40:
+            return 'reject'
+        return 'ok'
+    # 中文名：2–5 个汉字，去除非人名 token 后仍有残留
     if re.fullmatch(r'[\u4e00-\u9fff]{2,5}', s):
         if s in _NON_NAME_TOKENS:
-            return False
-        # 首字必须是百家姓之一，否则如「是我国」「本课程」「本标准」等 2–5 字中文
+            return 'reject'
+        # 首字须为常见姓氏，否则如「是我国」「本课程」「本标准」等 2–5 字中文
         # 非人名会被误放（曾导致 CTLD 398 把「主讲人是我国…」的「是我国」当主讲人）。
-        # 复姓首字（欧/司/上/诸/东/独…）亦在百家姓集合内，不受影响；少数民族音译名
-        # 首字偶不在集合时宁可少抓（仍可走 Pattern4/F4 或人工核验），避免误收非人名。
+        # 复姓首字（欧/司/上/诸/东/独…）亦在百家姓集合内，不受影响。
+        # 2026-10-07 拆闸：姓氏表查无从「否决」降为「存疑」——生僻姓/少数民族音译名
+        # 永远补不全（四轮人肉补漏的根因）；「误放非人名」的风险由 LLM 路径的
+        # 逐字溯源硬闸、规则路径的标签邻接与多层兜底承担。
         if not _SURNAME_RE.match(s):
-            return False
+            return 'doubt'
         stripped = re.sub('|'.join(_NON_NAME_TOKENS), '', s)  # 词表固定（约120项），非用户输入，无 ReDoS 风险
         if not stripped:
-            return False
-        return True
+            return 'reject'
+        return 'ok'
     # 中英文混合（如「张 San」）或带·的少数民族名，视为可能有效
     if re.search(r'[\u4e00-\u9fff]', s) and re.search(r'[A-Za-z·]', s):
-        return True
-    return False
+        return 'ok'
+    # 无字母无汉字（纯数字/标点等）→ 语义性垃圾；含字母但形态不匹配（如带杂符号）→ 存疑
+    if not re.search(r'[A-Za-z\u4e00-\u9fff]', s_fold):
+        return 'reject'
+    return 'doubt'
+
+
+def _looks_like_real_name(s):
+    """严格口径人名判定（规则路径全链路共用）＝ 形态判定为 'ok'。
+
+    拆闸（2026-10-07）后对既有调用方语义完全不变：reject 与 doubt 都返回 False。
+    LLM 采纳路径的软口径（doubt 降级为 speakerUnverified 标记）见
+    `_name_shape_verdict` 与 hybrid 的 `_speaker_trace_ok`/`_speaker_shape`。
+    """
+    return _name_shape_verdict(s) == 'ok'
 
 
 # 粘连切分（无空格两姓名合并成一段，如「陈家文刘磊明」）时，对每段姓名做更严格的
@@ -1850,16 +1903,26 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
             result[dst] = v
     # 主讲人清洗守卫（与 OCR 路径一致）：仅保留像人名的字符
     # 分隔符含半角/全角逗号（VLM「黄加耀, 刘轩奕」）。
+    # 2026-10-07 留证：清空时打 [F3-WIPE] 到 stderr——此前值与拒因双双丢失，
+    # 误杀只能靠用户肉眼发现（8855 教训）；日志同时是 F3 词表降级决策的观察数据。
     if result.get('speaker') and not _looks_like_real_name(result['speaker']):
+        _f3_bad = result['speaker']
+        _f3_wiped = False
         if re.search(r'[、,，]', result['speaker']):
             _segs = [s.strip() for s in re.split(r'[、,，]', result['speaker']) if s.strip()]
             if not (_segs and all(_looks_like_real_name(s) for s in _segs)
                     and len(set(_segs)) == len(_segs)):
                 result['speaker'] = ''
                 result['speakerAffiliation'] = ''
+                _f3_wiped = True
         else:
             result['speaker'] = ''
             result['speakerAffiliation'] = ''
+            _f3_wiped = True
+        if _f3_wiped:
+            print('[F3-WIPE] %s vlm-path speaker=%r'
+                  % (result.get('sourceUrl') or result.get('title') or '?', _f3_bad),
+                  file=sys.stderr)
     ts = (f.get('lectureStart') or '').strip()
     te = (f.get('lectureEnd') or '').strip()
     t = None
@@ -5006,14 +5069,23 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
             result['speaker'] = m2.group(1)
     if result.get('speaker') and not _looks_like_real_name(result['speaker']):
         # 多主讲人用「、」「,」「，」连接：逐段校验，全为有效人名时保留
+        # 2026-10-07 留证：清空时打 [F3-WIPE]（详见 _apply_vlm_to_result 同名块）
+        _f3_bad = result['speaker']
+        _f3_wiped = False
         if re.search(r'[、,，]', result['speaker']):
             _segs = [s.strip() for s in re.split(r'[、,，]', result['speaker']) if s.strip()]
             if not (_segs and all(_looks_like_real_name(s) for s in _segs)):
                 result['speaker'] = ''
                 result['speakerAffiliation'] = ''
+                _f3_wiped = True
         else:
             result['speaker'] = ''
             result['speakerAffiliation'] = ''
+            _f3_wiped = True
+        if _f3_wiped:
+            print('[F3-WIPE] %s ocr-path speaker=%r'
+                  % (result.get('sourceUrl') or title or '?', _f3_bad),
+                  file=sys.stderr)
     # F3 step2 — 姓名保留时，把分离出的职称后缀写入 speakerTitle
     if result.get('speaker') and sp_title:
         result['speakerTitle'] = sp_title
@@ -5671,16 +5743,25 @@ def _finalize_record(soup, url, title, list_title, _st, result,
 
     # F3 第 5 步（终检）：任何来源的 speaker 若非有效人名则清空（覆盖叙事兜底等路径）。
     # 分隔符含半角/全角逗号（VLM「黄加耀, 刘轩奕」），与 4376 处守卫对称。
+    # 2026-10-07 留证：清空时打 [F3-WIPE] 到 stderr——此前值与拒因双双丢失，
+    # 误杀只能靠用户肉眼发现（8855 教训）；日志同时是 F3 词表降级决策的观察数据。
     if result.get('speaker') and not _looks_like_real_name(result['speaker']):
+        _f3_bad = result['speaker']
+        _f3_wiped = False
         if re.search(r'[、,，]', result['speaker']):
             _segs = [s.strip() for s in re.split(r'[、,，]', result['speaker']) if s.strip()]
             if not (_segs and all(_looks_like_real_name(s) for s in _segs)
                     and len(set(_segs)) == len(_segs)):
                 result['speaker'] = ''
                 result['speakerAffiliation'] = ''
+                _f3_wiped = True
         else:
             result['speaker'] = ''
             result['speakerAffiliation'] = ''
+            _f3_wiped = True
+        if _f3_wiped:
+            print('[F3-WIPE] %s f3-final speaker=%r' % (url or '?', _f3_bad),
+                  file=sys.stderr)
 
     # F3-EN 标题英文主讲人兜底：纯海报英文讲座页（如 psy 2940/2941）正文无
     # 结构化标签，但页面标题含 "Professor Bryan Strange 学术讲座"。从标题抽取英文姓名，

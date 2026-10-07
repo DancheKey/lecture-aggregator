@@ -699,5 +699,83 @@ class TestCitedJudgeTimeReachable(unittest.TestCase):
                          'force 绕过了年份一致性检查')
 
 
+class TestSoftGate拆闸(unittest.TestCase):
+    """拆闸（2026-10-07）：speaker 词表从否决位降为标记位。
+
+    8855 根因复盘（docs/主讲人闸门优化方案-20261006.md）：A 抽到
+    Quoc-Hung NGUYEN、值与出处全对，却挂在「像不像人名」词表上——且 B 在
+    规则侧为空时结构上不被调用，force 也不豁免闸门。本套件锁拆闸后的新契约：
+
+      ① speaker 采纳 = 溯源硬闸（值逐字在原文）+ 语义脏值否决（reject）；
+      ② 形态存疑（doubt，姓氏表查无/英文形态不匹配）不再否决，
+         改打 speakerUnverified='whitelist' 进 audit 待核；
+      ③ 所有拒绝带留证 llmRejectReason='field@reason:value'（此前值与理由双丢）。
+    """
+
+    # 郄贵洲：生僻姓「郄」不在姓氏表（doubt），逐字写进正文供溯源
+    BODY_SOFT = ('讲座通知。主讲人：温永立 教授。特邀嘉宾：郄贵洲 博士（人民大学）。'
+                 '时间：2026-09-02 14:00。')
+
+    def _apply(self, rule, speaker_value, body):
+        provider = MockProvider(text_result={
+            'speaker': {'value': speaker_value,
+                        'snippet': speaker_value},
+        })
+        apply_llm_text_hybrid(rule, body, None, provider, None)
+        return rule
+
+    def test_81_doubt形态放行并打待核标记(self):
+        """规则空 + A 值姓表查无但逐字在原文 → 放行 + speakerUnverified='whitelist'。"""
+        rule = {'speaker': ''}
+        self._apply(rule, '郄贵洲', self.BODY_SOFT)
+        self.assertEqual(rule['speaker'], '郄贵洲',
+                         'doubt 值仍被否决——拆闸未生效（8855 同型事故会复发）')
+        self.assertEqual(rule.get('speakerUnverified'), 'whitelist')
+        self.assertEqual(rule.get('speakerSource'), 'llm')
+        self.assertNotIn('speaker', (rule.get('llmRejected') or '').split('|'))
+
+    def test_82_语义脏值即使逐字在原文仍拒绝(self):
+        """日程安排（_NON_NAME_TOKENS 整串硬否决）逐字在原文也不得上站。"""
+        body = self.BODY_SOFT + ' 日程安排如下。'
+        rule = {'speaker': ''}
+        self._apply(rule, '日程安排', body)
+        self.assertEqual(rule['speaker'], '')
+        self.assertIn('speaker', (rule.get('llmRejected') or '').split('|'))
+        self.assertIn('speaker@dirty:日程安排', rule.get('llmRejectReason') or '')
+
+    def test_83_职位词组合reject不上站(self):
+        """英文职位词（_EN_NON_NAME）属语义脏值，溯源通过也拒绝。"""
+        body = self.BODY_SOFT + ' Postdoctoral Associate 亦受邀出席。'
+        rule = {'speaker': ''}
+        self._apply(rule, 'Postdoctoral Associate', body)
+        self.assertEqual(rule['speaker'], '')
+        self.assertIn('speaker@dirty:Postdoctoral Associate',
+                      rule.get('llmRejectReason') or '')
+
+    def test_84_溯源拒绝带留证(self):
+        """no-cite 拒绝必须留证（8855 教训：被拒的值和理由不再丢失）。"""
+        rule = {'speaker': ''}
+        self._apply(rule, '李四', self.BODY_SOFT)
+        self.assertEqual(rule['speaker'], '')
+        self.assertIn('speaker@no-cite:李四', rule.get('llmRejectReason') or '')
+
+    def test_85_正常姓名不受拆闸影响(self):
+        """形态 ok + 溯源通过 → 正常采纳，不带待核标记。"""
+        rule = {'speaker': ''}
+        self._apply(rule, '温永立', self.BODY_SOFT)
+        self.assertEqual(rule['speaker'], '温永立')
+        self.assertIsNone(rule.get('speakerUnverified'))
+        self.assertIsNone(rule.get('llmRejected'))
+
+    def test_86_严格口径终检语义不变(self):
+        """_is_plausible_speaker 保留严格口径：doubt/reject 都 False，供回归对拍。"""
+        import hybrid
+        body = self.BODY_SOFT
+        self.assertFalse(hybrid._is_plausible_speaker('郄贵洲', body),
+                         '严格口径应保持 doubt=False（规则路径语义未变）')
+        self.assertFalse(hybrid._is_plausible_speaker('日程安排', body))
+        self.assertTrue(hybrid._is_plausible_speaker('温永立', body))
+
+
 if __name__ == '__main__':
     unittest.main()

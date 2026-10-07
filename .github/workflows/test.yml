@@ -159,6 +159,19 @@ jobs:
       - name: Run latin speaker name tests
         run: python tests/test_speaker_latin_name.py
 
+      # 语料门禁（2026-10-07 拆闸配套）：生产库全部非空 speaker 反钉人名词表。
+      # 词表历史上四轮人肉补漏（每次都是线上丢名字→事后补表），本门把「存量数据
+      # 必须能过当前词表」固化为阻断——收紧词表若误杀库内真名，合并前即红。
+      - name: Run speaker corpus gate
+        run: python tests/test_speaker_corpus_gate.py
+
+      # 拒而未填报警（2026-10-07 拆闸配套）：锁定 8855 事故签名（llmRejected 含
+      # speaker 且 speaker 最终为空）。此前被拒的值与理由双双丢失、只能用户肉眼
+      # 发现；配合 llmRejectReason 留证，同类事故当天红灯并附原值。speaker 硬拦，
+      # affiliation/bio/abstract 的拒且空属正确拒绝，仅打印观测。
+      - name: Run gate reject evidence alarm
+        run: python tests/test_gate_reject_evidence.py
+
       # 2026-10-02 引入：核心模块**可编译性**门禁。
       # 起因是一次批量编辑把 `_stats_dirty = {...}` 误写成 `def _stats_dirty = {...}`，
       # server.py 直接 SyntaxError 而无人察觉——CI 从不 import 它（公网部署用不到，

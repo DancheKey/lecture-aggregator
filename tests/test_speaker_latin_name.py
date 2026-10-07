@@ -85,6 +85,48 @@ class LatinNameValidatorTest(unittest.TestCase):
             self.assertFalse(P._looks_like_real_name(bad), bad)
 
 
+class WordlistRepairTest(unittest.TestCase):
+    """2026-10-07 拆闸配套词表修复：存量体检发现的真名逐一钉死（防回退）。"""
+
+    def test_01_弯引号名(self):
+        """Timi O’Neill（aol 1029，存量真名）：分隔符集补 `’`。"""
+        self.assertTrue(P._looks_like_real_name('Timi O’Neill'), 'Timi O’Neill')
+        self.assertTrue(P._looks_like_real_name("Timi O'Neill"), '直引号变体')
+
+    def test_02_括号注记名(self):
+        """Yiu Por (Vincent) Chen（em 6428，存量真名）：括号段剥离后按空格名匹配。"""
+        self.assertTrue(P._looks_like_real_name('Yiu Por (Vincent) Chen'))
+
+    def test_03_新补姓氏(self):
+        """关/奉/员（关淑华/奉国和/员巧云，存量真名）补进姓氏表。"""
+        for name in ('关淑华', '奉国和', '员巧云'):
+            self.assertTrue(P._looks_like_real_name(name), name)
+
+    def test_04_地名黑名单消歧(self):
+        """吴重庆（geography 46，存量真名）：重庆从子串黑名单迁至整串名单。"""
+        self.assertTrue(P._looks_like_real_name('吴重庆'), '吴重庆')
+        self.assertFalse(P._looks_like_real_name('重庆'), '孤立「重庆」仍须拦截')
+
+    def test_05_长题目串被结构上限拦截(self):
+        """论文题目长句（实验三漏网脏样本）：词数/长度硬上限，不靠人肉加词。"""
+        self.assertFalse(P._looks_like_real_name(
+            'The One-Child Policy and Intergenerational Mobility'))
+        self.assertFalse(P._looks_like_real_name(
+            'Juergen Stuhler Vice President Quantum Technologies'))
+        # 边际内不受影响（生产库最长 5 词/28 字符）
+        self.assertTrue(P._looks_like_real_name('A.M.A. van Deemen'))
+
+    def test_06_叙事脏值进整串硬否决名单(self):
+        """现为台北/为喜迎华/日程安排（psy 1251/221/283）：拆闸后须硬否决而非 doubt。"""
+        for bad in ('现为台北', '为喜迎华', '日程安排'):
+            self.assertEqual(P._name_shape_verdict(bad), 'reject', bad)
+
+    def test_07_三值判定语义(self):
+        """姓氏表查无从否决降为 doubt；严格口径对 doubt 仍 False（规则路径不变）。"""
+        self.assertEqual(P._name_shape_verdict('郄贵洲'), 'doubt')
+        self.assertFalse(P._looks_like_real_name('郄贵洲'))
+
+
 class EnglishSpeakerSplitTest(unittest.TestCase):
     """③ 姓名切分：正文值与标题两种入参。"""
 

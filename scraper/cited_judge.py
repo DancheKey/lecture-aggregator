@@ -186,7 +186,12 @@ def _vf_suspect(field, val, body_text):
             if not re.fullmatch(r"[A-Za-z][A-Za-z .'\-()]{1,60}", val):
                 return True
             return not _val_boundary_ok(val, body_text)
-        if not hybrid._is_plausible_speaker(val, body_text or ''):
+        if not hybrid._speaker_trace_ok(val, body_text or ''):
+            return True
+        # 拆闸（2026-10-07）：形态存疑（姓氏表查无/英文形态不匹配）不再判疑——
+        # 该类值由采纳闸门放行并打 speakerUnverified 标记，B 无须再投反对票；
+        # 只有语义性脏值（禁词/职位词/超长，reject）仍在此判疑。
+        if hybrid._speaker_shape(val) == 'reject':
             return True
         return not _val_boundary_ok(val, body_text)
     if field == 'speakerAffiliation':

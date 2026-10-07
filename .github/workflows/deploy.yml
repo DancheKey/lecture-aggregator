@@ -77,6 +77,8 @@ jobs:
             tests/test_speaker_duty_suffix.py
             tests/test_speaker_title_cut.py
             tests/test_speaker_latin_name.py
+            tests/test_speaker_corpus_gate.py
+            tests/test_gate_reject_evidence.py
             tests/js/app_bundle_smoke.js
             tests/js/app_longtext_flow.js
             tests/js/app_clamp_consistency.js

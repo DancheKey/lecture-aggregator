@@ -476,21 +476,18 @@ def _truncate_rich_text(v):
     return _fv.truncate_rich_text(v, aggressive=True)
 
 
-def _is_plausible_speaker(value, trace_text):
-    """speaker 终检：值必须①像人名 ②字面可溯源到正文或标题。
+def _speaker_trace_ok(value, trace_text):
+    """speaker 值级溯源硬闸（2026-10-07 拆闸后 speaker 的首要否决依据）：
+    多段值逐段逐字出现在正文+标题中。
 
-    两道闸门缺一不可：
-    - ①挡机构名/讲座题目（如 'Nanyang Technological University'、'Collider Frontier'）；
-    - ②挡 LLM 形近字错误（如把「魏文娅」认成「魏文雯」，错字在原文中不存在）。
-    多人（顿号/逗号分隔）逐段校验，任一段不通过则整体拒绝。
+    A 常从标题读到姓名却编造一段正文风格的 snippet（如「主讲人：曹艺轩（华南师范大学
+    心理学院）」），该 snippet 在正文与标题中都匹配不上，按 snippet 闸门会被误判为
+    幻觉。改为直接校验「姓名值本身」是否字面出现在正文+标题中——既能救回标题型
+    姓名，也能天然挡住 LLM 的形近字错误（错字在原文里不存在）。
+    实证：topic/location 走同口径逐字溯源拒绝率 0%，该闸不冤枉照抄原文的值。
     """
     if not value or str(value).strip() in _NOISE:
         return False
-    try:
-        from parsers import _looks_like_real_name
-    except Exception:
-        _looks_like_real_name = None
-
     _trace = _norm_for_match(trace_text or '')
     if not _trace:
         return False
@@ -498,12 +495,48 @@ def _is_plausible_speaker(value, trace_text):
         seg = seg.strip()
         if not seg:
             continue
-        if _looks_like_real_name is not None and not _looks_like_real_name(seg):
-            return False
-        # 值级溯源：姓名必须字面出现在正文或标题中
         if _norm_for_match(seg) not in _trace:
             return False
     return True
+
+
+def _speaker_shape(value):
+    """speaker 形态判定（逐段取最严）：'ok' 像人名 / 'doubt' 形态存疑 / 'reject' 语义脏值。
+
+    拆闸（2026-10-07）：只有 'reject'（禁词/职位词/机构词/超长等「明确不是人名」）
+    保留否决权；'doubt'（姓氏表查无、英文形态不匹配）不再否决，由调用方打
+    speakerUnverified='whitelist' 标记进 audit 待核。
+    根因：封闭词表永远追不上真实姓名分布（姓氏表四轮人肉补漏：09-01/09-05/09-24/
+    10-06），LLM 路径已有逐字溯源这个更强证据，再压一层词表是否决冗余——
+    8855（Quoc-Hung NGUYEN 值对、snippet 逐字在原文，挂在词表）即实证。
+    """
+    try:
+        from parsers import _name_shape_verdict
+    except Exception:
+        return 'ok'  # parsers 不可用时退回「仅溯源」口径（与原 _looks_like_real_name=None 降级一致）
+    worst = 'ok'
+    for seg in re.split(r'[、,，/]', str(value)):
+        seg = seg.strip()
+        if not seg:
+            continue
+        v = _name_shape_verdict(seg)
+        if v == 'reject':
+            return 'reject'
+        if v == 'doubt':
+            worst = 'doubt'
+    return worst
+
+
+def _is_plausible_speaker(value, trace_text):
+    """speaker 严格口径终检（拆闸前原语义）：值必须①像人名 ②字面可溯源。
+
+    2026-10-07 拆闸后 LLM 采纳路径不再使用本函数（见 _merge_a_into_result 的
+    speaker 分支：形态 doubt 不再否决、改打 speakerUnverified 标记）；
+    本函数保留给需要严格口径的调用方与回归对拍。
+    """
+    if not _speaker_trace_ok(value, trace_text):
+        return False
+    return _speaker_shape(value) == 'ok'
 
 
 _AFFIL_TRACE_PAREN = re.compile(r'[（(][^）)]{1,40}[）)]')
@@ -545,17 +578,23 @@ def _try_fill_speaker(result, a, trace_text):
     """仅填空融合 speaker。供「分歧未获 B 支持」分支单独调用。
 
     只补 speaker 是因为 abstract/speakerBio 在 _merge_a_into_result 中属
-    「A 主导覆盖型」字段，未获 B 支持时不得覆盖规则值；而 speaker 采用前
-    须通过 _is_plausible_speaker（值级溯源 + 人名终检），风险可控。
+    「A 主导覆盖型」字段，未获 B 支持时不得覆盖规则值；speaker 采用与主融合
+    同一套拆闸后双判据（2026-10-07）：溯源硬闸 + 语义脏值（reject）否决，
+    形态存疑（doubt）放行并打 speakerUnverified='whitelist' 标记。
     """
     if (result.get('speaker') or '').strip():
         return False
     lv = (a.get('speaker') or '').strip()
     if not lv or lv in _NOISE:
         return False
-    if not _is_plausible_speaker(lv, trace_text):
+    if not _speaker_trace_ok(lv, trace_text):
+        return False
+    _sp_shape = _speaker_shape(lv)
+    if _sp_shape == 'reject':
         return False
     result['speaker'] = lv
+    if _sp_shape == 'doubt':
+        result['speakerUnverified'] = 'whitelist'
     return True
 
 
@@ -768,6 +807,9 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
     支持 llm 的字段可跳过仅填空，但仍必须通过溯源/合法性闸门（speaker 值级溯源、
     单位 _is_valid_affiliation、其余 snippet 溯源），闸门不过照样拒绝并记 llmRejected。
     与 2026-09-05 回退的「A 主导覆盖」（无裁决无闸门）不同，此处是 B 裁决+闸门双保险。
+    拆闸（2026-10-07）：speaker 的「闸门」细分为溯源硬闸 + 语义脏值否决（reject）+
+    形态存疑标记（doubt → speakerUnverified='whitelist'，不再否决）；所有拒绝均经
+    _reject 留证，末尾写入 llmRejectReason='field@reason:value'。
     例外二（2026-09-09）：规则值被 _is_dirty_value 判定为形态学污染的字段同样
     不受仅填空保护（仅限 speaker/speakerAffiliation/location），仍走同一套闸门。
     「不破坏已提取值」的本意是不破坏干净值，被污染的值不在此列。
@@ -780,6 +822,15 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
     """
     rejected = []
     adopted = []
+    # 拒绝留证（2026-10-07）：此前 llmRejected 只记字段名，被拒的值与拒因双双丢失
+    # （8855 要不是用户肉眼发现永远不会浮出来）。_reject 统一收集三元组，
+    # 函数末尾写入 llmRejectReason='field@reason:value|...'。
+    _evidence = []
+
+    def _reject(fld, reason, value=''):
+        rejected.append(fld)
+        _evidence.append((fld, reason, value))
+
     _force = force_fields or frozenset()
     _fields = _RICH_FIELDS if rich_only else _ALL_FIELDS
     # speaker 溯源范围 = 正文 + 标题（见 apply_llm_text_hybrid 的 title_text 说明）
@@ -811,7 +862,7 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             if not lv or lv in _NOISE:
                 continue
             if not _snippet_ok(a.get(fld + 'Snippet'), body_text):
-                rejected.append(fld)  # A 溯源失败 -> 保留规则
+                _reject(fld, 'snippet', lv)  # A 溯源失败 -> 保留规则
                 continue
             result[fld] = lv
             adopted.append(fld)
@@ -835,17 +886,17 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             # 2026-09-27 二轮审计 P1-7：location 值级溯源（用户口径逐字）——
             # A 给的译名/改写（源页不存在的「文英楼D404报告厅」类）在此拦截。
             if not _value_verbatim_in_text(lv, _trace_text):
-                rejected.append('location')
+                _reject('location', 'no-cite', lv)
                 continue
             # 2026-09-24 守卫：A 地点更短且丢了会议号或校区/学院前缀 → 拒绝
             # （保留规则）。裁决实证 7/7 命中；仅去尾部噪声或 A 更完整的情形不在此列。
             # 注意：不叠加「规则非脏」前提——含会议号的合法地点会被 _is_dirty_value
             # 误判为脏（标签噪声正则命中"会议"），那反而会放过错剥会议号的 A 值。
             if _a_drops_location_context(cur, lv):
-                rejected.append('location')
+                _reject('location', 'context', lv)
                 continue
             if not _snippet_ok(a.get(fld + 'Snippet'), body_text):
-                rejected.append(fld)
+                _reject(fld, 'snippet', lv)
                 continue
             result[fld] = lv
             adopted.append(fld)
@@ -854,12 +905,12 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             lv = _clean_affiliation(lv)
             if not lv or not _is_valid_affiliation(lv) or _is_host_affiliation(lv):
                 if lv:
-                    rejected.append(fld)
+                    _reject(fld, 'invalid', lv)
                 continue
             # 2026-09-24 守卫：A 对合法机构过度细化（追加院系/研究中心等子单元）
             # → 拒绝（保留规则）。裁决实证 4/4 命中；规则本身不合法或 A 纠错时不拦。
             if _a_over_refines_affiliation(cur, lv, body_text):
-                rejected.append('speakerAffiliation')
+                _reject('speakerAffiliation', 'refine', lv)
                 continue
         if fld == 'topic':
             # 2026-09-24 守卫：A 用英文论文题替换源页本就正确的中文题目 → 拒绝
@@ -867,35 +918,45 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             # P1-7）更新：原「A 提炼真中文题不受影响」已废止——topic 逐字溯源后，
             # 翻译/提炼/改写一律拒绝（下闸门），仅去括号/去长尾类逐字修剪可过。
             if _a_replaces_cn_title_with_en(cur, lv):
-                rejected.append('topic')
+                _reject('topic', 'cn-swap', lv)
                 continue
             if not _value_verbatim_in_text(lv, _trace_text):
-                rejected.append('topic')
+                _reject('topic', 'no-cite', lv)
                 continue
         if fld == 'speaker':
-            # speaker 采用「值级溯源」而非 snippet 级：A 常从标题读到姓名却编造一段
-            # 正文风格的 snippet（如「主讲人：曹艺轩（华南师范大学心理学院）」），
-            # 该 snippet 在正文与标题中都匹配不上，按 snippet 闸门会被误判为幻觉。
-            # 改为直接校验「姓名值本身」是否字面出现在正文+标题中——既能救回
-            # 标题型姓名，也能天然挡住 LLM 的形近字错误（错字在原文里不存在）。
-            if not _is_plausible_speaker(lv, _trace_text):
-                rejected.append('speaker')
+            # 拆闸（2026-10-07）：溯源硬闸不过 → 拒绝（no-cite）；语义性脏值
+            # （禁词/职位词/超长，shape=reject）→ 拒绝（dirty）；仅形态存疑
+            # （姓氏表查无/英文形态不匹配，shape=doubt）→ 放行 + speakerUnverified
+            # 标记（进 audit 待核）。词表四轮人肉补漏（关淑华/Quoc-Hung 等）由此根治。
+            if not _speaker_trace_ok(lv, _trace_text):
+                _reject(fld, 'no-cite', lv)
                 continue
+            _sp_shape = _speaker_shape(lv)
+            if _sp_shape == 'reject':
+                _reject(fld, 'dirty', lv)
+                continue
+            if _sp_shape == 'doubt':
+                result['speakerUnverified'] = 'whitelist'
         elif fld == 'speakerAffiliation':
             # 单位同样采用「值级溯源」而非 snippet 级：A 常附一段真实原文作
             # snippet、值却自行翻译（iqm557：snippet 为英文原文，值是中文译名）。
             # 只验 snippet 拦不住改写，必须校验值本身是否字面出现在原文中。
             # 规则值不走此处（上方仅填空分支已放行），故不影响正则提取结果。
             if not _is_plausible_affiliation(lv, _trace_text):
-                rejected.append('speakerAffiliation')
+                _reject('speakerAffiliation', 'no-cite', lv)
                 continue
         elif not _snippet_ok(a.get(fld + 'Snippet'), body_text):
-            rejected.append(fld)
+            _reject(fld, 'snippet', lv)
             continue
         result[fld] = lv
         adopted.append(fld)
     if rejected:
         result['llmRejected'] = '|'.join(rejected)
+        # 拒绝留证（2026-10-07）：field@reason:value，值内分隔符折成「，」并截断，
+        # 保证单行格式可解析（audit/CI 报警直接按 @ 与 : 切）。
+        result['llmRejectReason'] = '|'.join(
+            '%s@%s:%s' % (f, r, re.sub(r'[|:;]', '，', str(v))[:60])
+            for f, r, v in _evidence)
     # ⚠ llmAdopted 的写入**必须**在下方时间守卫之后——守卫也会往 adopted 里追加
     # lectureStart/lectureEnd，写在前面会漏记这两个字段（调用方据此判
     # llmTextEnhanced，漏记会让「B 裁决修正了时间」表现为「未采纳任何字段」）。
