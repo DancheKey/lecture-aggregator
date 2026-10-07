@@ -82,7 +82,8 @@ class SpeakerCorpusGateTest(unittest.TestCase):
                      '吴重庆',                              # 10-07 黑名单消歧
                      'Quoc-Hung NGUYEN',                    # 10-06 连字符
                      'Timi O’Neill',                        # 10-07 弯引号
-                     'Yiu Por (Vincent) Chen'):             # 10-07 括号注记
+                     'Yiu Por (Vincent) Chen',              # 10-07 括号注记
+                     '吴昌卫', 'Bethany C. Bray'):           # 10-07 存量修补补回（psy1251/283）
             self.assertTrue(P._looks_like_real_name(name),
                             '真实姓名被词表误杀（拆闸回归）：%r' % name)
 

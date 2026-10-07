@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-07T10:18:38+08:00",
+  "updatedAt": "2026-10-07T11:01:25+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261013/8854.html",
@@ -91018,9 +91018,9 @@
       "lectureStart": "2017-03-31 15:00:00",
       "lectureEnd": "2017-03-31 17:00:00",
       "location": "心理学院201会议室",
-      "speaker": "",
+      "speaker": "吴昌卫",
       "speakerTitle": "副教授",
-      "speakerAffiliation": "医科大学",
+      "speakerAffiliation": "台北医学大学",
       "inviter": "",
       "organizer": "心理学院",
       "publishTime": "2017-03-27 11:44:16",
@@ -91034,7 +91034,8 @@
       "abstract": "睡眠是重要的生理节律性活动,可重启大脑并刷新我们的认知功能 。但是,这个过程在人类大脑中是如何发生的？ 这个问题的答案仍然是一个迷。代替传统的刺激反应策略,我们将睡眠后的自发大脑活动作为导致认知更新的假设目标。 我们利用神经成像同时性技术——即结合 EEG 和 fMRI 技术,从神经生理学中揭示更多关于睡眠的信息。 从同时性技术中,我们能够检测到大脑活动强度的动态多样性,完整性以及神经生理机制。",
       "speakerBio": "现为台北医科大学脑与意识研究中心副教授,并兼任台湾桃园市国立中央大学生物医学科学与工程系副教授,曾担任美国巴尔的摩国家药物滥用研究所担任博士后访问研究员。 2008 年至今为 Brain Connectivity 、 Human Brain Mapping 、 IEEE Transactions on Biomedical Engineering 以及 Neuroimage 等 SCI 期刊审稿人, 2012 年至今为 Frontiers in Brain Imaging Methods 国际期刊编辑委员会委员, 2014 年为台湾基础研究",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "speakerSource": "title"
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20170330/18.html",
@@ -102786,7 +102787,7 @@
       "lectureStart": "2014-07-02 14:30:00",
       "lectureEnd": "2014-07-02 17:30:00",
       "location": "心理学院711室2.讨论会",
-      "speaker": "",
+      "speaker": "Bethany C. Bray",
       "speakerTitle": "研究员",
       "speakerAffiliation": "美国宾州州立大学方法研究中心",
       "inviter": "",
@@ -102802,7 +102803,8 @@
       "abstract": "主题一: Introduction to Latent Class and Latent Profile Analysis",
       "speakerBio": "Bethany C. Bray 博士,Ph.D., 于2000年在密歇根大学就读数学与应用统计本科,随后在宾州州立大学就读应用统计与人类发展、家庭研究方向的硕博学位。曾任弗吉尼亚理工大学心理学助理教授,现任美国宾州州立大学方法研究中心研究员。主要从事潜在类别分析(latent class analysis),潜在转变分析(latent transition analysis),因果推断模型(casual inference)、变系数模型(time varying effect model)等统计方法研究,以及吸烟、酗酒、药物滥用、赌博等预防干预领域的研究,至今在Structural Equation Modeling: A Multidisciplinary Journal,Prevention Science等学术期刊发表文章20余篇。 工作坊",
       "llmTextEnhanced": true,
-      "llmVerdict": "rich-only"
+      "llmVerdict": "rich-only",
+      "speakerSource": "manual"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20140628/3731.html",
