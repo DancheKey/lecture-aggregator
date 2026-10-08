@@ -58,12 +58,12 @@ jobs:
       issues: write     # 信息源健康检查自动创建/更新告警 Issue
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0            # 需要完整历史以便增量基线
 
       - name: 配置 Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: pip
@@ -174,7 +174,7 @@ jobs:
           PYEOF
 
       - name: 上传体检报告（保留 30 天）
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: 字段体检报告
           path: reports/audit_fields_report.html
@@ -338,21 +338,21 @@ jobs:
       # /旧切片发上线（实测：官网「更新于」停在 9-25，仓库里已是 9-28）。
       # 显式检出 main 才能拿到 scrape job 刚推送的产物。
       - name: 检出已推送的数据产物
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
 
       - name: 配置 Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: 上传站点产物
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
       - name: 部署到 GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   # ---------------------------------------------------------------------
   # gate：失败源告警。只读 data/last_scrape.json，不做任何写操作。
@@ -378,7 +378,7 @@ jobs:
       # 同 deploy：显式检出 main，读到 scrape job 刚推送的本班 last_scrape.json
       # （默认 github.sha 是触发时的旧 commit，本班失败源会被漏看）。
       - name: 检出数据
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
 
