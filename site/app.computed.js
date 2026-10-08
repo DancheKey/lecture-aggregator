@@ -9,13 +9,27 @@ const APP_COMPUTED = {
       return this.lastRunAt || this.updatedAt || '';
     },
 
-    // 来源通知总数（合并后按各讲座的 sourceCount 求和），用于首页说明与统计一致性
-    // 口径与 stats.js / generate_frontend_data.py 统一：sourceCount 缺失时回退到 sources 长度
+    // 来源通知总数：按**唯一来源 URL 集合**计（2026-10-08 口径变更，与
+    // generate_frontend_data.py::unique_source_urls 逐字对齐，两侧必须同口径，
+    // 否则首页与统计页会显示两个不同的「覆盖 N 条来源通知」）。
+    //
+    // 为何不用 sourceCount 逐条累加：一页多场拆分后，每场都把同一张转发页登记进
+    // 自己的 sources（xz/20240116/127 拆 3 场，各挂 swc/.../0101/55），而转发页
+    // 本身没有独立记录入库 —— 逐条累加等于把 1 张转发页数了 3 次。
+    //
+    // ⚠ 只用于这个数字。学院/校区筛选计数仍按讲座计、不去重（用户按「汕尾校区」
+    // 筛就该看到那 3 场讲座）。两处口径不可混用。
     sourceNoticeCount() {
-      return this.all.reduce((a, l) => {
-        const fb = (Array.isArray(l.sources) && l.sources.length) ? l.sources.length : 1;
-        return a + (l.sourceCount != null ? l.sourceCount : fb);
-      }, 0);
+      const seen = new Set();
+      for (const l of this.all) {
+        const u = (l.sourceUrl || '').replace(/\/+$/, '');
+        if (u) seen.add(u);
+        for (const s of (l.sources || [])) {
+          const su = ((s || {}).sourceUrl || '').replace(/\/+$/, '');
+          if (su) seen.add(su);
+        }
+      }
+      return seen.size;
     },
 
     // 数据中出现过的年份（倒序，字符串便于与下拉值比较）

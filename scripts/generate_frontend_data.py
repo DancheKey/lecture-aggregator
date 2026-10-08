@@ -177,10 +177,37 @@ def sort_for_latest(data):
     return sorted(data, key=key, reverse=True)
 
 
+def unique_source_urls(item):
+    """该条记录关联的**唯一**来源通知 URL 集合。
+
+    2026-10-08：统计口径由「逐条累加 sourceCount」改为「按唯一来源 URL 集合计数」。
+
+    起因（问题 3 实测）：一页多场拆分后，每场都把同一张转发页登记进自己的 sources
+    （xz/20240116/127 拆 3 场 → 3 条记录各挂 swc/collaborative/2024/0101/55），
+    而转发页**本身没有独立记录入库**，只以 sources 形式存在 → 逐条累加等于把
+    1 张转发页数了 3 次，「覆盖 N 条来源通知」虚高。
+
+    注意口径边界：**只用于「来源通知总数」这一个数字**。筛选计数（按学院/校区）
+    仍按讲座计，不去重——用户按「汕尾校区」筛就该看到那 3 场讲座（确实有 3 场），
+    去重反而丢信息。两处口径不可混用。
+    """
+    urls = set()
+    u = (item.get('sourceUrl') or '').strip()
+    if u:
+        urls.add(u.rstrip('/'))
+    for s in (item.get('sources') or []):
+        su = ((s or {}).get('sourceUrl') or '').strip()
+        if su:
+            urls.add(su.rstrip('/'))
+    return urls
+
+
 def build_stats(data, updated_at):
     """生成统计页专用 JSON：预计算矩阵 + 最小讲座索引。"""
     years_set = set()
-    source_notice_count = 0
+    # 来源通知总数：按**唯一来源 URL 集合**计（见 unique_source_urls 的口径说明）。
+    # 早前是逐条累加 sourceCount，多场拆分页会因同一转发页被多次引用而虚高。
+    seen_notice_urls = set()
     # 学院 -> 年份 -> 来源通知数
     matrix = {}
     # 年份 -> 来源通知数
@@ -196,11 +223,7 @@ def build_stats(data, updated_at):
             years_set.add(y)
         primary_url = item.get('sourceUrl') or ''
         sources = item.get('sources') or [item]
-        # 累加来源通知总数。注意：显式 sourceCount=0（多讲座拆分出的非首条）应被尊重，
-        # 故不能写 `item.get('sourceCount') or ...`（0 会被 or 吞掉）。
-        sc = item.get('sourceCount')
-        s_count = sc if sc is not None else (len(sources) or 1)
-        source_notice_count += s_count
+        seen_notice_urls |= unique_source_urls(item)
         # 预计算矩阵：按「该讲座归属的全部单位」计数。
         # 跨源合并的讲座（同一讲座被多个单位发布）应在每个相关单位各计一次，
         # 与首页筛选逻辑 Set([主学院, ...来源单位]) 完全一致，修复统计页漏算合并讲座的问题。
@@ -230,12 +253,16 @@ def build_stats(data, updated_at):
         # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞。
         # cs = 该讲座归属的全部单位（含主学院与来源单位），供访问/点赞按单位展开归属；
         # c = 主学院（保留，供来源通知数等按主讲座口径统计）。
+        # s = **本条**关联的唯一来源通知数（主页面 + 去重后的 sources）。
+        #   2026-10-08 改：早前取 sourceCount，在 sources 含重复 URL 时会虚高
+        #   （iqm/180 曾 sources 两个同一 URL、sc=2）。此处与顶层 sourceNoticeCount
+        #   同一口径——同一条内的重复 URL 只算一次。
         lectures.append({
             'u': primary_url,
             'y': y or UNKNOWN_YEAR,
             'c': primary_college,
             'cs': units,
-            's': s_count,
+            's': len(unique_source_urls(item)),
         })
 
     # 年份排序：数字年份降序，"其他"放最后
@@ -249,7 +276,10 @@ def build_stats(data, updated_at):
     return {
         'updatedAt': updated_at,
         'lectureCount': len(data),
-        'sourceNoticeCount': source_notice_count,
+        # 唯一来源通知数（2026-10-08 口径变更，见 unique_source_urls）：
+        # 由 seen_notice_urls 在遍历全部记录后统一得出——同一张转发页被多场拆分
+        # 引用时只计 1 次。早前是逐条累加 sourceCount，会把那 1 张页数 N 次。
+        'sourceNoticeCount': len(seen_notice_urls),
         'years': years,
         'matrix': matrix,
         'yearTotals': year_totals,
