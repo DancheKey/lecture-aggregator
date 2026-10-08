@@ -46,6 +46,26 @@ if (!fs.existsSync(path.join(SITE, 'visits-trend-data.json'))) {
 if (/<script>/.test(html)) errs.push('页面仍有内联 <script>（无 src）');
 if (/<style[\s>]/.test(html)) errs.push('页面仍有内联 <style>');
 
+// ---------- ⑤ 页面导航闭环（2026-10-08 补） ----------
+// 背景：本页此前**没有任何**返回链接——首页(index.html)菜单里有「讲座统计/
+// 访问量趋势」，stats.html 顶部也有「访问量趋势/返回首页」，唯独本页面是死胡同，
+// 手机上（无后退键可见）用户只能自己改地址栏。此处锁住两个返回入口，
+// 防止后续重构把导航又删掉。
+const needNav = [['./', '返回首页'], ['stats.html', '去统计页']];
+for (const [href, label] of needNav) {
+  const re = new RegExp(`<a[^>]+href=["']${href.replace('.', '\\.')}["'][^>]*>\\s*${label}\\s*</a>`);
+  if (!re.test(html)) {
+    errs.push(`页面缺少「${label}」导航链接（href=${href}）——`
+              + '三页导航闭环：首页 ↔ 统计页 ↔ 趋势页');
+  }
+}
+// 导航样式须走外链 CSS（CSP 的 style-src 为 'self'，不允许内联 style）
+if (/<nav class="topnav"[^>]*\sstyle=/.test(html)) {
+  errs.push('导航用了内联 style —— style-src 为 \'self\'，样式须写在 visits-trend.css');
+}
+const css = fs.readFileSync(path.join(SITE, 'visits-trend.css'), 'utf-8');
+if (!/\.topnav\b/.test(css)) errs.push('visits-trend.css 缺 .topnav 样式（导航会无样式）');
+
 // ---------- ④ 行为：用最小 DOM 桩跑一遍渲染 ----------
 // 数据改为 fetch 载入，故桩里提供可控的 fetch（返回本地 JSON 文件内容）。
 const js = fs.readFileSync(path.join(SITE, 'visits-trend.js'), 'utf-8');
