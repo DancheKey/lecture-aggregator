@@ -172,6 +172,14 @@ jobs:
       - name: Run gate reject evidence alarm
         run: python tests/test_gate_reject_evidence.py
 
+      # sourceCount / sources 记账一致性（2026-10-08）。四类缺陷都只表现为
+      # 「统计数字不对」，无任何报错：C 类 MS5 单场回退漏清 sourceCount（活 bug，
+      # 已修 parsers）、D 类合并去重用 college 当键致少算（活 bug，已修 scraper）、
+      # A 类脚本写死 0、B 类历史遗留。本套件含两条实库红线：单场页不得带
+      # splitMode 残留、多场组整组 sc 不得为 0——它们是 C 类缺陷最易察觉的信号。
+      - name: Run sourceCount consistency guards
+        run: python tests/test_source_count_consistency.py
+
       # 标题日期前缀剥离回归（2026-10-07，psy283）：日期区间「7月2日-7月4日」
       # 只被剥掉首段，残留「-7月4日…」再被导航噪声剥离的「去前导孤立数字」
       # 误吃，标题剩「月4日…」。修复为整段区间剥离。
