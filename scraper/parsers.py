@@ -5867,6 +5867,18 @@ def _finalize_record(soup, url, title, list_title, _st, result,
                 kept[0].pop('lectureIndex', None)
                 kept[0].pop('lectureCount', None)
                 kept[0].pop('sessionNumber', None)
+                # 2026-10-08 补漏：上面把「多场」三个键都清掉了，唯独漏了
+                # sourceCount 与 splitMode，致本条以 sc=0 / splitMode 残留的形态入库：
+                #   · sourceCount=0 → 统计层把「这条来源通知」整条漏计
+                #     （首页「覆盖 N 条来源通知」偏小，实测 6 条：physics/13312、
+                #       em/6407、em/6075、em/5493、em/5295、ibc/2779）；
+                #   · splitMode 残留 → 单场页却带着「repeated-label」这类拆分标记，
+                #     正常单场页应在无 splitMode 的桶里（实测全库 3563 条），
+                #     该残留正是本缺陷最易察觉的信号。
+                # 本处是**当前唯一仍会复现**该缺陷的路径（另两类 A/B 是历史遗留），
+                # 故必须在出口修，不能只靠存量脚本补一次。
+                kept[0]['sourceCount'] = 1
+                kept[0].pop('splitMode', None)
         return kept
 
     # ---- 多主讲人连写拆分（同一公告含多位主讲人，报告人字段以「[头衔]姓名职称」拼接）----

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-07T15:02:50+08:00",
+  "updatedAt": "2026-10-08T10:56:34+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261013/8854.html",
@@ -2892,9 +2892,8 @@
       "timeNote": "authoritative-label",
       "abstract": "李雅普诺夫函数是非线性动力系统稳定性的重要判据,其构造一直是个难题。首次积分是降低高阶非线性方程解析难度的基本途径,寻找首次积分仍旧充满挑战。",
       "isMultiLecture": false,
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
-      "splitMode": "repeated-label",
       "speakerSource": "inherited",
       "qaGate": "topic|speakerBio",
       "listTitle": "物理学院学术报告（第34期）北京师范大学涂展春教授",
@@ -22330,9 +22329,8 @@
       "ocrExtracted": false,
       "hasPosterImage": false,
       "isMultiLecture": false,
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
-      "splitMode": "numbered-list",
       "speakerSource": "inherited",
       "listTitle": "学术期刊投稿指南及实证研究论文发表的个案分享",
       "speakerBio": "女,经济学博士,现任英国阿伯丁大学商学院金融学高级讲师(副教授),博士导师, 会计金融房地产系主任。 美国Fordham 大学商学院伦敦中心客座副教授。在《经济研究》、International Review of Financial Analysis (SSCI)、Energy Economics (SSCI), Journal of Banking and Finance (SSCI) 、Journal of Financial Stability (SSCI)、 Transportation Research Part A (SSCI)等国内外权威期刊发表20多篇高质量论文,经常参加国际论文讨论会,并参与国际学术杂志的评审工作。 讲庄预告华南纤花大学華南卸花大学 IBC International Business College SOUTHCHINANORMALUNIVERSITY 华南师范大学国际商学院学术写作(一):学术期刊投稿指南",
@@ -54425,7 +54423,7 @@
       "isMultiLecture": true,
       "lectureIndex": 1,
       "lectureCount": 4,
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
       "splitMode": "repeated-label",
       "speakerSource": "block",
@@ -58399,7 +58397,7 @@
         }
       ],
       "merged": true,
-      "sourceCount": 1,
+      "sourceCount": 2,
       "abstract": "We derive a quantum kinetic theory for QED including both elastic and inelastic collisions. By assuming parity invariance, we find the classical limit of the kinetic theory generalizes the well-known classical kinetic theory to massive case. The resulting classical kinetic theory simplifies when fermion bare mass is much greater than thermal mass. In this case only elastic collision is relevant and screening is only needed for Coulomb scattering. As an application, we obtain an additional contribution to the shear-induced spin polarization from the collision term. We also discuss phenomenological implications of the contribution.",
       "speakerBio": "2004-2010, PhD at Stony Brook University 2010-2012, Postdoc at Max-Planck-Institute for Physics, Munich 2012-2015, Postdoc at Brookhaven National Laboratory 2015-2016, Associate Professor at Sun Yat-Sen University 2016-present, Professor at Sun Yat-Sen University Research interest: kinetic theory and spin transport, application of gauge/gravity duality, non-equilibrium field theory.",
       "speakerTitle": "教授",
@@ -60785,11 +60783,6 @@
           "college": "物理学院",
           "campus": "大学城",
           "title": "20211019  华中师范大学秦广友教授学术报告"
-        },
-        {
-          "sourceUrl": "https://physics.scnu.edu.cn/a/20211018/11736.html",
-          "college": "物理学院",
-          "campus": "大学城"
         }
       ],
       "merged": true,
@@ -61329,11 +61322,6 @@
           "college": "物理学院",
           "campus": "大学城",
           "title": "20210928  清华大学庄鹏飞教授学术报告"
-        },
-        {
-          "sourceUrl": "https://physics.scnu.edu.cn/a/20210927/11713.html",
-          "college": "物理学院",
-          "campus": "大学城"
         }
       ],
       "merged": true,
@@ -78267,7 +78255,7 @@
       "timeNote": "embedded-pdf-schedule（May 22, 2019；Venue: Room 832）",
       "isMultiLecture": true,
       "lectureCount": 4,
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [
         "Session Chair: Dr. Yuanke Li"
       ],
@@ -83670,9 +83658,8 @@
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
       "isMultiLecture": false,
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
-      "splitMode": "repeated-label",
       "speakerSource": "block",
       "qaGate": "speakerBio",
       "listTitle": "● （地点更改）华南经济论坛第237期、238期"
@@ -85949,9 +85936,8 @@
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
       "isMultiLecture": false,
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
-      "splitMode": "repeated-label",
       "speakerSource": "block",
       "qaGate": "speakerBio",
       "listTitle": "● 王兴贺教授、聂普焱教授学术讲座的通知"
@@ -87594,7 +87580,7 @@
       "lectureIndex": 1,
       "lectureCount": 32,
       "splitMode": "manual",
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
       "speakerSource": "manual-agenda"
     },
@@ -88402,7 +88388,7 @@
       "lectureIndex": 1,
       "lectureCount": 12,
       "splitMode": "manual",
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
       "speakerSource": "manual-agenda"
     },
@@ -91205,9 +91191,8 @@
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
       "isMultiLecture": false,
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
-      "splitMode": "repeated-label",
       "speakerSource": "block",
       "listTitle": "● (地点更改)第205期和第206期“华南经济论坛”通知"
     },
@@ -92505,9 +92490,8 @@
       "llmVerdict": null,
       "llmSpeakerSource": null,
       "isMultiLecture": false,
-      "sourceCount": 0,
+      "sourceCount": 1,
       "notes": [],
-      "splitMode": "repeated-label",
       "speakerSource": "block",
       "qaGate": "speakerBio",
       "listTitle": "● 第198期和第199期“华南经济论坛”通知"

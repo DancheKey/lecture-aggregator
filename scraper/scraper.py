@@ -799,14 +799,20 @@ def cross_source_dedup(records):
                 continue
 
             # 如果主记录已有 sources（来自同源去重阶段），合并进去并去重
+            # ⚠ 2026-10-08：去重键由 college 改为 **URL**。原按 college 去重会把
+            # 「同一学院两个不同 URL 的转发页」吞掉第二条 → sourceCount 少算
+            # （实测 iqm/195 林树：sources 实际 1 个却记 sc=1，应为 2）。
+            # college 只作**排除主记录本学院**的判据，不再充当去重键——
+            # 否则跨学院合并（同学院多来源）永远只能记 1 条来源。
             existing_sources = primary.get('sources') or []
             all_sources = []
-            _seen = set()
+            _seen_urls = set()
             for s in existing_sources + sources_list:
-                c = s.get('college', '')
-                if c == primary_college or c in _seen:
+                _su = str(s.get('sourceUrl') or '').rstrip('/')
+                # 同本学院（非跨单位）不计入；同 URL 幂等去重（每日增量重复抓会命中）
+                if not _su or _su in _seen_urls or s.get('college', '') == primary_college:
                     continue
-                _seen.add(c)
+                _seen_urls.add(_su)
                 all_sources.append(s)
             primary['sources'] = all_sources
             primary['merged'] = True
