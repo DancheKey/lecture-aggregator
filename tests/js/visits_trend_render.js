@@ -66,6 +66,23 @@ if (/<nav class="topnav"[^>]*\sstyle=/.test(html)) {
 const css = fs.readFileSync(path.join(SITE, 'visits-trend.css'), 'utf-8');
 if (!/\.topnav\b/.test(css)) errs.push('visits-trend.css 缺 .topnav 样式（导航会无样式）');
 
+// ---------- ⑥ 产物必须与生成脚本模板一致（2026-10-09 补） ----------
+// 背景：site/visits-trend.{html,css} 都是 scripts/gen_visits_trend.py 的**产物**
+// （main() 里 _write(OUT_PATH/CSS)），每次 CI 跑该脚本都会被整体重写。
+// 2026-10-08 直接改了产物文件，当日部署成功，**次日 10-09 的自动提交就把导航覆盖
+// 掉了**，公网随之失效——改动落错了地方，且没有任何报错。此处锁住「模板里有」：
+// 模板缺导航 → 产物迟早被覆盖 → 门禁提前报红。
+const genSrc = fs.readFileSync(
+  path.join(SITE, '..', 'scripts', 'gen_visits_trend.py'), 'utf-8');
+for (const [label, needle] of [['返回首页', '<a href="./">返回首页</a>'],
+                               ['去统计页', '<a href="stats.html">去统计页</a>'],
+                               ['.topnav 样式', '.topnav{'] /* CSS 常量内 */]) {
+  if (!genSrc.includes(needle)) {
+    errs.push(`scripts/gen_visits_trend.py 模板缺「${label}」——`
+              + '直接改 site/ 产物会被下一次 CI 覆盖（10-08 → 10-09 已发生过一次）');
+  }
+}
+
 // ---------- ④ 行为：用最小 DOM 桩跑一遍渲染 ----------
 // 数据改为 fetch 载入，故桩里提供可控的 fetch（返回本地 JSON 文件内容）。
 const js = fs.readFileSync(path.join(SITE, 'visits-trend.js'), 'utf-8');

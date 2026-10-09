@@ -15,11 +15,24 @@
 </head>
 <body><div class="wrap">
 
+<!-- 页面导航（2026-10-08 补，2026-10-09 修正落点）：本页此前**没有任何**返回
+     链接——首页与统计页都有「访问量趋势 / 返回首页」互跳，唯独本页面是死胡同，
+     手机上（无可见后退键）只能自己改地址栏。
+
+     ⚠ 改动必须落在这里（模板），不能直接改 site/visits-trend.html：
+     该 HTML 是本脚本的**产物**，每次 CI 跑 gen_visits_trend.py 都会被整体重写。
+     2026-10-08 那版直接改了产物文件，当日部署成功、但次日 10-09 的自动提交
+     （chore: 自动更新讲座数据）就把它覆盖掉了，公网导航随之消失。 -->
+<nav class="topnav">
+  <a href="./">返回首页</a>
+  <a href="stats.html">去统计页</a>
+</nav>
+
 <header>
   <h1>站点访问量趋势</h1>
   <p class="sub">数据来源 busuanzi（公网）每日快照 · 覆盖
     2026-09-10 至 2026-10-09</p>
-  <p class="subline">生成于 2026-10-08 21:15 · 台账 data/visits_history.json</p>
+  <p class="subline">生成于 2026-10-09 08:51 · 台账 data/visits_history.json</p>
 </header>
 
 <div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v">1,573</div><div class="kpi-d">较前次 +27</div></div><div class="kpi"><div class="kpi-k">累计访客数</div><div class="kpi-v">1,261</div><div class="kpi-d">较前次 +22</div></div><div class="kpi"><div class="kpi-k">日均新增访客</div><div class="kpi-v">13</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">30 天</div><div class="kpi-d">快照 27 条，缺 3 天</div></div></div>

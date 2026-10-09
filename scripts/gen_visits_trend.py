@@ -56,6 +56,14 @@ body{margin:0;padding:36px 20px 48px;background:#F7F7F5;color:#2C2C2A;
   font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
 .wrap{max-width:960px;margin:0 auto}
 h1{font-size:22px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+/* 顶部导航（2026-10-08 补，2026-10-09 修正落点）：本页此前无任何返回链接，
+   是首页/统计页/趋势页三页里唯一的死胡同。与 HTML 一并落在本模板常量里——
+   site/visits-trend.css 同为本脚本产物（main() 里 _write(css, CSS)），
+   直接改产物会被下一次 CI 覆盖。 */
+.topnav{display:flex;align-items:center;gap:16px;margin:0 0 18px}
+.topnav a{font-size:13.5px;color:#5F5E5A;text-decoration:none;
+  padding:4px 12px;border:1px solid #E1E0DA;border-radius:999px;background:#fff}
+.topnav a:hover{color:#185FA5;border-color:#B5D4F4;background:#E6F1FB}
 .sub{color:#888780;font-size:13.5px;margin:0}
 header{margin-bottom:24px}
 .subline{color:#B4B2A9;font-size:13px;margin:4px 0 0}
@@ -460,6 +468,19 @@ def main():
 <link rel="stylesheet" href="visits-trend.css">
 </head>
 <body><div class="wrap">
+
+<!-- 页面导航（2026-10-08 补，2026-10-09 修正落点）：本页此前**没有任何**返回
+     链接——首页与统计页都有「访问量趋势 / 返回首页」互跳，唯独本页面是死胡同，
+     手机上（无可见后退键）只能自己改地址栏。
+
+     ⚠ 改动必须落在这里（模板），不能直接改 site/visits-trend.html：
+     该 HTML 是本脚本的**产物**，每次 CI 跑 gen_visits_trend.py 都会被整体重写。
+     2026-10-08 那版直接改了产物文件，当日部署成功、但次日 10-09 的自动提交
+     （chore: 自动更新讲座数据）就把它覆盖掉了，公网导航随之消失。 -->
+<nav class="topnav">
+  <a href="./">返回首页</a>
+  <a href="stats.html">去统计页</a>
+</nav>
 
 <header>
   <h1>站点访问量趋势</h1>
