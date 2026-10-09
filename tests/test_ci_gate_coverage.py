@@ -165,29 +165,29 @@ class CronDocConsistencyTest(unittest.TestCase):
     ADMIN_JS = os.path.join(ROOT, 'site', 'app.admin.js')
 
     def _cron_hours(self):
-        """从 daily.yml 取两班的**小时**（cron 格式 '分 时 日 月 周'，第 2 段是小时）。"""
+        """从 daily.yml 取三班的**小时**（cron 格式 '分 时 日 月 周'，第 2 段是小时）。"""
         with open(self.DAILY_YML, encoding='utf-8') as f:
             text = f.read()
         hs = []
         for m in re.finditer(r"-\s*cron:\s*['\"]?(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*['\"]?", text):
             hs.append(int(m.group(2)))          # group(1)=分，group(2)=时
-        self.assertEqual(len(hs), 2,
+        self.assertEqual(len(hs), 3,
                          f'daily.yml 的 cron 班次数异常（解析到 {hs}）——'
                          f'改班次时请同步 deploy.md 与 site/app.admin.js 的文案')
         return sorted(hs)
 
-    def test_06_cron班次为两班且升序(self):
-        a, b = self._cron_hours()
-        self.assertLess(a, b)
+    def test_06_cron班次为三班且升序(self):
+        hs = self._cron_hours()
+        self.assertEqual(hs, sorted(set(hs)))
 
     def test_07_文档时刻与daily_yml一致(self):
         if not os.path.exists(self.DOC):
             self.skipTest('docs/ 不入库（本地文档），跳过')
-        a, b = self._cron_hours()
+        a, b, c = self._cron_hours()
         with open(self.DOC, encoding='utf-8') as f:
             text = f.read()
-        want_utc = {'%02d:00' % a, '%02d:00' % b}
-        bj = {'%02d:00' % ((a + 8) % 24), '%02d:00' % ((b + 8) % 24)}
+        want_utc = {'%02d:00' % h for h in (a, b, c)}
+        bj = {'%02d:00' % ((h + 8) % 24) for h in (a, b, c)}
 
         # 只在**与 cron/班次相关**的行里比对时刻，避免把文档别处的时刻
         # （如「超时 08:00」「保留 30 天」之类）误当成班次。
@@ -212,8 +212,8 @@ class CronDocConsistencyTest(unittest.TestCase):
     def test_08_页面文案与daily_yml一致(self):
         if not os.path.exists(self.ADMIN_JS):
             self.skipTest('site/app.admin.js 不存在')
-        a, b = self._cron_hours()
-        want = {'%02d:00' % ((a + 8) % 24), '%02d:00' % ((b + 8) % 24)}
+        a, b, c = self._cron_hours()
+        want = {'%02d:00' % ((h + 8) % 24) for h in (a, b, c)}
         with open(self.ADMIN_JS, encoding='utf-8') as f:
             text = f.read()
         # 只看 toast 文案（排除注释里的说明）
