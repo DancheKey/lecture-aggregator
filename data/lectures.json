@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-08T15:11:04+08:00",
+  "updatedAt": "2026-10-10T04:46:37+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261013/8854.html",
@@ -30,6 +30,45 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-陈树敏"
+    },
+    {
+      "sourceUrl": "http://em.scnu.edu.cn/a/20261009/11184.html",
+      "images": [],
+      "college": "经济与管理学院",
+      "campus": "大学城",
+      "title": "寰宇问道·名师讲座 第11期",
+      "topic": "国际经验对海南自由贸易港规划建设的启示",
+      "lectureStart": "2026-10-11 18:30:00",
+      "lectureEnd": "2026-10-11 20:30:00",
+      "location": "大学城校园文三栋407室",
+      "speaker": "孟广文",
+      "speakerTitle": "二级教授、博士生导师",
+      "speakerAffiliation": "天津师范大学",
+      "inviter": "",
+      "speakerBio": "德国海德堡大学哲学博士,天津师范大学地理学部、欧洲文明研究院二级教授、博士生导师,地理学一级学科带头人。任天津市地理学会理事长,全国经济地理研究会常务理事、全国经济地理研究会中国自由经济区专业委员会主任、联合国贸易发展组织、联合国工业发展组织、非洲联盟、亚洲发展银行自由贸易区",
+      "organizer": "经济与管理学院",
+      "publishTime": "2026-10-09 09:52",
+      "publishTimeSource": "companion",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "newsFilterBypass": true,
+      "llmTextEnhanced": true,
+      "llmVerdict": "llm",
+      "llmSpeakerSource": null,
+      "llmSelfExtract": {
+        "speaker": null,
+        "speakerTitle": null,
+        "affiliation": null,
+        "lectureStart": null,
+        "lectureEnd": null,
+        "location": null,
+        "topic": null,
+        "title": null
+      },
+      "llmAdopted": "speakerTitle|speakerAffiliation",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "● 寰宇问道·名师讲座 第11期"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20261008/6824.html",
