@@ -93,34 +93,54 @@ class ForceFullGateTest(unittest.TestCase):
 class SilentSourceTest(unittest.TestCase):
     """失效源告警：老源零产出要有信号。"""
 
-    def test_07_失效源检测逻辑存在(self):
-        """「老源换 URL」场景：新源判据覆盖不到，必须靠零产出告警补上。
+    def test_07_失效源检测已移除防止回归(self):
+        """2026-10-10 生产修复：SRC-SILENT 检测已移除。
 
-        这是评审指出的第2 条——新源判据只覆盖「库里无记录」，而
-        「老源换了地址」时库里**有**旧记录，判据认定它是老源走常规增量，
-        旧 URL 的基线日期会挡住新 URL 的页面。此时唯一的信号就是
-        「本源本轮零产出但库里有大量存量」。
+        首版判据「本轮零产出 + 库中≥20 条」在正常增量下误报率极高：
+        源站一周没发新讲座完全正常，却被标为「疑似改版」刷屏（实测
+        16/33 个正常源被误报）。真正的改版信号应是「列表页取回成功但
+        零条目」，需要 _process_source 返回额外元数据才能精确检测。
+        本测试防止该特性被无意重新引入。
+        只检查 `silent_sources` 变量——注释里保留 `SRC-SILENT` 字样
+        作为「此处曾有此功能」的文档是允许的。
         """
-        self.assertIn('silent_sources', SRC, '缺少失效源（零产出）告警')
-        self.assertRegex(SRC, r'if \(not err and not local and is_incremental',
-                         '失效源检测条件缺失（应为：无错误、无产出、增量模式）')
-        self.assertRegex(SRC, r'if _lib >= 20:',
-                         '失效源告警未设存量阈值（小样本源会刷噪音）')
+        self.assertNotIn('silent_sources', SRC,
+                         'SRC-SILENT 检测不应存在（正常源零产出≠改版，误报率过高）')
 
-    def test_08_告警必须写入last_scrape供CI读取(self):
-        """告警不能只打日志：CI 读不到就等于没有。"""
-        self.assertRegex(SRC, r"payload\['silent_sources'\] = silent_sources",
-                         'silent_sources 未写入 last_scrape.json，CI 无法读取')
 
-    def test_09_告警不得阻断数据提交(self):
-        """零产出未必是故障（有些源当天确实没更新），不能因此拦住数据上线。"""
-        self.assertNotIn('silent_sources:\n                    sys.exit', SRC)
-        # 确认告警处没有 return/exit
-        idx = SRC.find('if silent_sources:')
-        self.assertGreater(idx, 0, '缺少 silent_sources 告警输出')
-        block = SRC[idx:idx + 400]
-        self.assertNotIn('sys.exit', block, '失效源告警不应导致进程退出')
-        self.assertNotIn('return\n', block[:200], '失效源告警不应中断主流程')
+class BootstrapTrackingTest(unittest.TestCase):
+    """Bootstrap 追踪：防止「一直零记录的源每轮被反复全量扫描」。
+
+    2026-10-10 生产修复：首版「新源」判据只看「库里是否零记录」，无法区分
+    「刚加入需要补历史」和「一直存在但从未产出」——后者每轮触发 force_full，
+    反复全量扫描 + 大量 SKIP-NEWS/SKIP-RETRO = 爬取项暴增 + 耗时暴增
+    （CI 实测：426 项/10+ 分钟，20 源被反复全量扫描，仅补回 3 条）。
+    """
+
+    def test_15_bootstrap追踪逻辑存在(self):
+        """新源检测必须排除已 bootstrap 过的源。"""
+        self.assertIn('source_bootstrap.json', SRC,
+                      '缺少 bootstrap 追踪文件（防反复全量扫描）')
+        self.assertIn('nm not in bootstrapped', SRC,
+                      '新源检测未排除已 bootstrap 过的源')
+
+    def test_16_bootstrap在落库后写入(self):
+        """bootstrap 标记必须在 lectures.json 落库之后写——
+        若中途 abort（--source 归零中止、总量缩水保护），不应标记，
+        下轮还会正常触发一次全量扫描。"""
+        idx_lectures = SRC.find("_atomic_write_json(os.path.join(data_dir, 'lectures.json')")
+        idx_bootstrap = SRC.find("bs[nm] = now_iso")
+        self.assertGreater(idx_lectures, 0, '未找到 lectures.json 落库点')
+        self.assertGreater(idx_bootstrap, 0, '未找到 bootstrap 写入点')
+        self.assertGreater(idx_bootstrap, idx_lectures,
+                           'bootstrap 标记必须在 lectures.json 落库之后写')
+
+    def test_17_bootstrap路径与新源检测一致(self):
+        """加载与写入必须用同一个 bootstrap_path 变量，防止路径漂移。"""
+        import re
+        paths = re.findall(r'bootstrap_path\s*=\s*os\.path\.join\([^)]+\)', SRC)
+        self.assertEqual(len(paths), 1,
+                         f'bootstrap_path 应只定义一次，实际 {len(paths)} 次')
 
 
 class TimeGateExemptionTest(unittest.TestCase):

@@ -2023,19 +2023,35 @@ def main():
     #   · PAGESTOP 翻两页就停
     # 三者叠加的结果就是「源加进去了，但一条历史数据都补不回来」。
     #
-    # 判据：该源的 college 名在 existing 中一条记录都没有（src_latest_date 为空）。
-    # 正常接入一个新学院时正是这种情况；已稳定运行的源不会命中。
+    # ⚠ 2026-10-10 生产修复（CI 实测 426 项/10+ 分钟，20 源反复全量扫描）：
+    #   首版判据只看「库里是否零记录」，无法区分：
+    #     ① 刚加入 sources.yaml、需要一次性补历史的新源（设计意图）
+    #     ② 一直存在但从未产出有效记录的源（页面全是新闻/回顾稿）
+    #   对②每轮都触发 force_full = 反复全量扫描 + 大量 SKIP-NEWS/SKIP-RETRO
+    #   = 爬取项暴增 + 耗时暴增。修复：用 source_bootstrap.json 追踪「已做
+    #   过全量扫描的源」，只在首次检测到时触发，之后即使仍零记录也不再重复。
+    bootstrap_path = os.path.join(ROOT, 'data', 'source_bootstrap.json')
+    bootstrapped = {}
+    if os.path.exists(bootstrap_path):
+        try:
+            bootstrapped = json.load(open(bootstrap_path, encoding='utf-8'))
+            if not isinstance(bootstrapped, dict):
+                bootstrapped = {}
+        except Exception:
+            bootstrapped = {}
+    # 判据：该源的 college 名在 existing 中一条记录都没有（src_latest_date 为空）
+    #       **且尚未做过 bootstrap 全量扫描**。
     new_source_names = set()
     if is_incremental and existing:
         for s in sources:
             nm = s.get('name', '')
-            if nm and not src_latest_date.get(nm):
+            if nm and not src_latest_date.get(nm) and nm not in bootstrapped:
                 # 双重确认：按 college 名精确查一次，避免 src_latest_date 因
                 # 「有记录但缺日期字段」而误判（那种情况应交给常规增量处理）。
                 if not any((r.get('college') or '') == nm for r in existing):
                     new_source_names.add(nm)
     if new_source_names:
-        print('[NEW-SOURCE] 以下信息源库中无任何历史记录，本轮强制全量扫描'
+        print('[NEW-SOURCE] 以下信息源库中无任何历史记录且未初始化过，本轮强制全量扫描'
               '（已放开水位线 / 被拒台账 / 翻页停止）：%s'
               % '、'.join(sorted(new_source_names)))
 
@@ -2057,7 +2073,6 @@ def main():
         max_workers = 3
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
-    silent_sources = []  # 2026-10-10 改造 1c：零产出但库中有存量的源（疑似改版）
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # ⚠ 第 8 个实参必须是**本源自己**的最晚条目日期（字符串），不是整张
         # {源名: 日期} 字典。传错类型会让 _process_source 里的
@@ -2073,20 +2088,12 @@ def main():
                 local, err = future.result()
                 if err:
                     failed_sources.append(err)
-                # 2026-10-10 改造 1c：失效源信号——本源本轮一条新数据都没产出，
-                # 而库里它有相当存量。正常增量下每个源每轮都会捞到东西（或因
-                # 已有数据而无新增）；持续零产出通常是「官网改版/栏目迁移」，
-                # 而现状是**静默**：旧数据还在（增量以 existing 为基底），
-                # 水位线照常推进，新讲座永远抓不到，且没有任何告警。
-                # 这正是使用者踩到的场景：改了地址却没改 sources.yaml。
-                if (not err and not local and is_incremental
-                        and src_name not in new_source_names):
-                    _lib = sum(1 for r in existing
-                               if (r.get('college') or '') == (src_name or ''))
-                    if _lib >= 20:
-                        silent_sources.append(
-                            f'{src_name}: 本轮零产出（库中存量 {_lib} 条）——'
-                            f'疑似源站改版/栏目迁移，请核对 sources.yaml 中的地址')
+                # (2026-10-10 生产修复：移除 SRC-SILENT 检测——首版判据
+                # 「本轮零产出 + 库中≥20 条」在正常增量下误报率极高：源站
+                # 一周没发新讲座完全正常，却被标为「疑似改版」刷屏（实测
+                # 16/33 个正常源被误报）。真正的改版信号应是「列表页取回
+                # 成功但零条目」，需要 _process_source 返回额外元数据才能
+                # 精确检测，留作后续改造；当前宁可不报也不误报。)
                 for url, rec in local.items():
                     lectures[url] = rec
                     all_fetched.append(rec)
@@ -2235,12 +2242,25 @@ def main():
         print(f'[INCREMENTAL] 本次未改变任何记录，updatedAt 沿用 {prev_updated_at}（数据文件内容不变）')
     _atomic_write_json(os.path.join(data_dir, 'lectures.json'),
                        {'updatedAt': data_updated_at, 'data': out})
-    # 2026-10-10 改造 1c：失效源告警。必须在水位写入**之前**完成——
-    # 否则 failed_sources 非空时走的是「保留旧水位」分支并提前 return，
-    # 告警会被整个跳过（而那恰恰是最需要告警的轮次）。
-    if silent_sources:
-        print(f'[SRC-SILENT] {len(silent_sources)} 个信息源本轮零产出（库中有存量）：\n  - '
-              + '\n  - '.join(silent_sources), file=sys.stderr)
+    # 新源 bootstrap 标记（2026-10-10 修复）：全量扫描完成且已落库，标记为已初始化，
+    # 后续增量不再重复触发 force_full（防止「一直零记录的源每轮被反复全量扫描」）。
+    # 必须在 lectures.json 落库之后写——若中途 abort（如 --source 归零中止、
+    # 总量缩水保护），不应标记，下轮还会正常触发一次全量扫描。
+    if new_source_names:
+        try:
+            bs = {}
+            if os.path.exists(bootstrap_path):
+                bs = json.load(open(bootstrap_path, encoding='utf-8'))
+                if not isinstance(bs, dict):
+                    bs = {}
+            for nm in new_source_names:
+                bs[nm] = now_iso
+            _atomic_write_json(bootstrap_path, bs)
+            print(f'[NEW-SOURCE] 已标记 {len(new_source_names)} 个源为已初始化'
+                  f'（source_bootstrap.json），后续增量不再重复全量扫描')
+        except Exception as e:
+            print(f'[WARN] 写入 source_bootstrap.json 失败（不影响本轮数据）：{e!r}',
+                  file=sys.stderr)
     # 局部修复模式不更新 last_scrape.json，避免影响下一次全量/定时增量调度
     if not args.source:
         if failed_sources:
@@ -2251,8 +2271,6 @@ def main():
             payload = {'mode': 'incremental' if is_incremental else 'full',
                        'attempted_at': now_iso,
                        'failed_sources': failed_sources}
-            if silent_sources:
-                payload['silent_sources'] = silent_sources
             if since:
                 payload['last_scrape'] = since
             _atomic_write_json(last_scrape_path, payload)
@@ -2263,8 +2281,6 @@ def main():
             # now_iso 仍用于 updatedAt（数据内容在结束时定型，语义正确）与 attempted_at。
             payload = {'last_scrape': watermark_iso,
                        'mode': 'incremental' if is_incremental else 'full'}
-            if silent_sources:
-                payload['silent_sources'] = silent_sources
             _atomic_write_json(last_scrape_path, payload)
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
           f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
