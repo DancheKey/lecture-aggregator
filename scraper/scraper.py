@@ -1677,9 +1677,20 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     if href_norm in src_list_norm:
                         continue
+                    # P0-2 误报修复（2026-10-10，当日 gate 红暴露）：fetch 返回 None
+                    # 有三种语义——白名单拒绝 / robots 禁止 / 真失败。前两者是
+                    # 预期过滤而非故障，必须预检排除，否则列表页里长期存在的
+                    # 站外广告外链（如 999brain.com，每轮都出现）会被记成
+                    # 「详情页失败」→ failed_sources 永远非空 → 水位永不推进、
+                    # gate 每班必红。fetch 返回 None 从此只代表「策略放行后的失败」。
+                    _host = urlparse(href).netloc
+                    if not (_host == 'scnu.edu.cn' or _host.endswith('.scnu.edu.cn')):
+                        continue
+                    if not _can_fetch(href, allowed_domains=['scnu.edu.cn']):
+                        continue
                     d = fetch(href, allowed_domains=['scnu.edu.cn'])
                     if not d:
-                        detail_fails.append(href)   # P0-2：静默丢失改为记账上报
+                        detail_fails.append(href)   # P0-2：策略放行后的取回失败才记账
                         continue
                     try:
                         recs = parse_detail(d, href, name, campus, year, list_title=txt,

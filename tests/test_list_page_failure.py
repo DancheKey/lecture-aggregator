@@ -52,17 +52,20 @@ class _SourceRun:
     """跑一次 _process_source，桩掉 fetch/parse_detail/sleep，返回 (err, 记录数)。"""
 
     def __init__(self, mod, pages, existing_urls=None, is_incremental=False,
-                 parse_mode='ok'):
+                 parse_mode='ok', robots_denied=()):
         self.mod = mod
         self.pages = pages          # {url: html 或 None}；详情页不登记 → 视为取回失败
         self.fetched = []
         self.parsed = []
         self.parse_mode = parse_mode  # 'ok' | 'raise'（parse_detail 抛异常）| 'none'（返回 None=SKIP-NEWS）
+        self.robots_denied = robots_denied  # 桩 _can_fetch 对这些 URL 返回 False
 
     def run(self, list_urls, **kw):
         m = self.mod
         orig = (m.fetch, m.parse_detail, m.time.sleep, m._can_fetch)
-        m._can_fetch = lambda url: True
+        # 签名须与生产 _can_fetch(url, allowed_domains=None) 对齐（2026-10-10
+        # 详情页预检开始传 allowed_domains，桩签名不齐会 TypeError）
+        m._can_fetch = lambda url, allowed_domains=None: url not in self.robots_denied
         m.time.sleep = lambda *_a, **_k: None
 
         def fake_fetch(url, _retries=3, allowed_domains=None):
@@ -272,6 +275,30 @@ class DetailPageFailureGateTest(unittest.TestCase):
         err, local = r.run([_lu(self.u_ok)])
         self.assertIsNone(err)
         self.assertEqual(len(local), 1)
+
+    def test_05_白名单外外链_不得计入失败(self):
+        """P0-2 误报修复（2026-10-10 gate 红、999brain 外链暴露）：fetch 返回 None
+        有三种语义，其中「域名不在白名单」是预期过滤而非故障。列表页里长期存在
+        的站外广告外链每轮都会出现，若被记成详情页失败 → failed_sources 永远
+        非空 → 水位永不推进、gate 每班必红。必须在 fetch 之前预检挡下。"""
+        u_adv = 'http://www.999brain.com/NewsMessage/NewsMessageDetails-x.html'
+        page = GOOD_PAGE.replace(
+            '</body>', f'<li><a href="{u_adv}">友情链接</a></li></body>')
+        r = _SourceRun(P, {self.u_ok: page})  # 外链不在 pages → 桩 fetch 返回 None
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNone(err, '白名单外外链被拦截是预期过滤，不得记为详情页失败')
+        self.assertNotIn(u_adv, r.fetched, '外链应在 fetch 之前被白名单预检挡下')
+        self.assertEqual(len(local), 1, '白名单内的正常详情页不得受影响')
+
+    def test_06_robots禁止_不得计入失败(self):
+        """robots Disallow 是合规跳过而非故障——fetch 内部同样返回 None，
+        若不预检排除同样会误记失败。"""
+        detail = 'http://t.scnu.edu.cn/a/202609/456.html'
+        page = GOOD_PAGE.replace('/a/202609/123.html', '/a/202609/456.html')
+        r = _SourceRun(P, {self.u_ok: page}, robots_denied=(detail,))
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNone(err, 'robots 禁止属合规跳过，不得记为详情页失败')
+        self.assertNotIn(detail, r.fetched, 'robots 禁止的 URL 不应发起 fetch')
 
 
 class ListDateSwitchTest(unittest.TestCase):
