@@ -143,7 +143,9 @@ def load_health():
 def save_health(data):
     os.makedirs(os.path.dirname(HEALTH_PATH), exist_ok=True)
     tmp = HEALTH_PATH + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
+    # newline='\n'：统一 LF 输出（与 fetch_visits_snapshot.save_history 同理），
+    # 避免 Windows 本地跑出 CRLF 造成 git 换行噪声。
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write('\n')
     os.replace(tmp, HEALTH_PATH)

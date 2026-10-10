@@ -79,7 +79,9 @@ def load_history():
 
 def save_history(data):
     tmp = HISTORY_PATH + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
+    # newline='\n'：本台账承诺「逐行追加便于自动合并」（见模块 docstring），
+    # Windows 文本模式会把 \n 写成 \r\n，破坏该前提并产生 git 换行噪声。
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write('\n')
     os.replace(tmp, HISTORY_PATH)
