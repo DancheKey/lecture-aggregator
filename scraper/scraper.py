@@ -1581,6 +1581,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
     list_fetch_fail = []
     list_empty_ok = []
     list_seen_ok = 0
+    # P0-2（2026-10-10）：详情页取回/解析失败的记账。此前循环内两处 continue
+    # 静默跳过、不进 failed_sources → 单场讲座漏抓无任何告警（外部审查发现）。
+    # 现与列表页失败同口径上报，由 main() 统一纳入水位闸门（不推进 + gate 告警）；
+    # 瞬时故障下轮自动重抓同区间恢复，与 B8 的 fail-closed 哲学一致。
+    detail_fails = []
     try:
         for lu in src.get('list_urls', []):
             if isinstance(lu, dict):
@@ -1674,12 +1679,14 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     d = fetch(href, allowed_domains=['scnu.edu.cn'])
                     if not d:
+                        detail_fails.append(href)   # P0-2：静默丢失改为记账上报
                         continue
                     try:
                         recs = parse_detail(d, href, name, campus, year, list_title=txt,
                                             skip_news_filter=src.get('skip_news_filter', False))
                     except Exception as e:
                         print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
+                        detail_fails.append(href)   # P0-2：仅告警不改为记账上报
                         continue
                     if recs is None:
                         print(f'[SKIP-NEWS] {name} | {txt} | {href}')
@@ -1767,6 +1774,13 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
         # main() 无从知晓哪些源失败，水位照常推进 → 失败时段内发布的讲座永久漏抓。
         # 已抓到的部分结果仍返回（不浪费），但本源水位不得推进。
         return local, f'{name}: {e}'
+    # P0-2：详情页失败与列表页失败同口径——返回非空 err → main() 记入
+    # failed_sources → 水位不推进，下轮重抓同区间自动补回；gate job 会发告警。
+    if detail_fails:
+        print(f'[DETAIL-FAIL] {name} | {len(detail_fails)} 页详情页取回/解析失败'
+              f'（首个：{detail_fails[0]}）| 本次本源不推进水位', file=sys.stderr)
+        return local, (f'{name}: 详情页取回/解析失败 {len(detail_fails)} 页'
+                       f'（首个：{detail_fails[0]}）')
     return local, None
 
 
@@ -1779,6 +1793,19 @@ def main():
     parser.add_argument('--out', help='将本源结果写入指定路径（而非合并进 data/lectures.json），'
                                       '用于「并行多进程分批重抓 + 最后统一合并」的场景，避免空库并发写竞争')
     args = parser.parse_args()
+
+    # P0-3（2026-10-10，外部审查发现）：增量水位线改取「本轮开始时间 − 5 分钟重叠」。
+    # 此前写 last_scrape 用的是抓取**结束**时刻的 now_iso：本轮运行期间、某源列表页
+    # 已被抓过之后才发布的讲座，其发布时间 < 旧水位（结束时刻），下轮会被
+    # [SKIP-OLD] 丢弃并拉黑 180 天 → 永久丢失窗口 ≈ 本轮运行时长。
+    # 改用开始时间后，发布时间晚于本轮开始的条目下轮必然重新过闸，窗口归零；
+    # −5min 重叠抵消源站时间戳偏差，多抓部分由 existing_urls + 台账幂等吸收。
+    try:
+        from zoneinfo import ZoneInfo
+        _wm = datetime.datetime.now(ZoneInfo('Asia/Shanghai'))
+    except Exception:
+        _wm = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    watermark_iso = (_wm - datetime.timedelta(minutes=5)).isoformat(timespec='seconds')
 
     cfg_path = os.path.join(ROOT, 'scraper', 'sources.yaml')
     with open(cfg_path, encoding='utf-8') as f:
@@ -2077,8 +2104,11 @@ def main():
             print(f'[WARN] 本次 {len(failed_sources)} 个信息源失败，水位未推进（下次自动重试）：'
                   + '；'.join(failed_sources), file=sys.stderr)
         else:
+            # 水位写本轮开始时间（watermark_iso，P0-3），不用结束时刻的 now_iso——
+            # now_iso 仍用于 updatedAt（数据内容在结束时定型，语义正确）与 attempted_at。
             _atomic_write_json(last_scrape_path,
-                               {'last_scrape': now_iso, 'mode': 'incremental' if is_incremental else 'full'})
+                               {'last_scrape': watermark_iso,
+                                'mode': 'incremental' if is_incremental else 'full'})
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
           f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
     if _LISTDATE_STATS['skipped']:

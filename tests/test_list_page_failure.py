@@ -51,11 +51,13 @@ EMPTY_PAGE = ('<html><body><a href="/xueyuangaikuang/">学院概况</a>'
 class _SourceRun:
     """跑一次 _process_source，桩掉 fetch/parse_detail/sleep，返回 (err, 记录数)。"""
 
-    def __init__(self, mod, pages, existing_urls=None, is_incremental=False):
+    def __init__(self, mod, pages, existing_urls=None, is_incremental=False,
+                 parse_mode='ok'):
         self.mod = mod
         self.pages = pages          # {url: html 或 None}；详情页不登记 → 视为取回失败
         self.fetched = []
         self.parsed = []
+        self.parse_mode = parse_mode  # 'ok' | 'raise'（parse_detail 抛异常）| 'none'（返回 None=SKIP-NEWS）
 
     def run(self, list_urls, **kw):
         m = self.mod
@@ -76,6 +78,10 @@ class _SourceRun:
 
         def fake_parse_detail(d, href, name, campus, year, list_title='', **kwargs):
             self.parsed.append(href)
+            if self.parse_mode == 'raise':
+                raise ValueError('桩注入的解析异常')
+            if self.parse_mode == 'none':
+                return None   # SKIP-NEWS：有意跳过，不是失败
             return {'sourceUrl': href, 'listTitle': list_title, 'title': list_title}
 
         m.fetch = fake_fetch
@@ -195,8 +201,10 @@ class GlobalWatermarkGuardTest(unittest.TestCase):
         tail = src[src.rindex('if failed_sources:'):]
         self.assertIn("payload['last_scrape'] = since", tail,
                       '失败时不再沿用旧水位，水位冻结语义已变')
-        self.assertIn("'last_scrape': now_iso", tail,
-                      '成功时才推进水位；失败分支必须不写 last_scrape')
+        # P0-3（2026-10-10）：成功分支水位改写本轮开始时间 watermark_iso（原为
+        # 结束时刻 now_iso——运行期间新发布的讲座会被下轮 SKIP-OLD+拉黑，永久丢失）。
+        self.assertIn("'last_scrape': watermark_iso", tail,
+                      '成功时才推进水位（写开始时间）；失败分支必须不写 last_scrape')
 
     def test_09_水位读取失败必须告警而非静默退化(self):
         """水位文件读坏 → 全量抓取（实测 3.9h），必须留痕。
@@ -217,6 +225,53 @@ class GlobalWatermarkGuardTest(unittest.TestCase):
                       '水位读取失败未告警——本轮会静默退化为全量抓取（实测 3.9h）')
         self.assertIn('全量抓取', seg,
                       '告警文案须点明「退化为全量」与耗时量级，否则读日志的人不会当回事')
+
+
+class DetailPageFailureGateTest(unittest.TestCase):
+    """P0-2（2026-10-10 外部审查）：详情页取回/解析失败必须计入本源失败。
+
+    此前 `_process_source` 循环内两处 continue（fetch 返回 None / parse_detail
+    抛异常）静默跳过：单场讲座漏抓无任何痕迹，failed_sources 看不到、水位照常
+    推进、gate 无告警——只有「数据量回归门禁」（尚未建）能事后兜底。
+    修复后与 B8 同口径：返回非空 err → main() 记入 failed_sources → 水位不推进。
+
+    ⚠ 三条边界必须分清（防把闸门焊死）：
+      - fetch 失败 / parse 异常 → 判失败（真故障，fail-closed）
+      - parse 返回 None（SKIP-NEWS，有意过滤新闻稿/回顾稿）→ **不**判失败
+      - 详情页取回成功但解析出 0 条 → 不在此口径内（现状不变）
+    """
+
+    def setUp(self):
+        self.u_ok = 'http://t.scnu.edu.cn/list/'
+        self.detail = 'http://t.scnu.edu.cn/a/202609/123.html'
+
+    def test_01_详情页取回失败_判本源失败(self):
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE, self.detail: None})
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNotNone(err, '详情页 fetch 失败必须上报，不得静默 continue')
+        self.assertIn('详情页取回/解析失败 1 页', err)
+        self.assertIn(self.detail, err, 'err 应带首个失败 URL 便于定位')
+
+    def test_02_解析异常_判本源失败(self):
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE}, parse_mode='raise')
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNotNone(err, 'parse_detail 抛异常必须上报（可能是解析器回归）')
+        self.assertIn('详情页取回/解析失败', err)
+
+    def test_03_有意跳过SKIPNEWS_不得判失败(self):
+        """parse 返回 None 是有意过滤（记台账跳过），绝不能被 P0-2 误判成失败，
+        否则正常源的 [SKIP-NEWS] 条目会把水位闸门焊死。"""
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE}, parse_mode='none')
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNone(err, 'SKIP-NEWS 属有意过滤，不是源失败')
+        self.assertEqual(len(local), 0)
+
+    def test_04_正常源_基线不回归(self):
+        """P0-2 修复不得影响正常路径（err=None、记录照常产出）。"""
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE})
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNone(err)
+        self.assertEqual(len(local), 1)
 
 
 class ListDateSwitchTest(unittest.TestCase):
