@@ -71,6 +71,9 @@ jobs:
             tests/test_admin_notice_ad3.py
             tests/test_server.py
             tests/test_list_page_failure.py
+            tests/test_data_reconciliation.py
+            tests/test_full_shrink_protection.py
+            tests/test_new_source_full_scan.py
             tests/test_ci_gate_coverage.py
             tests/test_env_flags.py
             tests/test_speaker_normalize.py

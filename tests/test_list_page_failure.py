@@ -22,6 +22,7 @@
 本套件桩掉 fetch / parse_detail / sleep，**零网络、零磁盘写入**。
 """
 import importlib.util
+import inspect
 import os
 import re
 import unittest
@@ -347,12 +348,39 @@ class ListDateSwitchTest(unittest.TestCase):
             self.assertEqual(len(local), 1, f'开关={flag} 时无水位也应照抓')
 
     def test_13_main_确实把开关下传(self):
-        """防止将来又退回「只打日志」：main 必须读一次 env 并传给 _process_source。"""
+        """防止将来又退回「只打日志」：main 必须读一次 env 并传给_process_source。
+
+        2026-10-10：从「字符串精确匹配调用行」改为 AST 校验位置实参个数。
+        原写法 `assertIn("src_latest_date.get(...), listdate_skip_on)")` 在
+        _process_source 新增参数（force_full）后必然失配，而失配原因是
+        **合法的签名演进**、不是回归——这类测试会诱导后来者去改断言迁就实现，
+        反而掩盖真问题。改为断言「提交 _process_source 时确实把值传下去了」：
+        ① 存在 _listdate_skip_enabled() 的读取；② 调用实参个数 == 形参个数。
+        """
         src = open(os.path.join(_ROOT, 'scraper', 'scraper.py'), encoding='utf-8').read()
         self.assertIn('listdate_skip_on = _listdate_skip_enabled()', src,
                       'main() 未读 env 开关')
-        self.assertIn("src_latest_date.get(src.get('name', ''), ''), listdate_skip_on)",
-                      src, '_process_source 的提交未带上开关值')
+        # AST：main() 里 executor.submit(_process_source, ...) 的位置实参个数
+        import ast
+        tree = ast.parse(src)
+        n_params = len(inspect.signature(P._process_source).parameters)
+        calls = 0
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == 'submit'):
+                continue
+            # 形如 executor.submit(_process_source, a, b, c, ...)
+            if len(node.args) < 2 or not isinstance(node.args[0], ast.Name):
+                continue
+            if node.args[0].id != '_process_source':
+                continue
+            calls += 1
+            self.assertEqual(
+                len(node.args) - 1, n_params,
+                'executor.submit(_process_source, ...) 的位置实参个数应与形参'
+                '个数一致（漏传会静默退回默认值，正是本用例要防的回归）')
+        self.assertGreater(calls, 0, '未找到 _process_source 的 submit 调用点')
 
     def test_14_默认参数为开启(self):
         """直接调 _process_source（不传该参数）必须保持历史行为（过滤开启）。"""

@@ -1361,6 +1361,69 @@ def _parse_iso(s):
         return None
 
 
+def _protect_sources_from_shrink(raw, existing, abort_single=None, shrink_ratio=0.5):
+    """按源保护（2026-10-10 改造 4）：全量重建时，某个源产出骤减/归零则回填旧数据。
+
+    背景（P0-1）：`--full` 从空 dict 重建 lectures.json。某个源站改版时，
+    列表页可能仍返回 HTTP 200 但 0 条讲座条目（判为「栏目真空，按成功处理」），
+    于是该源在新产出里彻底消失——**旧记录被静默抹除，且水位照常推进，
+    后续增量再也补不回来**。这类故障在总数层面几乎无感（掉 5% 而已）。
+
+    判据与既有 --source 保护一致，避免两套口径：
+      · 新产出 0 条而旧有数据 → 该源整源回填（并打醒目告警）
+      · 新产出 < 旧产出 × 50% → 回填**未被新产出覆盖的部分**
+
+    ⚠ 回填必须按 URL 去重：旧记录可能与新产出指向同一场讲座（官网改版
+      常伴随 URL 变化）。直接 `raw + old_src` 会让同一场讲座留下两条记录，
+      且因 sourceUrl 不同而绕开 test_invariants 的复合键唯一性检查。故这里
+      按 _canon_url_key 判重，只回填真正缺失的部分；剩余的同 URL 重复由调用
+      链上紧随其后的 dedup()/cross_source_dedup() 统一处理（故本函数必须
+      在 dedup **之前**调用）。
+
+    abort_single：指定该参数时（--source 模式），目标源产出 0 条直接中止
+    整轮而非回填——保持 2026-09-27 二轮审计 P0-3 的既有语义不变。
+
+    返回：合并后的记录列表（不修改入参）。
+    """
+    if not existing:
+        return raw
+    old_by_college = {}
+    for r in existing:
+        old_by_college.setdefault(r.get('college') or '', []).append(r)
+    new_counts = {}
+    for r in raw:
+        c = r.get('college') or ''
+        new_counts[c] = new_counts.get(c, 0) + 1
+
+    out = list(raw)
+    for college, olds in old_by_college.items():
+        n_old, n_new = len(olds), new_counts.get(college, 0)
+        if not n_old:
+            continue
+        target_is_single = (abort_single is not None
+                            and college == abort_single)
+        if n_new == 0:
+            if target_is_single:
+                print(f'[ABORT] --source {college} 新产出 0 条（旧 {n_old} 条），'
+                      f'疑似列表页失效或抓取失败，拒绝覆盖以保全该源历史数据。',
+                      file=sys.stderr)
+                return None                      # None = 调用方中止整轮
+            print(f'[WARN-SRC] {college} 新产出 0 条（旧 {n_old} 条）——'
+                  f'疑似源站改版/栏目迁移，已回填旧数据以保全历史。', file=sys.stderr)
+            out.extend(olds)
+            continue
+        if n_new < n_old * shrink_ratio:
+            # 只回填新产出未覆盖的 URL，避免同一讲座因改版换 URL 而重复入库
+            seen = {_canon_url_key(r.get('sourceUrl')) for r in raw}
+            missing = [r for r in olds
+                       if _canon_url_key(r.get('sourceUrl')) not in seen]
+            out.extend(missing)
+            print(f'[WARN-SRC] {college} 新产出 {n_new} 条 < 旧 {n_old} 条的 '
+                  f'{int(shrink_ratio * 100)}%——疑似抓取失败，已回填 '
+                  f'{len(missing)} 条旧记录。', file=sys.stderr)
+    return out
+
+
 def incremental_merge(existing, new_records):
     """增量模式合并：existing 基底原样锁定（不删除/不重组已精修记录），
     仅对新增记录做去重后追加。
@@ -1547,7 +1610,7 @@ def restore_human_time_annotations(new_records, existing):
 
 def _process_source(src, year, existing_urls, is_incremental, global_exclude=None,
                     cutoff_date_str=None, src_latest_date=None,
-                    listdate_skip_enabled=True):
+                    listdate_skip_enabled=True, force_full=False):
     """处理单个信息源，返回 {url: rec} 字典。
 
     cutoff_date_str: 增量水位日期（'YYYY-MM-DD'）。配合列表页条目日期过滤，
@@ -1561,6 +1624,15 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
         执行（假开关）。现作为参数显式下传；为 True 时行为与旧版完全一致。
         ⚠ 由 main() 传入 env 判定结果，不在函数内读 env——便于测试注入
         （真实值每轮固定，读 env 只会让测试必须改进程环境）。
+    force_full: 新源强制全量（2026-10-10 改造 1）。True 表示「本源的库中历史
+        不可信或不存在」——新加的源，或改版后换了新地址的源。此时必须**无视
+        水位线与台账**，把官网上所有页面重新扫一遍：
+          · 水位线判据会挡住改版期间漏抓的历史（日期早于水位线）
+          · 台账会把改版期被判 old 的页面锁 180 天
+          · PAGESTOP 会因「本源已入库最新日期」而提前停止翻页
+        三道闸门若不放开，新源会「加进去了但一条历史都补不回来」——
+        这正是使用者实际踩到的场景。此时入库判据仍由 existing_urls /
+        跨源去重负责，已在库的 URL 不会重复进库。
     """
     name = src['name']
     campus = src.get('campus', '')
@@ -1636,13 +1708,15 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                 # 修法：把「是否跳过」显式成一个变量，与用途②解耦——
                 # 翻页停止判据不关（它是"要不要继续翻页"，不是"要不要抓这一页"，
                 # 关掉它会让无日期列表页被无限翻页，反而更慢）。
-                skip_itemdate = bool(cutoff_date_str) and listdate_skip_enabled
+                skip_itemdate = (bool(cutoff_date_str) and listdate_skip_enabled
+                                  and not force_full)
                 item_date_map = (_build_item_date_map(html, cur, base, collect_mode)
                                  if use_item_date else {})
                 # 条目级跳过判据取「全局水位」与「本源基线」的更早者（见
                 # _effective_listdate_cutoff 注释），避免本源严重滞后时被全局
-                # 水位误挡新公告。
-                eff_cutoff = _effective_listdate_cutoff(cutoff_date_str, src_latest_date)
+                # 水位误挡新公告。force_full（新源）时判据整体失效 → 全部重扫。
+                eff_cutoff = ('' if force_full else
+                              _effective_listdate_cutoff(cutoff_date_str, src_latest_date))
                 listdate_skipped = 0
                 page_links = collect_links(html, base, list_url=cur, collect_mode=collect_mode)
                 if page_links:
@@ -1662,7 +1736,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     if is_incremental and (_canon_url_key(href_norm), None) in existing_urls:
                         continue
                     # 被拒台账：抓过且已判定不入库的 URL 不再重复 fetch/parse（见 _LEDGER 区块）
-                    if is_incremental and ledger_hit(_canon_url_key(href_norm)):
+                    if is_incremental and not force_full and ledger_hit(_canon_url_key(href_norm)):
                         _LEDGER_STATS['skipped'] += 1
                         continue
                     if (skip_itemdate
@@ -1735,7 +1809,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                 # 新条目。抽不到任何条目日期时不停（宁可多翻不漏抓）。
                 # ⛔ 全量模式（--full）不启用：首次建库/重修必须翻到底补全历史。
                 _stop_paging = False
-                if (is_incremental and src_latest_date and item_date_map):
+                if (is_incremental and src_latest_date and item_date_map
+                        and not force_full):
                     _page_dates = list(item_date_map.values())
                     if _page_dates and max(_page_dates) < src_latest_date:
                         _stop_paging = True
@@ -1939,6 +2014,31 @@ def main():
             print(f'[ERROR] 未找到信息源「{args.source}」', file=sys.stderr)
             return
 
+    # ---- 2026-10-10 改造 1：新源强制全量 -------------------------------------
+    # 场景：某学院官网改版/迁移 → 加了新地址进来。此时该源在库里**一条历史都
+    # 没有**（或极少量），而官网上挂着的是过去一两年的讲座——它们的日期早于
+    # 全局水位线。若沿用普通增量逻辑：
+    #   · 水位线判据在 fetch 之前就把它们跳过（连请求都不发）
+    #   · 台账把改版期被判 old 的页面锁 180 天
+    #   · PAGESTOP 翻两页就停
+    # 三者叠加的结果就是「源加进去了，但一条历史数据都补不回来」。
+    #
+    # 判据：该源的 college 名在 existing 中一条记录都没有（src_latest_date 为空）。
+    # 正常接入一个新学院时正是这种情况；已稳定运行的源不会命中。
+    new_source_names = set()
+    if is_incremental and existing:
+        for s in sources:
+            nm = s.get('name', '')
+            if nm and not src_latest_date.get(nm):
+                # 双重确认：按 college 名精确查一次，避免 src_latest_date 因
+                # 「有记录但缺日期字段」而误判（那种情况应交给常规增量处理）。
+                if not any((r.get('college') or '') == nm for r in existing):
+                    new_source_names.add(nm)
+    if new_source_names:
+        print('[NEW-SOURCE] 以下信息源库中无任何历史记录，本轮强制全量扫描'
+              '（已放开水位线 / 被拒台账 / 翻页停止）：%s'
+              % '、'.join(sorted(new_source_names)))
+
     # 全局排除名单：被人工确认删除的非讲座/新闻类 URL，cron 增量与全量均跳过，避免污染。
     # 由数据清洗时把「本地已删、cron 曾误加回」的 URL 写入 data/excluded_urls.json 生成。
     # 读取逻辑已统一至 scripts/excluded_urls.py（scraper / generate / server 三点共用）。
@@ -1957,6 +2057,7 @@ def main():
         max_workers = 3
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
+    silent_sources = []  # 2026-10-10 改造 1c：零产出但库中有存量的源（疑似改版）
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # ⚠ 第 8 个实参必须是**本源自己**的最晚条目日期（字符串），不是整张
         # {源名: 日期} 字典。传错类型会让 _process_source 里的
@@ -1965,13 +2066,27 @@ def main():
         # listdate_skip：开关只在 main() 读一次 env 后下传（不在 _process_source 内读），
         # 免得每个源各判一次、且测试无法注入。取值语义见 env_flags。
         listdate_skip_on = _listdate_skip_enabled()
-        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str, src_latest_date.get(src.get('name', ''), ''), listdate_skip_on): src for src in sources}
+        future_to_src = {executor.submit(_process_source, src, year, existing_urls, is_incremental, global_excluded, cutoff_date_str, src_latest_date.get(src.get('name', ''), ''), listdate_skip_on, src.get('name', '') in new_source_names): src for src in sources}
         for future in as_completed(future_to_src):
             src_name = future_to_src[future].get('name')
             try:
                 local, err = future.result()
                 if err:
                     failed_sources.append(err)
+                # 2026-10-10 改造 1c：失效源信号——本源本轮一条新数据都没产出，
+                # 而库里它有相当存量。正常增量下每个源每轮都会捞到东西（或因
+                # 已有数据而无新增）；持续零产出通常是「官网改版/栏目迁移」，
+                # 而现状是**静默**：旧数据还在（增量以 existing 为基底），
+                # 水位线照常推进，新讲座永远抓不到，且没有任何告警。
+                # 这正是使用者踩到的场景：改了地址却没改 sources.yaml。
+                if (not err and not local and is_incremental
+                        and src_name not in new_source_names):
+                    _lib = sum(1 for r in existing
+                               if (r.get('college') or '') == (src_name or ''))
+                    if _lib >= 20:
+                        silent_sources.append(
+                            f'{src_name}: 本轮零产出（库中存量 {_lib} 条）——'
+                            f'疑似源站改版/栏目迁移，请核对 sources.yaml 中的地址')
                 for url, rec in local.items():
                     lectures[url] = rec
                     all_fetched.append(rec)
@@ -1987,29 +2102,31 @@ def main():
     # cross_source_dedup/_multi_round_replace 会违反「增量不对全量重跑」承诺）——
     # 故本块仅在 --full --source（非增量）时生效；增量 + --source 走下方
     # incremental_merge 分支（语义=只对该源检查新页）。
-    if args.source and not args.out and not is_incremental:
+    if (args.source and not args.out and not is_incremental):
         other_existing = [r for r in existing if r.get('college') != args.source]
-        # 按源安全保护：列表页抓取失败/网络超时会使本源新结果骤减甚至为空，
-        # 此时不应清掉该源已有数据。新产出 < 旧产出 50% 时保留旧该源数据，避免误删。
-        old_src = [r for r in existing if r.get('college') == args.source]
-        new_src = [r for r in raw if r.get('college') == args.source]
-        # 2026-09-27 二轮审计 P0-3：新产出为 0 条（列表页 404/改版）时，按源维度
-        # 直接中止——50% 总量闸门对「单源清空」无感（其余源条数不变）。
-        if old_src and not new_src:
-            print(f'[ABORT] --source {args.source} 新产出 0 条（旧 {len(old_src)} 条），'
-                  f'疑似列表页失效或抓取失败，拒绝覆盖以保全该源历史数据。', file=sys.stderr)
-            return
-        if old_src and len(new_src) < len(old_src) * 0.5:
-            print(f'[WARN] --source {args.source} 新产出 {len(new_src)} 条 < 旧 {len(old_src)} 条的 50%，'
-                  f'疑似列表页抓取失败，保留该源旧数据不覆盖。', file=sys.stderr)
-            raw = raw + old_src
         raw = other_existing + raw
-        # 安全拦截：--source 模式绝不应让总条数大幅缩水，否则大概率是 existing
-        # 加载失败（json.load 异常被静默吞掉 → existing=[]）导致用单源覆盖全量。
-        # 一旦产出 < 现有条数 50%，拒绝覆盖，避免误删其他学院数据。
+    # 2026-10-10 改造 4：按源安全保护（全库 --full 同样适用）。
+    #
+    # 背景（P0-1）：`--source` 模式早有「新产出 0 条 / 缩水 >50% → 保留旧数据」
+    # 的保护，但**全库 --full 模式完全没有**。而 --full 是从空 dict 重建
+    # （lectures 仅在增量时预填 existing），于是「某学院官网改版 → 抓回 0 条」
+    # 会被当成成功，把该学院全部历史从 lectures.json 里抹掉，且水位照常推进，
+    # 增量再也补不回来。实测后果：经管学院 837 条可被清成 0 条而总数仍 >3000。
+    #
+    # 为什么放在这里（dedup 之前）：out = dedup(raw) 才是唯一做同源 URL 去重的
+    # 环节。若把旧数据在 dedup **之后**拼回（raw += old），旧记录会绕过去重
+    # 直通落库——新旧 URL 指向同一场讲座时产出重复记录。这正是评审指出、
+    # 并经确认的伪代码陷阱：合并必须发生在去重链之前，让统一的 dedup 兜住。
+    if not args.out and not is_incremental:
+        raw = _protect_sources_from_shrink(raw, existing, abort_single=args.source)
+        if raw is None:          # --source 目标源产出 0 条 → 中止整轮（保持既有语义）
+            return
+        # 总量兜底：existing 加载失败时 json.load 异常会被吞掉 → existing=[]，
+        # 用（近乎）空的产出覆盖全库。--source 模式早有此闸门，全库模式同样需要。
         if existing and len(raw) < len(existing) * 0.5:
-            print(f'[ABORT] --source 模式产出 {len(raw)} 条 < 现有 {len(existing)} 条的 50%，'
-                  f'疑似现有数据未正确合并，拒绝覆盖 data/lectures.json。', file=sys.stderr)
+            print(f'[ABORT] 全库产出 {len(raw)} 条 < 现有 {len(existing)} 条的 50%，'
+                  f'疑似现有数据未正确加载或大面积抓取失败，拒绝覆盖 data/lectures.json。',
+                  file=sys.stderr)
             return
     # 2026-09-27 二轮审计 P0-2：增量（含 --source 局部增量）一律走
     # incremental_merge——prefill 已含全部 existing，--source 只是缩小抓取范围；
@@ -2099,6 +2216,12 @@ def main():
         print(f'[INCREMENTAL] 本次未改变任何记录，updatedAt 沿用 {prev_updated_at}（数据文件内容不变）')
     _atomic_write_json(os.path.join(data_dir, 'lectures.json'),
                        {'updatedAt': data_updated_at, 'data': out})
+    # 2026-10-10 改造 1c：失效源告警。必须在水位写入**之前**完成——
+    # 否则 failed_sources 非空时走的是「保留旧水位」分支并提前 return，
+    # 告警会被整个跳过（而那恰恰是最需要告警的轮次）。
+    if silent_sources:
+        print(f'[SRC-SILENT] {len(silent_sources)} 个信息源本轮零产出（库中有存量）：\n  - '
+              + '\n  - '.join(silent_sources), file=sys.stderr)
     # 局部修复模式不更新 last_scrape.json，避免影响下一次全量/定时增量调度
     if not args.source:
         if failed_sources:
@@ -2109,6 +2232,8 @@ def main():
             payload = {'mode': 'incremental' if is_incremental else 'full',
                        'attempted_at': now_iso,
                        'failed_sources': failed_sources}
+            if silent_sources:
+                payload['silent_sources'] = silent_sources
             if since:
                 payload['last_scrape'] = since
             _atomic_write_json(last_scrape_path, payload)
@@ -2117,9 +2242,11 @@ def main():
         else:
             # 水位写本轮开始时间（watermark_iso，P0-3），不用结束时刻的 now_iso——
             # now_iso 仍用于 updatedAt（数据内容在结束时定型，语义正确）与 attempted_at。
-            _atomic_write_json(last_scrape_path,
-                               {'last_scrape': watermark_iso,
-                                'mode': 'incremental' if is_incremental else 'full'})
+            payload = {'last_scrape': watermark_iso,
+                       'mode': 'incremental' if is_incremental else 'full'}
+            if silent_sources:
+                payload['silent_sources'] = silent_sources
+            _atomic_write_json(last_scrape_path, payload)
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
           f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
     if _LISTDATE_STATS['skipped']:

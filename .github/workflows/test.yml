@@ -117,6 +117,24 @@ jobs:
       # （否则栏目改版会永久冻结全局水位闸门）。
       - name: Run list-page failure accounting tests
         run: python tests/test_list_page_failure.py
+      # 2026-10-10 引入：数据对账门禁。此前护栏只有固定常数 `< 3000` 的塌方兜底，
+      # 只能拦「数量级塌方」：某学院官网改版导致该源数据被清空、总数只掉 5%
+      # 时全部门禁照常放行，静默丢数无人知晓。本套件锁住按源对账（增量下每个
+      # college 只增不减，任何源归零/缩水 >30% 即报警）与总量对账两道新防线，
+      # 并验证它们对真实主库不误报。
+      - name: Run data reconciliation gate tests
+        run: python tests/test_data_reconciliation.py
+      # 2026-10-10 引入：全库 --full 的按源保护。此前只有 --source 模式有
+      # 「产出 0 条 /缩水 >50% → 保留旧数据」，--full 从空 dict 重建却是零保护，
+      # 源站改版会把该学院全部历史静默抹除且水位照常推进（实测经管学院 837 条
+      # 可被清成 0 而总数仍 >3000）。
+      - name: Run full-shrink protection tests
+        run: python tests/test_full_shrink_protection.py
+      # 2026-10-10 引入：新源强制全量 + 失效源告警。加了新信息源（或老源换
+      # 改版后的新地址）时，水位线 / 被拒台账 / PAGESTOP 三道闸门会把「库中
+      # 没有的历史讲座」全部挡掉——源加进去了但一条也补不回来，且全程无告警。
+      - name: Run new-source full-scan tests
+        run: python tests/test_new_source_full_scan.py
       # 2026-09-30 引入：env 开关真值判定单一事实源。此前全仓 4 处开关各写一套
       # 关闭值集合，同一串 'no'/'False' 在不同开关上效果相反——用户写「想关掉」
       # 却把功能留着，且这类失效是静默的（日志正常、数据正常，只是行为反了）。
