@@ -152,7 +152,7 @@ def _write_baseline(base_path, doc):
     """原子写基线文件（tmp + replace），避免中途崩溃留下半份 JSON。"""
     tmp = base_path + '.tmp'
     try:
-        with open(tmp, 'w', encoding='utf-8') as f:
+        with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
             json.dump(doc, f, ensure_ascii=False, indent=2, sort_keys=True)
         os.replace(tmp, base_path)
     except Exception:

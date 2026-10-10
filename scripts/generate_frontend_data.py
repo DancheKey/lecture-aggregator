@@ -43,9 +43,15 @@ LATEST_PREVIEW_LEN = 0
 
 
 def atomic_write_text(path, content):
-    """文本文件的原子写入（用于改写 HTML 等）。"""
+    """文本文件的原子写入（用于改写 HTML 等）。
+
+    ⚠ `newline='\n'` 不可省（2026-10-10 Windows 实测）：文本模式下 Python
+    在 Windows 会把 `\n` 转成 `\r\n`，写出的站点文件与 git 索引（LF）逐字节
+    不同 → `test_工作区与git换行一致` 当场变红，且 stamp 哈希工作区/索引两侧
+    口径分裂。CI（Linux）不复现，故此坑只在本地跑生成脚本时暴露。
+    """
     tmp = path + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
         f.write(content)
     os.replace(tmp, path)
 

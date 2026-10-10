@@ -535,9 +535,14 @@ def main():
 """
 
     def _write(path, content):
-        """原子写出（先 .tmp 再 replace），避免 GitHub Pages 读到半份文件。"""
+        """原子写出（先 .tmp 再 replace），避免 GitHub Pages 读到半份文件。
+
+        ⚠ `newline='\n'` 不可省（2026-10-10 Windows 实测）：文本模式在
+        Windows 把 `\n` 转 `\r\n`，本脚本产物是多行 HTML/JS/CSS，本地跑一次
+        就把工作区变 CRLF → test_工作区与git换行一致 变红。CI（Linux）不复现。
+        """
         tmp = path + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
+        with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
             f.write(content)
         os.replace(tmp, path)
 
@@ -547,6 +552,19 @@ def main():
            json.dumps(payload, ensure_ascii=False, separators=(',', ':')))
     css = os.path.join(OUT_DIR, CSS_NAME)
     _write(css, CSS)
+    # 缓存戳（2026-10-10，由**产物所有者**在写入后立即打）。
+    # ⚠ 为什么必须在这里打、而不是依赖 generate_frontend_data.py：
+    #   daily.yml 的顺序是「generate_frontend_data（打戳）→ gen_visits_trend
+    #   （整体重写本页）」，后者一跑，前者刚打的 ?v= 立刻被模板里的裸引用
+    #   冲掉 → 提交无戳文件 → 回访用户永久缓存旧脚本。这与 2026-10-08 的
+    #   「导航被次日 CI 覆盖」是同一类事故（模板与产物不同步）。
+    #   修在模板所有者一侧后，无论两脚本以什么顺序执行，本页的戳都正确；
+    #   generate 侧若再打一遍也是幂等的（同内容 hash 相同）。
+    # 模板里的裸引用（468/533 行）保持不变：它是「待打戳的源形态」，
+    # 正是 tests/test_frontend_schema.py::test_99 校验的输入。
+    from generate_frontend_data import stamp_script_version
+    stamp_script_version(os.path.basename(OUT_PATH), JS_NAME)
+    stamp_script_version(os.path.basename(OUT_PATH), CSS_NAME)
     for p in (OUT_PATH, JS_PATH, DATA_PATH, css):
         print(f'[done] {os.path.relpath(p, ROOT)}'
               f'（{os.path.getsize(p) / 1024:.1f} KB）')

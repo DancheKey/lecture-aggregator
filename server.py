@@ -132,6 +132,14 @@ _IS_LOOPBACK_RE = re.compile(r'^127\.0\.0\.1$|^::1$|^\[::1\]$')
 #   攻击又不伤正常路径。
 _ALLOWED_HOSTS = frozenset(('127.0.0.1', 'localhost', '::1', '[::1]'))
 
+# 是否执行 Host 校验（默认 True；main() 会在绑定非回环地址时改写为 False）。
+# 只在**绑定回环**时强制校验：DNS 重绑定的攻击形态是「让浏览器解析出回环地址
+# 连到本机」，回环绑定是它的唯一前提；且白名单只有回环名——若 HOST=0.0.0.0
+# 仍强制，LAN 客户端用 http://<本机IP>:8000 访问会全部 403，把文档支持的
+# 局域网模式直接打挂（2026-10-10 实测发现）。局域网模式本就按「自担风险」
+# 开放（见 main() 注释），且管理 token 发放另有 client IP 回环检查兜底。
+_ENFORCE_HOST = True
+
 
 def _host_allowed(host_header):
     """Host 头是否可信。缺 Host 视为放行（见上方注释）；带 Host 则必须命中白名单。
@@ -426,7 +434,7 @@ class Handler(SimpleHTTPRequestHandler):
         """
         if not super().parse_request():
             return False
-        if not _host_allowed(self.headers.get('Host')):
+        if _ENFORCE_HOST and not _host_allowed(self.headers.get('Host')):
             # 403 而非 404：这是策略拒绝，调用方需要知道原因
             self.send_error(403, 'Host not allowed')
             self.close_connection = True
@@ -1044,8 +1052,12 @@ def _prune_throttles():
                 for k, v in list(_recent_want_action.items()):
                     if now - v[0] >= WANT_THROTTLE:
                         _recent_want_action.pop(k, None)
-        except Exception:
-            pass
+        except Exception as e:
+            # 2026-10-10：此前是裸 except: pass——清理逻辑若出 bug 会被静默吞掉，
+            # 防刷字典从「有界」退化为「泄漏」且无人察觉。用 _warn 留痕但不中断
+            # 守护线程（下一轮 sleep 后继续）。
+            _warn(f'_prune_throttles 清理周期异常（下轮继续，不影响计数）：'
+                  f'{type(e).__name__}: {e}')
 
 
 def main():
@@ -1053,6 +1065,14 @@ def main():
     # 安全默认：仅绑定本机回环地址，避免把带写操作（/api/scrape、/api/sources 增删改）
     # 的后台意外暴露到局域网/公网。如确需局域网访问，显式设置 HOST=0.0.0.0（自担风险）。
     host = os.environ.get('HOST', '127.0.0.1')
+    # Host 头校验只在回环绑定时强制（见 _ENFORCE_HOST 注释）：非回环绑定时白名单
+    # 会把 LAN 客户端全部 403 掉，故显式关闭；关闭时打印醒目告警，不静默降级。
+    global _ENFORCE_HOST
+    _loopback_bind = host in ('127.0.0.1', 'localhost', '::1', '[::1]', '')
+    if not _loopback_bind:
+        _ENFORCE_HOST = False
+        print(f'[server] ⚠ 已绑定非回环地址 {host}：Host 头校验关闭（DNS 重绑定'
+              f'防护失效），管理 token 发放仍有 client IP 回环检查兜底', file=sys.stderr)
     # 启动防刷字典清理线程（守护线程，随主进程退出）
     threading.Thread(target=_prune_throttles, daemon=True).start()
     srv = ThreadingHTTPServer((host, port), Handler)

@@ -714,6 +714,34 @@ class TestHostHeaderGuard(_StaticGuardLiveBase):
                     'localhost.evil.com', '127.0.0.1@evil.com', '[::2]'):
             self.assertFalse(srv._host_allowed(bad), f'{bad!r} 应拒绝')
 
+    def test_56_局域网模式不强制Host校验(self):
+        """HOST=0.0.0.0 时必须关闭校验——否则 LAN 客户端全被 403 打挂。
+
+        文档明确支持 HOST=0.0.0.0 局域网访问（main() 注释「自担风险」）。
+        LAN 客户端的 Host 是 http://<本机IP>:8000，不在回环白名单内，
+        若无条件强制，该模式下的所有请求都会 403。2026-10-10 实测发现。
+        回环绑定（默认模式）仍强制——那才是 DNS 重绑定攻击的前提。
+
+        ⚠ 必须翻转 setUp 里那个模块实例（self.srv_mod）：_load_server()
+        每次调用都重新 exec_module，另拿一个新实例改不到运行中 Handler
+        的全局变量。
+        """
+        mod = self.srv_mod
+        orig = mod._ENFORCE_HOST
+        try:
+            # 模拟 main() 在非回环绑定下的改写
+            mod._ENFORCE_HOST = False
+            status, _ = self._request(
+                self._req_host('GET', '/api/visits', '192.168.1.8:8000'))
+            self.assertNotIn('403', status,
+                             '局域网模式下 LAN Host 不应被拒，实际 ' + status)
+        finally:
+            mod._ENFORCE_HOST = orig
+        # 还原后仍强制
+        status, _ = self._request(
+            self._req_host('GET', '/api/visits', 'evil.com'))
+        self.assertIn('403', status, '还原后应重新强制校验')
+
 
 class TestNoTestSideEffects(unittest.TestCase):
     """兜底：整轮测试跑完，真实 sources.yaml 与真实 server.py 都不该被写。"""
