@@ -124,14 +124,29 @@ jobs:
       # 抓不到，直到人工推送才变红。这里直跑与每日产物直接相关的 5 件测试
       # （全部离线、合计约 25 秒；与 test.yml 同一调用方式，无需 pytest），
       # 失败即红、阻断本轮提交与部署——门禁这才真正落在主路径上。
-      - name: 前端产物与抓取保护门禁（每日快跑）
-        run: |
-          set -euo pipefail
-          python tests/test_frontend_schema.py
-          python tests/test_frontend_consistency.py
-          python tests/test_data_reconciliation.py
-          python tests/test_full_shrink_protection.py
-          python tests/test_new_source_full_scan.py
+      # ⚠ 2026-10-11：原本 5 个测试挤在**一个**步骤里，任一失败时日志只显示
+      # 步骤名、看不出是哪个文件（CI 日志下载需仓库 admin 权限，排障者常拿不到）。
+      # 拆成 5 个独立步骤后，Actions 页与 jobs API 直接显示失败的文件名；
+      # 后续步骤加 if: always() 以便一次跑完、同时暴露多个红项（job 结论仍为
+      # failure，提交/部署照旧被阻断）。
+      - name: 门禁1 前端资源版本戳
+        run: python tests/test_frontend_schema.py
+
+      - name: 门禁2 前端产物一致性
+        if: always()
+        run: python tests/test_frontend_consistency.py
+
+      - name: 门禁3 按源对账
+        if: always()
+        run: python tests/test_data_reconciliation.py
+
+      - name: 门禁4 全量缩水保护
+        if: always()
+        run: python tests/test_full_shrink_protection.py
+
+      - name: 门禁5 新源全量扫描
+        if: always()
+        run: python tests/test_new_source_full_scan.py
 
       # 数据质量体检（2026-09-06）：每天抓取+修复后自动检查全库字段
       # （时间/地点/主讲人/单位的错误与缺失），报告存为运行附件保留 30 天，
