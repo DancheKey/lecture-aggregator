@@ -2153,6 +2153,18 @@ def main():
             kept, dropped = [], 0
             dropped_keys, kept_keys = set(), set()
             for r in all_fetched:
+                # 2026-10-10 补漏：新源豁免时间门。
+                # 改造 1 只放开了**列表页侧**三道闸门（水位线条目跳过 / 被拒台账 /
+                # PAGESTOP），但入库前还有最后一道「增量时间门」按 since 逐条过滤。
+                # 若不一并豁免，新源抓回的历史讲座在这里会被 [SKIP-OLD] 丢弃并
+                # 记入台账锁 180 天 —— 实测确认：3 条新源记录只保留 1 条，
+                # 「加了新源却补不回历史」的原症状依旧存在，force_full 等于白做。
+                # 判据用 college 名：_process_source 里 src['name'] 原样写进
+                # rec['college']，与 main() 识别新源时用的键完全一致。
+                if r.get('college') in new_source_names:
+                    kept.append(r)
+                    kept_keys.add(_canon_url_key(r.get('sourceUrl')))
+                    continue
                 pub = _parse_iso(r.get('publishTime'))
                 lec = _parse_iso(r.get('lectureStart'))
                 if pub is not None and pub.tzinfo is not None:
@@ -2175,6 +2187,13 @@ def main():
                 ledger_add(_k, 'old')
             if dropped:
                 print(f'[INCREMENTAL] 时间门过滤 {dropped} 条历史旧讲座（不计入增量，避免旧数据当新事件）')
+            if new_source_names:
+                # 让维护者确认「新源确实补回了历史」——改造 1 的效果需要看得见，
+                # 否则又会回到「加了源但不知道有没有补回来，只能靠猜」的状态。
+                _ns_n = sum(1 for r in all_fetched
+                            if r.get('college') in new_source_names)
+                print(f'[NEW-SOURCE] 已补回 {_ns_n} 条历史记录（豁免增量时间门）：'
+                      + '、'.join(sorted(new_source_names)))
         # 增量模式：基底(existing)原样锁定，仅对新增记录做同源去重后追加，
         # 不再对全量重跑 cross_source_dedup（避免每日增量退化/重组已有精修数据）。
         out = incremental_merge(existing, all_fetched)

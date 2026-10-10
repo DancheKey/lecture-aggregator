@@ -123,6 +123,52 @@ class SilentSourceTest(unittest.TestCase):
         self.assertNotIn('return\n', block[:200], '失效源告警不应中断主流程')
 
 
+class TimeGateExemptionTest(unittest.TestCase):
+    """入库前最后一道闸门：新源必须豁免增量时间门。
+
+    2026-10-10 补漏（实测发现的真缺陷）：改造 1 只放开了**列表页侧**三道闸门
+    （水位线条目跳过 / 被拒台账 / PAGESTOP），但 main() 里还有最后一道
+    「增量时间门」按 since 逐条过滤记录。若不一并豁免，新源抓回的历史讲座
+    在这里会被 [SKIP-OLD] 丢弃**并记入台账锁 180 天**——实测 3 条新源记录
+    只保留 1 条，「加了新源却补不回历史」的原症状依旧存在，force_full 等于白做。
+    """
+
+    def test_12_时间门须豁免新源(self):
+        """从源码结构上锁住：时间门循环内必须先判 college 是否属新源。"""
+        import ast
+        tree = ast.parse(SRC)
+        fn = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == 'main':
+                fn = node
+                break
+        self.assertIsNotNone(fn, '未找到 main()')
+        src_of_main = ast.get_source_segment(SRC, fn) or ''
+
+        idx_gate = src_of_main.find('dropped_keys, kept_keys = set(), set()')
+        self.assertGreater(idx_gate, 0, '未找到增量时间门循环')
+        loop_body = src_of_main[idx_gate:idx_gate + 900]
+        self.assertIn('new_source_names', loop_body,
+                      '增量时间门循环内未豁免新源——新源历史讲座仍会被丢弃'
+                      '（force_full 只放开了列表页侧闸门，入库前这道没放开）')
+        self.assertLess(loop_body.find('new_source_names'),
+                        loop_body.find('_parse_iso'),
+                        '豁免判断须在日期解析之前，否则仍会先被日期逻辑拦下')
+
+    def test_13_豁免分支须continue且计入kept(self):
+        """豁免的记录必须进 kept（而不是既不丢也不留）。"""
+        idx = SRC.find("if r.get('college') in new_source_names:")
+        self.assertGreater(idx, 0, '未找到新源豁免分支')
+        block = SRC[idx:idx + 320]
+        self.assertIn('kept.append(r)', block, '豁免分支未把记录加入 kept')
+        self.assertIn('continue', block, '豁免分支应 continue，跳过日期判定')
+
+    def test_14_新源补回量须可见(self):
+        """改造效果要看得见：打印补回条数，避免「加了源却不知有没有补回」。"""
+        self.assertIn('[NEW-SOURCE] 已补回', SRC,
+                      '缺少新源补回数量的日志（效果不可见）')
+
+
 class NoRegressionTest(unittest.TestCase):
     """确认没有把既有行为改坏。"""
 
