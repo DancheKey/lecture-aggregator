@@ -342,9 +342,13 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
                      if r not in skip
                      and not any(fnmatch.fnmatch(r, p) for p in self.paths)]
         # 只对「本项目生成的产物」断言：品牌图/样式等长期存在且已在清单或属静态资产
+        # ⚠ 2026-10-10：site/style.css 已删除——它是被 Tailwind 预编译方案
+        #   （vendor/tailwind.css）取代的遗留文件，全站无任何页面引用它，
+        #   属「既不被加载、也不被 stamp」的孤儿资产。若日后重新引入，
+        #   必须同时在 html 里引用它，否则本清单会重新把它列为待覆盖项。
         known_static = {
             'site/motto.png', 'site/motto.webp', 'site/scnu-emblem.png',
-            'site/scnu-emblem.svg', 'site/site-title.png', 'site/style.css',
+            'site/scnu-emblem.svg', 'site/site-title.png',
             'site/vendor/tailwind.css', 'site/vendor/vue.global.prod.js',
             'site/footer-counter.js', 'site/stats.js',
             'site/app.js', 'site/app.core.js', 'site/app.state.js',

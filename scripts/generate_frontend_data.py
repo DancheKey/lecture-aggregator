@@ -95,36 +95,43 @@ def _short_hash(path, length=10, git_first=True):
     return h.hexdigest()[:length]
 
 
-def stamp_script_version(html_name, js_name):
-    """给 html 中引用 js_name 的 <script> 标签打上「基于文件内容 hash」的版本号：
-    <script defer src="stats.js"></script> -> <script defer src="stats.js?v=abc123"></script>
+def stamp_script_version(html_name, asset_name):
+    """给 html 中引用 asset_name 的标签打上「基于文件内容 hash」的缓存破坏版本号：
 
-    作用：GitHub Pages 对未哈希的静态资源会长期缓存。若只改 JS 逻辑而不改文件名，
+        <script defer src="stats.js"></script>  -> src="stats.js?v=abc123"
+        <link rel="stylesheet" href="x.css">      -> href="x.css?v=abc123"
+
+    作用：GitHub Pages 对未哈希的静态资源会长期缓存。若只改 JS/CSS 逻辑而不改文件名，
     回访用户的浏览器会继续跑旧 JS（例如统计页仍加载 5.7MB 全量数据而非 291KB 切片），
-    表现为「改动已推送但体验没变 / 仍很慢」。按内容 hash 打版本号后，JS 一改版本号即变，
-    浏览器必然重新拉取；JS 未变时版本号不变，不产生无谓改动。幂等（重复运行不会叠加 ?v）。
+    表现为「改动已推送但体验没变 / 仍很慢」。按内容 hash 打版本号后，资源一改版本号即变，
+    浏览器必然重新拉取；未变时版本号不变，不产生无谓改动。幂等（重复运行不会叠加 ?v）。
+
+    2026-10-10：原先只匹配 `src=`，**CSS 完全在缓存破坏机制之外**——
+    `<link href="visits-trend.css">` 没有任何版本号，改样式对回访用户不生效。
+    这是与「app.admin.js 漏打戳」同源的系统性缺口（见 docs 结论），故一并覆盖 href=。
     """
     html_path = os.path.join(ROOT, 'site', html_name)
-    js_path = os.path.join(ROOT, 'site', js_name)
-    if not (os.path.exists(html_path) and os.path.exists(js_path)):
+    asset_path = os.path.join(ROOT, 'site', asset_name)
+    if not (os.path.exists(html_path) and os.path.exists(asset_path)):
         return
-    ver = _short_hash(js_path)
+    ver = _short_hash(asset_path)
     with open(html_path, 'r', encoding='utf-8') as f:
         html = f.read()
-    # 匹配 src="js_name" 或 src="js_name?v=xxxx"（无论单/双引号），统一替换为带新版本号。
+    # 匹配 src="x" / href="x"，无论单双引号，且已带任意 ?v= 的也要能命中并替换。
     # 版本号字符集必须宽松：历史上一处手写的 "?v=20260906g" 含非十六进制字符 'g'，
     # 被旧正则 (?:\?v=[0-9a-fA-F]+)? 整体失配 -> 该 script 版本号永久冻结（且静默无告警），
     # 回访用户持续跑旧 JS，正是本机制本该防住的事。故改用 [^"']* 兜住任意版本号形态，
     # 只以引号收边界。
-    pat = re.compile(r'src=(["\'])' + re.escape(js_name) + r'(?:\?v=[^"\']*)?\1')
+    pat = re.compile(r'\b(src|href)=(["\'])' + re.escape(asset_name)
+                     + r'(?:\?v=[^"\']*)?\2')
     if pat.search(html) is None:
-        print(f'[warn] {html_name} 中未找到对 {js_name} 的引用，版本号未更新'
-              f'（请检查该 script 是否被改名/删除）')
+        print(f'[warn] {html_name} 中未找到对 {asset_name} 的引用，版本号未更新'
+              f'（请检查该资源是否被改名/删除）')
         return
-    new_html = pat.sub(r'src="%s?v=%s"' % (js_name, ver), html)
+    new_html = pat.sub(r'\1="%s?v=%s"' % (asset_name, ver), html)
     if new_html != html:
         atomic_write_text(html_path, new_html)
-        print(f'[done] {html_name}: {js_name} 缓存版本号 = {ver}')
+        print(f'[done] {html_name}: {asset_name} 缓存版本号 = {ver}')
 
 
 def latest_preview(item):
@@ -511,6 +518,14 @@ def main():
     stamp_script_version('index.html', 'app.js')
     stamp_script_version('index.html', 'footer-counter.js')
     stamp_script_version('stats.html', 'footer-counter.js')
+    # 2026-10-10：访问量趋势页此前**完全在缓存破坏机制之外**——
+    # visits-trend.js / visits-trend.css 是裸引用，既没注册打戳，也没进
+    # tests/test_frontend_schema.py 的 PAGES 清单（只有 index/stats 两页），
+    # 属结构性盲区：改了趋势页样式或脚本，回访用户仍跑旧版。
+    # （git 历史已有两轮同源事故：f58e5fd 重打 app.admin.js 戳、daa11e1 趋势页
+    #   导航改落生成脚本模板——都是「清单漏一处、零告警」。）
+    stamp_script_version('visits-trend.html', 'visits-trend.js')
+    stamp_script_version('visits-trend.html', 'visits-trend.css')
 
 
 if __name__ == '__main__':

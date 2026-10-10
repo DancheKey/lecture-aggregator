@@ -84,19 +84,20 @@ class _DataSandbox:
         # 复制真实脚本（它靠相对定位 ROOT 找 data/）
         for rel in ('scripts/test_invariants.py',):
             shutil.copy(os.path.join(ROOT, rel), os.path.join(self.tmp, rel))
-        # scraper.py 还会 import scripts/ 下的 excluded_urls，一并复制。
+        # 沙箱还必须备齐两处被 import 的模块，否则门禁脚本会在 import 阶段就炸：
+        #   ① scripts/excluded_urls.py —— scraper.py 会 import
+        #   ② scraper/ 下的一组模块    —— incremental_merge 单元测试会 import
         #
-        # ⚠ 一律 shutil.copy，**不要用 os.symlink**（2026-10-10 实测）：本机
-        #   Windows 无符号链接特权时 os.symlink 可能**不抛异常但创建出坏链**
-        #   （realpath 不解析、open 读出 0 字节）——import scraper 加载空文件、
-        #   无任何属性，incremental_merge 单元测试必炸，且失败形态极难排查。
-        #   CI(Linux) 上软链正常，故此坑只在 Windows 本机暴露。8 个文件
-        #   合计约 200KB，复制成本可忽略，跨平台行为一致。
+        # ⚠ 一律 shutil.copy，**不要用 os.symlink**（2026-10-10）：本机 Windows
+        #   无符号链接特权时 os.symlink 直接抛 OSError [WinError 1314]
+        #   （实测如此，不是「静默创建坏链」）。此前靠 `except OSError → copy`
+        #   兜底虽也能跑通，但把正确性押在「异常一定抛」上——换环境行为不可预期。
+        #   且软链会让本机与 CI(Linux) 走不同代码路径，两端行为不一致。
+        #   全部依赖合计约 200KB，复制成本可忽略。
         for fn in ('excluded_urls.py',):
             src = os.path.join(ROOT, 'scripts', fn)
             if os.path.exists(src):
                 shutil.copy(src, os.path.join(self.tmp, 'scripts', fn))
-        # scraper 包：门禁里的 incremental_merge 单元测试会 import 它。
         real_scraper = os.path.join(ROOT, 'scraper')
         os.makedirs(os.path.join(self.tmp, 'scraper'), exist_ok=True)
         for fn in ('scraper.py', 'parsers.py', 'timeparse.py',

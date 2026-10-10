@@ -94,6 +94,98 @@ class ScriptVersionStampTest(unittest.TestCase):
     PAGES = ('site/index.html', 'site/stats.html')
     SCRIPT_RE = re.compile(r'src="([\w./-]+\.js)\?v=([0-9a-f]{10})"')
 
+    # ---- 2026-10-10 新增：全量反向断言（根治「清单漂移」）----
+    #
+    # 为什么需要它：上面那条 SCRIPT_RE **只匹配已带 ?v= 的引用**，所以
+    # 「新资源漏打戳」对它完全不可见——漏戳的资源以裸 src="x.js" 出现，正则
+    # 压根不匹配，测试静默通过。而孤儿检查（test_所有app分片都被引用）复用
+    # 同一正则，同样漏。这正是 git 历史里两轮同源事故的根因：
+    #   · f58e5fd 重打 app.admin.js 戳（门禁红）
+    #   · daa11e1 趋势页导航改落生成脚本模板
+    # 两次都是「改了 A 处、同步清单 B 处被遗忘」，且没有任何门禁能强制清单完整。
+    #
+    # 本断言反转为**由文件系统事实驱动**：扫描所有页面里的本地 src=/href=
+    # 引用，凡指向 site/ 内的 .js/.css，都必须带 ?v= 且等于 git blob 的 hash。
+    # 这样新增资源天然被覆盖，不需要维护任何清单。
+    #
+    # vendor/ 下的第三方库（tailwind.css / vue.global.prod.js）不在此列：
+    # 它们不在 stamp 注册表里，按设计保持固定名 + CDN 缓存。
+    ALL_PAGES = ('site/index.html', 'site/stats.html', 'site/visits-trend.html')
+    # ⚠ 尾部只捕获 ?v= 部分，不要用 [^"']*\1 回溯收尾——那会跨过闭合引号
+    # 继续吞到下一个属性（本项目 index.html 里 <link ... /> 紧接 <script，
+    # 实测会把 vendor/tailwind.css 匹配成 ' />\n  <script defer src='）。
+    REF_RE = re.compile(r'''(?:src|href)=(["'])([\w./-]+\.(?:js|css))\??(v=[^"']*)?\1''')
+
+    @classmethod
+    def _local_refs(cls):
+        """返回 [(page, asset, ver_or_None)]，只含 site/ 内的本地 js/css 引用。"""
+        refs = []
+        for page in cls.ALL_PAGES:
+            p = os.path.join(_ROOT, page)
+            if not os.path.exists(p):
+                continue
+            html = open(p, encoding='utf-8').read()
+            for _q, asset, ver in cls.REF_RE.findall(html):
+                if asset.startswith('vendor/'):
+                    continue
+                if os.path.exists(os.path.join(_ROOT, 'site', asset)):
+                    refs.append((page, asset, ver[2:] if ver else None))
+        return refs
+
+    def test_99_所有本地资源都必须打戳且版本号正确(self):
+        """反向全量断言：凡被页面引用的本地 .js/.css，都必须带正确的 ?v=。
+
+        这条测试取代「维护一份资源清单」的做法——新增分片/样式会被自动纳入校验，
+        从此不再出现「加了资源忘了打戳、浏览器永久缓存旧版且零告警」。
+        """
+        refs = self._local_refs()
+        self.assertTrue(refs, '未扫描到任何本地资源引用——正则或页面路径失效？')
+        unstamped, mismatched = [], []
+        for page, asset, ver in refs:
+            if not ver:
+                unstamped.append(f'{page} -> {asset}')
+                continue
+            rel = 'site/' + asset
+            real = self._git_blob_hash(rel)
+            if real is None:
+                mismatched.append(f'{page} -> {asset}: 未入库（git 索引取不到）')
+            elif ver != real:
+                mismatched.append(
+                    f'{page} -> {asset}: 戳={ver} 但 Git 实际={real}')
+        self.assertEqual(
+            unstamped, [],
+            '以下本地资源被页面引用但**没有缓存版本号**——改动对回访用户不生效，'
+            '且浏览器会长期缓存旧版：\n  ' + '\n  '.join(unstamped)
+            + '\n修法：把它登记进 scripts/generate_frontend_data.py 的'
+              ' stamp_script_version 调用并重跑该脚本。')
+        self.assertEqual(
+            mismatched, [],
+            '以下资源的版本号与 Git 实际内容不符——缓存破坏失效：\n  '
+            + '\n  '.join(mismatched)
+            + '\n修法：重跑 scripts/generate_frontend_data.py 重打戳。')
+
+    def test_98_孤儿资源检测(self):
+        """反向：site/ 下的 .js/.css 若无任何页面引用，就是孤儿（改了也不生效）。
+
+        2026-10-10 用它收掉 site/style.css——被 Tailwind 预编译取代的遗留文件，
+        既不被加载也不被 stamp，纯属噪音。孤儿文件比缺戳更隐蔽：它看起来
+        「存在且有内容」，但任何改动都不会反映到页面上。
+        """
+        referenced = {a for _p, a, _v in self._local_refs()}
+        site_dir = os.path.join(_ROOT, 'site')
+        orphans = []
+        for fn in sorted(os.listdir(site_dir)):
+            if not fn.endswith(('.js', '.css')) or fn in ('footer-counter.js',):
+                continue
+            # footer-counter.js 由三页共同加载，且不在 index/stats 的 ?v= 体系内，
+            # 实际已在别处打戳（见 test_99 的引用集），故从孤儿判定中排除。
+            if fn not in referenced:
+                orphans.append(fn)
+        self.assertEqual(
+            orphans, [],
+            f'site/ 下这些资源无任何页面引用（孤儿）：{orphans}——'
+            '改了不会生效，请删除或补上引用。')
+
     def _html(self, page):
         p = os.path.join(_ROOT, page)
         if not os.path.exists(p):
