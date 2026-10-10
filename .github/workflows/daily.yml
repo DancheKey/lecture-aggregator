@@ -181,6 +181,7 @@ jobs:
           base_path = os.path.join(ROOT, 'data', 'audit_baseline.json')
           base = {}
           ver_note = ''
+          seed_only = False
           if os.path.exists(base_path):
               try:
                   doc = json.load(open(base_path, encoding='utf-8'))
@@ -193,9 +194,14 @@ jobs:
               if doc.get('version') == 2:
                   base = doc.get('high') or {}
               else:
+                  seed_only = True
                   ver_note = '（基线为旧版 key 格式，本轮重播种为 v2，不对比）'
-          regressions = {k: v - base.get(k, 0) for k, v in cur.items()
-                         if v > base.get(k, 0)}
+          # ⚠️ 重播种轮必须真的「不对比」：v1 旧键与 v2 模板键无法对齐，
+          # 若照常计算 regressions，cur 全部 v>base(0) → exit 1，且基线
+          # 永远写不回 v2 → 每班必红（2026-10-10 首版遗漏，本行守卫补上）。
+          regressions = {} if seed_only else {
+              k: v - base.get(k, 0) for k, v in cur.items()
+              if v > base.get(k, 0)}
           total = sum(cur.values())
           print(f'高严重度问题：本次 {total} 条 / 基线 {sum(base.values())} 条 {ver_note}')
           if regressions:
