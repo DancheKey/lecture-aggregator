@@ -129,24 +129,48 @@ jobs:
       # 拆成 5 个独立步骤后，Actions 页与 jobs API 直接显示失败的文件名；
       # 后续步骤加 if: always() 以便一次跑完、同时暴露多个红项（job 结论仍为
       # failure，提交/部署照旧被阻断）。
+      # ⚠ 2026-10-11：每个门禁都把输出尾部写进 $GITHUB_STEP_SUMMARY。
+      # 原因：CI 日志下载需仓库 admin 权限（jobs/logs 端点对协作者返回 403），
+      # 门禁一旦红，排障者只能看到步骤名、拿不到报错——10-11 三班红均因此
+      # 无法定位。写进 summary 后，Actions 页面直接可见失败原因。
       - name: 门禁1 前端资源版本戳
-        run: python tests/test_frontend_schema.py
+        run: |
+          set -uo pipefail
+          python tests/test_frontend_schema.py > gate1.log 2>&1; rc=$?
+          { echo "### 门禁1 前端资源版本戳（rc=$rc）"; echo '```'; tail -25 gate1.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: 门禁2 前端产物一致性
         if: always()
-        run: python tests/test_frontend_consistency.py
+        run: |
+          set -uo pipefail
+          python tests/test_frontend_consistency.py > gate2.log 2>&1; rc=$?
+          { echo "### 门禁2 前端产物一致性（rc=$rc）"; echo '```'; tail -25 gate2.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: 门禁3 按源对账
         if: always()
-        run: python tests/test_data_reconciliation.py
+        run: |
+          set -uo pipefail
+          python tests/test_data_reconciliation.py > gate3.log 2>&1; rc=$?
+          { echo "### 门禁3 按源对账（rc=$rc）"; echo '```'; tail -25 gate3.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: 门禁4 全量缩水保护
         if: always()
-        run: python tests/test_full_shrink_protection.py
+        run: |
+          set -uo pipefail
+          python tests/test_full_shrink_protection.py > gate4.log 2>&1; rc=$?
+          { echo "### 门禁4 全量缩水保护（rc=$rc）"; echo '```'; tail -25 gate4.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: 门禁5 新源全量扫描
         if: always()
-        run: python tests/test_new_source_full_scan.py
+        run: |
+          set -uo pipefail
+          python tests/test_new_source_full_scan.py > gate5.log 2>&1; rc=$?
+          { echo "### 门禁5 新源全量扫描（rc=$rc）"; echo '```'; tail -25 gate5.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       # 数据质量体检（2026-09-06）：每天抓取+修复后自动检查全库字段
       # （时间/地点/主讲人/单位的错误与缺失），报告存为运行附件保留 30 天，
