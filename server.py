@@ -117,6 +117,43 @@ def _load_or_create_admin_token():
 _ADMIN_TOKEN = _load_or_create_admin_token()
 _IS_LOOPBACK_RE = re.compile(r'^127\.0\.0\.1$|^::1$|^\[::1\]$')
 
+# ---- Host 头白名单（2026-10-10，堵 DNS 重绑定）----
+# 攻击链：攻击者把 rebind.evil.com 的 A 记录指向 127.0.0.1，受害者浏览器解析后
+# 连到本机；此时 TCP 对端确实是回环（_IS_LOOPBACK_RE 放行）、但 Host 是 evil.com。
+# 若服务端不校验 Host，同源策略就会让攻击者页面**读到响应**——实测
+# `GET /api/admin/token` 带 `Host: evil.com` 仍返回完整管理 token，进而可触发
+# /api/scrape、篡改 sources.yaml。
+#
+# 校验 Host 是 DNS 重绑定的标准缓解手段（不依赖应用层认证，也不受 SOP 绕过影响）。
+#
+# ⚠ 刻意**不要求 Host 必须存在**：HTTP/1.0 客户端、curl 默认、端口探活都可能不带
+#   Host；一律拒绝会误伤本机既有工具与测试里的裸 socket 请求。真正的攻击必须
+#   带 Host（浏览器一定会发），故「缺 Host → 放行、带错 Host → 拒绝」既能挡住
+#   攻击又不伤正常路径。
+_ALLOWED_HOSTS = frozenset(('127.0.0.1', 'localhost', '::1', '[::1]'))
+
+
+def _host_allowed(host_header):
+    """Host 头是否可信。缺 Host 视为放行（见上方注释）；带 Host 则必须命中白名单。
+
+    归一化：去掉端口、IPv6 的方括号、小写化。`[::1]:8000` 与 `::1` 都应放行。
+    """
+    if host_header is None:
+        return True                      # 无 Host：非浏览器客户端，放行
+    h = str(host_header).strip().lower()
+    if not h:
+        return True
+    if h.startswith('['):                # [::1]:8000 → ::1
+        h = h[1:h.index(']')] if ']' in h else h[1:]
+    elif ':' in h:
+        # 多个冒号 = 裸 IPv6（::1 / ::1:8000 这类无方括号写法），
+        # 不能按第一个冒号切——否则 '::1' 会被切成空串而误拒。
+        # 只有一个冒号才是 host:port（127.0.0.1:8000 → 127.0.0.1）。
+        if h.count(':') > 1:
+            return h.split(':', 1)[0] in _ALLOWED_HOSTS or h in _ALLOWED_HOSTS
+        h = h.split(':', 1)[0]
+    return h in _ALLOWED_HOSTS
+
 
 def _check_admin(self):
     # 写接口凭证校验：X-Admin-Token 必须与启动时生成的 token 一致。
@@ -372,6 +409,29 @@ class Handler(SimpleHTTPRequestHandler):
             super().handle_one_request()
         except (socket.timeout, TimeoutError, ConnectionError):
             self.close_connection = True
+
+    def parse_request(self):
+        """在请求头解析完成后校验 Host（2026-10-10，堵 DNS 重绑定）。
+
+        为什么挂在这里而不是 handle_one_request：
+          基类在 **handle_one_request 内部**才调用 parse_request 并设置
+          self.headers —— 在 handle_one_request 里读 headers 恒为 None，
+          校验会静默失效，且实测导致所有请求 NO-RESPONSE（send_error 在
+          headers 未就绪时崩链）。parse_request 才是「请求头已就绪、尚未
+          分派 do_*」的正确时点。
+
+        选它而非各 do_* 方法，是为了**一处覆盖全部动词**：do_GET / HEAD /
+        POST / PUT / DELETE 都由基类在此处分派，少挂一处就留下一个绕过口
+        （例如只护 /api/admin/token，POST /api/scrape 仍可被重绑定触发）。
+        """
+        if not super().parse_request():
+            return False
+        if not _host_allowed(self.headers.get('Host')):
+            # 403 而非 404：这是策略拒绝，调用方需要知道原因
+            self.send_error(403, 'Host not allowed')
+            self.close_connection = True
+            return False
+        return True
 
     def end_headers(self):
         # 禁用缓存：每次刷新都拿到最新数据

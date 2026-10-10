@@ -646,6 +646,75 @@ class TestSourcesYamlLoaderEdgeCases(_SourcesRoundTripBase):
         self.assertIsInstance(data['sources'], list)
 
 
+class TestHostHeaderGuard(_StaticGuardLiveBase):
+    """Host 头校验（2026-10-10）：堵 DNS 重绑定窃取管理 token。
+
+    攻击链：攻击者把 `rebind.evil.com` 的 A 记录指向 127.0.0.1，受害者浏览器
+    解析后连到本机。此时 TCP 对端**确实是回环**（`_IS_LOOPBACK_RE` 放行），
+    但 `Host: rebind.evil.com`。服务端若不校验 Host，同源策略会让攻击者页面
+    **读到响应**——实测 `GET /api/admin/token` 带 `Host: evil.com` 仍返回
+    完整管理 token，进而可触发 /api/scrape、篡改 sources.yaml。
+
+    校验 Host 是 DNS 重绑定的标准缓解（不依赖应用层认证，不受 SOP 绕过影响）。
+    """
+
+    def _req_host(self, method, path, host):
+        return f'{method} {path} HTTP/1.0\r\nHost: {host}\r\n\r\n'
+
+    def test_50_恶意Host被拒(self):
+        for evil in ('evil.com', 'rebind.evil.com', 'attacker.test:8000'):
+            status, _ = self._request(
+                self._req_host('GET', '/api/admin/token', evil))
+            self.assertIn('403', status,
+                          f'Host: {evil} 应被拒（DNS 重绑定口径），实际 {status}')
+
+    def test_51_恶意Host下写接口同样被拒(self):
+        """校验必须覆盖全部动词——只护 GET 等于没护。
+
+        此前考虑过挂在 do_GET 或 handle_one_request：前者漏 POST/PUT/DELETE，
+        后者因基类尚未解析 headers 而恒读到 None（静默失效 + 崩链）。
+        """
+        for method, path in (('POST', '/api/scrape'),
+                             ('PUT', '/api/sources/0'),
+                             ('DELETE', '/api/sources/0'),
+                             ('POST', '/api/sources')):
+            status, _ = self._request(
+                self._req_host(method, path, 'evil.com'))
+            self.assertIn('403', status,
+                          f'{method} {path} 带恶意 Host 应被拒，实际 {status}')
+
+    def test_52_正常Host放行(self):
+        for host in ('127.0.0.1', 'localhost', f'127.0.0.1:{self.port}',
+                     f'localhost:{self.port}', '[::1]', f'[::1]:{self.port}'):
+            status, _ = self._request(
+                self._req_host('GET', '/api/visits', host))
+            self.assertNotIn('403', status,
+                             f'正常 Host: {host} 不应被拒，实际 {status}')
+
+    def test_53_缺Host放行(self):
+        """HTTP/1.0 客户端/健康检查可能不带 Host，一律拒绝会误伤。
+
+        真正的浏览器攻击**必定**带 Host，故「缺 Host 放行、带错 Host 拒绝」
+        既能挡攻击又不伤正常路径。
+        """
+        status, _ = self._request(self._req('GET', '/api/visits'))
+        self.assertNotIn('403', status, f'无 Host 请求不应被拒，实际 {status}')
+
+    def test_54_静态资源同样受保护(self):
+        """重绑定也能读页面内容，不只是 API。"""
+        status, _ = self._request(self._req_host('GET', '/', 'evil.com'))
+        self.assertIn('403', status, f'静态页带恶意 Host 应被拒，实际 {status}')
+
+    def test_55_归一化函数的边界(self):
+        srv = _load_server()
+        for good in ('127.0.0.1', '127.0.0.1:8000', 'LOCALHOST', 'localhost:1',
+                     '::1', '[::1]', '[::1]:8000', None, '', '   '):
+            self.assertTrue(srv._host_allowed(good), f'{good!r} 应放行')
+        for bad in ('evil.com', 'evil.com:8000', '127.0.0.1.evil.com',
+                    'localhost.evil.com', '127.0.0.1@evil.com', '[::2]'):
+            self.assertFalse(srv._host_allowed(bad), f'{bad!r} 应拒绝')
+
+
 class TestNoTestSideEffects(unittest.TestCase):
     """兜底：整轮测试跑完，真实 sources.yaml 与真实 server.py 都不该被写。"""
 
