@@ -19,3 +19,9 @@ opencv-python-headless==4.13.0.92
 # 中文人名→拼音转换：双主讲人「讲座人：高兴森教授，张飞」与英文分场题目
 # 「…By Ms Fei Zhang / …By Xingsen Gao」的场-人配对（physics791 类页面）
 pypinyin==0.55.0
+
+# ruamel.yaml：server.py:25 顶层 import（sources.yaml 往返读写，PyYAML 会丢
+# 19 行人工注释）。daily.yml 的门禁2（test_frontend_consistency）经
+# _load_module 加载 server.py → CI 此前未装它而秒崩（2026-10-11 实证）。
+# 版本与根 requirements.txt 对齐，避免本地/CI 装出两套。
+ruamel.yaml==0.19.1
