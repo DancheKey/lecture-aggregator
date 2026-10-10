@@ -209,6 +209,10 @@ class ScriptEntrypointTest(unittest.TestCase):
 
         缺失时 daily.yml 会把「本次全部高危问题」当成新增而误阻断一次
         （首次运行必然如此），故基线须随仓库入库。
+        2026-10-10：version 从 1 升为 2——旧 key 归一化只按全角「（」切，
+        ASCII 括号/冒号/空格分隔的实例值切不动，导致实例级键（讲者名/日期
+        直接进键）双向出错（误报阻断部署 + 漏报静默放行）。v2 改为在
+        「冒号/全角括号/空格-半角括号」最左出现处截断，只保留模板部分。
         """
         p = os.path.join(ROOT, 'data', 'audit_baseline.json')
         if not os.path.exists(p):
@@ -217,7 +221,8 @@ class ScriptEntrypointTest(unittest.TestCase):
             payload = json.load(f)
         self.assertIn('high', payload, '基线须含 high 字段')
         self.assertIsInstance(payload['high'], dict)
-        self.assertEqual(payload.get('version'), 1)
+        self.assertEqual(payload.get('version'), 2,
+                         '基线 version 应为 2（key 归一化修正，见 daily.yml）')
 
     def test_47_测试不得在导入期改写全局缓存(self):
         """防「夹具被测试写脏」（2026-10-02 实踩）。

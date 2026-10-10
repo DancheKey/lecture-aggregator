@@ -117,6 +117,22 @@ jobs:
       - name: 校验数据不变量（铁律护栏）
         run: python scripts/test_invariants.py
 
+      # 每日产物门禁快跑（2026-10-10）：daily 的数据提交用 GITHUB_TOKEN 推送，
+      # GitHub **不会**为它触发 test.yml/deploy.yml——意味着缓存戳、产物一致性、
+      # 对账门禁等全部 pytest 门禁在**每日主部署路径上是失效的**。
+      # 实证：趋势页裸引用戳（e83f608/426651d）在线上静默跑了近一周，test_99
+      # 抓不到，直到人工推送才变红。这里直跑与每日产物直接相关的 5 件测试
+      # （全部离线、合计约 25 秒；与 test.yml 同一调用方式，无需 pytest），
+      # 失败即红、阻断本轮提交与部署——门禁这才真正落在主路径上。
+      - name: 前端产物与抓取保护门禁（每日快跑）
+        run: |
+          set -euo pipefail
+          python tests/test_frontend_schema.py
+          python tests/test_frontend_consistency.py
+          python tests/test_data_reconciliation.py
+          python tests/test_full_shrink_protection.py
+          python tests/test_new_source_full_scan.py
+
       # 数据质量体检（2026-09-06）：每天抓取+修复后自动检查全库字段
       # （时间/地点/主讲人/单位的错误与缺失），报告存为运行附件保留 30 天，
       # 出现异常当天可见，不用等用户在网页上发现问题来反馈。
@@ -135,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PYEOF'
-          import json, os, sys, subprocess
+          import json, os, re, sys, subprocess
           ROOT = os.environ.get('GITHUB_WORKSPACE', '.')
           sys.path.insert(0, os.path.join(ROOT, 'scraper'))
           sys.path.insert(0, os.path.join(ROOT, 'scripts'))
@@ -144,33 +160,58 @@ jobs:
                                encoding='utf-8'))['data']
           issues = audit_fields.audit(data)
           high = [i for i in issues if i[2] == '高']
-          # 归一化到「类型|字段|描述模板」，避免同一类问题因数据变化反复触发
+          # 归一化到「类别|字段|描述模板」，避免同一类问题因数据变化反复触发。
+          # 2026-10-10 修正（子代理审查 P2）：旧写法只按全角「（」切，
+          # 而高危描述大量用 ASCII 括号/冒号/空格后直接跟实例值，切不动 →
+          # 实例值进了键：当前 4 条高危里 2 条是实例级键。双向出错：
+          #   误报——同记录重抓后讲者串微变 → 旧键消失、新键 count=1>base(0)
+          #          → exit 1，当班数据不提交不部署；
+          #   漏报——同类问题修 1 条 + 新增 1 条 → 计数相等 → 放行。
+          # 新切法：在「冒号/全角冒号/全角括号/空格-半角括号/任意空白」
+          # 最左出现处截断，只留模板部分。已对 audit_fields 全部 18 处
+          # issue.append 的描述逐一验证归一结果互不冲突。
+          _TAIL_CUT = re.compile(r'[:：]|（| \(')
           def key(i):
-              return f'{i[0]}|{i[1]}|{i[3].split("（")[0]}'
+              m = _TAIL_CUT.search(i[3])
+              tpl = i[3][:m.start()] if m else i[3]
+              return f'{i[0]}|{i[1]}|{tpl}'
           cur = {}
           for i in high:
               cur[key(i)] = cur.get(key(i), 0) + 1
           base_path = os.path.join(ROOT, 'data', 'audit_baseline.json')
           base = {}
+          ver_note = ''
           if os.path.exists(base_path):
               try:
-                  base = json.load(open(base_path, encoding='utf-8')).get('high') or {}
+                  doc = json.load(open(base_path, encoding='utf-8'))
               except Exception:
-                  base = {}
+                  doc = {}
+              # v1 基线用旧 key 归一（含实例值），与 v2 模板键无法对比——
+              # 直接比会把全部现存键判成「新增」，首跑必然整班红。
+              # 故 version 不匹配时放弃对比、直接重播种（无回归风险：宁可
+              # 少拦一轮，也不让基线格式演进阻断数据发布）。
+              if doc.get('version') == 2:
+                  base = doc.get('high') or {}
+              else:
+                  ver_note = '（基线为旧版 key 格式，本轮重播种为 v2，不对比）'
           regressions = {k: v - base.get(k, 0) for k, v in cur.items()
                          if v > base.get(k, 0)}
           total = sum(cur.values())
-          print(f'高严重度问题：本次 {total} 条 / 基线 {sum(base.values())} 条')
+          print(f'高严重度问题：本次 {total} 条 / 基线 {sum(base.values())} 条 {ver_note}')
           if regressions:
               print('::error::字段体检出现基线之外的新问题（已阻断部署）：', file=sys.stderr)
               for k, d in sorted(regressions.items(), key=lambda x: -x[1]):
                   print(f'  +{d}  {k}', file=sys.stderr)
               sys.exit(1)
-          # 无新增则把基线收紧到当前值（存量问题被修复时自动下调）
+          # 无新增则把基线收紧到当前值（存量问题被修复时自动下调）。
+          # 2026-10-10（子代理审查 P4）：直写 open('w') 改为 tmp + os.replace
+          # 原子写——此前写坏会被下方 except 静默复位为 {}，下轮全部判新增、整班红。
           if cur != base:
-              json.dump({'version': 1, 'high': cur},
-                        open(base_path, 'w', encoding='utf-8'),
-                        ensure_ascii=False, indent=2, sort_keys=True)
+              tmp_p = base_path + '.tmp'
+              with open(tmp_p, 'w', encoding='utf-8', newline='\n') as f:
+                  json.dump({'version': 2, 'high': cur}, f,
+                            ensure_ascii=False, indent=2, sort_keys=True)
+              os.replace(tmp_p, base_path)
               print(f'基线已更新：{base_path}')
           print('字段体检：无新增高危问题')
           PYEOF

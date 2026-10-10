@@ -253,6 +253,17 @@ def main():
     except Exception as e:
         _warn('sources.yaml 解析失败（%s：%s）' % (type(e).__name__, e))
         return 0
+    # 2026-10-10（子代理审查 P3）：**零源防御**——sources.yaml 解析成功但
+    # sources 键缺失/为空表时，load_sources() 返回 []，此前会「检查 0 条」
+    # 然后走到下方 bad 为空的分支，给既存告警 Issue 评论「所有栏目均可达」
+    # 并**自动关闭**——配置坏了反而报全绿、还把真实告警关掉。
+    # 现在显式拦截：::error:: 留痕（Actions 摘要可见），跳过全部检查与
+    # Issue 操作，仍退 0 保证数据部署不受影响（本步在提交之后，非 0 会
+    # 令 scrape job 失败、deploy 被跳过——那是「数据不得中断」红线）。
+    if not sources:
+        print('::error::sources.yaml 解析成功但未配置任何信息源——健康检查无法执行；'
+              '本次不检查、不写台账、不关闭任何告警 Issue（请检查 sources.yaml 的 sources 键）')
+        return 0
 
     print('开始信息源健康检查：%d 个源' % len(sources))
     results = run_checks(sources)
@@ -316,7 +327,13 @@ def main():
 
     checked = counts['totalUrls']
     if alerting and checked and len(alerting) > checked * MASS_FAILURE_RATIO:
-        _warn('失效比例过高（%d/%d），疑似 CI 出口网络异常而非源站失效，本次跳过 Issue 告警'
+        # 2026-10-10（子代理审查 P3）：从 ::warning:: 升为 ::error::。
+        # 大面积同时失效最可能是 CI 出口网络异常（跳过 Issue 的取舍不变——
+        # 建 Issue 只会产生误导性告警），但纯黄字在 Actions 摘要里太不起眼：
+        # 学院整站群迁移（多数 404）正是这种形态，此前只剩一行黄字、无人察觉。
+        # 红色注解仍不阻断部署（保持 exit 0）。
+        print('::error::失效比例过高（%d/%d），疑似 CI 出口网络异常或源站整站迁移，'
+              '本次跳过 Issue 告警但请人工核查 data/source_health.json'
               % (len(alerting), checked))
         return 0
 

@@ -43,10 +43,35 @@ UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 TIMEOUT = 25
 CST = datetime.timezone(datetime.timedelta(hours=8))
+# 台账最新快照距今超过该天数仍取不到数 → 升级为 ::error::（2026-10-10 P3）。
+# 单日失败只告警不报错（外部服务抖动不该打断数据发布）；但持续多日取不到
+# 意味着 busuanzi 失效或 schema 变更，台账与趋势页会持续冻结且此前**零信号**
+# ——这是「公网访问量的唯一本地备份」，失明必须可见。
+STALE_DAYS = 3
 
 
 def _warn(msg):
     print('::warning::' + msg)
+
+
+def _stale_error():
+    """台账是否已连续 STALE_DAYS 天无新快照；是则发 ::error:: 并返回 True。"""
+    try:
+        hist = load_history() or {}
+        snaps = hist.get('snapshots') or []
+        last_date = max((str(s.get('date', '')) for s in snaps), default='')
+        if not last_date:
+            return True   # 台账空且本次也失败：同样算失明
+        gap = (datetime.datetime.now(CST).date()
+               - datetime.date.fromisoformat(last_date)).days
+        if gap >= STALE_DAYS:
+            print('::error::访问量台账已 %d 天无新快照（busuanzi 持续不可用或'
+                  '接口变更），公网访问量与趋势页将持续冻结，请检查该服务与'
+                  ' fetch_visits_snapshot.py 的解析逻辑' % gap)
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def fetch_snapshot():
@@ -96,6 +121,10 @@ def main():
         snap = fetch_snapshot()
     except Exception as e:
         _warn('访问量快照获取失败，本次不写入台账（%s：%s）' % (type(e).__name__, e))
+        # 2026-10-10 P3：单日失败保持告警；台账已连续 STALE_DAYS 天失明则升级
+        # ::error::（红色注解在 Actions 摘要可见）。仍退 0——busuanzi 抖动
+        # 不得阻断讲座数据的部署（本步失败会令 deploy job 被跳过）。
+        _stale_error()
         return 0
 
     now = datetime.datetime.now(CST)
