@@ -268,19 +268,49 @@ Object.assign(APP_METHODS, {
       if (this._clampTimer) clearTimeout(this._clampTimer);
       this._clampTimer = setTimeout(() => { this._clampTimer = null; this._measureClamp(); }, 0);
     },
-    absOverflow(l) { return !!this._clampOverflow['abs|' + (l.sourceUrl || '')]; },
-    bioOverflow(l) { return !!this._clampOverflow['bio|' + (l.sourceUrl || '')]; },
-    async toggleAbstract(url) {
-      if (!url) return;
-      const l = this.all.find(x => (x.sourceUrl || '') === url);
-      if (l) await this._ensureLongText(l);   // 展开前按需拉该条全文
-      this.expandedAbstract = { ...this.expandedAbstract, [url]: !this.expandedAbstract[url] };
+    /* ---------- clamp 键：必须含 lectureIndex ----------
+     * 2026-10-11 修 B1：原键是 `abs|` + sourceUrl，而**一页拆出的多条记录
+     * 共享同一 sourceUrl**（全库 380 条 lectureIndex 记录分布在 93 个 URL 上，
+     * 其中 41 组（同日单卡 + 各自带长文本）会真的串扰）。症状：
+     *   · _measureClamp 用 `next[k] = ...` 写入，**后测量的同键记录覆盖先前的**；
+     *   · 结果是一张卡的溢出判定长在另一张卡上 → 「有截断却没有展开按钮」或反之，
+     *     用户看不到全文，且**零报错**（静默失效）。
+     * 键的四要素与 app.data.js 的 _ltKey / _mergeChunk 的 keyOf 保持同口径
+     * （sourceUrl | lectureStart | title | lectureIndex 里去重后取最小稳定集），
+     * 这里只用 sourceUrl + '#' + lectureIndex —— 同一 sourceUrl 下 lectureIndex
+     * 已唯一，与 _ltKey 逐字一致最省心（长文本与 clamp 天然同键空间，便于调试）。
+     */
+    _clampKey(l, kind) {
+      return kind + '|' + (l.sourceUrl || '') + '#' + (l.lectureIndex != null ? l.lectureIndex : '');
     },
-    async toggleBio(url) {
-      if (!url) return;
-      const l = this.all.find(x => (x.sourceUrl || '') === url);
-      if (l) await this._ensureLongText(l);
-      this.expandedBio = { ...this.expandedBio, [url]: !this.expandedBio[url] };
+    absOverflow(l) { return !!this._clampOverflow[this._clampKey(l, 'abs')]; },
+    bioOverflow(l) { return !!this._clampOverflow[this._clampKey(l, 'bio')]; },
+    /* ---------- 展开态：同样必须含 lectureIndex（B1 同族，2026-10-11）----------
+     * 与 clamp 键同源的问题：expandedAbstract / expandedBio 原以 sourceUrl 为键，
+     * 而一页拆出的多条记录共享同一 sourceUrl（41 组「同日单卡 + 各自带长文本」）。
+     * 症状比 clamp 串扰更严重——不是按钮显隐错乱，而是**内容错配**：
+     *   · toggleAbstract(url) 用 `all.find(x => x.sourceUrl === url)` 找记录，
+     *     同源多条时**只会找到第一条** → 点第 2 期的「展开摘要」拉的是第 1 期的全文；
+     *   · expandedAbstract[url] 被同源多条共享 → 展开/收起状态互相串。
+     * 40/41 组的两篇文章落在大不同的长文本桶，故几乎必现（实测）。
+     * 修法：展开态改用与 _clampKey/_ltKey 同一口径的复合键
+     * （sourceUrl#lectureIndex），模板读取侧同步改。
+     */
+    _expKey(l, kind) {
+      return (l && (l.sourceUrl || '') || '') + '#' + (l && l.lectureIndex != null ? l.lectureIndex : '');
+    },
+    async toggleAbstract(l) {
+      if (!l || !l.sourceUrl) return;
+      const k = this._expKey(l, 'abs');
+      // 展开前按需拉**该条**的全文（按 _ltKey 定位桶，不依赖 sourceUrl 单键）
+      await this._ensureLongText(l);
+      this.expandedAbstract = { ...this.expandedAbstract, [k]: !this.expandedAbstract[k] };
+    },
+    async toggleBio(l) {
+      if (!l || !l.sourceUrl) return;
+      const k = this._expKey(l, 'bio');
+      await this._ensureLongText(l);
+      this.expandedBio = { ...this.expandedBio, [k]: !this.expandedBio[k] };
     },
     // 安全链接：仅放行 http/https，阻断 javascript:/data: 等可执行协议，防止 XSS
     safeUrl(u) {
