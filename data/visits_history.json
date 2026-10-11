@@ -320,6 +320,17 @@
       "uv_delta": 10,
       "pv_delta": 11,
       "note": ""
+    },
+    {
+      "date": "2026-10-12",
+      "capturedAt": "2026-10-12T04:10:11+08:00",
+      "site_pv": 1599,
+      "site_uv": 1284,
+      "page_pv": 1571,
+      "page_uv": 1283,
+      "uv_delta": 0,
+      "pv_delta": 0,
+      "note": ""
     }
   ]
 }
