@@ -39,6 +39,7 @@ import ast
 import io
 import json
 import os
+import re
 import shutil
 import socket
 import sys
@@ -615,6 +616,71 @@ class TestSlowBodyNoBlock(_StaticGuardLiveBase):
                           'Content-Type: application/json\r\n'
                           'Content-Length: 2\r\n\r\n{}')
         self.assertIn('400', st, '空body 应走 400 分支')
+
+
+class TestLocalOriginParity(unittest.TestCase):
+    """GET 类数据接口的 Origin 校验必须对齐（2026-10-11，S3）。
+
+    背景：`/api/visits` 在 2026-09-26 审计 P3 补了 `_is_local_origin()`，
+    但同为 GET 的 `/api/lecture/stats` 一直**没有**——同类接口防线不对称。
+    响应体虽受同源策略保护、外站页面读不到内容，但外站仍可借访客浏览器
+    触发请求。
+
+    ⚠ 刻意**不起真实服务**（与 TestHostHeaderGuard 等 _StaticGuardLiveBase
+    子类不同）：本机沙箱下 site/lectures 只读，那些 live 用例会因 setUp 写
+    探针文件而 ERROR，纯静态断言反而稳定且已足够覆盖本修复。行为侧由
+    test_server.py 里既有的 do_GET 分派断言间接保护。
+    """
+
+    def test_54_stats接口与visits接口防线对称(self):
+        """静态锁：两个 GET 数据接口都必须有 _is_local_origin() 守卫。
+
+        为什么静态也要锁：删掉校验后该端点只是「少了防护」——不报错、页面
+        照常，纯行为断言很难在 review 中意识到这是一处不对称。静态比对让
+        「删校验」这个动作本身变红。
+        """
+        with open(os.path.join(ROOT, 'server.py'), encoding='utf-8') as f:
+            src = f.read()
+
+        def _body(fn_name):
+            i = src.index('def %s(self)' % fn_name)
+            # 取到下一个类方法定义为边界（同缩进 4 空格的 def）
+            j = src.find('\n    def ', i + 1)
+            return src[i:j if j > 0 else len(src)]
+
+        for fn in ('_api_visits_get', '_api_lecture_stats_get'):
+            body = _body(fn)
+            self.assertIn('_is_local_origin()', body,
+                          f'{fn} 缺 _is_local_origin() 守卫 —— '
+                          f'GET 数据接口防线不对称（S3 回归）')
+            self.assertIn('跨站请求被拒绝', body,
+                          f'{fn} 被拒时未返回统一文案')
+
+    def test_55_全部GET数据接口都过一遍(self):
+        """反向兜底：将来新增 GET /api/* 时，本用例逼人做一次抉择。
+
+        不是"必须加"——而是让人看见这个清单并显式决定。新增接口若忘了加，
+        白名单还停在旧集合 => 本用例红，提醒补 judgment。
+        """
+        with open(os.path.join(ROOT, 'server.py'), encoding='utf-8') as f:
+            src = f.read()
+        do_get = src[src.index('def do_GET(self)'):]
+        do_get = do_get[:do_get.index('\n    def ')]
+        # 从 do_GET 里找出被分派的 api 处理器
+        handlers = set(do_get.replace('return ', ' ').split())
+        handled = {h for h in re.findall(r'_api_\w+', do_get)}
+        self.assertIn('_api_lecture_stats_get', handled,
+                      'do_GET 不再分派 _api_lecture_stats_get —— 本白名单需同步')
+        self.assertIn('_api_visits_get', handled,
+                      'do_GET 不再分派 _api_visits_get —— 本白名单需同步')
+        # 每个 GET 侧 api 处理器（除 /api/lectures 的全量数据端点）都应过 Origin
+        for h in sorted(handled):
+            h = h.rstrip('()')
+            body = src[src.index('def %s(self)' % h):]
+            body = body[:body.index('\n    def ')]
+            self.assertIn('_is_local_origin()', body,
+                          f'GET 处理器 {h} 缺 _is_local_origin() —— '
+                          f'若确为公开端点请在测试里显式豁免并写明理由')
 
 
 class TestSourcesYamlLoaderEdgeCases(_SourcesRoundTripBase):

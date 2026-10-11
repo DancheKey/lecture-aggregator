@@ -281,6 +281,65 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/check_source_health.py
 
+      # G2 根治（2026-10-11）：CI 产出的**状态文件**提交，必须与 gate 成败解绑。
+      #
+      # 锁死模式（2026-10-11 実测过一次，见 .workbuddy/memory/2026-10-11.md）：
+      #   门禁 1~5 与「字段体检基线对比」都排在「提交并推送」**之前**，任一失败即
+      #   exit 1 → 后续步骤连同「提交并推送」整块被跳过 → 而 source_bootstrap.json、
+      #   reconcile_baseline.json、audit_baseline.json、source_health.json 这四个
+      #   文件的更新**只能靠提交才入库**。于是：
+      #       门禁红 → 不提交 → 状态文件丢失/不更新 → 下一轮判据退化 → 更红/更慢
+      #   实例：20 个零产出老源每轮被判「新源」而 force_full 全量扫描，单轮 3min→14min，
+      #   且修好的 bootstrap 状态因门禁红迟迟入库不了，形成正反馈死循环。
+      #
+      # 修法（GLM 方案 + 本轮落地）：新增本兜底步骤，**永不改变 job 结论**（`|| true`），
+      # 只负责把 CI 侧生成的状态文件单独推上去。三道保险：
+      #   ① `if: always()` —— 前序任一步骤失败也照样执行；
+      #   ② `|| true`   —— 推送自身失败也绝不让整班更红（本轮已经够红了）；
+      #   ③ 只 add 白名单内的状态文件 —— 绝不把 data/lectures.json、site/ 等**数据产物**
+      #     一起带上（那是「提交并推送」步的职责，混进来会让门禁失去拦截意义）。
+      # ⚠ 「提交并推送」被门禁拦下时，本轮**新讲座数据不上线**——这是有意的
+      #   「宁可不发，不发半成品」。本兜底只让「状态」跟上，不放行「数据」。
+      - name: 兜底提交 CI 状态文件（与门禁成败解绑）
+        if: always()
+        run: |
+          set -uo pipefail
+          # 仅这 4 个由 CI 独占维护、且其新鲜度直接影响下一轮判据的状态文件
+          STATE_FILES="data/source_bootstrap.json data/reconcile_baseline.json data/audit_baseline.json data/source_health.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          changed=0
+          for f in $STATE_FILES; do
+            [ -f "$f" ] || continue
+            if ! git diff --quiet -- "$f" 2>/dev/null || [ -n "$(git status --porcelain -- "$f")" ]; then
+              git add -- "$f" && changed=1
+            fi
+          done
+          if [ "$changed" -eq 0 ]; then
+            echo "CI 状态文件无变化，无需兜底提交"
+            exit 0
+          fi
+          git status --short -- $STATE_FILES
+          git commit -m "chore: CI 状态文件兜底提交（门禁未阻断数据，仅同步判据基线）" \
+            || { echo "::warning::状态文件 commit 失败（可能无变化或被锁）"; exit 0; }
+          # 最多重试 3 次；远端已前进则放弃——下轮 cron 会再推一次，不会永久卡住
+          for i in 1 2 3; do
+            if git push origin main; then
+              echo "状态文件已推送 (try $i)"
+              exit 0
+            fi
+            echo "::warning::状态文件 push 失败 (try $i)，5s 后重试..."
+            sleep 5
+            git fetch origin main 2>/dev/null || true
+            if ! git merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
+              echo "::warning::远端已前进，放弃本轮状态提交（下轮重试）"
+              git reset --hard origin/main 2>/dev/null || true
+              exit 0
+            fi
+          done
+          echo "::warning::状态文件 push 连续 3 次失败，已放弃（不影响本轮数据结论）"
+          exit 0
+
       # G5（2026-09-22）：出片脚本会改写 HTML 版本戳，但 git add 清单不含 scripts/。
       # 若 scripts/ 有未提交改动，显式告警（不阻断）——避免「以为 CI 会处理」的静默落差。
       - name: 检查 scripts/ 未提交改动（告警）

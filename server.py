@@ -497,6 +497,14 @@ class Handler(SimpleHTTPRequestHandler):
         os.replace(tmp, SOURCES_PATH)
 
     def _api_sources_get(self):
+        # 2026-10-11 补 Origin 校验（S3 扩展）：本端点会把整个 sources.yaml
+        # （53 个学院的 base + list_urls）明文吐出，而 .gitignore:106 为
+        # 「不暴露信息源结构」专门把 site/sources.html 排除出部署——本地 API
+        # 却把这个结构明文暴露，与项目自身的安全意图矛盾。HOST=0.0.0.0 时
+        # 局域网任意主机可拉走完整源清单。与 /api/visits、/api/lecture/stats
+        # 同一口径补上守卫。
+        if not self._is_local_origin():
+            return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         data = self._load_sources()
         self._send_json({'ok': True, 'sources': data.get('sources', [])})
 
@@ -639,7 +647,15 @@ class Handler(SimpleHTTPRequestHandler):
         return self._send_json(payload)
 
     def _api_lecture_stats_get(self):
-        """返回每条讲座的访问/点赞统计：{url: {visits, likes}}。"""
+        """返回每条讲座的访问/点赞统计：{url: {visits, likes}}。
+
+        2026-10-11 补 Origin 校验（S3）：此前本端点是 do_GET 里唯一**没有**
+        `_is_local_origin()` 守护的数据接口（/api/visits 已于 2026-09-26 审计 P3
+        补齐）。虽然响应体受同源策略保护、外站页面读不到内容，但外站仍可借
+        访客浏览器触发请求。与同文件其它 GET 接口保持同一防线。
+        """
+        if not self._is_local_origin():
+            return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
         # 锁内浅拷贝快照、锁外发响应（同 中等-16 修正；避免慢客户端持锁）。
         with _stat_lock:
             snapshot = {u: dict(st) for u, st in _lecture_stats.items()}
