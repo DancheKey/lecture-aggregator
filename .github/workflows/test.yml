@@ -251,6 +251,15 @@ jobs:
       - name: Run visits-trend render tests
         run: node tests/js/visits_trend_render.js
 
+      # 模板卫生门禁（2026-10-12）：Vue 模板里禁止调用 _/$ 前缀方法。
+      # 背景（2026-10-11 白屏事故）：Vue 3 对 _/$ 前缀方法静默跳过绑定（prod
+      # 构建零警告），模板 with(this) 作用域链穿透 → ReferenceError × 25 →
+      # errorHandler 只打日志 → v-cloak 整页隐藏 → 白屏。现有 node 仿真门禁
+      # 用 vm 直接执行 JS 分片、跳过 Vue 模板编译环节，永远抓不到这类 bug
+      # ——动态测试有覆盖盲区时，用确定性静态分析补位（同 test_stage_var_leak）。
+      - name: Run template hygiene tests
+        run: node tests/js/app_template_hygiene.js
+
       # topicHasSession 门禁（2026-10-02）：该函数此前零测试，且 n>99 时会拼出
       # 'undefined十undefined' 这种永不匹配的正则（静默失效 → 题目被重复追加
       # 「（第N期）」）。当前全库 lectureIndex 最大 32 故零触发，属「结构已坏、

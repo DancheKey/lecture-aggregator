@@ -92,6 +92,7 @@ jobs:
             tests/js/app_topic_session.js
             tests/js/app_ltkey_consistency.js
             tests/js/app_merge_chunk.js
+            tests/js/app_template_hygiene.js
             tests/js/app_year_consistency.js
             tests/js/app_time_placeholder.js
             tests/test_main_water_gate.py
