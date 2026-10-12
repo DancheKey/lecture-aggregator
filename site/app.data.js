@@ -95,6 +95,18 @@ Object.assign(APP_METHODS, {
       const chunks = (manifest && manifest.chunks) || [];
       if (!chunks.length) return this._loadFullSingle();
       this.dataStage = 'partial';
+      // 分片 URL 按数据版本分桶（2026-10-12 混龄缓存事故）：
+      // latest.json 是 no-store（恒新），而分片走 cache:'default' 命中 GitHub Pages
+      // 的 max-age=600 旧副本——部署后的 10 分钟窗口内，浏览器会拿**旧分片覆盖
+      // 新 latest 记录**（_mergeChunk 的覆盖设计），表现为「刚刷新有阿里云、加载
+      // 完又没了」，且各设备因缓存龄不同而表现不一（移动端有/电脑没有）。
+      // 修法：用清单里的 updatedAt 给分片 URL 加 ?v= —— 数据版本变则 URL 变，
+      // 浏览器缓存天然按版本隔离；同版本重复访问仍命中缓存，性能不损失。
+      // GitHub Pages 忽略查询串，CDN 侧同理按完整 URL 键控，新版本 URL 必为回源。
+      const _ver = (manifest && manifest.updatedAt) || '';
+      const _urlOf = u => _ver
+        ? u + (u.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(_ver)
+        : u;
       const failed = [];
       // 2026-09-28 性能修复：分片由严格串行改为并发池（默认 4 路）。
       // 诊断：公网 8 片 gzip 后合计约 2.4MB，单片实测 1.8~18s（链路速度 80~540KB/s
@@ -117,7 +129,7 @@ Object.assign(APP_METHODS, {
               // 原先这里是 no-store，等于每次访问都强制重下全部 2.4MB，这正是
               // 「以前很快、现在一直没加载出来」的主因。分片清单 chunks.json 仍保持
               // no-store（仅 297B），保证分片清单第一时间拿到。
-              const cres = await fetch(url, { cache: 'default' });
+              const cres = await fetch(_urlOf(url), { cache: 'default' });
               if (!cres.ok) throw new Error('chunk-' + cres.status);
               const cj = await cres.json();
               this._mergeChunk((cj && cj.data) || []);
@@ -221,7 +233,10 @@ Object.assign(APP_METHODS, {
 
     async _ltManifestJson() {
       if (this._ltManifest) return this._ltManifest;
-      const r = await fetch('lectures/detail/manifest.json', { cache: 'default' });
+      // no-store（2026-10-12 与分片同因）：清单仅 ~600B，若走 default 命中旧副本，
+      // 下方桶 URL 会带旧版本戳去取**旧桶覆盖新 latest 的截断预览**，与分片同一类
+      // 混龄覆盖。与 chunks.json 同口径恒新，桶按版本戳隔离。
+      const r = await fetch('lectures/detail/manifest.json', { cache: 'no-store' });
       if (!r.ok) throw new Error('detail-manifest-' + r.status);
       this._ltManifest = await r.json();
       return this._ltManifest;
@@ -234,7 +249,12 @@ Object.assign(APP_METHODS, {
         const man = await this._ltManifestJson();
         const file = (man.files || []).find(f => f.endsWith('detail_' + String(idx).padStart(2, '0') + '.json'));
         if (!file) return;
-        const r = await fetch(file, { cache: 'default' });
+        // 版本戳与分片同口径（2026-10-12）：按清单 updatedAt 分桶缓存键
+        const ver = man.updatedAt || '';
+        const url = ver
+          ? file + (file.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(ver)
+          : file;
+        const r = await fetch(url, { cache: 'default' });
         if (!r.ok) throw new Error('detail-' + r.status);
         const j = await r.json();
         this._absorbDetailRows(j.data);

@@ -65,8 +65,12 @@ print(json.dumps({
     'n': len(recs),
 }, ensure_ascii=False))
 `;
+  // PYTHONIOENCODING=utf-8（2026-10-12）：Windows 控制台默认 GBK，子进程把「其他」
+  // 写成 GBK 字节、父进程按 utf-8 解码得乱码 → 兜底豁免 `py === '其他'` 匹配不上
+  // → 本机假红（CI/Linux UTF-8 不复现）。与 test_data_reconciliation._clean_env 同口径。
   const { stdout } = await execFileAsync(process.env.PYTHON || 'python',
-    ['-c', pyProbe], { cwd: ROOT, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });
+    ['-c', pyProbe], { cwd: ROOT, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024,
+                       env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
   const PY = JSON.parse(stdout.trim());
 
   // ---------- 2) JS 侧：vm 加载真实前端分片，取出 yearOf ----------
