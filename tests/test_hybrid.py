@@ -334,6 +334,128 @@ class TestAffiliationValueTrace(unittest.TestCase):
         self.assertFalse(_is_plausible_affiliation(None, self.SRC))
 
 
+class TestBrandAffiliationExempt(unittest.TestCase):
+    """品牌型单位豁免路径（2026-10-12，maths/8857 实测缺口）。
+
+    背景：_is_valid_affiliation 按机构后缀形状判定，纯品牌名（阿里云/华为/腾讯…）
+    必被 invalid 拒掉——8857 模型 A 带引证给出「阿里云」被拒、单位留空。数院新版
+    页面把单位排在报告人标签的下一段落，规则层看不到、全靠模型 A 补位，白名单遂成
+    唯一拦路者。豁免 = 非职称 + 非校名 + 非报告人/邀请人姓名 + 逐字邻近报告人标签；
+    放行后 refine 守卫与值级溯源终检照常生效。
+    """
+
+    # 复刻 maths/8857 版式：单位「阿里云」在报告人标签所在段的下一段（此处以空格折叠
+    # 后的连续正文模拟 body_text 口径）
+    BODY = ('勷勤数学•专家报告 题目：从医学视觉到多模态大模型：高效感知与推理方法 '
+            '报告人： 陈天翔 博士  (邀请人：王伟彬) 阿里云 '
+            '时间：10月31日 14：00-15:00 地点：数科院西楼111 '
+            '报告人简介: 陈天翔于2026年在中国科学技术大学网络空间安全学院获得博士学位。'
+            '现任阿里云算法专家，研究方向包括多模态大语言模型。')
+
+    def test_brand_near_label_adopted(self):
+        """正例（8857）：无后缀品牌名、逐字邻近报告人标签 -> 采纳。"""
+        r = {'speaker': '陈天翔'}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '陈天翔', 'snippet': '报告人： 陈天翔 博士'},
+            'speakerAffiliation': {'value': '阿里云',
+                                   'snippet': '(邀请人：王伟彬) 阿里云'},
+        })
+        apply_llm_text_hybrid(r, self.BODY, None, provider, None)
+        self.assertEqual(r.get('speakerAffiliation'), '阿里云')
+        self.assertNotIn('speakerAffiliation', (r.get('llmRejected') or ''))
+
+    def test_brand_far_from_label_rejected(self):
+        """负例①：品牌名只出现在简介深处（距标签 >150 字）-> 不豁免，仍拒。"""
+        far_body = ('报告人： 张三 教授 (邀请人：李四) 某某大学 '
+                    + '无关内容。' * 60 +
+                    ' 报告人简介: 张三曾在华为工作多年，熟悉通信协议。')
+        r = {'speaker': '张三'}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '张三', 'snippet': '报告人： 张三 教授'},
+            'speakerAffiliation': {'value': '华为', 'snippet': '张三曾在华为工作多年'},
+        })
+        apply_llm_text_hybrid(r, far_body, None, provider, None)
+        self.assertNotEqual(r.get('speakerAffiliation'), '华为')
+        self.assertIn('speakerAffiliation', (r.get('llmRejected') or ''))
+
+    def test_host_school_near_label_still_rejected(self):
+        """负例②：主办校名即使邻近标签也不豁免（cs/5826 页眉污染防线）。"""
+        r = {'speaker': '陈天翔'}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '陈天翔', 'snippet': '报告人： 陈天翔 博士'},
+            'speakerAffiliation': {'value': '华南师范大学',
+                                   'snippet': '报告人： 陈天翔 博士 华南师范大学'},
+        })
+        apply_llm_text_hybrid(r, self.BODY, None, provider, None)
+        self.assertNotEqual(r.get('speakerAffiliation'), '华南师范大学')
+
+    def test_speaker_name_as_affiliation_rejected(self):
+        """负例③：报告人姓名被当成单位 -> 精确比对拦下。"""
+        r = {'speaker': '陈天翔'}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '陈天翔', 'snippet': '报告人： 陈天翔 博士'},
+            'speakerAffiliation': {'value': '陈天翔',
+                                   'snippet': '报告人： 陈天翔 博士'},
+        })
+        apply_llm_text_hybrid(r, self.BODY, None, provider, None)
+        self.assertNotEqual(r.get('speakerAffiliation'), '陈天翔')
+
+    def test_inviter_name_as_affiliation_rejected(self):
+        """负例④：邀请人姓名被当成单位 -> 精确比对拦下。"""
+        r = {'speaker': '陈天翔', 'inviter': '王伟彬'}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '陈天翔', 'snippet': '报告人： 陈天翔 博士'},
+            'speakerAffiliation': {'value': '王伟彬',
+                                   'snippet': '(邀请人：王伟彬)'},
+        })
+        apply_llm_text_hybrid(r, self.BODY, None, provider, None)
+        self.assertNotEqual(r.get('speakerAffiliation'), '王伟彬')
+
+    def test_pure_title_near_label_still_rejected(self):
+        """负例⑤：纯职称词即使邻近标签也不豁免（白名单第一职责不放水）。"""
+        r = {'speaker': '陈天翔'}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '陈天翔', 'snippet': '报告人： 陈天翔 博士'},
+            'speakerAffiliation': {'value': '助理', 'snippet': '报告人： 陈天翔 博士 助理'},
+        })
+        apply_llm_text_hybrid(r, self.BODY, None, provider, None)
+        self.assertNotEqual(r.get('speakerAffiliation'), '助理')
+
+    def test_suffixed_values_unaffected(self):
+        """回归：后缀白名单本就放行的值（南方科技大学）路径不变——豁免不介入。"""
+        r = {'speaker': '王超'}
+        body = ('报告人： 王超 副研究员 (邀请人：骆其伦) 南方科技大学 '
+                '时间：10月14日 10：30-11:30 地点：数科院东楼401')
+        provider = MockProvider(text_result={
+            'speaker': {'value': '王超', 'snippet': '报告人： 王超 副研究员'},
+            'speakerAffiliation': {'value': '南方科技大学',
+                                   'snippet': '南方科技大学'},
+        })
+        apply_llm_text_hybrid(r, body, None, provider, None)
+        self.assertEqual(r.get('speakerAffiliation'), '南方科技大学')
+
+    def test_two_char_brand_boundary(self):
+        """已知边界（有意保留）：两字品牌过得了本豁免，仍被终检的「值长 ≥3」
+        底线拦下（no-cite）。放宽终检会波及主路径全部防护，不值得。"""
+        r = {'speaker': '陈天翔'}
+        provider = MockProvider(text_result={
+            'speaker': {'value': '陈天翔', 'snippet': '报告人： 陈天翔 博士'},
+            'speakerAffiliation': {'value': '华为', 'snippet': '(邀请人：王伟彬) 华为'},
+        })
+        apply_llm_text_hybrid(r, self.BODY, None, provider, None)
+        self.assertNotEqual(r.get('speakerAffiliation'), '华为')
+
+    def test_near_label_detection_units(self):
+        """_near_affil_label 直测：空白折叠/NFKC 口径与无标签场景。"""
+        from hybrid import _near_affil_label
+        self.assertTrue(_near_affil_label('阿里云', '报告人： 陈天翔 博士 阿里云 时间：14:00'))
+        self.assertTrue(_near_affil_label('阿里云', '主讲人:\n陈天翔\n阿里云'))   # 换行折叠
+        self.assertTrue(_near_affil_label('ＡＴ＆Ｔ', '报告人：张三 AT&T'))       # 全角 NFKC 归一
+        self.assertFalse(_near_affil_label('阿里云', '报告人：陈天翔 时间：14:00'))
+        self.assertFalse(_near_affil_label('阿里云', ''))
+        self.assertFalse(_near_affil_label('', '报告人：陈天翔 阿里云'))
+
+
 class TestInferAffiliation(unittest.TestCase):
     """bio 兜底单位提取：只认现职依据，学历/历史任职一律不取（2026-09-22）。
 

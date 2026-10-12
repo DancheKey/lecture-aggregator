@@ -262,6 +262,65 @@ def _is_host_affiliation(v):
 
 
 # ---------------------------------------------------------------------------
+# 品牌型单位豁免路径（2026-10-12，maths/8857 实测缺口）
+#
+# 缺口：_is_valid_affiliation 按「机构后缀形状」判定（大学/公司/科技…），对纯品牌名
+# （阿里云/华为/腾讯/字节跳动…）系统性误拒——8857 模型 A 带引证给出「阿里云」被
+# invalid 拒掉、单位留空（llmRejectReason 可查）。旧规则层从同行文本抓的品牌名
+# （百度/广发期货）不受此闸约束，同值不同命。而数院新版页面把单位排在报告人标签的
+# **下一段落**（右对齐），规则层看不到，全靠模型 A 补位——白名单就成了唯一拦路者。
+#
+# 豁免判据（全部满足才跳过本道白名单；下方 refine 守卫与 _is_plausible_affiliation
+# 值级溯源终检**照常生效**，双保险不变）：
+#   ① 非纯职称（_AFFIL_INVALID——白名单的第一职责不放水）
+#   ② 非主办校名（_is_host_affiliation——cs/5826 页眉污染仍拦）
+#   ③ 非报告人/邀请人姓名（窗口内的人名是主要误拾源；用精确比对而非形态判定——
+#      实测「华为」被判 ok 人名形态，形态判定会把目标品牌自己拦掉）
+#   ④ 逐字邻近报告人标签（值须在正文「报告人：/主讲人：」标签后的近邻窗口内出现，
+#      把「摘要里提到的合作企业被误当单位」的误报面压掉；逐字性由终检兜住，此处不重复）
+#
+# 已知边界（有意保留）：终检 _is_plausible_affiliation 自带「值长 ≥3」底线，
+# 故两字品牌（华为/腾讯/百度）即使满足①~④、过了本豁免，仍会在终检被拒
+# （no-cite）。放宽终检会波及 speakerAffiliation 主路径的全部防护，不值得；
+# 三字及以上品牌（阿里云/字节跳动/之江实验室…）不受影响。
+_AFFIL_LABEL_RE = re.compile(r'(?:报\s*告\s*人|主\s*讲\s*人?|讲\s*者|报\s*告\s*者)\s*[:：]')
+_AFFIL_BRAND_PROX = 150   # 标签后的近邻窗口（字符数，NFKC+空白折叠后）
+
+
+def _near_affil_label(v, body_text):
+    """值 v 是否出现在报告人/主讲人标签后的近邻窗口内（maths 页单位排在下一段仍可命中）。"""
+    if not v or not body_text:
+        return False
+
+    def _ws(s):
+        return re.sub(r'\s+', ' ', unicodedata.normalize('NFKC', str(s or '')))
+    nv, nb = _ws(v), _ws(body_text)
+    if not nv:
+        return False
+    for m in _AFFIL_LABEL_RE.finditer(nb):
+        if nv in nb[m.end():m.end() + _AFFIL_BRAND_PROX]:
+            return True
+    return False
+
+
+def _brand_affiliation_exempt(lv, body_text, result, a):
+    """品牌型单位豁免主判据（设计依据见上方区块注释）。"""
+    if not lv or len(lv.strip()) < 2:
+        return False
+    if _AFFIL_INVALID.match(lv):
+        return False
+    if _is_host_affiliation(lv):
+        return False
+    sp = str((result or {}).get('speaker') or (a or {}).get('speaker') or '').strip()
+    if sp and lv == sp:
+        return False
+    iv = str((result or {}).get('inviter') or '').strip()
+    if iv and lv == iv:
+        return False
+    return _near_affil_label(lv, body_text)
+
+
+# ---------------------------------------------------------------------------
 # 纯规则兜底：模型 A 偶发抽不到 affiliation/title 时，从已有 speakerBio 开头片段
 # 正则提取。华师讲座简介通用格式为「姓名,单位职称,...」，此兜底确定性、不依赖模型可用性，
 # 仅在 A 仍未提供时触发，绝不覆盖已有值。搜索范围限定 bio 前 40 字（姓名+单位职称通常在此），
@@ -903,10 +962,16 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
             continue
         if fld == 'speakerAffiliation':
             lv = _clean_affiliation(lv)
-            if not lv or not _is_valid_affiliation(lv) or _is_host_affiliation(lv):
-                if lv:
-                    _reject(fld, 'invalid', lv)
+            if not lv:
                 continue
+            if not _is_valid_affiliation(lv) or _is_host_affiliation(lv):
+                # 品牌型豁免（2026-10-12，maths/8857）：无后缀品牌名（阿里云/华为…
+                # ）被形状白名单误拒时，满足「非职称/非校名/非人名/邻近报告人标签」
+                # 四条件即放行——仅跳过本道白名单；下方 refine 守卫与
+                # _is_plausible_affiliation 值级溯源终检照常生效（双保险不变）。
+                if not _brand_affiliation_exempt(lv, body_text, result, a):
+                    _reject(fld, 'invalid', lv)
+                    continue
             # 2026-09-24 守卫：A 对合法机构过度细化（追加院系/研究中心等子单元）
             # → 拒绝（保留规则）。裁决实证 4/4 命中；规则本身不合法或 A 纠错时不拦。
             if _a_over_refines_affiliation(cur, lv, body_text):
