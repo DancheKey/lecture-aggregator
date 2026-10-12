@@ -33,7 +33,7 @@ const SITE = path.join(__dirname, '..', '..', 'site');
 // Vue 3 模板里合法的内置方法（$ 前缀）。来源：runtime-core 公共实例 API。
 // 新增 Vue 内置方法时同步此表；第三方库的 $ 方法（如 jQuery）不该出现在模板里。
 const VUE_BUILTINS = new Set([
-  '$emit', '$nextTick', '$watch', '$once', '$forceUpdate', '$set', '$delete',
+  '$emit', '$nextTick', '$watch', '$once', '$forceUpdate',
   '$refs', '$el', '$parent', '$root', '$slots', '$attrs', '$props', '$data',
 ]);
 
