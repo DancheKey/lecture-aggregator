@@ -493,10 +493,10 @@
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold leading-relaxed">简介</span>
                     <div class="min-w-0 flex-1">
-                      <p :data-clamp-key="_clampKey(l, 'bio')" :class="['text-slate-500 leading-relaxed', expandedBio[_expKey(l, 'bio')] ? '' : 'line-clamp-2']">{{ bioText(l) }}</p>
+                      <p :data-clamp-key="clampKey(l, 'bio')" :class="['text-slate-500 leading-relaxed', expandedBio[expKey(l, 'bio')] ? '' : 'line-clamp-2']">{{ bioText(l) }}</p>
                       <button v-if="bioLong(l)" @click="toggleBio(l)"
                         class="block text-11pt text-blue-600 hover:text-blue-800 hover:underline mt-1">
-                        {{ expandedBio[_expKey(l, 'bio')] ? '收起简介 ▲' : '展开简介 ▼' }}
+                        {{ expandedBio[expKey(l, 'bio')] ? '收起简介 ▲' : '展开简介 ▼' }}
                       </button>
                     </div>
                   </div>
@@ -509,10 +509,10 @@
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold leading-relaxed">摘要</span>
                     <div class="min-w-0 flex-1">
-                      <p :data-clamp-key="_clampKey(l, 'abs')" :class="['text-slate-600 leading-relaxed', expandedAbstract[_expKey(l, 'abs')] ? '' : 'line-clamp-3']">{{ abstractOf(l) }}</p>
+                      <p :data-clamp-key="clampKey(l, 'abs')" :class="['text-slate-600 leading-relaxed', expandedAbstract[expKey(l, 'abs')] ? '' : 'line-clamp-3']">{{ abstractOf(l) }}</p>
                       <button v-if="abstractLong(l)" @click="toggleAbstract(l)"
                         class="block text-11pt text-blue-600 hover:text-blue-800 hover:underline mt-1">
-                        {{ expandedAbstract[_expKey(l, 'abs')] ? '收起摘要 ▲' : '展开摘要 ▼' }}
+                        {{ expandedAbstract[expKey(l, 'abs')] ? '收起摘要 ▲' : '展开摘要 ▼' }}
                       </button>
                     </div>
                   </div>
@@ -682,9 +682,9 @@
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=6684a6e682"></script>
-  <script defer src="app.state.js?v=6880eabbad"></script>
+  <script defer src="app.state.js?v=7d76429a72"></script>
   <script defer src="app.computed.js?v=ccb3cd5f64"></script>
-  <script defer src="app.display.js?v=a2fe742f51"></script>
+  <script defer src="app.display.js?v=7b07fe2392"></script>
   <script defer src="app.social.js?v=f2c3f20f97"></script>
   <script defer src="app.data.js?v=ec65775b38"></script>
   <script defer src="app.admin.js?v=415bcd2aac"></script>

@@ -189,7 +189,7 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
 //   · _measureClamp 用 `next[k] = ...` 写入，后测量的同键记录**覆盖**先前的；
 //   · 症状：一张卡的溢出判定长在另一张卡上 → 「有截断却没有展开按钮」或反之，
 //     用户看不到全文，且零报错（静默失效 —— 这正是它此前漏网的原因）。
-// 修法：_clampKey(l,kind) = kind|sourceUrl#lectureIndex，模板与 JS 两侧同用该函数。
+// 修法：clampKey(l,kind) = kind|sourceUrl#lectureIndex，模板与 JS 两侧同用该函数。
 // 本组锁三件事：键含期号 / 模板不再手写键 / _ltKey 与 clamp 键同口径（便于调试对齐）。
 {
   const display = fs.readFileSync(path.join(SITE, 'app.display.js'), 'utf-8');
@@ -199,19 +199,19 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
      && !/data-clamp-key="'bio\|'\s*\+/.test(INDEX_HTML),
      'B3: index.html 仍在手写不含期号的 clamp 键 —— 多场拆分记录会串扰');
 
-  // ② 模板必须走 _clampKey（唯一键构造入口）
+  // ② 模板必须走 clampKey（唯一键构造入口）
   const tplKeys = (INDEX_HTML.match(/data-clamp-key="[^"]*"/g) || []);
   ok(tplKeys.length >= 2, 'B3: index.html 里应有两处 data-clamp-key（简介 + 摘要）');
-  ok(tplKeys.every(k => /_clampKey\(l,\s*'(abs|bio)'\)/.test(k)),
-     'B3: data-clamp-key 未统一走 _clampKey(l, kind)，实得：' + JSON.stringify(tplKeys));
+  ok(tplKeys.every(k => /clampKey\(l,\s*'(abs|bio)'\)/.test(k)),
+     'B3: data-clamp-key 未统一走 clampKey(l, kind)，实得：' + JSON.stringify(tplKeys));
 
-  // ③ _clampKey 的实现必须含 lectureIndex，且与 app.data.js 的 _ltKey 同口径
-  const keyFn = display.match(/_clampKey\(l,\s*kind\)\s*\{([\s\S]*?)\}/);
-  ok(!!keyFn, 'B3: app.display.js 缺 _clampKey 定义');
+  // ③ clampKey 的实现必须含 lectureIndex，且与 app.data.js 的 _ltKey 同口径
+  const keyFn = display.match(/clampKey\(l,\s*kind\)\s*\{([\s\S]*?)\}/);
+  ok(!!keyFn, 'B3: app.display.js 缺 clampKey 定义');
   if (keyFn) {
     ok(/lectureIndex/.test(keyFn[1]),
-       'B3: _clampKey 未含 lectureIndex —— 同 sourceUrl 的多场记录仍会互相覆盖');
-    ok(/sourceUrl/.test(keyFn[1]), 'B3: _clampKey 未含 sourceUrl');
+       'B3: clampKey 未含 lectureIndex —— 同 sourceUrl 的多场记录仍会互相覆盖');
+    ok(/sourceUrl/.test(keyFn[1]), 'B3: clampKey 未含 sourceUrl');
   }
   const ltKeyFn = fs.readFileSync(path.join(SITE, 'app.data.js'), 'utf-8')
     .match(/_ltKey\(l\)\s*\{([\s\S]*?)\}/);
@@ -220,28 +220,28 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
     // 两者都应是 sourceUrl + '#' + lectureIndex(空串兜底) 的形态
     const norm = s => s.replace(/\s+/g, '');
     ok(/sourceUrl/.test(norm(keyFn[1])) && /lectureIndex/.test(norm(keyFn[1])),
-       'B3: _clampKey 与 _ltKey 口径不一致，调试时对不上账');
+       'B3: clampKey 与 _ltKey 口径不一致，调试时对不上账');
   }
 
   // ④ 行为验证：真实执行两个 getter，确认同源不同 lectureIndex 落到不同键
   if (keyFn) {
-    // APP_METHODS 已在上面 load 进 ctx，直接从组件对象上取真实的 _clampKey
-    const real = vm.runInContext('APP_METHODS._clampKey', ctx);
-    ok(typeof real === 'function', 'B3: APP_METHODS 上没有 _clampKey（未挂载或未定义）');
+    // APP_METHODS 已在上面 load 进 ctx，直接从组件对象上取真实的 clampKey
+    const real = vm.runInContext('APP_METHODS.clampKey', ctx);
+    ok(typeof real === 'function', 'B3: APP_METHODS 上没有 clampKey（未挂载或未定义）');
     const fns = typeof real === 'function'
-      ? { _clampKey: real } : null;
+      ? { clampKey: real } : null;
     const thisStub = { _clampOverflow: {} };
     if (fns) {
-      const a = fns._clampKey.call(thisStub, { sourceUrl: 'http://x/a.html', lectureIndex: 1 }, 'abs');
-      const b = fns._clampKey.call(thisStub, { sourceUrl: 'http://x/a.html', lectureIndex: 2 }, 'abs');
-      const c = fns._clampKey.call(thisStub, { sourceUrl: 'http://x/a.html' }, 'abs');
+      const a = fns.clampKey.call(thisStub, { sourceUrl: 'http://x/a.html', lectureIndex: 1 }, 'abs');
+      const b = fns.clampKey.call(thisStub, { sourceUrl: 'http://x/a.html', lectureIndex: 2 }, 'abs');
+      const c = fns.clampKey.call(thisStub, { sourceUrl: 'http://x/a.html' }, 'abs');
       ok(a !== b, `B3: lectureIndex=1 与 2 算出同一个键（${a}）—— 串扰复现`);
       ok(a !== c && b !== c, 'B3: 有 lectureIndex 与无 lectureIndex 撞键 —— 单卡与多场卡串扰');
       ok(a.startsWith('abs|') && b.startsWith('abs|'),
          'B3: 键缺少 kind 前缀，abs/bio 会互相覆盖');
-      // 树摇式回归：若有人把 _clampKey 改回 sourceUrl-only，上面三条应立刻红
+      // 树摇式回归：若有人把 clampKey 改回 sourceUrl-only，上面三条应立刻红
       ok(/lectureIndex/.test(keyFn[1]),
-         'B3: _clampKey 退化为 sourceUrl-only 键');
+         'B3: clampKey 退化为 sourceUrl-only 键');
     }
   }
 
@@ -249,12 +249,12 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
   //    修 clamp 键时一并发现：expand 态原以 sourceUrl 为键，而 toggleAbstract
   //    内部用 `all.find(x => x.sourceUrl === url)` 找记录——同源多条时只命中
   //    第一条，于是点第 2 期的「展开摘要」拉回的是第 1 期的全文（内容错配）。
-  const expFn = display.match(/_expKey\(l,\s*kind\)\s*\{([\s\S]*?)\}/);
-  ok(!!expFn, 'B3: app.display.js 缺 _expKey 定义（展开态键会退回 sourceUrl 单键）');
+  const expFn = display.match(/expKey\(l,\s*kind\)\s*\{([\s\S]*?)\}/);
+  ok(!!expFn, 'B3: app.display.js 缺 expKey 定义（展开态键会退回 sourceUrl 单键）');
   if (expFn) {
     ok(/lectureIndex/.test(expFn[1]),
-       'B3: _expKey 未含 lectureIndex —— 展开摘要会拉到别的期数的全文');
-    ok(/sourceUrl/.test(expFn[1]), 'B3: _expKey 未含 sourceUrl');
+       'B3: expKey 未含 lectureIndex —— 展开摘要会拉到别的期数的全文');
+    ok(/sourceUrl/.test(expFn[1]), 'B3: expKey 未含 sourceUrl');
   }
   // toggle 必须收「记录对象」而不是 url 字符串（否则无法定位到具体期数）
   ok(/async\s+toggleAbstract\(l\)/.test(display)
@@ -262,11 +262,11 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
      'B3: toggleAbstract/toggleBio 仍以 url 字符串为参 —— 无法区分期数');
   ok(!/this\.all\.find\(x\s*=>\s*\(x\.sourceUrl/.test(display),
      'B3: toggle 里仍在用 sourceUrl 单键 find 记录（同源多条只命中第一条）');
-  // 模板展开态读取侧必须走 _expKey
+  // 模板展开态读取侧必须走 expKey
   const tplExp = (INDEX_HTML.match(/(?:expandedAbstract|expandedBio)\[[^\]]*\]/g) || []);
   ok(tplExp.length >= 4,
      'B3: index.html 里 expandedAbstract/expandedBio 的读取处少于 4 处，可能漏改');
-  ok(tplExp.every(k => /_expKey\(l,\s*'(?:abs|bio)'\)/.test(k)),
+  ok(tplExp.every(k => /expKey\(l,\s*'(?:abs|bio)'\)/.test(k)),
      'B3: 展开态仍以 sourceUrl 为键读取，实得：' + JSON.stringify(tplExp));
   // 旧签名必须消失：不再有 toggleAbstract(l.sourceUrl) 这类调用
   ok(!/toggle(?:Abstract|Bio)\(l\.sourceUrl\)/.test(INDEX_HTML),

@@ -39,8 +39,8 @@ const APP_STATE = function () {
       // 「展开简介/摘要」按钮是否出现，改由 DOM 实测决定（内容真的被 clamp 裁掉才给按钮），
       // 取代原「按字符数估行数」的阈值：同一段文字在 375px 与 1440px 下行数差 3~4 倍，
       // 任何字符阈值在某一端必然误判（宽屏下多余按钮 / 窄屏下按钮缺失）。
-      // 键：`_clampKey(l,'abs'|'bio')` = kind|sourceUrl#lectureIndex（含期号，见
-      // app.display.js 的 _clampKey —— 2026-10-11 修 B1）；每次变化重算
+      // 键：`clampKey(l,'abs'|'bio')` = kind|sourceUrl#lectureIndex（含期号，见
+      // app.display.js 的 clampKey —— 2026-10-11 修 B1）；每次变化重算
       // （仅展开中的条目沿用旧值），避免字体加载替换造成的瞬时溢出被永久记住。
       _clampOverflow: {},
       _clampSig: '',           // 上次测量的状态签名（页码/筛选/展开态/视口宽），未变则跳过

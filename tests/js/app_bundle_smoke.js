@@ -90,8 +90,8 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 // （2026-09-30：新增 warmLongText / _ensureLongTextAll —— 长文本改为交互即预取，94 → 96）
 // （2026-09-30：顶部数字改「阶梯跳变」，删除已无插值作用的 _countTick，96 → 95）
 // （2026-10-04：新增 isDateSuspect —— timeConfidence=low 的记录挂「日期待核」角标，95 → 96）
-// （2026-10-11：新增 _clampKey —— 修 B1，clamp 键加入 lectureIndex 防多场拆分记录串扰，96 → 97）
-// （2026-10-11：新增 _expKey —— B1 同族，展开态键同样加入 lectureIndex
+// （2026-10-11：新增 clampKey —— 修 B1，clamp 键加入 lectureIndex 防多场拆分记录串扰，96 → 97）
+// （2026-10-11：新增 expKey —— B1 同族，展开态键同样加入 lectureIndex
 //   （原 expandedAbstract/expandedBio 以 sourceUrl 为键，同源多条时
 //     toggleAbstract 的 all.find 只命中第一条 → 展开拉到别的期数的全文，实测 40/41 组踩中），97 → 98）
 const nMethods = Object.keys(methods).length;

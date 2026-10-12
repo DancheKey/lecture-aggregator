@@ -280,11 +280,11 @@ Object.assign(APP_METHODS, {
      * 这里只用 sourceUrl + '#' + lectureIndex —— 同一 sourceUrl 下 lectureIndex
      * 已唯一，与 _ltKey 逐字一致最省心（长文本与 clamp 天然同键空间，便于调试）。
      */
-    _clampKey(l, kind) {
+    clampKey(l, kind) {
       return kind + '|' + (l.sourceUrl || '') + '#' + (l.lectureIndex != null ? l.lectureIndex : '');
     },
-    absOverflow(l) { return !!this._clampOverflow[this._clampKey(l, 'abs')]; },
-    bioOverflow(l) { return !!this._clampOverflow[this._clampKey(l, 'bio')]; },
+    absOverflow(l) { return !!this._clampOverflow[this.clampKey(l, 'abs')]; },
+    bioOverflow(l) { return !!this._clampOverflow[this.clampKey(l, 'bio')]; },
     /* ---------- 展开态：同样必须含 lectureIndex（B1 同族，2026-10-11）----------
      * 与 clamp 键同源的问题：expandedAbstract / expandedBio 原以 sourceUrl 为键，
      * 而一页拆出的多条记录共享同一 sourceUrl（41 组「同日单卡 + 各自带长文本」）。
@@ -293,22 +293,22 @@ Object.assign(APP_METHODS, {
      *     同源多条时**只会找到第一条** → 点第 2 期的「展开摘要」拉的是第 1 期的全文；
      *   · expandedAbstract[url] 被同源多条共享 → 展开/收起状态互相串。
      * 40/41 组的两篇文章落在大不同的长文本桶，故几乎必现（实测）。
-     * 修法：展开态改用与 _clampKey/_ltKey 同一口径的复合键
+     * 修法：展开态改用与 clampKey/_ltKey 同一口径的复合键
      * （sourceUrl#lectureIndex），模板读取侧同步改。
      */
-    _expKey(l, kind) {
+    expKey(l, kind) {
       return (l && (l.sourceUrl || '') || '') + '#' + (l && l.lectureIndex != null ? l.lectureIndex : '');
     },
     async toggleAbstract(l) {
       if (!l || !l.sourceUrl) return;
-      const k = this._expKey(l, 'abs');
+      const k = this.expKey(l, 'abs');
       // 展开前按需拉**该条**的全文（按 _ltKey 定位桶，不依赖 sourceUrl 单键）
       await this._ensureLongText(l);
       this.expandedAbstract = { ...this.expandedAbstract, [k]: !this.expandedAbstract[k] };
     },
     async toggleBio(l) {
       if (!l || !l.sourceUrl) return;
-      const k = this._expKey(l, 'bio');
+      const k = this.expKey(l, 'bio');
       await this._ensureLongText(l);
       this.expandedBio = { ...this.expandedBio, [k]: !this.expandedBio[k] };
     },
