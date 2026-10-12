@@ -13,7 +13,13 @@ Object.assign(APP_METHODS, {
     // 调用点在 mounted()：本地与公网是两条互斥的加载路径，必须各自都能取到该文件，
     // 只挂在 loadLectures() 上会让公网静态路径永远拿不到 lastRunAt（表现为「更新于」停在数据日）。
     _loadLastRun() {
-      fetch('lectures/last_run.json', { cache: 'no-store' })
+      // cache-busting（2026-10-13）：URL 带唯一时间戳。`cache:'no-store'` 拦不住不遵守
+      // 缓存指令的中间层（代理/加速器/部分 WebView）——用户实测 last_run.json 的 10-06
+      // 旧副本卡死 7 天：「更新于」在 10-06 与当天值之间反复横跳，而列表数据是新的
+      // （total 3824 vs 10-06 版 3812、首条卡片亦不同），铁证旧副本就在这个 47B 小文件。
+      // 查询串变则缓存键变，任何缓存层都无法把旧副本映射到新 URL；文件仅 47B，
+      // 每次回源的成本可忽略。
+      fetch('lectures/last_run.json?t=' + Date.now(), { cache: 'no-store' })
         .then(r => (r.ok ? r.json() : null))
         .then(j => { if (j && j.lastRunAt) this.lastRunAt = j.lastRunAt; })
         .catch(() => {});
@@ -50,8 +56,12 @@ Object.assign(APP_METHODS, {
     },
 
     _loadStaticLatest() {
-      // 先加载 latest.json：仅 50 条，用于首屏秒开；cache:default 让浏览器复用 600s 缓存
-      fetch('lectures/latest.json', { cache: 'no-store' })
+      // 先加载 latest.json：仅 50 条，用于首屏秒开。
+      // cache-busting（2026-10-13）：同 _loadLastRun——latest.json 是「更新于」的回退源
+      // （displayUpdatedAt = lastRunAt || updatedAt，updatedAt 即来自本文件），旧副本会让
+      // 日期退回数据日。no-store 语义本就要求每次重新获取，加唯一时间戳只是让不遵守该
+      // 指令的中间层也无旧副本可用；70KB 回源与 no-store 的既有成本相同。
+      fetch('lectures/latest.json?t=' + Date.now(), { cache: 'no-store' })
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
@@ -85,7 +95,9 @@ Object.assign(APP_METHODS, {
     async _loadChunks() {
       let manifest;
       try {
-        const mres = await fetch('lectures/chunks.json', { cache: 'no-store' });
+        // cache-busting（2026-10-13）：同 _loadLastRun。清单旧副本会让 _ver 带上旧
+        // updatedAt → 分片 URL 命中旧分片缓存 → 混龄覆盖（d27a79f 事故类复发）。
+        const mres = await fetch('lectures/chunks.json?t=' + Date.now(), { cache: 'no-store' });
         if (!mres.ok) throw new Error('no-manifest');
         manifest = await mres.json();
       } catch (e) {
@@ -236,7 +248,9 @@ Object.assign(APP_METHODS, {
       // no-store（2026-10-12 与分片同因）：清单仅 ~600B，若走 default 命中旧副本，
       // 下方桶 URL 会带旧版本戳去取**旧桶覆盖新 latest 的截断预览**，与分片同一类
       // 混龄覆盖。与 chunks.json 同口径恒新，桶按版本戳隔离。
-      const r = await fetch('lectures/detail/manifest.json', { cache: 'no-store' });
+      // cache-busting（2026-10-13）：同 _loadLastRun——清单旧副本会让桶 URL 带旧版本戳，
+      // 命中旧桶缓存覆盖新 latest 的截断预览（与分片同一类混龄事故）。
+      const r = await fetch('lectures/detail/manifest.json?t=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) throw new Error('detail-manifest-' + r.status);
       this._ltManifest = await r.json();
       return this._ltManifest;
