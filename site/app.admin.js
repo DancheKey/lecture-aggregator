@@ -92,14 +92,16 @@ Object.assign(APP_METHODS, {
                 if (r.ok) this.showToast('已触发后台更新，几分钟后刷新即可看到最新数据');
                 else throw new Error('dispatch-failed');
               })
-              .catch(() => this.showToast('立即更新触发失败，网站每天自动更新三次（约 06:00、12:00 与次日 00:00）'));
+              .catch(() => this.showToast('立即更新触发失败，网站每天自动更新三次（约 12:17、18:42 与 23:17）'));
           } else {
             // ⚠ 文案里的时刻必须与 .github/workflows/daily.yml 的 on.schedule 对齐
-            // （04:00/16:00/22:00 UTC = 北京时间 12:00 / 次日 00:00 / 06:00）。
+            // （17 04 / 42 10 / 17 15 UTC = 北京时间 12:17 / 18:42 / 23:17，
+            //  2026-10-12 重排：全部避开「0 分」整点拥堵，实测整点班延迟 0.3~6.5h 随机）。
             // 2026-10-02 实测发现此处与 docs/deploy.md 都写着「11:00 与次日 01:00」，
             // 与实际配置差 2 小时——用户按文案去查 Actions 会得出「这个点还没跑」的错误结论。
-            // 改班次时三处一起改：daily.yml（本源）、app.admin.js、docs/deploy.md。
-            this.showToast('网站每天自动更新三次（约 06:00、12:00 与次日 00:00）；如需立即更新，请在本机运行爬虫或手动触发工作流');
+            // 改班次时三处一起改：daily.yml（本源）、app.admin.js、docs/deploy.md
+            // （元测试 tests/test_ci_gate_coverage.py::CronDocConsistencyTest 会强制三处一致）。
+            this.showToast('网站每天自动更新三次（约 12:17、18:42 与 23:17）；如需立即更新，请在本机运行爬虫或手动触发工作流');
           }
         })
         .finally(() => { this.scraping = false; });
