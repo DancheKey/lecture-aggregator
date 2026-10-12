@@ -414,6 +414,31 @@ def warn_uncommitted_scripts():
               f'提交脚本自身；若这些改动影响出片/解析，请手动 commit 后再推送')
 
 
+def warn_stale_stamp_inputs():
+    """site/*.js 有未暂存（未 git add）改动时打印醒目告警。
+
+    背景（2026-10-12）：版本戳按 **git 索引版**内容计算（`git show :path`），改了
+    site/*.js 但没 add 就跑本脚本，刷出的戳对应旧内容——提交后 CI test_99 立即红、
+    部署被跳过。该形态只有本地能发现，在此处显式告警；与 .githooks/pre-commit
+    （提交瞬间的硬拦截）互为补充，本告警覆盖「跑了脚本但没 add」这条前置链路。
+    """
+    try:
+        r = subprocess.run(['git', 'diff', '--name-only', '--', 'site/*.js'],
+                           cwd=ROOT, capture_output=True, text=True, timeout=10)
+    except Exception:
+        return
+    changed = [l.strip() for l in (r.stdout or '').splitlines() if l.strip()]
+    if r.returncode == 0 and changed:
+        print('=' * 64)
+        print('[warn] 以下 site/*.js 有未暂存改动（未 git add），版本戳正按'
+              ' git 索引里的【旧内容】计算：')
+        for p in changed:
+            print(f'         - {p}')
+        print('       直接提交会触发 CI 门禁红（test_99 版本戳不一致）。')
+        print('       请先：git add -A site && 重新运行本脚本 && git add site')
+        print('=' * 64)
+
+
 def write_visits_snapshot():
     """把访问量台账的最后一条快照出片为 site/lectures/visits.json。
 
@@ -455,6 +480,7 @@ def write_visits_snapshot():
 
 def main():
     warn_uncommitted_scripts()
+    warn_stale_stamp_inputs()
     os.makedirs(SITE_DIR, exist_ok=True)
     # 访问量快照出片与讲座数据无关，先独立执行——即使无讲座数据也应保留降级数据源
     write_visits_snapshot()

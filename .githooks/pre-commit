@@ -1,0 +1,46 @@
+#!/bin/bash
+# 前端版本戳本地守卫：把 CI test_99（tests/test_frontend_schema.py）的校验前移到 commit 瞬间。
+#
+# 背景：改 site/*.js 后忘跑 generate_frontend_data.py 刷戳 → 推上去 CI test_99 红、
+# 部署被跳过（f58e5fd、10-12 app.admin.js 排期文案，48h 内两次同源事故）。
+# 本 hook 在提交前用同一算法拦截，把「推完才知道」变成「commit 就知道」。
+#
+# 算法与 test_99 完全同源：戳 = sha256( git 索引版文件 )[:10]。
+# 启用（每克隆一次配置一次，CI 不受影响）：
+#   git config core.hooksPath .githooks
+
+fail=0
+for page in site/index.html site/stats.html site/visits-trend.html; do
+  html=$(git show ":$page" 2>/dev/null) || continue
+  # 提取本地 js/css 引用（口径对齐 test_99 的 REF_RE；vendor/ 按设计豁免）
+  while IFS='|' read -r asset ver; do
+    [ -n "$asset" ] || continue
+    case "$asset" in vendor/*) continue ;; esac
+    rel="site/$asset"
+    if [ -z "$ver" ]; then
+      echo "✗ [$page] $asset 被引用但没有 ?v= 缓存戳（改动对回访用户不生效）"
+      echo "  修法：登记进 scripts/generate_frontend_data.py 的 stamp_script_version 并重跑"
+      fail=1
+      continue
+    fi
+    real=$(git show ":$rel" 2>/dev/null | sha256sum | cut -c1-10)
+    if [ -z "$real" ]; then
+      echo "✗ [$page] $asset 引用了不存在/未入库的文件"
+      fail=1
+    elif [ "$ver" != "$real" ]; then
+      echo "✗ [$page] $asset 的版本戳是 $ver，但 Git 索引里的实际 hash 是 $real"
+      echo "  修法：git add -A site && python scripts/generate_frontend_data.py && git add site"
+      fail=1
+    fi
+  done < <(printf '%s\n' "$html" \
+    | grep -oE '(src|href)="[A-Za-z0-9_./-]+\.(js|css)(\?v=[0-9a-f]{10})?"' \
+    | sed -E 's/^(src|href)="//; s/"$//' \
+    | awk -F'?' '{ print $1 "|" (NF>1 ? substr($2,3) : "") }')
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "❌ 提交被拒：前端资源版本戳与内容不一致（推上去 CI test_99 也会红）"
+  exit 1
+fi
+exit 0
