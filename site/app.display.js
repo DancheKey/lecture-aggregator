@@ -22,6 +22,14 @@ Object.assign(APP_METHODS, {
       this.expandedForums[u.url] = !this.isForumOpen(u);
     },
 
+    // 远期折叠组判定（2026-10-13 方案 B）：供 index.html 模板区分「折叠提示条」与
+    // 「日期头」两种组头。⚠ 必须走实例方法而不能在模板里直接引用 FAR_FOLD_KEY 常量——
+    // Vue 运行时编译（new Function + with(_ctx)）拿不到脚本顶层的 const 绑定
+    // （不挂 globalThis），模板里会恒为 undefined。
+    isFarFoldGroup(g) {
+      return !!g && g.key === FAR_FOLD_KEY;
+    },
+
     /* ---------- 讲者视图 ---------- */
     pickSpeaker(l) {
       // 进入讲者视图：按该记录的归一化键筛选，滚回顶部
@@ -108,12 +116,30 @@ Object.assign(APP_METHODS, {
     //   ongoing  进行中（lectureStart ≤ now ≤ lectureEnd；end 缺失或早于 start 时按开始+2小时兜底，
     //            数据中 lectureEnd 覆盖率约六成，兜底保证「进行中」始终可判定）
     //   ended    已结束（now > lectureEnd）
+    //
+    // 2026-10-13 用户规则（结束时刻的两种来源）：
+    //   ① 写明 lectureEnd → 按实际结束时间；
+    //   ② 只有 lectureStart → 默认时长 2 小时，**但若 start+2h 越过 12:00 / 18:00 /
+    //      22:00（午休/晚饭/晚课截止），认为在该边界即结束**——10:30 的单始场按
+    //      12:00 结束而非 12:30。边界只在 start 早于边界时生效（23:00 的夜场
+    //      不适用任何边界，仍按 +2h）。
     statusOf(l) {
       if (this.isTimeTBD(l)) return 'tbd';
       const s = new Date(String(l.lectureStart || '').replace(' ', 'T')).getTime();
       if (!s || isNaN(s)) return 'tbd';
       const endRaw = l.lectureEnd ? new Date(String(l.lectureEnd).replace(' ', 'T')).getTime() : 0;
-      const e = (endRaw && endRaw > s) ? endRaw : s + 2 * 3600 * 1000;
+      let e;
+      if (endRaw && endRaw > s) {
+        e = endRaw;
+      } else {
+        e = s + 2 * 3600 * 1000;
+        // 半日边界截断：start+2h 越过 12:00 / 18:00 / 22:00 中最早的适用边界即止
+        const sd = new Date(s);
+        for (const h of [12, 18, 22]) {
+          const b = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate(), h, 0, 0).getTime();
+          if (s < b && e > b) { e = b; break; }
+        }
+      }
       const now = Date.now();
       if (now < s) return 'upcoming';
       return now <= e ? 'ongoing' : 'ended';

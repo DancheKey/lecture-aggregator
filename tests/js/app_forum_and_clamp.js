@@ -91,7 +91,9 @@ function mkCM(i) {
 // 本测试直接调用 computed 函数，故须像框架那样先把 filtered 物化到实例上，
 // 否则 units() 会读到 undefined.filtered（2026-10-02 首次运行即踩到）。
 function makeCtx(allData, over) {
-  const cm = Object.assign(vm.runInContext('APP_STATE()', ctx), {
+  // methods 必须一并挂上：2026-10-13 起 filtered 的活段判定调 this.statusOf
+  // （半日边界规则），ctx 缺 methods 会直接抛「not a function」。
+  const cm = Object.assign(vm.runInContext('APP_STATE()', ctx), methods, {
     all: allData, campus: '', college: '', year: '', query: '', searchField: '',
     speaker: '', showLikedOnly: false, likedUrls: new Set(),
   }, over || {});

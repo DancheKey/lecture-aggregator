@@ -60,7 +60,9 @@ ctx.document = { addEventListener() {}, querySelectorAll() { return []; } };
 ctx.Vue = { createApp: () => ({}) };
 vm.createContext(ctx);
 
-const PARTS = ['app.core.js', 'app.state.js', 'app.computed.js', 'app.data.js', 'app.social.js'];
+// 2026-10-13：补 app.display.js——filtered 的活段判定调 this.statusOf（半日边界
+// 规则），缺该分片时 ctx 里没有 statusOf，filtered 直接抛 not a function。
+const PARTS = ['app.core.js', 'app.state.js', 'app.computed.js', 'app.data.js', 'app.social.js', 'app.display.js'];
 for (const f of PARTS) {
   vm.runInContext(fs.readFileSync(path.join(SITE, f), 'utf8'), ctx, { filename: f });
 }

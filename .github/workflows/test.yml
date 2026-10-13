@@ -242,6 +242,14 @@ jobs:
       - name: Run forum card and clamp signature tests
         run: node tests/js/app_forum_and_clamp.js
 
+      # 方案 B「两段式排序 + 远期折叠」门禁（2026-10-13）：>7 天未开始讲座折成
+      # 提示条 + 24h 内置顶。三个易静默退化点：① pagedGroups 组间排序若保持
+      # 日期倒序，filtered 的两段式会被分组层抵消（远期组凭日期最大弹回首屏，
+      # DeepSeek 方案 A 的同款漏洞）；② far-fold 容器若非常驻单元，展开时
+      #   foldedUnits 长度变化会打乱分页；③ 展开态不落 localStorage 则刷新丢状态。
+      - name: Run far-future fold tests
+        run: node tests/js/app_far_future_fold.js
+
       # 访问量趋势报告渲染门禁（2026-10-02）：该页此前用 innerHTML 拼接渲染，
       # 而快照 note 是唯一来自台账的自由文本（经 json.dumps 内嵌进内联脚本），
       # 含 </script> 或 <img onerror=…> 即构成存储型 XSS。现已全部改为

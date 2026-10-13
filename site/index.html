@@ -341,9 +341,21 @@
           <div v-if="loading" class="text-center text-slate-400 py-16 text-12pt">数据加载中…</div>
           <div v-else-if="filtered.length">
             <div v-for="g in pagedGroups" :key="g.key" class="mb-2">
-              <div class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">
+              <!-- 远期折叠组（2026-10-13 方案 B）：>7 天未开始讲座收在未来区末尾的一条提示条里。
+                   折叠态 g.items 为空（只显示条）；展开态 items = 被折的 units，走下方与普通组
+                   完全相同的渲染分支（分页不受影响：fold 容器恒占 1 个渲染单元位）。
+                   展开态存 localStorage（toggleFarFuture），刷新不丢。 -->
+              <button v-if="isFarFoldGroup(g)" type="button" @click="toggleFarFuture()"
+                class="far-fold-bar w-full text-left flex items-center gap-2 text-12pt text-slate-600 bg-white border border-dashed border-slate-300 rounded-xl px-4 py-3 mb-3 hover:border-blue-300 hover:text-blue-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+                <span class="font-medium">距今 7 天以上的预告（<span class="font-bold text-slate-900">{{ g.count }}</span> 场）</span>
+                <span class="ml-auto shrink-0 text-blue-600">{{ farFutureOpen ? '收起 ▲' : '展开 ▼' }}</span>
+              </button>
+              <div v-else class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">
                 <span class="w-1 h-5 rounded-full bg-blue-500"></span>
-                {{ g.key }}
+                {{ g.label }}
               </div>
               <template v-for="u in g.items" :key="u.key">
               <!-- 论坛卡（2026-09-30 修订）：**同一天**场次 ≥3 才合并为一张卡，展开可看逐场清单；
@@ -681,14 +693,14 @@
 
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
-  <script defer src="app.core.js?v=6684a6e682"></script>
-  <script defer src="app.state.js?v=7d76429a72"></script>
-  <script defer src="app.computed.js?v=ccb3cd5f64"></script>
-  <script defer src="app.display.js?v=7b07fe2392"></script>
-  <script defer src="app.social.js?v=f2c3f20f97"></script>
+  <script defer src="app.core.js?v=542facedad"></script>
+  <script defer src="app.state.js?v=302000ff68"></script>
+  <script defer src="app.computed.js?v=4bcb802031"></script>
+  <script defer src="app.display.js?v=a993718c1f"></script>
+  <script defer src="app.social.js?v=9eaccf4e6f"></script>
   <script defer src="app.data.js?v=b1bfddd28d"></script>
   <script defer src="app.admin.js?v=d02b198ebb"></script>
-  <script defer src="app.js?v=bbe72a515e"></script>
+  <script defer src="app.js?v=bfdaee9586"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->

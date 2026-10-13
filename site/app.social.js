@@ -17,6 +17,25 @@ Object.assign(APP_METHODS, {
         localStorage.setItem(LIKED_KEY, JSON.stringify(Array.from(this.likedUrls)));
       } catch (e) { /* ignore quota/storage errors */ }
     },
+
+    /* ---------- 远期折叠条展开态（>7 天未开始讲座，2026-10-13 方案 B） ---------- */
+    // 与点赞/想听同模式：纯本机偏好，存 localStorage，刷新/重开浏览器保留。
+    loadFarFuture() {
+      try {
+        this.farFutureOpen = localStorage.getItem(FAR_FOLD_STATE_KEY) === '1';
+      } catch (e) {
+        this.farFutureOpen = false;
+      }
+    },
+    toggleFarFuture() {
+      this.farFutureOpen = !this.farFutureOpen;
+      this.saveFarFuture();
+    },
+    saveFarFuture() {
+      try {
+        localStorage.setItem(FAR_FOLD_STATE_KEY, this.farFutureOpen ? '1' : '0');
+      } catch (e) { /* ignore quota/storage errors */ }
+    },
     likeCount(url) {
       // 计数以 lectureStats（后端权威 / 本机 STAT_KEY 缓存）为唯一来源，
       // 不回退旧本地计数键（残留脏值会导致「刷新后数值增加」）。

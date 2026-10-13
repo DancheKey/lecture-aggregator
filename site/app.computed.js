@@ -1,4 +1,19 @@
 // 派生计算（原 app.js 的 computed）。
+
+// 远期折叠（2026-10-13 用户拍板方案 B）：未开始且距今超过 FAR_FUTURE_DAYS 天的讲座，
+// 在列表「未来区」末尾折成一条提示条，点击就地展开（展开态存 localStorage）。
+//
+// 动机：全库 99.7% 是历史归档，纯日期倒序会让最远的未来讲座霸占首屏
+// （10-31 的讲座曾排在 10-13 前面）。与 24h 置顶（filtered 两段式排序）配套：
+// 排序管「谁在前」，折叠管「远的收起来」。
+//
+// ⚠ 阈值语义线：7 天同时是 app.display.js::statusInfo 的「倒计时 / 只写未开始」
+//   分界（2026-10-06 用户裁定），两边是同一条产品线，改这里必须同步那边。
+const FAR_FUTURE_DAYS = 7;
+// 远期折叠组在 pagedGroups 里的 key。真实日期组形如「2026-10-13 周二」，
+// 不会与此冲突；模板用它区分「折叠条」与「日期头」两种组头。
+const FAR_FOLD_KEY = '__far_future__';
+
 const APP_COMPUTED = {
     totalCount() { return this.all.length; },
 
@@ -119,15 +134,47 @@ const APP_COMPUTED = {
         }
         return true;
       });
+      // 两段式排序（2026-10-13 用户拍板方案 B 第一层 + 用户后续两条规则）：
+      // **活段（未开始/进行中）按 lectureStart 升序**排在前，已结束/待定段维持
+      // 日期倒序在后。
+      //
+      // 动机与规则来源：
+      //   ① 站点是「历史归档 + 少量预告」，纯倒序让最远的未来讲座霸占首屏
+      //      （10-31 排 10-13 前面），而访客来首屏几乎只为看「最近有什么要开」；
+      //   ② 24h 内置顶 = 活段升序的自然结果，「按最先开始顺序」；
+      //   ③ 活段**同日**也必须按时刻升序（2026-10-13 用户截图反馈：10-14 的
+      //      10:30 曾排在 15:00 后面——同日掉了「系列编号倒序」的旧分支，
+      //      那是为已结束段时间线设计的，活段不适用）；
+      //   ④ 「是否已结束」的判定走 statusOf（半日边界 12:00/18:00/22:00 截断），
+      //      不用裸 start>=now——否则 16:00 开始、18:00 结束的讲座在 17:00
+      //      会被算成已结束排到后面，与「进行中」徽章自相矛盾。
+      //
+      // 基准取排序前固定的 nowMs（预计算状态，不比较时现算）：比较函数在毫秒级
+      // 跳变下会变成非全序；且不依赖 this.tick——排序是 computed，依赖 tick 会
+      // 每秒重排 → 翻页内容抖动、3800 条排序每秒空转；交互（筛选/翻页/数据到达）
+      // 自然触发重算即可，「开始→进行中」的实时迁移由徽章（statusInfo 读 tick）负责。
+      const nowMs = Date.now();
+      const isLive = new Map();
+      list.forEach(l => {
+        const st = this.statusOf(l);
+        const s = l.lectureStart || '';
+        // tbd（时间待定）保持原口径：占位日期在未来 → 活段；已过 → 死段
+        // （其徽章本就是灰的「时间待定」，不该混进「即将开始」的时间线）
+        isLive.set(l, st === 'upcoming' || st === 'ongoing'
+          || (st === 'tbd' && !!s && new Date(s.replace(' ', 'T')).getTime() >= nowMs));
+      });
       list.sort((a, b) => {
         const ta = a.lectureStart || '', tb = b.lectureStart || '';
         if (!ta && !tb) return 0;
         if (!ta) return 1;
         if (!tb) return -1;
-        // 主排序：日期倒序
+        const fa = isLive.get(a), fb = isLive.get(b);
+        if (fa !== fb) return fa ? -1 : 1;   // 活段在前
         const da = ta.slice(0, 10), db = tb.slice(0, 10);
-        if (da !== db) return db.localeCompare(da);
-        // 同一天同系列（砺儒讲坛第X讲等）按编号倒序，让133讲在132讲之上
+        if (da !== db) return fa ? da.localeCompare(db) : db.localeCompare(da);  // 活段升序 / 已结束倒序
+        // 活段同日：按完整时刻升序（最先开始的排最前）
+        if (fa) return ta.localeCompare(tb);
+        // 已结束段同日：同系列（砺儒讲坛第X讲等）按编号倒序，让133讲在132讲之上
         // 中文数字（第三讲、第十二期）也支持，映射到 int 后比较
         const _cn2num = (s) => {
           const map = {零:0,一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,百:100};
@@ -223,9 +270,44 @@ const APP_COMPUTED = {
       return units;
     },
 
-    // 总页数（按渲染单元计：论坛折成 1 个卡片位）
+    // 远期折叠层（2026-10-13 方案 B 第二层）：把「未开始且 > FAR_FUTURE_DAYS 天」的
+    // 渲染单元收进一个 far-fold 容器，容器占据原第一个被折叠单元的位置（未来区末尾），
+    // 后续单元依次前移——units 数组总长度不变（fold 恒为 1 个单元），分页计数稳定。
+    //
+    // 为何用「start > now + 7d」而不再判未来段：filtered 两段式后 >7 天的必然全在
+    // 未来区末尾且彼此相邻，该判定天然只在未来区命中；已结束段 start<now<cutoff
+    // 不可能命中，无需额外分区判断。
+    //
+    // 容器 recs 存的是 units（forum/single 原样），展开时 pagedGroups 直接把它们
+    // 当作普通 items 走既有渲染分支（见 pagedGroups），零模板重复。
+    foldedUnits() {
+      const cutoff = Date.now() + FAR_FUTURE_DAYS * 86400000;
+      const out = [];
+      let far = [];
+      const flush = () => {
+        if (far.length) {
+          out.push({ type: 'far-fold', recs: far, key: FAR_FOLD_KEY });
+          far = [];
+        }
+      };
+      this.units.forEach(u => {
+        const s = (u.type === 'forum' ? u.head.lectureStart : u.recs[0].lectureStart) || '';
+        const ms = s ? new Date(s.replace(' ', 'T')).getTime() : 0;
+        if (ms && ms > cutoff) {
+          far.push(u);
+        } else {
+          flush();
+          out.push(u);
+        }
+      });
+      flush();
+      return out;
+    },
+
+    // 总页数（按渲染单元计：论坛折成 1 个卡片位；远期折叠容器同样占 1 位，
+    // 展开/收起不改变 foldedUnits 长度 → 分页不错乱）
     totalPages() {
-      return Math.max(1, Math.ceil(this.units.length / this.pageSize));
+      return Math.max(1, Math.ceil(this.foldedUnits.length / this.pageSize));
     },
 
     // 智能分页页码：当前页前后各 2 页 + 首尾，省略号占位（边界平滑过渡）
@@ -250,25 +332,85 @@ const APP_COMPUTED = {
       return pages;
     },
 
-    // 当前页对应的单元列表（已筛选 + 按时间倒序 + 论坛折叠）
+    // 当前页对应的单元列表（已筛选 + 两段式排序 + 论坛折叠 + 远期折叠）
     pagedUnits() {
       const start = (this.currentPage - 1) * this.pageSize;
-      return this.units.slice(start, start + this.pageSize);
+      return this.foldedUnits.slice(start, start + this.pageSize);
     },
 
     // 当前页再按天分组（单元的日：论坛取最新场次日、单条取本场日），保持时间线视觉风格
+    // 当前页再按天分组（单元的日：论坛取最新场次日、单条取本场日），保持时间线视觉风格。
+    //
+    // 2026-10-13 三处修订（方案 B + 用户截图反馈）：
+    // ① 组间排序从「日期倒序」改为「跟随 pagedUnits 顺序」——否则 filtered 里
+    //    已压到未来区末尾的远期组（如 10-31）会在分组后凭日期最大又弹回首屏，
+    //    两段式排序被层间抵消（DeepSeek 方案 A 的同款漏洞）。
+    // ② **同日混合拆组**（用户 12:33 反馈）：「已结束」的场次不得留在当天日期组里，
+    //    拆成独立组（键加 |e 后缀）排到该日期活组之后；仅当该日期同时有活单元时
+    //    才给死组头加「· 已结束」标注（纯已结束日不加，避免满屏噪音）。
+    //    用户原话：「只要是显示已结束的，就要把它放到后面去」。
+    // ③ far-fold 容器自成一组（key=FAR_FOLD_KEY）：折叠态 items 为空（只渲染
+    //    提示条），展开态 items = 被折的 units（走与普通组完全相同的渲染分支）；
+    //    count 供提示条显示「N 场」。它不并入任何天组——成员跨多天。
+    //
+    // ⚠ 论坛卡的状态取 head（filtered 序第一场）：同源同日 ≥3 场才成论坛卡，
+    //   同日跨「活/死」两态的极端情形下整卡随 head 归类（内部清单自带时间，
+    //   不影响可读性）；此情形全库为 0，真出现时再细化。
     pagedGroups() {
       const groups = {};
+      const firstIdx = new Map();
+      const unitDate = u => (u.type === 'forum' ? u.head.lectureStart : u.recs[0].lectureStart) || '';
+      // 第一遍：标记哪些日期含「活」单元（未结束/进行中；far-fold 成员全是远期活场）
+      const liveDates = new Set();
       this.pagedUnits.forEach(u => {
-        const headDate = u.type === 'forum' ? (u.head.lectureStart || '') : (u.recs[0].lectureStart || '');
-        const k = this.dayKey(headDate);
-        (groups[k] = groups[k] || []).push(u);
+        if (u.type === 'far-fold') return;
+        const d = this.dayKey(unitDate(u));
+        if (d !== '时间待定' && this.statusOf(u.type === 'forum' ? u.head : u.recs[0]) !== 'ended') {
+          liveDates.add(d);
+        }
+      });
+      // 第二遍：分组（死组键加 |e 后缀与同日活组区分；组间顺序=首次出现位置）
+      this.pagedUnits.forEach((u, i) => {
+        let k, label;
+        if (u.type === 'far-fold') {
+          k = FAR_FOLD_KEY;
+          label = k;
+        } else {
+          const d = this.dayKey(unitDate(u));
+          const ended = d !== '时间待定'
+            && this.statusOf(u.type === 'forum' ? u.head : u.recs[0]) === 'ended';
+          k = ended ? d + '|e' : d;
+          label = ended && liveDates.has(d) ? d + ' · 已结束' : d;
+        }
+        if (!groups[k]) {
+          groups[k] = { label, items: [] };
+          firstIdx.set(k, i);
+        }
+        if (u.type === 'far-fold') {
+          // 容器只入组一次（recs 里的单元不进组，展开时整体替换 items，见下）
+          if (groups[k].items.length === 0) groups[k].items.push(u);
+        } else {
+          groups[k].items.push(u);
+        }
       });
       const keys = Object.keys(groups).sort((a, b) => {
-        if (a === '时间待定') return 1;
-        if (b === '时间待定') return -1;
-        return b.localeCompare(a);
+        if (a === '时间待定' || a === '时间待定|e') return 1;
+        if (b === '时间待定' || b === '时间待定|e') return -1;
+        return (firstIdx.get(a) ?? 0) - (firstIdx.get(b) ?? 0);
       });
-      return keys.map(k => ({ key: k, items: groups[k] }));
+      return keys.map(k => {
+        if (k === FAR_FOLD_KEY) {
+          const fold = groups[k].items[0];
+          return {
+            key: k,
+            label: k,
+            count: fold.recs.length,
+            // 展开态：items 直接是被折的 units——模板的 forum/single 分支原样复用；
+            // 折叠态：items 为空，只留提示条（fold 单元本身不渲染卡片）。
+            items: this.farFutureOpen ? fold.recs : [],
+          };
+        }
+        return { key: k, label: groups[k].label, items: groups[k].items };
+      });
     },
 };

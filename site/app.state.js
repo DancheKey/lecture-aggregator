@@ -35,6 +35,10 @@ const APP_STATE = function () {
       expandedAbstract: {}, // 卡片摘要的展开状态：sourceUrl -> bool（默认 3 行截断）
       expandedBio: {},      // 主讲简介的展开状态：sourceUrl -> bool（长文默认折叠）
       expandedForums: {},   // 论坛卡的展开状态：sourceUrl -> bool（缺省=筛选子集自动展开，2026-09-26 方案B）
+      // 远期折叠条（>7 天未开始讲座，2026-10-13 方案 B）的展开状态：true=展开被折的
+      // 场次。初值 false（默认折叠）；mounted 时 loadFarFuture() 从 localStorage
+      // 恢复上次选择（刷新不丢，同点赞/想听的本机偏好模式）。
+      farFutureOpen: false,
       // ---- clamp 溢出实测（2026-09-29）----
       // 「展开简介/摘要」按钮是否出现，改由 DOM 实测决定（内容真的被 clamp 裁掉才给按钮），
       // 取代原「按字符数估行数」的阈值：同一段文字在 375px 与 1440px 下行数差 3~4 倍，

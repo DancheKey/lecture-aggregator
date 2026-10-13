@@ -17,6 +17,7 @@ const { createApp } = Vue;
 const LIKED_KEY = 'lecture_liked_urls_v1';
 const WANTED_KEY = 'lecture_wanted_urls_v1';
 const STAT_KEY = 'lecture_stats_v1';      // 本地缓存 + 后端合并后的讲座访问/点赞/想听统计
+const FAR_FOLD_STATE_KEY = 'lecture_far_future_open_v1';  // 远期折叠条展开态（2026-10-13 方案 B）
 const COUNT_CAP = 300;                    // 点赞/想听超过此值显示 "300+"，防止虚高数字
 
 // 注：顶部总数动画的时长参数（COUNT_DUR_MIN / COUNT_DUR_SOFT_CAP / COUNT_IDLE_DIV /
