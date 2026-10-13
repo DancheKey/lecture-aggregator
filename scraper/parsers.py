@@ -3648,7 +3648,7 @@ class _OcrSt:
       外层变量而 _st.text 永久陈旧 → 下游读 _st.text 拿到旧值，且 OCR 文字被拼到
       「未移除邀请人标签」的正文上。故 store 必须逐点改为写属性。
     """
-    __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text')
+    __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text', 'body_text_html')
 
 
 def _prep_doc_text(soup, list_title, _st):
@@ -3959,6 +3959,12 @@ def _collect_assets(soup, content_div, url, _st):
             return
         raw = ' '.join(_img_to_text(img) for img in candidates)
         if raw:
+            # 快照 OCR 拼接前的 HTML 正文（2026-10-13，yjsy 10265 实测）：
+            # OCR trailer 无 topic 标签，拼进 body_text 后会整体落进多场拆分的最后
+            # 一个分块（该页 ④ 块吞进整段海报文字，speaker/bio 被污染）。拆分段落
+            # 只用这份 HTML 快照；纯海报页快照过短，下游自会回退合并文本。
+            if not getattr(_st, 'body_text_html', ''):
+                _st.body_text_html = _st.body_text
             # 清理 OCR 中常见的顶部/底部噪声
             _st.ocr_text = _clean_ocr_text(raw)
             # N1（全角→半角 + N1a 去 CJK 内部空格）：OCR 文本也应归一化，确保标签可扫描。
@@ -5721,11 +5727,26 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     # 「候选日期 == 讲座日」→ 年份与 t 同年）。拆分路径各场次要独立再跑一次
     # parse_cn_time，无此线索时会全部回退 default_year=当前年（module/3762 2014 年、
     # module/7542 2019 年的历史讲座曾因此被识别为 2026）。仅补线索，不改落库字段。
-    _sessions_pre = detect_multi_session(
-        _st.body_text, title=title, default_year=default_year,
-        publish_time=(publish_time or _pub_year_hint),
-        title_year=title_year, url_year=url_year, soup=soup, url=url,
-        base_start=_base_dt, base_end=_base_dt_end)
+    # 拆分文本选择（2026-10-13，yjsy 10265 实测）：海报 OCR 文本拼接在 body_text 尾部，
+    # 无 topic 标签的 OCR trailer 会整体落进最后一个分块——该页 ④ 块吞进整段海报文字，
+    # 其中的「主讲嘉宾:胡伟」把该场 speaker/bio 污染成第一场主讲人。HTML 正文
+    # （_st.body_text_html，OCR 拼接前的快照）足够长时拆分只用它；纯海报页
+    # （快照过短）或 HTML 拆不出 ≥2 场时回退合并文本，存量行为不变。
+    _html_text = getattr(_st, 'body_text_html', '') or ''
+    _use_html_split = bool(_html_text) and len(_html_text) >= 150
+    _split_text = _html_text if _use_html_split else _st.body_text
+
+    def _detect_sessions_on(_txt):
+        return detect_multi_session(
+            _txt, title=title, default_year=default_year,
+            publish_time=(publish_time or _pub_year_hint),
+            title_year=title_year, url_year=url_year, soup=soup, url=url,
+            base_start=_base_dt, base_end=_base_dt_end)
+
+    _sessions_pre = _detect_sessions_on(_split_text)
+    if _use_html_split and len(_sessions_pre or []) < 2:
+        # HTML 正文拆不出多场（标签只在 OCR 里/纯海报页）→ 合并文本重试
+        _sessions_pre = _detect_sessions_on(_st.body_text)
     if not _sessions_pre and not skip_news_filter and is_news_record(result, poster_page=poster_only):
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
@@ -5834,7 +5855,7 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     # 「第N讲/第N期/第N场」重复标记误当成分段锚点（汕尾教学工作坊、abdn357等）。
     sessions = _sessions_pre
     if sessions:
-        split_recs = split_record_by_sessions(result, sessions, full_text=_st.body_text)
+        split_recs = split_record_by_sessions(result, sessions, full_text=_split_text)
         kept = []
         for r in split_recs:
             # MS5：拆分后每条独立过回顾判定（某期日期早于发布日→剔除该期，不影响其他期）
@@ -5862,6 +5883,12 @@ def _finalize_record(soup, url, title, list_title, _st, result,
             for i, r in enumerate(kept, 1):
                 r['lectureIndex'] = i
                 r['lectureCount'] = m
+                # sourceCount 同步重排（2026-10-13）：MS5 剔除的恰是首条场次时，
+                # sc=1 随被剔记录一起消失，库里该页所有条 sc=0 → 统计层把整条来源
+                # 通知漏计（与下方 m==1 分支 10-08 修复同族，仅 m>1 时漏网；
+                # yjsy 10265 实证）。按剩余场次重排，仅首条计 1；剔除中/尾条时
+                # 本重排是幂等的。
+                r['sourceCount'] = 1 if i == 1 else 0
             if m == 1:
                 kept[0]['isMultiLecture'] = False
                 kept[0].pop('lectureIndex', None)
@@ -6101,14 +6128,22 @@ _TOPIC_DELIM_RE = re.compile(
     r'(?:报告[一二三四五六七八九十百零0-9]+\s*[题目主题]'
     r'|专题[一二三四五六七八九十百零0-9]+\s*[题目主题]'
     r'|主题[0-9]+'
-    r'|讲座题目|题目|主题|讲座主题|报告题目|演讲题目|报告主题|Topic|Title)[：:]')
+    r'|讲座题目|讲座名称|活动名称|报告名称|题目|主题|讲座主题|报告题目|演讲题目|报告主题|Topic|Title)\s*[：:]')
 # 主题值终止符：遇到下一个字段标签、中文日期/时段、块结尾即止。
+# 复合字段标签（讲座时间/活动时间…）须排在裸「时间/地点」之前：lookahead 锚在
+# 「讲」字处，裸「时间」匹配不到「讲座时间」的「讲」，不补则 topic 尾部粘连
+# 「 讲座」二字（yjsy 10265 实测）。
 # 「报告」后的时间/数字/人/地点/摘要 可能与其间被 get_text(' ') 插入的空格隔开，
 # 故用 (?=\s*(?:\d|时间|地点|人|摘要)) 容忍空白（修 ggy/cs 类「报告1题目…报告 时间」错把「报告」吞入主题）。
-_TOPIC_VAL_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点|摘要|简介\s*[：:]|主办|承办|'
+_TOPIC_VAL_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|讲座时间|讲座地点|讲座内容|'
+                   r'活动时间|活动地点|活动内容|报告时间|报告地点|'
+                   r'时间|地点|摘要|简介\s*[：:]|主办|承办|'
                    r'邀请人|报告(?=\s*(?:\d|时间|地点|人|摘要))|$|【|第[一二三四五六七八九十百零0-9]+期))')
 # 块内子字段（主持人/参与者/主讲人）的终止符：遇到下一个字段标签、中文日期/时段、块结尾即止
-_BLOCK_FIELD_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|时间|地点|题目|主题|摘要|简介\s*[：:]|'
+# （复合字段标签同步补齐，理由同 _TOPIC_VAL_STOP）
+_BLOCK_FIELD_STOP = (r'(?=\s*(?:主讲[人师]|报告人|主持人|讲座时间|讲座地点|讲座内容|'
+                      r'活动时间|活动地点|活动内容|报告时间|报告地点|'
+                      r'时间|地点|题目|主题|摘要|简介\s*[：:]|'
                       r'主办|承办|邀请人|参与者|$|【|第[一二三四五六七八九十百零0-9]+期|'
                       r'\d{4}年|\d{1,2}月\d{1,2}日|上午|下午|晚上))')
 
@@ -7634,17 +7669,26 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         # 不拆分；若日期互异（≥2 个不同日期）即使无时钟也保留为独立场次。
         st = dt['start']
         _has_clock = not (st.hour == 0 and st.minute == 0 and dt.get('end') is None)
+        # 多日区间标记（yjsy 10265「文法杯辩论大赛」10月14日至10月29日实测）：
+        # parse_cn_time 不给纯日期区间补 end，此类块 _has_clock=False，但块内含显式
+        # 「X月X日至X月X日」区间（常伴地点/赛程）的是真实场次（比赛/系列活动），
+        # 不是页眉主题行——下方混合页剔除时予以保留。
+        _multi_day = bool(re.search(
+            r'\d{1,2}\s*月\s*\d{1,2}\s*日\s*(?:至|到|—|－|-|~)\s*\d{1,2}\s*月\s*\d{1,2}\s*日', block))
         sessions_raw.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
                              'block': block, 'splitMode': 'repeated-label',
                              'speaker': speaker, '_has_clock': _has_clock,
+                             '_multi_day': _multi_day,
                              'affiliation': _aff_inblk})
     # 候选1 收尾：按修订后的 MS1 守卫决定保留哪些场次
     if sessions_raw:
         # 混合页剔除（2026-09-26）：部分块带时钟时，无时钟块是页眉/论坛主题行
         # （em/3769 分会场主题「公共信息服务与社会发展」@00:00 混入首场实测），
         # 先剔除再判定；全无时钟页（ai/163 六行仅日期型）不受影响。
+        # 多日区间块（_multi_day）是真实场次而非页眉主题行，同样保留（yjsy 10265）。
         if any(r['_has_clock'] for r in sessions_raw):
-            sessions_raw = [r for r in sessions_raw if r['_has_clock']]
+            sessions_raw = [r for r in sessions_raw
+                            if r['_has_clock'] or r.get('_multi_day')]
         _distinct_dates = {r['start'].date() for r in sessions_raw}
         if sessions_raw and (any(r['_has_clock'] for r in sessions_raw)
                              or len(_distinct_dates) >= 2):
@@ -7658,6 +7702,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             else:
                 for _r in sessions_raw:
                     _r.pop('_has_clock', None)
+                    _r.pop('_multi_day', None)
                 sessions = _ms_gate_filter(sessions_raw)
         # 否则（全部无时钟且日期相同）→ 视为共享页日期，不拆分（维持原守卫语义）
     # 多人异名兜底（2026-09-26，em/3771「主题：X 主讲人：Y 时间：30分钟」、
@@ -8326,14 +8371,17 @@ def split_record_by_sessions(base, sessions, full_text=''):
         participants = _extract_block_field(block, r'参与者')
         is_roundtable = bool(participants) or bool(re.search(r'圆桌|座谈', block))
         # 主讲人（逐块优先；缺失继承前序；圆桌且无主讲人→置空）
-        sp_m = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*|讲者简介|(?:第\s*[一二三四五六七八九十0-9]+\s*[讲场]?)?嘉宾)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
+        # 冒号前容许空白（「嘉宾介绍 : X」型，N1 归一后空格仍在）；「嘉宾简介」不进
+        # 首选交替（「嘉宾」+冒号匹配不到「嘉宾简介:」的「简」字），交由下方回退。
+        sp_m = re.search(rf'(?:主讲[人师]|报告人\d*|讲者\d*|讲者简介|(?:第\s*[一二三四五六七八九十0-9]+\s*[讲场]?)?嘉宾)\s*[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
         if not sp_m:
             # 块内仅有「主讲人简介：」标签时（psy 1226 逐场简介型：每场只写
             # 「主讲人简介：肖林博士，…」而无独立「主讲人：」行），该标签同样指向本场
             # 主讲人。不补此路则整段落到下方「继承前序」分支，使拆出的每一场都继承
-            # 第一场主讲人（psy 1226 三条全成「肖林」）。仅在首选正则未命中时启用，
-            # 既有能命中「主讲人：」的页面行为完全不变。
-            sp_m = re.search(rf'(?:主讲人简介|报告人简介|讲者简介)[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
+            # 第一场主讲人（psy 1226 三条全成「肖林」）。「嘉宾简介/嘉宾介绍」同性质
+            # （yjsy 10265 每场只写「嘉宾简介: 胡伟,暨南大学教授,…」实测）。仅在首选
+            # 正则未命中时启用，既有能命中「主讲人：」的页面行为完全不变。
+            sp_m = re.search(rf'(?:主讲人简介|报告人简介|讲者简介|嘉宾简介|嘉宾介绍)\s*[：:]\s*(.+?){_BLOCK_FIELD_STOP}', block)
         if sp_m:
             if s.get('speaker'):
                 # 块内「嘉宾：」实为下一场主讲（physics807 块末"嘉宾：下一场"会被 sp_m
@@ -8457,6 +8505,21 @@ def split_record_by_sessions(base, sessions, full_text=''):
                 rec['speakerTitle'] = ''
                 rec['speakerSource'] = None
                 rec['notes'].append('该期为圆桌论坛/座谈会形式，无独立主讲人')
+            elif re.search(r'辩论|大赛|竞赛|比赛|赛事|赛程', block):
+                # 赛事/活动类场次（yjsy 10265「文法杯研究生辩论大赛」实测）：块内无任何
+                # 主讲人标签，走「继承前序」会把上一场教授张冠李戴到辩论赛上 → 显式置空，
+                # 与圆桌论坛同口径；同时清掉随基底复制的简介/摘要/单位（它们属于别的场次）。
+                # 块内自带摘要/简介的（其后设置）不受影响，会被后续覆盖保留。
+                rec['speaker'] = None
+                rec['speakerAffiliation'] = ''
+                rec['speakerTitle'] = ''
+                rec['speakerSource'] = None
+                rec['speakerBio'] = ''
+                rec['abstract'] = ''
+                # 显式置空标记：下方「最终兜底」（本块未识别到主讲人时继承前序）
+                # 不得把前一场主讲人写回赛事场次；圆桌分支不设此标记，维持存量口径。
+                rec['_spk_cleared'] = True
+                rec['notes'].append('该期为赛事/活动形式，无独立主讲人')
             else:
                 rec['speaker'] = prev_speaker
                 rec['speakerAffiliation'] = prev_aff
@@ -8541,13 +8604,15 @@ def split_record_by_sessions(base, sessions, full_text=''):
         # 模式A：块内「报告N地点：」标签（避免基底抽取被「报告N」标签污染）
         # 结束前瞻须含「报告摘要/报告人/报告时间/时间/题目」——CS 压缩标签「报告地点：X会议室
         # 报告摘要」会把「报告」漏进地点，且「报告地点：X时间:3月11日」须遇裸「时间」即截断。
-        lm = re.search(r'报告\d*地点[：:]\s*([\u4e00-\u9fffA-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告\d|报告摘要|报告人|报告时间|报告题目|时间|题目|主题|摘要|内容简介|$)', block)
+        lm = re.search(r'报告\d*地点[：:]\s*([\u4e00-\u9fffA-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告\d|报告摘要|报告人|报告时间|报告题目|时间|题目|主题|摘要|内容简介|赛程|安排|主办|承办|协办|$)', block)
         if not lm:
             # 模式B：块内独立「地点：」标签（系列讲座每场自带地点，如 lswh 冷战史系列），
             # 与「报告N地点」互斥分工；停止前瞻须含下一场序号（二、三、…）与常见尾部词，
             # 避免吞入下一场地点或「欢迎…」。页眉「地点：一、」在块外，不会命中。
+            # 赛程/安排/主办/承办/协办：赛事类块「活动地点: X模拟法庭赛程安排: 初赛…」
+            # 无停止词时 {2,40}? 找不到前瞻落点、整块提取失败（yjsy 10265 实测）。
             lm = re.search(
-                r'(?<!报告)地点[：:]\s*([\u4e00-\u9fffA-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告[人题时摘地简]|时间|题目|主题|摘要|内容简介|主讲|主持|参与|报名|联系|欢迎|嘉宾|'
+                r'(?<!报告)地点[：:]\s*([\u4e00-\u9fffA-Za-z0-9（）()楼室厅馆号\-／/\s]{2,40}?)(?=报告[人题时摘地简]|时间|题目|主题|摘要|内容简介|主讲|主持|参与|报名|联系|欢迎|嘉宾|赛程|安排|主办|承办|协办|'
                 r'一、|二、|三、|四、|五、|六、|七、|八、|九、|十、|$)', block)
         if lm:
             loc = lm.group(1).strip()
@@ -8574,8 +8639,10 @@ def split_record_by_sessions(base, sessions, full_text=''):
                 # 去掉「华南师范大学」学校全称前缀，与存量数据前缀约定一致），
                 # 否则全页 fallback 抓来的脏 location 会绕过 _clean_location 直接落库。
                 rec['location'] = _clean_location(loc, rec.get('title') or rec.get('topic'))
-        # 最终兜底：若本块未识别到主讲人，保留基底（避免误清空系列级主讲人）
-        if not rec.get('speaker'):
+        # 最终兜底：若本块未识别到主讲人，保留基底（避免误清空系列级主讲人）。
+        # 例外：_spk_cleared（赛事/活动场次显式置空）不写回前序主讲人——
+        # 否则辩论赛会张冠李戴成上一场教授（yjsy 10265 实测）。
+        if not rec.get('speaker') and not rec.get('_spk_cleared'):
             rec['speaker'] = prev_speaker or ''
             rec['speakerAffiliation'] = prev_aff or ''
         # 规则 R16（退化场次丢弃，闸6）：丢弃「无 speaker 且无 topic」的退化场次（如表格/海报解析残次行、
@@ -8584,6 +8651,7 @@ def split_record_by_sessions(base, sessions, full_text=''):
         # （如年会/赛事/工作坊）不受此规则约束。
         if not (rec.get('speaker') or '').strip() and not (rec.get('topic') or '').strip():
             continue
+        rec.pop('_spk_cleared', None)
         out.append(rec)
         # 更新继承链（圆桌置空不更新，避免影响后续块）
         if rec.get('speaker'):

@@ -347,3 +347,110 @@ class PlainNumberedLongTopicTest(unittest.TestCase):
                 '时间： 7 月 2 日下午 2:30-5:30 地点：心理学院 711 室')
         sessions = parsers.detect_multi_session(text, title='工作坊', default_year=2014)
         self.assertEqual(len(sessions), 0)
+
+
+# ── yjsy 10265：混合标签多活动页（讲座名称/活动名称，2026-10-13 修复回归）──
+# 页面含 4 个独立活动块：① AI赋能写作(10-14) ② 心理咨询师养成路径(10-12)
+# ③ 文法杯辩论大赛(10-14~10-29) ④ 仿生皮肤的传感器件(10-13)。
+# 根因链：标签与冒号间有空格（「讲座名称 :」）→ _TOPIC_DELIM_RE 漏 2/4 标签；
+# topic 尾部粘连「讲座/活动」（_TOPIC_VAL_STOP 不认「讲座时间/活动时间」复合标签）；
+# 每场只写「嘉宾简介:」无「主讲人:」→ speaker 回退正则不认；
+# 辩论赛无时钟被混合页剔除；海报 OCR trailer 拼进 body_text 污染最后一块。
+# ② 发布于 10-12 16:28 晚于其 14:30 开场 → MS5 按回顾稿剔除（铁律，非缺陷）。
+YJSY_HTML_PATH = os.path.join(_ROOT, 'tests', 'fixtures', 'html', 'yjsy10265.html')
+YJSY_URL = 'https://yjsy.scnu.edu.cn/a/20261012/10265.html'
+YJSY_TITLE = '【培养】第十九届“勷勤论坛”活动预告（10月12日-10月18日）'
+# 海报 OCR trailer（取自该页海报图的识别文本）：排在 HTML 正文之后、无 topic 标签，
+# 其中的「主讲嘉宾:胡伟」正是污染最后一块 speaker/bio 的向量。
+YJSY_OCR_TRAILER = (
+    '石牌校园华南师范大学第十九届勤勤论坛主论坛之格物致新,问道前语学术科研板块之'
+    '人工智能赋能写作主讲嘉宾:胡伟暨南大学教授,复旦大学博士后,广东省写作学会会长'
+    '讲座时间:2026年10月14日(周三)15:00-17:00 讲座地点:华南师范大学石牌校园教育科学学院125室'
+    '讲座内容:人工智能赋能写作主办单位:华南师范大学研究生会')
+
+
+class YjsyMultiLabelSplitTest(unittest.TestCase):
+    """yjsy 10265 混合标签页拆分（parse_detail 全链路，离线桩 OCR）。"""
+
+    def setUp(self):
+        # 纯规则基线（同进程内其他测试可能已带 LLM 导入 parsers，逐例强制回退）
+        for _n in ('_USE_LLM_TEXT', '_USE_LLM_RICH'):
+            if hasattr(parsers, _n):
+                setattr(parsers, _n, False)
+        if hasattr(parsers, 'get_judge_provider'):
+            parsers.get_judge_provider = lambda: None
+        if hasattr(parsers, 'get_text_provider'):
+            parsers.get_text_provider = lambda: None
+        # VLM 密封化：不可达地址，未命中缓存即快速失败（零真实 API 调用）
+        parsers._load_vlm_configs = lambda: [{'model': 'test-replay', 'api_key': 'unused',
+                                              'base_url': 'http://snapshot-test.invalid/vlm'}]
+        self._orig_img_to_text = parsers._img_to_text
+        with open(YJSY_HTML_PATH, encoding='utf-8') as f:
+            self.html = f.read()
+
+    def tearDown(self):
+        parsers._img_to_text = self._orig_img_to_text
+
+    def _parse(self, ocr_text):
+        parsers._img_to_text = lambda _img: ocr_text
+        return parsers.parse_detail(self.html, YJSY_URL, '研究生院', '校级', 2026,
+                                    list_title=YJSY_TITLE)
+
+    def test_01_无OCR时拆出三场(self):
+        """海报图不可达（OCR 空）也应拆出 3 场：② 已过发布时刻按回顾稿剔除。"""
+        recs = self._parse('')
+        self.assertEqual(len(recs), 3, '应拆出 3 场（② 吴理场发布时已散场，剔除）')
+        self.assertEqual([r.get('lectureIndex') for r in recs], [1, 2, 3])
+        self.assertEqual([r.get('lectureCount') for r in recs], [3, 3, 3])
+        # 来源通知计数：仅首条计 1（MS5 剔除首条场次后 sc=1 不得随之消失）
+        self.assertEqual([r.get('sourceCount') for r in recs], [1, 0, 0])
+
+    def test_02_各场字段正确(self):
+        recs = self._parse('')
+        # ① 仿生皮肤的传感器件（10-13 14:30-16:00，光电学院颂豪厅）
+        r1 = recs[0]
+        self.assertIn('仿生皮肤的传感器件', r1['topic'])
+        self.assertEqual(r1['speaker'], '潘力佳')
+        self.assertEqual(r1['speakerAffiliation'], '南京大学电子科学与工程学院')
+        self.assertEqual(r1['lectureStart'], '2026-10-13 14:30:00')
+        self.assertEqual(r1['lectureEnd'], '2026-10-13 16:00:00')
+        self.assertIn('颂豪厅', r1['location'])
+        # 简介取本场「嘉宾简介:」正文（姓名前缀按设计剥掉，不重复进 bio）
+        self.assertTrue(r1['speakerBio'].startswith('南京大学'),
+                        'bio 应取潘力佳场简介正文: %r' % r1['speakerBio'][:30])
+        self.assertIn('仿生感知器件', r1['speakerBio'])
+        # ② 文法杯辩论大赛（10-14 起多日赛事，无主讲人）
+        r2 = recs[1]
+        self.assertIn('辩论大赛', r2['topic'])
+        self.assertFalse(r2.get('speaker'), '赛事场次不得继承前一场主讲人')
+        self.assertIn('模拟法庭', r2['location'])
+        self.assertEqual(r2['lectureStart'], '2026-10-14 00:00:00')
+        # ③ AI赋能写作（10-14 15:00-17:00，教科院125室）
+        r3 = recs[2]
+        self.assertIn('人工智能赋能写作', r3['topic'])
+        self.assertEqual(r3['speaker'], '胡伟')
+        self.assertEqual(r3['speakerAffiliation'], '暨南大学')
+        self.assertEqual(r3['lectureStart'], '2026-10-14 15:00:00')
+        self.assertIn('125', r3['location'])
+
+    def test_03_OCR_trailer_不污染拆分(self):
+        """海报 OCR 文本拼进 body_text 尾部时，拆分只用 HTML 快照：
+        ④ 块的 speaker/bio 不得被 trailer 里的「主讲嘉宾:胡伟」污染。"""
+        recs = self._parse(YJSY_OCR_TRAILER)
+        self.assertEqual(len(recs), 3)
+        r1 = recs[0]
+        self.assertEqual(r1['speaker'], '潘力佳',
+                         'OCR trailer 的「主讲嘉宾:胡伟」不得污染仿生皮肤场')
+        self.assertTrue(r1['speakerBio'].startswith('南京大学'),
+                        'bio 应取潘力佳场简介正文: %r' % r1['speakerBio'][:30])
+        self.assertNotIn('胡伟', r1['speakerBio'])
+        self.assertNotIn('格物致新', r1['speakerBio'], '海报 trailer 不得混入简介')
+
+    def test_04_topic_无尾部粘连(self):
+        """topic 止于复合字段标签，尾部不得残留「讲座/活动」二字。"""
+        recs = self._parse('')
+        for r in recs:
+            self.assertFalse(r['topic'].rstrip().endswith('讲座'),
+                             'topic 尾部粘连「讲座」: %r' % r['topic'])
+            self.assertFalse(r['topic'].rstrip().endswith('活动'),
+                             'topic 尾部粘连「活动」: %r' % r['topic'])
