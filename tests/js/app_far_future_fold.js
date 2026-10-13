@@ -354,10 +354,49 @@ function makeCtx(allData, over) {
   }
 }
 
+// ---------- test_13：当天组内时刻待定排最后（用户 13:25 截图反馈） ----------
+{
+  // 活段：10-14 00:00（时刻待定）+ 10-14 09:00 + 10-14 15:00 同日。
+  // 旧口径活段同日按 lectureStart 升序 → 00:00 占位天然排最前，把真实时刻
+  // 挤后（截图实证：研究生院「时间待定」排在物理学院 09:00 前面）。
+  const data = [
+    at('2026-10-14 00:00:00', 1, '研究生院·时间待定'),
+    at('2026-10-14 15:00:00', 2, '下午场'),
+    at('2026-10-14 09:00:00', 3, '上午场'),
+  ];
+  const cm = makeCtx(data);
+  const order = cm.filtered.map(l => l.lectureStart);
+  ok(order[0] === '2026-10-14 09:00:00' && order[1] === '2026-10-14 15:00:00'
+     && order[2] === '2026-10-14 00:00:00',
+     `test_13a 活段同日 tbd 应排最后，实际=${order}`);
+}
+{
+  // 已结束段：now 推到 10-15，10-14 三条全 ended。tbd 置后须显式生效——
+  // 00:00 占位在倒序里恰好落末尾是巧合；08:00 占位会排到 07:00 真实场之前，
+  // 专门放一条 08:00 占位防「靠巧合通过」。
+  const save = FIXED_MS;
+  FIXED_MS = new Date(2026, 9, 15, 12, 0, 0).getTime();
+  try {
+    const data = [
+      at('2026-10-14 00:00:00', 1, '昨日·待定'),
+      at('2026-10-14 08:00:00', 2, '昨日·待定2'),
+      at('2026-10-14 07:00:00', 3, '昨日·真实场'),
+    ];
+    const cm = makeCtx(data);
+    const order = cm.filtered.map(l => l.lectureStart);
+    ok(order[0] === '2026-10-14 07:00:00',
+       `test_13b 已结束段真实场应最前，实际=${order}`);
+    ok(order[2] === '2026-10-14 00:00:00',
+       `test_13b 已结束段 tbd 应置后（00:00 在 08:00 后），实际=${order}`);
+  } finally {
+    FIXED_MS = save;
+  }
+}
+
 // ---------- 汇总 ----------
 if (errs.length) {
   console.log(`[FAIL] ${errs.length} 项`);
   errs.forEach(e => console.log(' - ' + e));
   process.exit(1);
 }
-console.log('[PASS] 两段式排序/24h 置顶/组间顺序/远期折叠/分页稳定/localStorage 持久化全部通过');
+console.log('[PASS] 两段式排序/24h 置顶/组间顺序/远期折叠/分页稳定/localStorage 持久化/tbd 置后全部通过');
