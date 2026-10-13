@@ -417,6 +417,11 @@
                        多来源记录出现两个「# 石牌」）；campus-tag class 供 CDP 探针/测试定位。 -->
                   <button v-if="u.head.actualCampus && !actualCampusDup(u.head)" @click="onTagClick('campus', u.head.actualCampus)"
                     class="campus-tag px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.actualCampus }}</button>
+                  <!-- 线上标签（2026-10-13 用户要求）：location 写的是参会方式（腾讯会议/
+                       Zoom/会议号等）而非实体地点时显示；静态标签不可点——校区筛选无
+                       「线上」值，点击无意义。 -->
+                  <span v-if="u.head.isOnline"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt"># 线上</span>
                   <div class="card-actions flex items-center gap-2 shrink-0">
                     <button @click="toggleWant(u.url, $event)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.url) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
@@ -541,8 +546,6 @@
                     <button v-for="c in sourceColleges(l)" :key="c"
                       @click="onTagClick('college', c)"
                       class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
-                    <button @click="toggleSources(l.sourceUrl)"
-                      class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-12pt border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.sourceUrl] ? '▲' : '▼' }}</button>
                   </template>
                   <template v-else>
                     <button @click="onTagClick('college', l.college)"
@@ -553,6 +556,14 @@
                        campus-tag class 仅落在 actualCampus 项上，供 CDP 探针/测试定位（无视觉影响）。 -->
                   <button v-for="c in campusTags(l)" :key="c" @click="onTagClick('campus', c)"
                     :class="['px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition', c === l.actualCampus ? 'campus-tag' : '']"># {{ c }}</button>
+                  <!-- 线上标签（2026-10-13 用户要求）：见 forum 模板同款注释 -->
+                  <span v-if="l.isOnline"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt"># 线上</span>
+                  <!-- 多来源切换按钮（2026-10-13 用户裁定挪到标签行末尾）：展开各官方
+                       原文链接的入口，琥珀色高亮以示「可展开更多内容」，与普通筛选标签
+                       （灰底可点击筛选）视觉区分。 -->
+                  <button v-if="l.merged" @click="toggleSources(l.sourceUrl)"
+                    class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-12pt border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.sourceUrl] ? '▲' : '▼' }}</button>
                   <!-- 想听 + 点赞：包成一个整体（.card-actions）——避免「想听被 ml-auto 留在上一行右端、
                        点赞被迫换行到下一行左端」的割裂。移动端整组随标签流式排列（放不下则整组换行，
                        两按钮仍相邻同行）；桌面端由 .card-actions 的媒体查询恢复右推。 -->

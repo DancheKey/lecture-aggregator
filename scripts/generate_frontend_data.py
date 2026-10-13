@@ -341,6 +341,9 @@ def with_unit(item, url_dates):
     ac = _fv.actual_campus(item)
     if ac:
         it['actualCampus'] = ac
+    # 线上举办（2026-10-13 用户要求）：location 写的是参会方式即 True，仅 True 落字段
+    if _fv.is_online_lecture(item):
+        it['isOnline'] = True
     # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
     it['speakerKeys'] = speaker_keys(item.get('speaker'))
     return strip_frontend_fields(it)

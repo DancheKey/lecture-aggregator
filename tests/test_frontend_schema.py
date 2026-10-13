@@ -21,7 +21,7 @@ import unittest
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, 'scraper'))
 
-DERIVED_KEYS = {'unitType', 'speakerKeys', 'b', 'actualCampus'}
+DERIVED_KEYS = {'unitType', 'speakerKeys', 'b', 'actualCampus', 'isOnline'}
 # 前端已按职责分片（app.core/state/computed/display/social/data/admin），
 # 字段引用分散在各分片里——这里动态发现，避免再拆/再合时扫描清单过时导致假绿或假红。
 _FRONTEND_FILES = ('site/index.html',) + tuple(

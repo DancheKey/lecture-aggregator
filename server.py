@@ -211,6 +211,9 @@ def _attach_unit_types(data):
         ac = _fv.actual_campus(item)
         if ac:
             it['actualCampus'] = ac
+        # 线上举办（2026-10-13）：须与 with_unit 一致
+        if _fv.is_online_lecture(item):
+            it['isOnline'] = True
         # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
         it['speakerKeys'] = _speaker_keys(item.get('speaker'))
         # 按白名单裁掉前端无消费者的内部字段（llmSelfExtract/qaRepaired 等）。

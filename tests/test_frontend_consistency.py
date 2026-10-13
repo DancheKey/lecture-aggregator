@@ -117,6 +117,11 @@ SYNTHETIC = [
      'campus': '校级', 'location': '国际商学院学术报告厅', 'title': '校级国商场'},
     {'sourceUrl': 'http://t.scnu.edu.cn/v/20.html', 'lectureStart': '2026-09-20 15:00:00',
      'campus': '校级', 'location': '校史文博馆一楼展厅', 'title': '校级文博馆场'},
+    # 线上举办（2026-10-13 用户要求加「线上」标签）：location 写参会方式即 isOnline
+    {'sourceUrl': 'http://u.scnu.edu.cn/v/21.html', 'lectureStart': '2026-09-21 15:00:00',
+     'campus': '大学城', 'location': '腾讯会议 295-390-567', 'title': '线上腾讯会议场'},
+    {'sourceUrl': 'http://v.scnu.edu.cn/v/22.html', 'lectureStart': '2026-09-22 15:00:00',
+     'campus': '石牌', 'location': '线上', 'title': '线上裸词场'},
 ]
 
 
@@ -159,6 +164,11 @@ class ConsistencyTest(unittest.TestCase):
         self.assertEqual(got_gen[19].get('actualCampus'), '大学城')  # 文学院（用户裁定）
         self.assertEqual(got_gen[20].get('actualCampus'), '佛山')    # 国际商学院（用户裁定）
         self.assertEqual(got_gen[21].get('actualCampus'), '石牌')    # 校史文博馆（用户裁定）
+        # 线上举办：location 为参会方式即 True；实体地点不写字段（缺省即否）
+        self.assertTrue(got_gen[22].get('isOnline'))                 # 腾讯会议
+        self.assertTrue(got_gen[23].get('isOnline'))                 # 裸「线上」
+        self.assertNotIn('isOnline', got_gen[21])                    # 实体地点不写
+        self.assertEqual(got_gen[22].get('isOnline'), got_srv[22].get('isOnline'))
         self.assertEqual(got_gen[11].get('actualCampus'), got_srv[11].get('actualCampus'))
         self.assertEqual(got_gen[12].get('actualCampus'), got_srv[12].get('actualCampus'))
         self.assertEqual(got_gen[15].get('actualCampus'), got_srv[15].get('actualCampus'))

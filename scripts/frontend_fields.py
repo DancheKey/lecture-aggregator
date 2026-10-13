@@ -58,6 +58,9 @@ FRONTEND_KEEP = frozenset({
     # 实际举办校区（2026-10-13 用户拍板）：校级讲座按 location 推导（南海归佛山），
     # 仅写 site 层；前端校区筛选 OR 分支（app.computed.js）与卡片角标（index.html）消费
     'actualCampus',
+    # 线上举办（2026-10-13 用户要求）：location 写参会方式（腾讯会议/Zoom/会议号等）
+    # 即 True，仅 True 落字段；前端标签行显示「# 线上」
+    'isOnline',
     'b',  # 长文本所在桶号（0-15）：展开某条时前端据此只拉那一桶 detail 分片
 })
 

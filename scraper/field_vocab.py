@@ -688,6 +688,32 @@ def actual_campus(item):
     return None
 
 
+# 线上举办判据（2026-10-13 用户要求加「线上」标签）：location 写的是参会方式
+# 而非实体地点。存量量化：腾讯会议 247 / 线上 9 / Zoom 6，共 262 条、
+# 无误伤样例。「会议号」单独列出——有的源只写「会议号：xxx」不写平台名。
+_ONLINE_LOCATION_PAT = re.compile(
+    r'腾讯会议|Zoom|Meeting ID|会议号|直播链接|网络直播|观看方式|线上'
+)
+
+
+def is_online_lecture(item):
+    """按 location 原文判定是否线上举办（参会链接/会议号即地点）。
+
+    :param item: 讲座记录 dict，读取 location
+    :return: bool——True 时生成器/server 双端写派生字段 isOnline，
+        前端标签行显示「# 线上」；False 不写字段（省体积，缺省即否）。
+
+    全库生效、不限校级（线上讲座任何归口都可能出现）。
+    location 为空一律 False——「未知」不等于「线上」。
+    """
+    if not item:
+        return False
+    loc = item.get('location') or ''
+    if not isinstance(loc, str) or not loc.strip():
+        return False
+    return bool(_ONLINE_LOCATION_PAT.search(loc))
+
+
 # ---------------------------------------------------------------------------
 # Speaker 形态学污染判据（C2 收敛单一事实源，2026-09-22）
 #
