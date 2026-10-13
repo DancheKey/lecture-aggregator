@@ -94,6 +94,20 @@ SYNTHETIC = [
     # 优先级：显式校区词先于建筑名（「大学城校园心理学院…」归大学城，不归石牌）
     {'sourceUrl': 'http://l.scnu.edu.cn/v/12.html', 'lectureStart': '2026-09-12 15:00:00',
      'campus': '校级', 'location': '大学城校园心理学院301', 'title': '校级显式优先场'},
+    # 建筑/单位名扩展（2026-10-13 用户追加裁定：田家炳/会议厅/课室大楼/教学楼/
+    # 文科楼/国际文化学院/天河校区→石牌，先进光电子/政管/体科院→大学城）
+    {'sourceUrl': 'http://m.scnu.edu.cn/v/13.html', 'lectureStart': '2026-09-13 15:00:00',
+     'campus': '校级', 'location': '田家炳教育书院301', 'title': '校级田家炳场'},
+    {'sourceUrl': 'http://n.scnu.edu.cn/v/14.html', 'lectureStart': '2026-09-14 15:00:00',
+     'campus': '校级', 'location': '体育科学学院报告厅', 'title': '校级体科战场'},
+    {'sourceUrl': 'http://o.scnu.edu.cn/v/15.html', 'lectureStart': '2026-09-15 15:00:00',
+     'campus': '校级', 'location': '天河校区科学楼', 'title': '校级天河场'},
+    # 共现强证据词（2026-10-13 用户原则「学院按所在校区」+ 共现统计：地理科学学院
+    # →石牌 75 次 100%、网络教育学院→佛山 6 次 100%）
+    {'sourceUrl': 'http://p.scnu.edu.cn/v/16.html', 'lectureStart': '2026-09-16 15:00:00',
+     'campus': '校级', 'location': '地理科学学院101阶梯教室', 'title': '校级地科场'},
+    {'sourceUrl': 'http://q.scnu.edu.cn/v/17.html', 'lectureStart': '2026-09-17 15:00:00',
+     'campus': '校级', 'location': '教师发展中心206课室(网络教育学院二楼)', 'title': '校级网教场'},
 ]
 
 
@@ -126,8 +140,15 @@ class ConsistencyTest(unittest.TestCase):
         self.assertEqual(got_gen[12].get('actualCampus'), '大学城')  # 文二栋
         # 显式校区词优先于建筑名（防优先级反转）
         self.assertEqual(got_gen[13].get('actualCampus'), '大学城')
+        # 建筑/单位名扩展（2026-10-13 用户追加裁定）
+        self.assertEqual(got_gen[14].get('actualCampus'), '石牌')    # 田家炳教育书院
+        self.assertEqual(got_gen[15].get('actualCampus'), '大学城')  # 体育科学学院
+        self.assertEqual(got_gen[16].get('actualCampus'), '石牌')    # 天河校区归石牌
+        self.assertEqual(got_gen[17].get('actualCampus'), '石牌')    # 地理科学学院（共现强证据）
+        self.assertEqual(got_gen[18].get('actualCampus'), '佛山')    # 网络教育学院（共现强证据）
         self.assertEqual(got_gen[11].get('actualCampus'), got_srv[11].get('actualCampus'))
         self.assertEqual(got_gen[12].get('actualCampus'), got_srv[12].get('actualCampus'))
+        self.assertEqual(got_gen[15].get('actualCampus'), got_srv[15].get('actualCampus'))
 
     def test_excluded_filter_equal(self):
         """排除名单读取：三条路径必须返回相同集合（generate ↔ server ↔ scraper）。"""

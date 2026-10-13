@@ -373,10 +373,6 @@
                   </span>
                   <span v-if="isDateSuspect(u.head)" class="px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-amber-50 text-amber-600 border border-amber-200"
                     title="解析器对该条的日期置信度为 low（跨年窗口无法判定/发布时间不可解析），年份可能有误">日期待核</span>
-                  <!-- 实际举办校区角标（2026-10-13）：归口校级但 location 可推导出举办校区时显示；
-                       移动端隐藏（窄屏下地点行文字已含校区信息，角标让位给时间+状态徽章） -->
-                  <span v-if="u.head.actualCampus" class="hidden sm:inline px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200"
-                    :title="'归口校级单位，实际举办校区：' + u.head.actualCampus">📍 {{ u.head.actualCampus }}</span>
                   <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap', statusInfo(u.head).cls]">
                     <span class="hidden sm:inline">{{ statusInfo(u.head).label }}</span>
                     <span class="sm:hidden">{{ statusInfo(u.head).labelShort }}</span>
@@ -416,6 +412,13 @@
                 <div class="flex flex-wrap gap-2 items-center mt-2">
                   <button @click="onTagClick('college', u.head.college)"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.college }}</button>
+                  <!-- 实际举办校区标签（2026-10-13）：归口校级但 location 可推导出举办校区时，
+                       在标签行加「#校区」（点击=按该校区筛选）；样式与其他标签一致、不做
+                       高亮（用户 2026-10-13 裁定）；campus-tag class 供 CDP 探针/测试定位
+                       （与 lecture-card/far-fold-bar 同类的测试钩子，无视觉影响）。
+                       校级记录才可能有值，与左侧「#校级」归口标签并存，互不矛盾。 -->
+                  <button v-if="u.head.actualCampus" @click="onTagClick('campus', u.head.actualCampus)"
+                    class="campus-tag px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.actualCampus }}</button>
                   <div class="card-actions flex items-center gap-2 shrink-0">
                     <button @click="toggleWant(u.url, $event)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.url) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
@@ -448,10 +451,6 @@
                   </span>
                   <span v-if="isDateSuspect(l)" class="px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-amber-50 text-amber-600 border border-amber-200"
                     title="解析器对该条的日期置信度为 low（跨年窗口无法判定/发布时间不可解析），年份可能有误">日期待核</span>
-                  <!-- 实际举办校区角标（2026-10-13）：归口校级但 location 可推导出举办校区时显示；
-                       移动端隐藏（窄屏下地点行文字已含校区信息，角标让位给时间+状态徽章） -->
-                  <span v-if="l.actualCampus" class="hidden sm:inline px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200"
-                    :title="'归口校级单位，实际举办校区：' + l.actualCampus">📍 {{ l.actualCampus }}</span>
                   <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1', statusInfo(l).cls]">
                     <span v-if="statusInfo(l).dot" class="live-dot rounded-full shrink-0" style="width:6px;height:6px;background:currentColor"></span>
                     <!-- 移动端用紧凑倒计时（还有 17:44:59），桌面端保留完整语义（即将开始 · 还有 17 时 44 分 59 秒） -->
@@ -553,6 +552,13 @@
                   </template>
                   <button v-for="c in sourceCampuses(l)" :key="c" @click="onTagClick('campus', c)"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
+                  <!-- 实际举办校区标签（2026-10-13）：归口校级但 location 可推导出举办校区时，
+                       在标签行加「#校区」（点击=按该校区筛选）；样式与其他标签一致、不做
+                       高亮（用户 2026-10-13 裁定）；campus-tag class 供 CDP 探针/测试定位，
+                       无视觉影响。与来源校区标签并存时可能重复（如来源含大学城且实际
+                       也是大学城），属正常——一个表归口来源、一个表实际举办地。 -->
+                  <button v-if="l.actualCampus" @click="onTagClick('campus', l.actualCampus)"
+                    class="campus-tag px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.actualCampus }}</button>
                   <!-- 想听 + 点赞：包成一个整体（.card-actions）——避免「想听被 ml-auto 留在上一行右端、
                        点赞被迫换行到下一行左端」的割裂。移动端整组随标签流式排列（放不下则整组换行，
                        两按钮仍相邻同行）；桌面端由 .card-actions 的媒体查询恢复右推。 -->
