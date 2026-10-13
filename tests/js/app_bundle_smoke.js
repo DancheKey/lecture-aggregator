@@ -96,8 +96,10 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //     toggleAbstract 的 all.find 只命中第一条 → 展开拉到别的期数的全文，实测 40/41 组踩中），97 → 98）
 // （2026-10-13：方案 B 远期折叠 —— loadFarFuture / saveFarFuture / toggleFarFuture /
 //   isFarFoldGroup（模板判定须走实例方法，全局 const 在运行时编译里不可见），98 → 102）
+// （2026-10-13：校区标签去重 —— campusTags（归口∪actualCampus 统一渲染）/
+//   actualCampusDup（forum 卡防重复守卫），102 → 104）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 102) errs.push(`方法数 ${nMethods} != 102`);
+if (nMethods !== 104) errs.push(`方法数 ${nMethods} != 104`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');

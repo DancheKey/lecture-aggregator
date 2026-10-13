@@ -263,7 +263,7 @@ Object.assign(APP_METHODS, {
       });
       return out;
     },
-    // 多来源讲座：返回去重后的所有校区（用于标签展示）
+    // 多来源讲座：返回去重后的所有「归口校区」（用于标签展示，不含 actualCampus）
     sourceCampuses(l) {
       // 空校区不参与渲染：否则会生成一个只有「#」没有文字的标签（点它也不会有任何按钮高亮）
       if (!l) return [];
@@ -275,6 +275,19 @@ Object.assign(APP_METHODS, {
       // 合并来源的校区（缺省回退到主记录）
       (l.sources || []).forEach(s => push(s.campus || l.campus));
       return out;
+    },
+    // 标签行校区集合 = 归口校区 ∪ actualCampus（实际举办校区）去重。
+    // 2026-10-13 用户截图反馈：多来源校级记录（如社会科学处+心理学院）里，
+    // 来源校区（心理学院→石牌）与 actualCampus（国际会议厅→石牌）会渲染出
+    // 两个「# 石牌」——合并到同一集合统一去重，single 卡走本方法。
+    campusTags(l) {
+      const out = this.sourceCampuses(l);
+      if (l && l.actualCampus && !out.includes(l.actualCampus)) out.push(l.actualCampus);
+      return out;
+    },
+    // actualCampus 是否与归口校区重复（重复则 forum 卡不再渲染独立标签）
+    actualCampusDup(l) {
+      return !!(l && l.actualCampus && this.sourceCampuses(l).includes(l.actualCampus));
     },
     // 切换多来源讲座的原文链接展开
     toggleSources(url) {

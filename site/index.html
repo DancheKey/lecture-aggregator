@@ -412,12 +412,10 @@
                 <div class="flex flex-wrap gap-2 items-center mt-2">
                   <button @click="onTagClick('college', u.head.college)"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.college }}</button>
-                  <!-- 实际举办校区标签（2026-10-13）：归口校级但 location 可推导出举办校区时，
-                       在标签行加「#校区」（点击=按该校区筛选）；样式与其他标签一致、不做
-                       高亮（用户 2026-10-13 裁定）；campus-tag class 供 CDP 探针/测试定位
-                       （与 lecture-card/far-fold-bar 同类的测试钩子，无视觉影响）。
-                       校级记录才可能有值，与左侧「#校级」归口标签并存，互不矛盾。 -->
-                  <button v-if="u.head.actualCampus" @click="onTagClick('campus', u.head.actualCampus)"
+                  <!-- 实际举办校区标签（2026-10-13）：归口校级但 location 可推导出举办校区时显示。
+                       actualCampusDup 守卫：与归口校区同值时不重复渲染（用户截图反馈
+                       多来源记录出现两个「# 石牌」）；campus-tag class 供 CDP 探针/测试定位。 -->
+                  <button v-if="u.head.actualCampus && !actualCampusDup(u.head)" @click="onTagClick('campus', u.head.actualCampus)"
                     class="campus-tag px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.actualCampus }}</button>
                   <div class="card-actions flex items-center gap-2 shrink-0">
                     <button @click="toggleWant(u.url, $event)"
@@ -550,15 +548,11 @@
                     <button @click="onTagClick('college', l.college)"
                       class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
                   </template>
-                  <button v-for="c in sourceCampuses(l)" :key="c" @click="onTagClick('campus', c)"
-                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
-                  <!-- 实际举办校区标签（2026-10-13）：归口校级但 location 可推导出举办校区时，
-                       在标签行加「#校区」（点击=按该校区筛选）；样式与其他标签一致、不做
-                       高亮（用户 2026-10-13 裁定）；campus-tag class 供 CDP 探针/测试定位，
-                       无视觉影响。与来源校区标签并存时可能重复（如来源含大学城且实际
-                       也是大学城），属正常——一个表归口来源、一个表实际举办地。 -->
-                  <button v-if="l.actualCampus" @click="onTagClick('campus', l.actualCampus)"
-                    class="campus-tag px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.actualCampus }}</button>
+                  <!-- 校区标签行（2026-10-13 改版）：campusTags = 归口校区 ∪ actualCampus
+                       统一去重（用户截图反馈多来源记录出现两个「# 石牌」），只渲染一个 v-for；
+                       campus-tag class 仅落在 actualCampus 项上，供 CDP 探针/测试定位（无视觉影响）。 -->
+                  <button v-for="c in campusTags(l)" :key="c" @click="onTagClick('campus', c)"
+                    :class="['px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition', c === l.actualCampus ? 'campus-tag' : '']"># {{ c }}</button>
                   <!-- 想听 + 点赞：包成一个整体（.card-actions）——避免「想听被 ml-auto 留在上一行右端、
                        点赞被迫换行到下一行左端」的割裂。移动端整组随标签流式排列（放不下则整组换行，
                        两按钮仍相邻同行）；桌面端由 .card-actions 的媒体查询恢复右推。 -->
@@ -711,7 +705,7 @@
   <script defer src="app.state.js?v=302000ff68"></script>
   <script defer src="app.computed.js?v=4937bd3c76"></script>
   <script defer src="app.display.js?v=a993718c1f"></script>
-  <script defer src="app.social.js?v=9eaccf4e6f"></script>
+  <script defer src="app.social.js?v=730f2a8e43"></script>
   <script defer src="app.data.js?v=b1bfddd28d"></script>
   <script defer src="app.admin.js?v=d02b198ebb"></script>
   <script defer src="app.js?v=bfdaee9586"></script>

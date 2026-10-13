@@ -158,10 +158,49 @@ const titles = cm => cm.filtered.map(l => l.title).sort().join(',');
   }
 }
 
+// ---------- T8：标签行校区去重（2026-10-13 用户截图反馈） ----------
+{
+  // 复现截图场景：多来源（社会科学处=校级 + 心理学院=石牌）+ actualCampus=石牌
+  // （国际会议厅→石牌）。旧代码 sourceCampuses 出「# 石牌」+ 独立 actualCampus
+  // button 再出一个 → 同卡两个「# 石牌」。campusTags 必须去重且不丢值。
+  const l = rec('H', '校级', {
+    actualCampus: '石牌',
+    sources: [
+      { sourceUrl: 'http://x.scnu.edu.cn/h_s1', college: '社会科学处', campus: '校级', title: 's1' },
+      { sourceUrl: 'http://x.scnu.edu.cn/h_s2', college: '心理学院', campus: '石牌', title: 's2' },
+    ],
+  });
+  const cm = makeCtx();
+  const tags = methods.campusTags.call(cm, l);
+  ok(JSON.stringify(tags) === JSON.stringify(['校级', '石牌']),
+     `T8 campusTags 应=[校级,石牌]（去重保序），实际=${JSON.stringify(tags)}`);
+  const uniq = new Set(tags).size === tags.length;
+  ok(uniq, 'T8 标签集合内不得有重复值');
+  // 无 sources 的普通校级条：campusTags = [校级, actualCampus]
+  const tagsF = methods.campusTags.call(cm, DATA[5]); // F 校级+石牌
+  ok(JSON.stringify(tagsF) === JSON.stringify(['校级', '石牌']),
+     `T8b F 的 campusTags 应=[校级,石牌]，实际=${JSON.stringify(tagsF)}`);
+}
+// ---------- T9：actualCampusDup 守卫（forum 卡防重复） ----------
+{
+  const cm = makeCtx();
+  const dup = rec('I', '校级', {
+    actualCampus: '石牌',
+    sources: [{ sourceUrl: 'http://x.scnu.edu.cn/i_s', college: '心理学院', campus: '石牌', title: 'i_s' }],
+  });
+  const notDup = DATA[5]; // F：归口校级 + actualCampus 石牌 → 不重复
+  ok(methods.actualCampusDup.call(cm, dup) === true,
+     'T9 来源校区已含 actualCampus 同值时应判 dup=true');
+  ok(methods.actualCampusDup.call(cm, notDup) === false,
+     'T9 归口校区与 actualCampus 不同时应判 dup=false');
+  ok(methods.actualCampusDup.call(cm, DATA[1]) === false, // B 无 actualCampus
+     'T9 无 actualCampus 时应判 dup=false');
+}
+
 // ---------- 汇总 ----------
 if (errs.length) {
   console.log(`[FAIL] ${errs.length} 项`);
   errs.forEach(e => console.log(' - ' + e));
   process.exit(1);
 }
-console.log('[PASS] 校区筛选 OR 语义/校级全量/sources 回归/交叉筛选全部通过');
+console.log('[PASS] 校区筛选 OR/校级全量/sources 回归/交叉筛选/标签去重全部通过');
