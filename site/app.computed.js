@@ -81,7 +81,7 @@ const APP_COMPUTED = {
 
     // 是否有任何筛选条件激活（控制"清除"按钮显示）
     hasActiveFilter() {
-      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.speaker);
+      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.speaker || this.onlineOnly);
     },
 
     // 长文本（简介/摘要）不再阻塞搜索（2026-09-30 用户定）：
@@ -95,6 +95,9 @@ const APP_COMPUTED = {
       const q = this.query.trim().toLowerCase();
       const list = this.all.filter(l => {
         if (this.showLikedOnly && !this.hasLiked(l.sourceUrl)) return false;
+        // 线上讲座筛选（2026-10-13）：点卡片「# 线上」标签进入；isOnline 为派生
+        // 字段（location 写的是参会方式而非实体地点），与校区筛选可叠加。
+        if (this.onlineOnly && !l.isOnline) return false;
         // 合并讲座可能跨校区/学院，任一来源匹配即保留
         if (this.campus) {
           const campuses = new Set([l.campus, ...(l.sources || []).map(s => s.campus)].filter(Boolean));

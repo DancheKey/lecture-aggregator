@@ -226,7 +226,7 @@ Object.assign(APP_METHODS, {
     setCollege(c) { this.college = c; },
     setYear(y) { this.year = y; },
     toggleLikedFilter() { this.showLikedOnly = !this.showLikedOnly; this.campus = ''; this.college = ''; },
-    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.speaker = ''; this.currentPage = 1; },
+    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.speaker = ''; this.onlineOnly = false; this.currentPage = 1; },
     /* ---------- 分页 ---------- */
     gotoPage(p) {
       if (p < 1 || p > this.totalPages) return;
@@ -247,6 +247,13 @@ Object.assign(APP_METHODS, {
     onTagClick(field, val) {
       if (field === 'college') this.college = val;
       else this.campus = val;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    // 线上讲座筛选开关（2026-10-13）：点卡片「# 线上」标签或顶部筛选片的 × 切换。
+    // 与其他标签筛选不同：无固定候选值列表，是布尔开关，再点一次即取消。
+    toggleOnline() {
+      this.onlineOnly = !this.onlineOnly;
+      this.currentPage = 1;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
     // 多来源讲座：返回去重后的所有来源单位（用于标签展示）

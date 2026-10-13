@@ -16,6 +16,8 @@
 //   T5 无筛选时全量返回
 //   T6 交叉筛选（校区+学院）语义不串
 //   T7 actualCampus 不造成「张冠李戴」：未推导的校级条在任何具体校区筛里都不出现
+//   T8 campusTags 标签行去重   T9 actualCampusDup 守卫
+//   T10-T12 线上讲座筛选（onlineOnly：点「# 线上」标签 → 仅线上条，可叠加校区，开关+清除）
 //
 // 运行：node tests/js/app_campus_filter.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -95,6 +97,7 @@ function rec(title, campus, extra) {
 // 数据集（覆盖全部筛选路径）：
 //   A 校级·大学城   B 校级·无推导   C 校级·南海(→佛山)   D 石牌学院
 //   E 大学城学院    F 校级·石牌      G 校级·来源跨校区(sources 命中石牌)
+//   J 石牌·线上讲座(isOnline，2026-10-13 线上筛选用)
 const DATA = [
   rec('A', '校级', { actualCampus: '大学城' }),
   rec('B', '校级', { location: '待公布' }),
@@ -103,12 +106,13 @@ const DATA = [
   rec('E', '大学城'),
   rec('F', '校级', { actualCampus: '石牌' }),
   rec('G', '校级', { sources: [{ sourceUrl: 'http://x.scnu.edu.cn/g_src', college: '法学院', campus: '石牌', title: '来源页' }] }),
+  rec('J', '石牌', { isOnline: true, location: '腾讯会议' }),
 ];
 
 function makeCtx(over) {
   const cm = Object.assign(vm.runInContext('APP_STATE()', ctx), methods, {
     all: DATA, campus: '', college: '', year: '', query: '', searchField: '',
-    speaker: '', showLikedOnly: false, likedUrls: new Set(),
+    speaker: '', showLikedOnly: false, onlineOnly: false, likedUrls: new Set(),
     pageSize: 25, currentPage: 1,
   }, over || {});
   Object.defineProperty(cm, 'filtered', {
@@ -130,7 +134,7 @@ const titles = cm => cm.filtered.map(l => l.title).sort().join(',');
 // ---------- T3：非校级 campus 与 sources[].campus 回归 ----------
 {
   const got = titles(makeCtx({ campus: '石牌' }));
-  ok(got === 'D,F,G', `T3 选「石牌」应得 D(归口),F(actualCampus),G(sources)，实际=${got}`);
+  ok(got === 'D,F,G,J', `T3 选「石牌」应得 D(归口),F(actualCampus),G(sources),J(归口)，实际=${got}`);
 }
 // ---------- T4：佛山（南海归佛山） ----------
 {
@@ -140,7 +144,7 @@ const titles = cm => cm.filtered.map(l => l.title).sort().join(',');
 // ---------- T5：无筛选全量 ----------
 {
   const got = titles(makeCtx({ campus: '' }));
-  ok(got === 'A,B,C,D,E,F,G', `T5 无筛选应返回全部 7 条，实际=${got}`);
+  ok(got === 'A,B,C,D,E,F,G,J', `T5 无筛选应返回全部 8 条，实际=${got}`);
 }
 // ---------- T6：交叉筛选（校区+学院）语义不串 ----------
 {
@@ -197,10 +201,36 @@ const titles = cm => cm.filtered.map(l => l.title).sort().join(',');
      'T9 无 actualCampus 时应判 dup=false');
 }
 
+// ---------- T10：线上讲座筛选（2026-10-13 点「# 线上」标签） ----------
+{
+  const got = titles(makeCtx({ onlineOnly: true }));
+  ok(got === 'J', `T10 仅线上筛选应得 J，实际=${got}`);
+}
+// ---------- T11：线上 + 校区叠加筛选 ----------
+{
+  const got = titles(makeCtx({ onlineOnly: true, campus: '石牌' }));
+  ok(got === 'J', `T11 线上+石牌应得 J（可叠加），实际=${got}`);
+  const got2 = titles(makeCtx({ onlineOnly: true, campus: '大学城' }));
+  ok(got2 === '', `T11b 线上+大学城应为空（J 非大学城），实际=${got2}`);
+}
+// ---------- T12：toggleOnline 开关 + clearFilters 清除 ----------
+{
+  const cm = makeCtx();
+  ok(cm.onlineOnly === false, 'T12 初始 onlineOnly=false');
+  methods.toggleOnline.call(cm);
+  ok(cm.onlineOnly === true, 'T12 toggleOnline 后应为 true');
+  ok(titles(cm) === 'J', 'T12 开启后 filtered 应只剩线上条');
+  methods.toggleOnline.call(cm);
+  ok(cm.onlineOnly === false, 'T12 再点一次应取消');
+  methods.toggleOnline.call(cm);
+  methods.clearFilters.call(cm);
+  ok(cm.onlineOnly === false, 'T12 clearFilters 应清除线上筛选');
+}
+
 // ---------- 汇总 ----------
 if (errs.length) {
   console.log(`[FAIL] ${errs.length} 项`);
   errs.forEach(e => console.log(' - ' + e));
   process.exit(1);
 }
-console.log('[PASS] 校区筛选 OR/校级全量/sources 回归/交叉筛选/标签去重全部通过');
+console.log('[PASS] 校区筛选 OR/校级全量/sources 回归/交叉筛选/标签去重/线上筛选全部通过');

@@ -323,6 +323,13 @@
                     <button type="button" @click="clearSpeaker" aria-label="清除讲者筛选"
                       class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
                   </span>
+                  <!-- 线上讲座筛选片（2026-10-13）：点卡片「# 线上」标签后在此显示激活态，
+                       × 或再点卡片标签取消；与讲者片同款深色样式，激活时清「✕ 清除」按钮随之出现 -->
+                  <span v-if="onlineOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
+                    <span>线上讲座</span>
+                    <button type="button" @click="toggleOnline()" aria-label="清除线上筛选"
+                      class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+                  </span>
                   <button v-if="hasActiveFilter" @click="clearFilters()"
                     class="shrink-0 px-2 py-1.5 text-12pt rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
                     title="清除所有筛选条件">✕ 清除</button>
@@ -418,10 +425,10 @@
                   <button v-if="u.head.actualCampus && !actualCampusDup(u.head)" @click="onTagClick('campus', u.head.actualCampus)"
                     class="campus-tag px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.actualCampus }}</button>
                   <!-- 线上标签（2026-10-13 用户要求）：location 写的是参会方式（腾讯会议/
-                       Zoom/会议号等）而非实体地点时显示；静态标签不可点——校区筛选无
-                       「线上」值，点击无意义。 -->
-                  <span v-if="u.head.isOnline"
-                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt"># 线上</span>
+                       Zoom/会议号等）而非实体地点时显示；点击进入「仅线上讲座」筛选
+                       （toggleOnline），再点一次或点顶部筛选片 × 取消。 -->
+                  <button v-if="u.head.isOnline" @click="toggleOnline()"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># 线上</button>
                   <div class="card-actions flex items-center gap-2 shrink-0">
                     <button @click="toggleWant(u.url, $event)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.url) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
@@ -556,9 +563,9 @@
                        campus-tag class 仅落在 actualCampus 项上，供 CDP 探针/测试定位（无视觉影响）。 -->
                   <button v-for="c in campusTags(l)" :key="c" @click="onTagClick('campus', c)"
                     :class="['px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition', c === l.actualCampus ? 'campus-tag' : '']"># {{ c }}</button>
-                  <!-- 线上标签（2026-10-13 用户要求）：见 forum 模板同款注释 -->
-                  <span v-if="l.isOnline"
-                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt"># 线上</span>
+                  <!-- 线上标签（2026-10-13 用户要求）：见 forum 模板同款注释；点击进入线上筛选 -->
+                  <button v-if="l.isOnline" @click="toggleOnline()"
+                    class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># 线上</button>
                   <!-- 多来源切换按钮（2026-10-13 用户裁定挪到标签行末尾）：展开各官方
                        原文链接的入口，琥珀色高亮以示「可展开更多内容」，与普通筛选标签
                        （灰底可点击筛选）视觉区分。 -->
@@ -713,10 +720,10 @@
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=542facedad"></script>
-  <script defer src="app.state.js?v=302000ff68"></script>
-  <script defer src="app.computed.js?v=4937bd3c76"></script>
+  <script defer src="app.state.js?v=0242e2b346"></script>
+  <script defer src="app.computed.js?v=500debd694"></script>
   <script defer src="app.display.js?v=a993718c1f"></script>
-  <script defer src="app.social.js?v=730f2a8e43"></script>
+  <script defer src="app.social.js?v=a1c90599e6"></script>
   <script defer src="app.data.js?v=b1bfddd28d"></script>
   <script defer src="app.admin.js?v=d02b198ebb"></script>
   <script defer src="app.js?v=bfdaee9586"></script>

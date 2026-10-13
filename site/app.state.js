@@ -14,6 +14,7 @@ const APP_STATE = function () {
       query: '',
       searchField: '',  // 搜索维度：''=全部 | college=单位 | location=地点 | topic=题目 | abstract=摘要
       showLikedOnly: false,  // 仅显示已点赞讲座
+      onlineOnly: false,   // 仅显示线上讲座（点卡片「# 线上」标签进入，2026-10-13）
       scraping: false,
       showMenu: false,    // 顶部栏更多操作下拉菜单
       showReport: false,  // 信息源报告弹窗显隐
