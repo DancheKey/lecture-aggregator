@@ -103,11 +103,20 @@ SYNTHETIC = [
     {'sourceUrl': 'http://o.scnu.edu.cn/v/15.html', 'lectureStart': '2026-09-15 15:00:00',
      'campus': '校级', 'location': '天河校区科学楼', 'title': '校级天河场'},
     # 共现强证据词（2026-10-13 用户原则「学院按所在校区」+ 共现统计：地理科学学院
-    # →石牌 75 次 100%、网络教育学院→佛山 6 次 100%）
+    # →石牌 75 次 100%）
     {'sourceUrl': 'http://p.scnu.edu.cn/v/16.html', 'lectureStart': '2026-09-16 15:00:00',
      'campus': '校级', 'location': '地理科学学院101阶梯教室', 'title': '校级地科场'},
+    # 教师发展中心→石牌（用户 2026-10-13 二次裁定）先于括号内「网络教育学院」：
+    # 建筑名表按序扫描；网络教育学院亦归石牌（用户三次裁定，推翻早前共现→佛山推定）
     {'sourceUrl': 'http://q.scnu.edu.cn/v/17.html', 'lectureStart': '2026-09-17 15:00:00',
      'campus': '校级', 'location': '教师发展中心206课室(网络教育学院二楼)', 'title': '校级网教场'},
+    # 2026-10-13 用户裁定补充：文学院→大学城、国际商学院→佛山（学院按所在校区）
+    {'sourceUrl': 'http://r.scnu.edu.cn/v/18.html', 'lectureStart': '2026-09-18 15:00:00',
+     'campus': '校级', 'location': '文学院报告厅', 'title': '校级文学院场'},
+    {'sourceUrl': 'http://s.scnu.edu.cn/v/19.html', 'lectureStart': '2026-09-19 15:00:00',
+     'campus': '校级', 'location': '国际商学院学术报告厅', 'title': '校级国商场'},
+    {'sourceUrl': 'http://t.scnu.edu.cn/v/20.html', 'lectureStart': '2026-09-20 15:00:00',
+     'campus': '校级', 'location': '校史文博馆一楼展厅', 'title': '校级文博馆场'},
 ]
 
 
@@ -145,7 +154,11 @@ class ConsistencyTest(unittest.TestCase):
         self.assertEqual(got_gen[15].get('actualCampus'), '大学城')  # 体育科学学院
         self.assertEqual(got_gen[16].get('actualCampus'), '石牌')    # 天河校区归石牌
         self.assertEqual(got_gen[17].get('actualCampus'), '石牌')    # 地理科学学院（共现强证据）
-        self.assertEqual(got_gen[18].get('actualCampus'), '佛山')    # 网络教育学院（共现强证据）
+        # 教师发展中心（石牌）优先于括号内「网络教育学院」；后者亦归石牌（用户三次裁定）
+        self.assertEqual(got_gen[18].get('actualCampus'), '石牌')
+        self.assertEqual(got_gen[19].get('actualCampus'), '大学城')  # 文学院（用户裁定）
+        self.assertEqual(got_gen[20].get('actualCampus'), '佛山')    # 国际商学院（用户裁定）
+        self.assertEqual(got_gen[21].get('actualCampus'), '石牌')    # 校史文博馆（用户裁定）
         self.assertEqual(got_gen[11].get('actualCampus'), got_srv[11].get('actualCampus'))
         self.assertEqual(got_gen[12].get('actualCampus'), got_srv[12].get('actualCampus'))
         self.assertEqual(got_gen[15].get('actualCampus'), got_srv[15].get('actualCampus'))
