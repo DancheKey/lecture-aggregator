@@ -22,12 +22,17 @@ const BUCKETS = 16;
 let fetchLog = [];
 let manifestOk = true;     // false → 模拟 detail 清单 404/500
 let failBucket = null;     // 'NN' → 该桶第一次请求失败，用于验证「缺桶不阻塞 + 后续补拉」
+let failLatestTimes = 0;   // latest.json 前 N 次请求失败（2026-10-13），验证「抖动重试、不轻易降级」
 
 const ctx = {
   console,
   setTimeout,
   fetch: async (url) => {
     fetchLog.push(url);
+    if (String(url).includes('latest.json')) {
+      if (failLatestTimes > 0) { failLatestTimes--; return { ok: false, status: 503 }; }
+      return { ok: true, status: 200, json: async () => ({ data: [] }) };
+    }
     if (String(url).includes('manifest.json')) {
       if (!manifestOk) return { ok: false, status: 500 };
       return {
@@ -171,6 +176,38 @@ function check(label, got, want) {
   fetchLog = [];
   await f6._prefetchLongText();
   check('补齐后不再空跑', countDetailCalls(), 0);
+
+  console.log('\n--- 10) latest.json 抖动重试：前两次失败不降级，第三次成功走正常路径（2026-10-13）---');
+  {
+    const s = newFake({});
+    s._applyLectureData = () => {};
+    s.bumpCount = () => {};
+    const fullArgs = [];   // 记录 _loadStaticFull 参数：[] = 正常路径，[true] = 降级路径
+    s._loadStaticFull = (...a) => { fullArgs.push(a); };
+    let auto = 0;
+    s._ensureLongTextAll = () => { auto++; };
+    failLatestTimes = 2;   // 前两次 503
+    fetchLog = [];
+    s._loadStaticLatest();
+    await settle(3400);    // 800ms + 1600ms 退避 + 余量
+    check('第三次成功：未走降级路径', fullArgs.filter(a => a[0] === true).length, 0);
+    check('第三次成功：正常路径被调 1 次', fullArgs.length, 1);
+    check('latest.json 共请求 3 次（两次重试）', fetchLog.filter(u => String(u).includes('latest.json')).length, 3);
+    check('预取触发 1 次', auto, 1);
+  }
+
+  console.log('\n--- 11) latest.json 三次全失败：降级整文件，且降级路径也自动预取（2026-10-13）---');
+  {
+    const s = newFake({});
+    let auto = 0;
+    s._ensureLongTextAll = () => { auto++; };
+    failLatestTimes = 99;  // 永远失败
+    fetchLog = [];
+    s._loadStaticLatest();
+    await settle(3600);    // 两次退避 2400ms + 降级加载 + 余量
+    check('走了降级路径（请求了 lectures.json）', fetchLog.filter(u => String(u).includes('lectures.json')).length >= 1, true);
+    check('降级路径也触发长文本预取', auto, 1);
+  }
 
   console.log('\n' + (fail ? '[FAIL] ' + fail + ' 项未通过' : '[PASS] 长文本加载流程全部用例通过'));
   process.exit(fail ? 1 : 0);

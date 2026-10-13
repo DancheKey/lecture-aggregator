@@ -61,29 +61,47 @@ Object.assign(APP_METHODS, {
       // （displayUpdatedAt = lastRunAt || updatedAt，updatedAt 即来自本文件），旧副本会让
       // 日期退回数据日。no-store 语义本就要求每次重新获取，加唯一时间戳只是让不遵守该
       // 指令的中间层也无旧副本可用；70KB 回源与 no-store 的既有成本相同。
-      fetch('lectures/latest.json?t=' + Date.now(), { cache: 'no-store' })
-        .then(r => r.json())
-        .then(resp => {
-          this._applyLectureData(resp);
-          this.dataStage = 'partial';
-          this.loading = false;
-          this.bumpCount();          // 数字跳到 50（首屏已加载真实条数；阶梯跳变无动画）
-          // 后台继续分片加载完整数据（启用完整筛选翻页）
-          this._loadStaticFull();
-          // 首屏一渲染即在后台静默预取全部长文本（简介/摘要，16 桶 gzip 约 1.6MB）——
-          // 2026-09-30 用户定：原策略是「交互（滚动/聚焦/翻页）才预取」，导致「打开页面就
-          // 立即搜索」时桶还没下完、搜索被迫等待并弹「正在加载完整内容」提示。改为首屏即拉，
-          // 用户开始搜索时通常已就绪；即便未就绪，搜索也不再阻塞（先出已到结果、到齐静默补全），
-          // 见 computed.filtered 与 index.html 时间线分支。
-          this._ensureLongTextAll();
-        })
-        .catch((e) => {
-          // 2026-10-02：补原始错误。同文件 :167-174 的 catch 已是 console.error(e) 口径，
-          // 此处原先是 `() => {...}` 把 e 丢掉——「网络抖动」与「latest.json 未部署/404」
-          // 是两种完全不同的处置（前者重试即可，后者要查部署），丢掉错误就无从区分。
-          console.error('[load] latest.json 加载失败，回退整文件 lectures.json', e);
-          this._loadStaticFull(true);
-        });
+      //
+      // 失败重试（2026-10-13）：latest.json 一失败就会掉进 7.4MB 无长文本的降级路径
+      // （_loadFullSingle），首屏退化成「最简版」、简介摘要要等用户滚动才补——用户实测
+      // 遇到过（其网络中间层与 last_run.json 卡旧副本同源）。抖动与未部署是两种处置：
+      // 先重试两次（800ms/1600ms 退避，与 _loadChunks 同口径），仍失败才降级；
+      // r.ok 检查让 404/5xx 与网络抖动走同一重试口径（原代码直接 r.json()，
+      // 404 页可能解析出非预期结构）。
+      const attempt = (n) => {
+        fetch('lectures/latest.json?t=' + Date.now(), { cache: 'no-store' })
+          .then(r => {
+            if (!r.ok) throw new Error('latest-' + r.status);
+            return r.json();
+          })
+          .then(resp => {
+            this._applyLectureData(resp);
+            this.dataStage = 'partial';
+            this.loading = false;
+            this.bumpCount();          // 数字跳到 50（首屏已加载真实条数；阶梯跳变无动画）
+            // 后台继续分片加载完整数据（启用完整筛选翻页）
+            this._loadStaticFull();
+            // 首屏一渲染即在后台静默预取全部长文本（简介/摘要，16 桶 gzip 约 1.6MB）——
+            // 2026-09-30 用户定：原策略是「交互（滚动/聚焦/翻页）才预取」，导致「打开页面就
+            // 立即搜索」时桶还没下完、搜索被迫等待并弹「正在加载完整内容」提示。改为首屏即拉，
+            // 用户开始搜索时通常已就绪；即便未就绪，搜索也不再阻塞（先出已到结果、到齐静默补全），
+            // 见 computed.filtered 与 index.html 时间线分支。
+            this._ensureLongTextAll();
+          })
+          .catch((e) => {
+            // 2026-10-02：补原始错误。同文件 :167-174 的 catch 已是 console.error(e) 口径，
+            // 此处原先是 `() => {...}` 把 e 丢掉——「网络抖动」与「latest.json 未部署/404」
+            // 是两种完全不同的处置（前者重试即可，后者要查部署），丢掉错误就无从区分。
+            if (n < 3) {
+              console.warn(`[load] latest.json 第 ${n} 次加载失败，退避后重试`, e);
+              setTimeout(() => attempt(n + 1), 800 * Math.pow(2, n - 1));
+              return;
+            }
+            console.error('[load] latest.json 重试后仍失败，回退整文件 lectures.json', e);
+            this._loadStaticFull(true);
+          });
+      };
+      attempt(1);
     },
 
     _loadStaticFull(fallbackToOriginal = false) {
@@ -176,6 +194,11 @@ Object.assign(APP_METHODS, {
           this._applyLectureData(resp);
           this.dataStage = 'full';
           this.loading = false;
+          // 2026-10-13：降级路径也自动预取长文本——lectures.json 无简介/摘要，
+          // 不预取则首屏停在「最简版」且要等用户滚动/搜索才补（onScroll 才触发
+          // _ensureLongTextAll）。正常路径 _loadStaticLatest 首屏即拉，此前两条
+          // 路径不对称；本行使降级体验与正常路径对齐（几秒后自动补齐）。
+          this._ensureLongTextAll();
         })
         .catch(e => {
           console.error('加载完整讲座数据失败', e);
