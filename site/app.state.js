@@ -53,8 +53,9 @@ const APP_STATE = function () {
       _clampMeasured: false,   // 首次 DOM 测量是否已完成（兜底阈值在此之前生效）
       tick: Date.now(),     // 秒级心跳（响应式依赖）：statusInfo 内的「即将开始」倒计时读它触发每秒重渲染
       // 顶部数字展示值 = 已加载的真实条数。2026-09-30 起为「每分片跳变」，无插值动画：
-      // 每次分片到达由 bumpCount() 直接赋值（50 → 550 → 1050 …），故这两个字段
-      // 恒等于 totalCount / sourceNoticeCount，不存在中间过渡值。
+      // 每次分片到达由 bumpCount() 直接赋值（50 → 150 → 250 …，2026-10-14 起
+      // 100 条/片），故这两个字段恒等于 totalCount / sourceNoticeCount，
+      // 不存在中间过渡值。
       // 初值 0：mounted 时数据尚未加载，模板文案是「已加载 0+ 场讲座」。
       displayTotal: 0,
       displaySource: 0,

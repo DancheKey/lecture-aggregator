@@ -31,7 +31,12 @@ DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
 SITE_LECTURES_PATH = os.path.join(ROOT, 'site', 'lectures.json')
 SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
 LATEST_SIZE = 50
-CHUNK_SIZE = 500        # 公网分片加载：每片 500 条，失败可单独重试，数字渐进滚动
+CHUNK_SIZE = 100        # 公网分片加载：每片 100 条（2026-10-14 用户定，原 500）。
+# 背景：阶梯跳变形态下数字只在分片到达时更新（bumpCount 恒等于已加载真实条数，
+# 无插值动画——插值方案 2026-09-30 两轮被否：观感「平滑上滚→长时间不动→猛跳」
+# 且出现过负数）。500/片时 8 片大跳观感迟缓；100/片后 3830 条约 38 片，
+# 数字以 4 页（pageSize=25）为粒度持续小步更新，总下载量不变、单请求更小
+# （弱网友好），首片到达更快（50→150 秒现）。
 UNKNOWN_YEAR = '其他'
 # 首页首屏（latest.json）长文本截断长度：0 = 不截断（2026-09-29 起）。
 # 历史做法是按 220 字符截断 abstract/speakerBio「让首屏秒开」，但首屏 50 条正是用户
@@ -376,8 +381,9 @@ def write_detail_chunks(buckets, updated_at):
 def write_chunks(data, updated_at):
     """将全量数据切片为 chunk_NNNN.json，并写入 chunks.json 清单。
 
-    公网（GitHub Pages）下前端改为逐片加载：每片 ~1MB（500 条），比整文件 6MB 更抗弱网；
-    任一片失败仅重试该片，不影响其它片；每片到达数字滚动到已加载真实条数，
+    公网（GitHub Pages）下前端改为逐片加载：每片 ~200KB（100 条），比整文件 6MB 更抗弱网；
+    任一片失败仅重试该片，不影响其它片；每片到达数字跳变到已加载真实条数
+    （阶梯跳变，2026-10-14 起 100/片，数字以 4 页为粒度持续小步更新），
     彻底解决「手机端一次性拉 6MB 失败 -> 数字定格在 50」的问题。
     """
     # 清理旧分片：数据量减少时不残留（如 100 片缩到 50 片后旧的 chunk_0051+ 仍会被 git add 提交）
