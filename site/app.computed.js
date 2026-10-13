@@ -10,6 +10,9 @@
 // ⚠ 阈值语义线：7 天同时是 app.display.js::statusInfo 的「倒计时 / 只写未开始」
 //   分界（2026-10-06 用户裁定），两边是同一条产品线，改这里必须同步那边。
 const FAR_FUTURE_DAYS = 7;
+// 折叠触发的最小条数（2026-10-13 用户调整）：≥3 条远期才折成提示条；
+// 只有 1-2 条时直接渲染——量少不构成霸屏，折叠反而多一次点击。
+const FAR_FOLD_MIN = 3;
 // 远期折叠组在 pagedGroups 里的 key。真实日期组形如「2026-10-13 周二」，
 // 不会与此冲突；模板用它区分「折叠条」与「日期头」两种组头。
 const FAR_FOLD_KEY = '__far_future__';
@@ -283,6 +286,8 @@ const APP_COMPUTED = {
     // 远期折叠层（2026-10-13 方案 B 第二层）：把「未开始且 > FAR_FUTURE_DAYS 天」的
     // 渲染单元收进一个 far-fold 容器，容器占据原第一个被折叠单元的位置（未来区末尾），
     // 后续单元依次前移——units 数组总长度不变（fold 恒为 1 个单元），分页计数稳定。
+    // 仅当远期单元数 ≥ FAR_FOLD_MIN（3，2026-10-13 用户调整）才折叠；1-2 条走 flush 的
+    // else 分支原样吐出，顺序与不折叠路径完全一致。
     //
     // 为何用「start > now + 7d」而不再判未来段：filtered 两段式后 >7 天的必然全在
     // 未来区末尾且彼此相邻，该判定天然只在未来区命中；已结束段 start<now<cutoff
@@ -295,10 +300,12 @@ const APP_COMPUTED = {
       const out = [];
       let far = [];
       const flush = () => {
-        if (far.length) {
+        if (far.length >= FAR_FOLD_MIN) {
           out.push({ type: 'far-fold', recs: far, key: FAR_FOLD_KEY });
-          far = [];
+        } else {
+          far.forEach(u => out.push(u));
         }
+        far = [];
       };
       this.units.forEach(u => {
         const s = (u.type === 'forum' ? u.head.lectureStart : u.recs[0].lectureStart) || '';

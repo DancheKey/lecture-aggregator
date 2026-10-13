@@ -11,7 +11,8 @@
 //   test_01 filtered 两段式排序（未来升序在前 / 已结束倒序在后 / 无时间垫底）
 //   test_02 24h 内置顶（未来段升序的自然结果）
 //   test_03 pagedGroups 组间跟随 filtered 顺序（防层间抵消）
-//   test_04 foldedUnits：>7 天折成 far-fold 容器（位置=未来区末尾、恒占 1 位）
+//   test_04 foldedUnits：≥3 条 >7 天才折成 far-fold 容器（位置=未来区末尾、恒占 1 位）
+//   test_04b 1-2 条 >7 天不折叠（FAR_FOLD_MIN=3 边界）：原样渲染、顺序与不折叠路径一致
 //   test_05 无 >7 天时不产生折叠容器
 //   test_06 fold 组：折叠态 items 空、展开态 items=被折 units（原样走普通渲染分支）
 //   test_07 分页按 foldedUnits 计（展开/收起不改页数）
@@ -185,7 +186,7 @@ function makeCtx(allData, over) {
 {
   const data = [
     past(1, 'a'),
-    future(2 * DAY, 2, 'b'), future(8 * DAY, 3, 'c'), future(20 * DAY, 4, 'd'),
+    future(2 * DAY, 2, 'b'), future(8 * DAY, 3, 'c'), future(20 * DAY, 4, 'd'), future(30 * DAY, 5, 'e'),
   ];
   const cm = makeCtx(data);
   const units = cm.units;
@@ -193,9 +194,9 @@ function makeCtx(allData, over) {
   const fold = folded.filter(u => u.type === 'far-fold');
   ok(fold.length === 1, `test_04 应恰有 1 个 far-fold 容器，实际=${fold.length}`);
   ok(fold[0].key === CONSTS.FAR_FOLD_KEY, `test_04 fold key 应为 ${CONSTS.FAR_FOLD_KEY}`);
-  ok(fold[0].recs.length === 2, `test_04 应折入 2 场（+8/+20 天），实际=${fold[0].recs.length}`);
+  ok(fold[0].recs.length === 3, `test_04 应折入 3 场（+8/+20/+30 天，≥FAR_FOLD_MIN=3），实际=${fold[0].recs.length}`);
   // 折叠守恒：foldedUnits 数 = units 数 - 被折数 + 1
-  ok(folded.length === units.length - 2 + 1,
+  ok(folded.length === units.length - 3 + 1,
      `test_04 折叠后单元数应守恒，units=${units.length} folded=${folded.length}`);
   // 位置：fold 容器应紧跟在最后一个 ≤7 天未来单元之后（未来区末尾）
   const foldIdx = folded.findIndex(u => u.type === 'far-fold');
@@ -211,21 +212,45 @@ function makeCtx(allData, over) {
   ok(cm2.foldedUnits.length === cm2.units.length, 'test_05 无折叠时 foldedUnits 应与 units 等长');
 }
 
+// ---------- test_04b：1-2 条远期不折叠（FAR_FOLD_MIN=3 边界，2026-10-13 用户调整） ----------
+{
+  // 1 条远期：直接渲染，无折叠容器；foldedUnits 与 units 等长（不减位）
+  const cm1 = makeCtx([past(1, 'a'), future(2 * DAY, 2, 'b'), future(8 * DAY, 3, 'c')]);
+  ok(cm1.foldedUnits.filter(u => u.type === 'far-fold').length === 0,
+     'test_04b 仅 1 条远期不得折叠');
+  ok(cm1.foldedUnits.length === cm1.units.length,
+     'test_04b 1 条远期时 foldedUnits 应与 units 等长');
+  // 未折叠的远期单元必须仍在渲染链里（不被隐藏）
+  ok(cm1.pagedUnits.some(u => u.recs[0].title === 'c'),
+     'test_04b 未折叠的远期单元必须仍在 pagedUnits 中');
+  // 顺序与 filtered 完全一致（未来升序 b,c + 已结束 a 垫底）
+  ok(cm1.foldedUnits.map(u => u.recs[0].title).join(',') === 'b,c,a',
+     `test_04b 1 条远期不折时顺序应为 b,c,a，实际=${cm1.foldedUnits.map(u => u.recs[0].title).join(',')}`);
+  // 2 条远期：仍不折叠（<3）
+  const cm2 = makeCtx([past(1, 'a'), future(2 * DAY, 2, 'b'), future(8 * DAY, 3, 'c'), future(20 * DAY, 4, 'd')]);
+  ok(cm2.foldedUnits.filter(u => u.type === 'far-fold').length === 0,
+     'test_04b 2 条远期仍不得折叠');
+  ok(cm2.foldedUnits.length === cm2.units.length,
+     'test_04b 2 条远期时 foldedUnits 应与 units 等长');
+  ok(cm2.foldedUnits.map(u => u.recs[0].title).join(',') === 'b,c,d,a',
+     `test_04b 2 条远期不折时顺序应为 b,c,d,a，实际=${cm2.foldedUnits.map(u => u.recs[0].title).join(',')}`);
+}
+
 // ---------- test_06/07：fold 组渲染数据与分页稳定性 ----------
 {
   const data = [
     past(1, 'a'),
-    future(2 * DAY, 2, 'b'), future(8 * DAY, 3, 'c'), future(20 * DAY, 4, 'd'),
+    future(2 * DAY, 2, 'b'), future(8 * DAY, 3, 'c'), future(20 * DAY, 4, 'd'), future(30 * DAY, 5, 'e'),
   ];
   const cm = makeCtx(data);
   const foldGroup = cm.pagedGroups.find(g => g.key === CONSTS.FAR_FOLD_KEY);
   ok(!!foldGroup, 'test_06 pagedGroups 应含 far-fold 组');
-  ok(foldGroup.count === 2, `test_06 fold 组 count 应为 2，实际=${foldGroup.count}`);
+  ok(foldGroup.count === 3, `test_06 fold 组 count 应为 3，实际=${foldGroup.count}`);
   ok(foldGroup.items.length === 0, 'test_06 折叠态 fold 组 items 应为空');
   // 展开态：items = 被折 units（原样，供模板 forum/single 分支复用）
   const cmOpen = makeCtx(data, { farFutureOpen: true });
   const foldGroupOpen = cmOpen.pagedGroups.find(g => g.key === CONSTS.FAR_FOLD_KEY);
-  ok(foldGroupOpen.items.length === 2, 'test_06 展开态 fold 组 items 应为被折的 2 个单元');
+  ok(foldGroupOpen.items.length === 3, 'test_06 展开态 fold 组 items 应为被折的 3 个单元');
   ok(foldGroupOpen.items.every(u => u.type === 'single'),
      'test_06 展开态 items 应保留原 unit 类型');
   // 分页：展开前后 foldedUnits 长度一致 → 页数一致
