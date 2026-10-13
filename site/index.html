@@ -373,6 +373,10 @@
                   </span>
                   <span v-if="isDateSuspect(u.head)" class="px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-amber-50 text-amber-600 border border-amber-200"
                     title="解析器对该条的日期置信度为 low（跨年窗口无法判定/发布时间不可解析），年份可能有误">日期待核</span>
+                  <!-- 实际举办校区角标（2026-10-13）：归口校级但 location 可推导出举办校区时显示；
+                       移动端隐藏（窄屏下地点行文字已含校区信息，角标让位给时间+状态徽章） -->
+                  <span v-if="u.head.actualCampus" class="hidden sm:inline px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200"
+                    :title="'归口校级单位，实际举办校区：' + u.head.actualCampus">📍 {{ u.head.actualCampus }}</span>
                   <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap', statusInfo(u.head).cls]">
                     <span class="hidden sm:inline">{{ statusInfo(u.head).label }}</span>
                     <span class="sm:hidden">{{ statusInfo(u.head).labelShort }}</span>
@@ -444,6 +448,10 @@
                   </span>
                   <span v-if="isDateSuspect(l)" class="px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-amber-50 text-amber-600 border border-amber-200"
                     title="解析器对该条的日期置信度为 low（跨年窗口无法判定/发布时间不可解析），年份可能有误">日期待核</span>
+                  <!-- 实际举办校区角标（2026-10-13）：归口校级但 location 可推导出举办校区时显示；
+                       移动端隐藏（窄屏下地点行文字已含校区信息，角标让位给时间+状态徽章） -->
+                  <span v-if="l.actualCampus" class="hidden sm:inline px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap bg-sky-50 text-sky-600 border border-sky-200"
+                    :title="'归口校级单位，实际举办校区：' + l.actualCampus">📍 {{ l.actualCampus }}</span>
                   <span :class="['ml-auto px-2 py-0.5 rounded text-11pt font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1', statusInfo(l).cls]">
                     <span v-if="statusInfo(l).dot" class="live-dot rounded-full shrink-0" style="width:6px;height:6px;background:currentColor"></span>
                     <!-- 移动端用紧凑倒计时（还有 17:44:59），桌面端保留完整语义（即将开始 · 还有 17 时 44 分 59 秒） -->
@@ -695,7 +703,7 @@
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=542facedad"></script>
   <script defer src="app.state.js?v=302000ff68"></script>
-  <script defer src="app.computed.js?v=fd904f53c8"></script>
+  <script defer src="app.computed.js?v=4937bd3c76"></script>
   <script defer src="app.display.js?v=a993718c1f"></script>
   <script defer src="app.social.js?v=9eaccf4e6f"></script>
   <script defer src="app.data.js?v=b1bfddd28d"></script>

@@ -337,6 +337,10 @@ def with_unit(item, url_dates):
     if item.get('lectureIndex') is not None:
         dates = url_dates.get(item.get('sourceUrl') or '', set())
         it['unitType'] = 'session' if len(dates) == 1 else 'issue'
+    # 实际举办校区（2026-10-13 用户拍板）：校级讲座按 location 推导，仅写 site 层
+    ac = _fv.actual_campus(item)
+    if ac:
+        it['actualCampus'] = ac
     # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
     it['speakerKeys'] = speaker_keys(item.get('speaker'))
     return strip_frontend_fields(it)

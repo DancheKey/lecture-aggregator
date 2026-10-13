@@ -55,6 +55,9 @@ FRONTEND_KEEP = frozenset({
     'images', 'hasPosterImage', 'imageParseMethod',
     # 派生键（由 with_unit / _attach_unit_types / split_long_text 加工，strip 不得删除）
     'speakerKeys',
+    # 实际举办校区（2026-10-13 用户拍板）：校级讲座按 location 推导（南海归佛山），
+    # 仅写 site 层；前端校区筛选 OR 分支（app.computed.js）与卡片角标（index.html）消费
+    'actualCampus',
     'b',  # 长文本所在桶号（0-15）：展开某条时前端据此只拉那一桶 detail 分片
 })
 

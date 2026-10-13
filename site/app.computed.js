@@ -98,7 +98,10 @@ const APP_COMPUTED = {
         // 合并讲座可能跨校区/学院，任一来源匹配即保留
         if (this.campus) {
           const campuses = new Set([l.campus, ...(l.sources || []).map(s => s.campus)].filter(Boolean));
-          if (!campuses.has(this.campus)) return false;
+          // actualCampus（2026-10-13）：校级讲座按 location 推导的实际举办校区，
+          // 归口仍算校级，但点具体校区时应能筛到（如研究生院讲座在大学城办）。
+          // 「校级」筛选项本身不受影响——校级记录的 campus 仍是「校级」。
+          if (!campuses.has(this.campus) && l.actualCampus !== this.campus) return false;
         }
         if (this.college) {
           const colleges = new Set([l.college, ...(l.sources || []).map(s => s.college)].filter(Boolean));

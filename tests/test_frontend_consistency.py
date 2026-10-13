@@ -72,6 +72,28 @@ SYNTHETIC = [
     # 有 lectureIndex 但全组无日期：dates 为空集 → 两条路径都应判 issue
     {'sourceUrl': 'http://d.scnu.edu.cn/w/4.html', 'lectureIndex': 1,
      'isMultiLecture': True, 'title': '无日期分期'},
+    # 实际举办校区推导（2026-10-13 用户拍板）：校级+location 命中 → actualCampus
+    {'sourceUrl': 'http://e.scnu.edu.cn/v/5.html', 'lectureStart': '2026-09-05 15:00:00',
+     'campus': '校级', 'location': '大学城校园文1栋模拟法庭', 'title': '校级大学城场'},
+    # 南海校区归入佛山（2026-10-13 用户裁定）
+    {'sourceUrl': 'http://f.scnu.edu.cn/v/6.html', 'lectureStart': '2026-09-06 15:00:00',
+     'campus': '校级', 'location': '南海校区多功能会议厅', 'title': '校级南海场'},
+    # 校级但 location 无校区关键词 → 不推导（举办地未知，仍归校级）
+    {'sourceUrl': 'http://g.scnu.edu.cn/v/7.html', 'lectureStart': '2026-09-07 15:00:00',
+     'campus': '校级', 'location': '待公布', 'title': '校级无地点场'},
+    # 非校级（归口即校区级单位）→ 不推导，哪怕 location 含校区词
+    {'sourceUrl': 'http://h.scnu.edu.cn/v/8.html', 'lectureStart': '2026-09-08 15:00:00',
+     'campus': '石牌', 'location': '石牌校园教育科学学院125室', 'title': '石牌学院场'},
+    # 建筑/单位名推导（2026-10-13 用户裁定三条：桃李园→石牌、心理学院→石牌、文二栋→大学城）
+    {'sourceUrl': 'http://i.scnu.edu.cn/v/9.html', 'lectureStart': '2026-09-09 15:00:00',
+     'campus': '校级', 'location': '桃李园三楼高明厅', 'title': '校级桃李园场'},
+    {'sourceUrl': 'http://j.scnu.edu.cn/v/10.html', 'lectureStart': '2026-09-10 15:00:00',
+     'campus': '校级', 'location': '心理学院520报告厅', 'title': '校级心理学院场'},
+    {'sourceUrl': 'http://k.scnu.edu.cn/v/11.html', 'lectureStart': '2026-09-11 15:00:00',
+     'campus': '校级', 'location': '文二栋536', 'title': '校级文二栋场'},
+    # 优先级：显式校区词先于建筑名（「大学城校园心理学院…」归大学城，不归石牌）
+    {'sourceUrl': 'http://l.scnu.edu.cn/v/12.html', 'lectureStart': '2026-09-12 15:00:00',
+     'campus': '校级', 'location': '大学城校园心理学院301', 'title': '校级显式优先场'},
 ]
 
 
@@ -90,6 +112,22 @@ class ConsistencyTest(unittest.TestCase):
         self.assertEqual(got_gen[2].get('unitType'), 'issue')     # 跨天分期 → 期
         self.assertNotIn('unitType', got_gen[4])                  # 无 lectureIndex → 不标注
         self.assertEqual(got_gen[5].get('unitType'), 'issue')     # 无日期 → 期（与现状一致）
+        # 实际举办校区推导（2026-10-13 用户拍板）：显式锁语义，防「两边一起错」
+        self.assertEqual(got_gen[6].get('actualCampus'), '大学城')
+        self.assertEqual(got_gen[7].get('actualCampus'), '佛山')  # 南海归佛山
+        self.assertNotIn('actualCampus', got_gen[8])              # 无关键词不推导
+        self.assertNotIn('actualCampus', got_gen[9])              # 非校级不推导
+        # 两条路径必须同产该字段（单边接入即漂移，全量回归兜底之外再显式锁一对）
+        self.assertEqual(got_gen[6].get('actualCampus'), got_srv[6].get('actualCampus'))
+        self.assertEqual(got_gen[7].get('actualCampus'), got_srv[7].get('actualCampus'))
+        # 建筑/单位名推导（2026-10-13 用户裁定三条）
+        self.assertEqual(got_gen[10].get('actualCampus'), '石牌')   # 桃李园
+        self.assertEqual(got_gen[11].get('actualCampus'), '石牌')   # 心理学院
+        self.assertEqual(got_gen[12].get('actualCampus'), '大学城')  # 文二栋
+        # 显式校区词优先于建筑名（防优先级反转）
+        self.assertEqual(got_gen[13].get('actualCampus'), '大学城')
+        self.assertEqual(got_gen[11].get('actualCampus'), got_srv[11].get('actualCampus'))
+        self.assertEqual(got_gen[12].get('actualCampus'), got_srv[12].get('actualCampus'))
 
     def test_excluded_filter_equal(self):
         """排除名单读取：三条路径必须返回相同集合（generate ↔ server ↔ scraper）。"""

@@ -593,6 +593,74 @@ def is_placeholder_time(record):
 
 
 # ---------------------------------------------------------------------------
+# 实际举办校区推导（2026-10-13 用户拍板「校级讲座按举办地归入校区」）
+#
+# 背景：campus 字段是 sources.yaml 里每个源的**归口管理单位**（校级单位如
+# 研究生院的讲座 campus=校级），不代表举办地。用户要求校级讲座能按实际
+# 举办校区筛选（如研究生院讲座实际在大学城举办，点「大学城」应出现）。
+#
+# 规则：仅 campus='校级' 且 location 原文含校区关键词时推导——其他归口本身
+# 就是校区级单位（如物理学院=大学城），其 location 基本落在本校区间，推导
+# 只会产出与 campus 相同的冗余值，故不推导。
+# ⚠ 南海校区归入佛山（2026-10-13 用户裁定：南海属佛山）。
+# 推导值只写 site 层派生字段 actualCampus（与 unitType 同模式），不动源数据。
+#
+# 单一事实源：scripts/generate_frontend_data.py::with_unit 与
+# server.py::_attach_unit_types 都调本函数（同 speaker_keys 的收敛模式），
+# 两条产出路径由构造保证一致，不再手工复制。
+# ---------------------------------------------------------------------------
+
+# 关键词 -> 归入校区。多关键词命中取表中第一个（「南海」先于「佛山」，
+# 两者都归佛山，显式排列让「南海优先级」可读）。
+_CAMPUS_KEYWORDS = [
+    ('南海', '佛山'),
+    ('佛山', '佛山'),
+    ('大学城', '大学城'),
+    ('石牌', '石牌'),
+    ('汕尾', '汕尾'),
+]
+
+# 建筑/单位名 -> 归入校区（2026-10-13 用户裁定三条 + 全库共现统计佐证）。
+# 用途：location 只写建筑名不写校区词时（如「桃李园三楼高明厅」「心理学院
+# 520报告厅」「文二栋536」），仍能把校级讲座归到实际举办校区。
+# 共现佐证（非校级记录 location 含该词的 campus 分布）：
+#   桃李园→石牌、心理学院→石牌 1460 次、文二栋→大学城 100%。
+# ⚠ 扫描顺序在 _CAMPUS_KEYWORDS 之后：location 同时含显式校区词与建筑名时，
+#   以显式校区词为准（「大学城校园心理学院…」归大学城，不归石牌）。
+_BUILDING_CAMPUS = [
+    ('桃李园', '石牌'),
+    ('心理学院', '石牌'),
+    ('文二栋', '大学城'),
+]
+
+
+def actual_campus(item):
+    """按 location 原文推导校级讲座的实际举办校区；推导不出返回 None。
+
+    :param item: 讲座记录 dict，读取 campus 与 location
+    :return: 校区名（'大学城'/'石牌'/'佛山'/'汕尾'）或 None
+
+    仅 campus='校级' 才推导（其余归口即校区级单位，无需推导）。
+    两段扫描：先显式校区关键词（_CAMPUS_KEYWORDS），后建筑/单位名
+    （_BUILDING_CAMPUS）——前者是源页明示，优先级更高。
+    与前端 site/app.computed.js 筛选 OR 分支、index.html 卡片角标配套：
+    有值才显示/参与匹配，无值即「举办地未知，仍归校级」。
+    """
+    if not item or (item.get('campus') or '') != '校级':
+        return None
+    loc = item.get('location') or ''
+    if not isinstance(loc, str):
+        return None
+    for kw, val in _CAMPUS_KEYWORDS:
+        if kw in loc:
+            return val
+    for name, val in _BUILDING_CAMPUS:
+        if name in loc:
+            return val
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Speaker 形态学污染判据（C2 收敛单一事实源，2026-09-22）
 #
 # 病根：多人白名单与判脏正则原只活在 hybrid._is_dirty_value，体检
