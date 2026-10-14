@@ -823,5 +823,107 @@ class TestNoTestSideEffects(unittest.TestCase):
             self.assertIsInstance(pyyaml.safe_load(f), dict)
 
 
+class TestSourcesUrlValidation(_SourcesRoundTripBase):
+    """信息源写接口的 URL 白名单与重名校验（2026-10-14 P2-4）。
+
+    背景：POST/PUT 此前只有类型校验。校外/内网地址（如 http://169.254.169.254/）
+    写进 sources.yaml 后，scraper 每轮把它记 failed_sources → CI gate 红 +
+    全局水位冻结（自伤 DoS）；重名源扰乱按源名索引的 PAGESTOP 基线。
+    写接口侧拦截，与 scraper.fetch 的域名白名单同口径。
+    """
+
+    class _Stub:
+        pass
+
+    def _post_handler(self, body):
+        h = self._Stub()
+        self._bind(h, '_load_sources', '_save_sources', '_api_sources_post')
+        h.sent = []
+        h._send_json = lambda payload, code=200: h.sent.append((code, payload))
+        h._read_body_json = lambda: body
+        return h
+
+    def _put_handler(self, idx, body):
+        h = self._Stub()
+        self._bind(h, '_load_sources', '_save_sources', '_api_sources_put')
+        h.sent = []
+        h._send_json = lambda payload, code=200: h.sent.append((code, payload))
+        h._read_body_json = lambda: body
+        h.idx = idx
+        return h
+
+    def _first_real_name(self):
+        import yaml as pyyaml
+        with open(self.real_path, 'r', encoding='utf-8') as f:
+            srcs = (pyyaml.safe_load(f) or {}).get('sources') or []
+        return srcs[0]['name']
+
+    def test_11_POST校外base被拒且不落盘(self):
+        h = self._post_handler({'name': '测试源', 'base': 'http://evil.example.org',
+                                'list_urls': []})
+        h._api_sources_post()
+        code, payload = h.sent[-1]
+        self.assertEqual(code, 400, f'校外 base 须 400：{payload}')
+        self.assertEqual(self._read(), self.before_text, '被拒请求不应落盘')
+
+    def test_12_POST非常规scheme被拒(self):
+        h = self._post_handler({'name': '测试源', 'base': 'file:///etc/passwd',
+                                'list_urls': []})
+        h._api_sources_post()
+        self.assertEqual(h.sent[-1][0], 400, f'file:// 须 400：{h.sent[-1]}')
+
+    def test_13_POST合法scnu地址放行(self):
+        h = self._post_handler({'name': '测试新源xyz', 'base': 'https://jky.scnu.edu.cn',
+                                'list_urls': [{'url': 'https://jky.scnu.edu.cn/a/', 'collect_mode': 'all_items'}]})
+        h._api_sources_post()
+        code, payload = h.sent[-1]
+        self.assertEqual(code, 200, f'合法 scnu 地址应放行：{payload}')
+
+    def test_14_POST重名被拒(self):
+        name = self._first_real_name()
+        h = self._post_handler({'name': name, 'base': 'https://jky.scnu.edu.cn',
+                                'list_urls': []})
+        h._api_sources_post()
+        code, payload = h.sent[-1]
+        self.assertEqual(code, 400, f'重名须 400：{payload}')
+        self.assertIn('已存在', payload.get('message', ''))
+        self.assertEqual(self._read(), self.before_text, '被拒请求不应落盘')
+
+    def test_15_POST_list_urls校外地址被拒(self):
+        h = self._post_handler({'name': '测试新源xyz', 'base': 'https://jky.scnu.edu.cn',
+                                'list_urls': ['http://evil.example.org/x/']})
+        h._api_sources_post()
+        self.assertEqual(h.sent[-1][0], 400, f'list_urls 校外地址须 400：{h.sent[-1]}')
+
+    def test_16_PUT改base为校外被拒(self):
+        h = self._put_handler(0, {'base': 'http://evil.example.org'})
+        h._api_sources_put(0)
+        code, payload = h.sent[-1]
+        self.assertEqual(code, 400, f'PUT 校外 base 须 400：{payload}')
+        self.assertEqual(self._read(), self.before_text, '被拒请求不应落盘')
+
+    def test_17_PUT改名与别源重名被拒(self):
+        import yaml as pyyaml
+        with open(self.real_path, 'r', encoding='utf-8') as f:
+            srcs = (pyyaml.safe_load(f) or {}).get('sources') or []
+        other = srcs[1]['name']
+        h = self._put_handler(0, {'name': other})
+        h._api_sources_put(0)
+        code, payload = h.sent[-1]
+        self.assertEqual(code, 400, f'PUT 重名须 400：{payload}')
+        self.assertEqual(self._read(), self.before_text, '被拒请求不应落盘')
+
+    def test_18_白名单与scraper抓取端对齐(self):
+        """server 白名单与 scraper.DEFAULT_ALLOWED_DOMAINS 必须一致（双源防漂移）。"""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            '_scraper_mod_for_test', os.path.join(ROOT, 'scraper', 'scraper.py'))
+        scraper_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scraper_mod)
+        self.assertEqual(set(self.srv.SOURCE_ALLOWED_DOMAINS),
+                         set(scraper_mod.DEFAULT_ALLOWED_DOMAINS),
+                         'server 与 scraper 的域名白名单不一致（改一处必须同步另一处）')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

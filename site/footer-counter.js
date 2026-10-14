@@ -102,6 +102,12 @@
     var script = document.createElement('script');
     script.async = true;
     script.src = 'https://busuanzi.aspark.cc/js';
+    // SRI 已核实不可行（2026-10-14 P2-3 排查结论）：跨域脚本带 integrity 必须
+    // crossOrigin='anonymous' 且服务端返回 Access-Control-Allow-Origin，而
+    // busuanzi.aspark.cc 实测不返回任何 CORS 头 → 加 integrity 会让浏览器
+    // 直接拒绝加载、计数停更（onerror 降级反受其害）。替代防护：index.html 的
+    // CSP script-src 已从整域放行收敛到具体路径 /js（同域其他路径被挂马会被挡），
+    // connect-src 保留整域（busuanzi 计数 API 路径可能随版本变化）。
     script.onerror = fallbackToArchive;   // 脚本加载失败（服务下线/被墙）同样降级
     document.head.appendChild(script);
   }

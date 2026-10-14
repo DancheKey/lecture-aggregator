@@ -204,5 +204,53 @@ class SharedCacheTest(unittest.TestCase):
         self.assertIsNone(llm_cache.cache_get('k'))      # 仍不得抛
 
 
+class LlmFailureWarnTest(unittest.TestCase):
+    """P2-8：LLM 通道失败必须留痕（2026-10-14）。
+
+    原实现 3 次重试耗尽/鉴权失败后静默返回 None：key 过期、限费、网络中断
+    在服务端零痕迹，表现为「今天没抓到什么」，极易误判为源站无更新。
+    本类断言：失败路径写 WARN 到 stderr，且返回值语义不变（仍为 None）。
+    """
+
+    def _run_post(self, fake_post):
+        import io
+        import contextlib
+        import llm_provider
+        p = llm_provider.AgnesProvider(api_key='test-key', model='test-model')
+        llm_provider.time.sleep = lambda *a: None  # 跳过重试退避
+        orig = llm_provider.requests.post
+        llm_provider.requests.post = fake_post
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(buf):
+                result = p._post([{'role': 'user', 'content': 'x'}], 0.0)
+        finally:
+            llm_provider.requests.post = orig
+        return result, buf.getvalue()
+
+    def test_59_鉴权失败告警且返回None(self):
+        class _R:
+            status_code = 401
+
+            def raise_for_status(self):
+                pass
+        result, err = self._run_post(lambda *a, **k: _R())
+        self.assertIsNone(result)
+        self.assertIn('401', err)
+        self.assertIn('llm[agnes]', err)
+
+    def test_60_重试耗尽告警且返回None(self):
+        calls = {'n': 0}
+
+        def _post(*a, **k):
+            calls['n'] += 1
+            raise ConnectionError('network unreachable')
+        result, err = self._run_post(_post)
+        self.assertIsNone(result)
+        self.assertEqual(calls['n'], 3, '应重试满 3 次')
+        self.assertIn('3 次重试均失败', err)
+        self.assertIn('network unreachable', err)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

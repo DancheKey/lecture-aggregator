@@ -264,11 +264,16 @@ Object.assign(APP_METHODS, {
       //   ① 在第 1 页点「讲者」标签 → DOM 全换、签名不变 → 跳过测量 →
       //      新卡片测不到溢出，「展开简介/摘要」按钮缺失且字符数兜底已失效；
       //   ② 二次筛选（默认就在第 1 页）同样不触发重测。
+      // 2026-10-14 补 onlineOnly/farFutureOpen（修复 P2-1）：两者同样整体更换卡片 DOM
+      // （onlineOnly 线上筛选、farFutureOpen 远期折叠 items 从 [] 变全部），
+      // 且都在第 1 页原位切换、不触发翻页 → 签名不变 → 测量被跳过 →
+      // 新卡片无溢出记录 → 「展开摘要/展开简介」按钮静默缺失，零报错。与 B2 同根。
       const sig = [this.currentPage, this.query, this.searchField, this.campus,
         this.college, this.year, this.speaker, this.showLikedOnly,
         this.all.length, this.dataStage, window.innerWidth,
         Object.keys(this._longText).length,
-        JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio)].join('|');
+        JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio),
+        this.onlineOnly, this.farFutureOpen].join('|');
       if (sig === this._clampSig) return;
       this._clampSig = sig;
       const next = {};

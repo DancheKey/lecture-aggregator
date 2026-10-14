@@ -79,12 +79,19 @@ createApp({
     //（mode 计算属性已在 2026-08-13 清理冗余时删除，模板统一使用 displayMode）
 
     // 当前校区筛选下的学院集合（'' = 全部学院）
+    // 双集合口径（2026-10-14 P2-2，与首页 filtered() 对齐）：归口校区 ∪ 实际举办校区。
+    // 早前只看 campusMap（学院→归口校区），校级讲座实际在大学城/石牌办的 232 条
+    // 在具体校区筛选中完全看不到；首页按 actualCampus 能筛到，两页口径分叉。
     campusColleges() {
       if (!this.campusFilter) return null;
       const cmap = (this.summary && this.summary.campusMap) || {};
+      const amap = (this.summary && this.summary.campusActualMap) || {};
       const set = new Set();
       Object.entries(cmap).forEach(([college, campus]) => {
         if (campus === this.campusFilter) set.add(college);
+      });
+      Object.entries(amap).forEach(([college, list]) => {
+        if (Array.isArray(list) && list.includes(this.campusFilter)) set.add(college);
       });
       return set;
     },

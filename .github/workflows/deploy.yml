@@ -115,7 +115,23 @@ jobs:
               *)cmd="python $t" ;;
             esac
             echo "::group::$cmd"
-            if ! $cmd; then rc=1; echo "::endgroup::"; echo "FAILED: $cmd"; else echo "::endgroup::"; fi
+            # 2026-10-14 P2-6：失败时把该测试的末尾日志（断言详情/回溯尾部）写进
+            # $GITHUB_STEP_SUMMARY——协作者无 admin 权限下载完整日志，邮件里只有
+            # 步骤名无法定位；summary 展示在 run 页顶部并进邮件摘要。
+            if ! out=$($cmd 2>&1); then
+              rc=1
+              echo "::endgroup::"
+              echo "FAILED: $cmd"
+              {
+                echo "### ❌ $cmd"
+                echo '```'
+                echo "$out" | tail -25
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::endgroup::"
+              echo "ok: $cmd"
+            fi
           done
           if [ "$rc" -ne 0 ]; then
             echo "门禁未通过，终止部署。"

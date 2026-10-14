@@ -22,12 +22,23 @@ import hashlib
 import json
 import os
 import re
+import sys
 import threading
 import time
 
 import requests
 
 import field_vocab as _fv
+
+
+def _llm_warn(name, msg):
+    """LLM 通道失败告警（2026-10-14 P2-8）。
+
+    原实现 3 次重试耗尽/鉴权失败后静默返回 None：key 过期、限费、网络中断
+    在服务端零痕迹，表现为「今天没抓到什么」，极易误判为源站无更新。
+    告警只写 stderr（CI/daily 日志可见），不改变任何返回值语义。
+    """
+    print('[WARN] llm[%s]: %s' % (name, msg), file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -427,7 +438,10 @@ class AgnesProvider(ModelProvider):
                 r = requests.post(self.base_url, headers=headers, json=payload,
                                   timeout=60, proxies=proxies)
                 if r.status_code in (401, 403):
-                    return None  # 鉴权失败，重试无意义
+                    _llm_warn(self.name,
+                              '鉴权失败 HTTP %d（API key 无效/过期，重试无意义）'
+                              % r.status_code)
+                    return None
                 if r.status_code == 429 and attempt < 2:
                     time.sleep(5 * (attempt + 1))
                     continue
@@ -436,11 +450,14 @@ class AgnesProvider(ModelProvider):
                     continue
                 r.raise_for_status()
                 return r.json()['choices'][0]['message']['content']
-            except Exception:
+            except Exception as e:
                 if attempt < 2:
                     time.sleep(3 * (attempt + 1))
                     continue
+                _llm_warn(self.name, '3 次重试均失败: %s: %s'
+                          % (type(e).__name__, e))
                 return None
+        _llm_warn(self.name, '3 次重试均失败（429/5xx 持续）')
         return None
 
     def extract_text(self, body_text, *, temperature=0.0):
@@ -558,11 +575,14 @@ class ZhipuProvider(ModelProvider):
                     continue
                 r.raise_for_status()
                 return r.json()['choices'][0]['message']['content']
-            except Exception:
+            except Exception as e:
                 if attempt < 2:
                     time.sleep(3 * (attempt + 1))
                     continue
+                _llm_warn(self.name, '3 次重试均失败: %s: %s'
+                          % (type(e).__name__, e))
                 return None
+        _llm_warn(self.name, '3 次重试均失败（429/5xx 持续）')
         return None
 
     def extract_text(self, body_text, *, temperature=0.0):

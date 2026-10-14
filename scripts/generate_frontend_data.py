@@ -234,6 +234,10 @@ def build_stats(data, updated_at):
     lectures = []
     # 学院 -> 校区（供统计页校区筛选）
     campus_map = {}
+    # 学院 -> 实际举办校区集合（2026-10-14 P2-2）：校级等讲座按 location 推导的
+    # 实际举办校区，供统计页按「归口 ∪ 实际举办」双集合筛选（与首页
+    # app.computed.js filtered() 的 actualCampus 口径一致）。
+    campus_actual = {}
 
     for item in data:
         y = year_of(item)
@@ -268,6 +272,11 @@ def build_stats(data, updated_at):
             else:
                 src = next((s for s in sources if s.get('college') == c), None)
                 campus_map[c] = (src or {}).get('campus') or ''
+        # 学院 -> 实际举办校区集合（P2-2）：讲座归属的每个单位都记入该场的实际校区
+        _ac = _fv.actual_campus(item)
+        if _ac:
+            for c in units:
+                campus_actual.setdefault(c, set()).add(_ac)
         # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞。
         # cs = 该讲座归属的全部单位（含主学院与来源单位），供访问/点赞按单位展开归属；
         # c = 主学院（保留，供来源通知数等按主讲座口径统计）。
@@ -303,6 +312,8 @@ def build_stats(data, updated_at):
         'yearTotals': year_totals,
         'lectures': lectures,
         'campusMap': campus_map,
+        # 实际举办校区集合（P2-2）：set 不可 JSON 序列化，转排序列表
+        'campusActualMap': {c: sorted(v) for c, v in campus_actual.items()},
     }
 
 

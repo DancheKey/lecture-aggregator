@@ -212,6 +212,13 @@ jobs:
       - name: Run module compile gate
         run: python tests/test_module_compile.py
 
+      # 防漂移元测试（2026-10-14 P2-5）：锁「deploy 的 GATE_TESTS ⊇ 本文件引用、
+      # 无游离测试、deploy needs:gate 在位、cron 时刻三处同步」。此前它只在 deploy
+      # gate 侧跑，PR 路径不跑——只改本文件忘同步 GATE_TESTS 时 PR 全绿、合并后才拦，
+      # 反馈晚一个环节，正是元测试要防的模式（两侧必须同步，见该套件 docstring）。
+      - name: Run CI gate coverage meta tests
+        run: python tests/test_ci_gate_coverage.py
+
       # 解析器自动产出 timeUnknown（2026-10-03，方案 A）。
       # 08:00/00:00 是占位约定（源页只给日期时填充），但确有讲座真在 8:00 开始。
       # 此前该区分全靠人工在 data/lectures.json 里标注，而爬虫不产出该字段 →
@@ -329,3 +336,15 @@ jobs:
       # （不得再各自定义锁）与动态（200 并发写不丢条目）。
       - name: Run shared LLM cache tests
         run: python tests/test_llm_cache.py
+
+      # 失败速查（2026-10-14 P2-6）：本文件是逐步形态，失败 step 即停、无循环可汇总。
+      # 公开仓库的 step 日志匿名即可读，此摘要给出失败后的标准排查入口；
+      # 部署侧（deploy.yml gate 循环）失败时会把失败测试的末尾日志直接写进摘要。
+      - name: 失败排查提示写入 step summary
+        if: failure()
+        run: |
+          {
+            echo "### ❌ 门禁未通过";
+            echo "点击上方红色 × 的步骤展开日志（公开仓库无需登录即可查看完整输出）。";
+            echo "部署侧（deploy.yml gate）失败时会把失败测试的末尾日志直接写进摘要。";
+          } >> "$GITHUB_STEP_SUMMARY"

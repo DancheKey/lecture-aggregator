@@ -588,5 +588,119 @@ class TestFrameGuardCoverage(unittest.TestCase):
                       'gen_visits_trend.py 的 JS 常量缺顶层放行 IIFE')
 
 
+class StatsCampusDualSetTest(unittest.TestCase):
+    """统计页校区筛选必须是「归口 ∪ 实际举办」双集合口径（2026-10-14 P2-2）。
+
+    首页 filtered() 按 `campus ∪ sources ∪ actualCampus` 记录级筛选；统计页此前
+    只看 campusMap（学院→归口校区），校级讲座实际在石牌/大学城办的 232 条在具体
+    校区筛选中完全看不到——两页口径分叉，且统计页无任何门禁守护。
+    本类锁三处：生成器产出 campusActualMap、stats.js 消费它、产物里带该键。
+    """
+
+    def test_60_生成器产出实际举办校区映射(self):
+        with open(os.path.join(ROOT, 'scripts', 'generate_frontend_data.py'),
+                  encoding='utf-8') as f:
+            src = f.read()
+        self.assertIn('campusActualMap', src,
+                      '生成器未产出 campusActualMap（统计页双集合口径失据）')
+        self.assertIn("_fv.actual_campus(item)", src,
+                      '生成器未用 _fv.actual_campus 推导实际举办校区')
+
+    def test_61_统计页消费双集合(self):
+        with open(os.path.join(ROOT, 'site', 'stats.js'), encoding='utf-8') as f:
+            src = f.read()
+        self.assertIn('campusActualMap', src,
+                      'stats.js 未消费 campusActualMap（统计页仍是单归口口径）')
+        # 双集合都必须从 summary 里取（缺键时不得抛）
+        self.assertIn("this.summary.campusActualMap", src,
+                      'campusActualMap 未按 this.summary 防御性读取')
+        # 必须真的用它过滤（只引用不过滤=假消费：删掉 forEach 块断言仍绿的教训）
+        self.assertIn('list.includes(this.campusFilter)', src,
+                      'campusActualMap 未参与 campusFilter 过滤（假消费）')
+
+    def test_62_产物含该键(self):
+        p = os.path.join(ROOT, 'site', 'lectures', 'stats.json')
+        if not os.path.exists(p):
+            self.skipTest('stats.json 未生成（本地未跑生成器）')
+        with open(p, encoding='utf-8') as f:
+            s = json.load(f)
+        self.assertIn('campusActualMap', s, '产物 stats.json 缺 campusActualMap')
+
+
+class BusuanziCspScopeTest(unittest.TestCase):
+    """CSP 对 busuanzi 的 script-src 必须收敛到具体文件路径（2026-10-14 P2-3）。
+
+    原 CSP 放行整个 busuanzi.aspark.cc 域：镜像站任一路径被挂马即可在页面上下文
+    执行任意 JS。已收敛为仅 /js 一个文件（SRI 不可行：对方无 CORS 头，加了反而
+    加载失败，详见 footer-counter.js 注释）。connect-src 保留整域（计数 API 路径
+    随版本可能变，不能收敛）。
+    """
+
+    def test_63_script_src不含裸域放行(self):
+        with open(os.path.join(ROOT, 'site', 'index.html'), encoding='utf-8') as f:
+            html = f.read()
+        m = re.search(r'content="([^"]*Content-Security-Policy[^"]*)"', html)
+        if not m:
+            m = re.search(r'<meta http-equiv="Content-Security-Policy"\s+content="([^"]*)"', html)
+        self.assertIsNotNone(m, '未找到 CSP meta')
+        csp = m.group(1)
+        # script-src 段内不得出现裸域（必须以 /js 结尾）
+        ss = re.search(r'script-src ([^;]+)', csp)
+        self.assertIsNotNone(ss, 'CSP 缺 script-src')
+        seg = ss.group(1)
+        self.assertNotRegex(seg, r'busuanzi\.aspark\.cc(?!/js)\b',
+                            'script-src 仍是裸域放行（应收敛到 /js 具体路径）')
+        self.assertIn('https://busuanzi.aspark.cc/js', seg,
+                      'script-src 缺少 busuanzi /js 具体路径')
+        # connect-src 保留整域（计数 API）不得被误收敛
+        cs = re.search(r'connect-src ([^;]+)', csp)
+        self.assertIsNotNone(cs, 'CSP 缺 connect-src')
+        self.assertIn('https://busuanzi.aspark.cc', cs.group(1),
+                      'connect-src 丢了 busuanzi 计数 API 域名（计数会失效）')
+
+
+class DocNumbersSmokeTest(unittest.TestCase):
+    """文档/注释陈旧数字防回退冒烟（2026-10-14 P2-10 配套）。
+
+    策略：条数/片数等**日变数字**不硬锁（每天增量更新，写死即天天过期）；
+    锁的是「旧值表述不得回退」+「与实测一致的稳定锚」（chunkSize）。
+    2026-10-14 批量更新过 7 处：chunk 500→100、3811→3830、8 分片→39、
+    「单文件 1475 行」→8 个 JS、2020→2009、app.data.js 三处体积/「截断预览」。
+    """
+
+    def _read(self, rel):
+        with open(os.path.join(ROOT, rel), encoding='utf-8') as f:
+            return f.read()
+
+    def test_64_deploy分片条数与实测一致(self):
+        deploy = self._read(os.path.join('docs', 'deploy.md'))
+        m = re.search(r'chunk_0001\.\.N\.json\s+每片\s+(\d+)\s+条', deploy)
+        self.assertIsNotNone(m, 'deploy.md 分片条数描述行缺失或格式变更')
+        # 实测锚：chunks.json 的 chunkSize（生成器唯一事实源）
+        p = os.path.join(ROOT, 'site', 'lectures', 'chunks.json')
+        if not os.path.exists(p):
+            self.skipTest('chunks.json 未生成（本地未跑生成器）')
+        with open(p, encoding='utf-8') as f:
+            real = json.load(f).get('chunkSize')
+        self.assertEqual(int(m.group(1)), real,
+                         f'deploy.md 每片 {m.group(1)} 条 ≠ 实测 chunkSize={real}')
+
+    def test_65_架构文档无单文件旧表述(self):
+        arch = self._read(os.path.join('docs', 'ARCHITECTURE.md'))
+        self.assertNotIn('单文件组件', arch,
+                         'ARCHITECTURE.md 仍称前端为单文件组件（实际 8 个 JS）')
+
+    def test_66_appdata无旧体积与截断表述(self):
+        src = self._read(os.path.join('site', 'app.data.js'))
+        for stale in ('8×334KB', '70KB 首屏', '7.4MB', '拉 8 分片', '截断预览'):
+            self.assertNotIn(stale, src,
+                             f'app.data.js 仍含陈旧表述「{stale}」（P2-10 已更新）')
+
+    def test_67_deploy起始年份非2020(self):
+        deploy = self._read(os.path.join('docs', 'deploy.md'))
+        self.assertNotIn('2020 年至今', deploy,
+                         'deploy.md 起始年份仍写 2020（实测最早 2009）')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -2,11 +2,12 @@
 // 本地与公网的形态分叉由 tests/test_frontend_consistency.py 锁死，勿顺手统一。
 Object.assign(APP_METHODS, {
     /* ---------- 数据加载（增量 / 渐进式） ----------
-     * 本地与公网统一走静态分片路径：latest.json（70KB 首屏秒开）→ chunks
-     * （8×334KB 分片，4 路并发 + 协商缓存）→ detail（16 桶长文本按需）。
-     * 不再先试 /api/lectures（7.4MB 全量下载，长文本分离前是本地慢的根因）。
+     * 本地与公网统一走静态分片路径：latest.json（约 105KB 首屏秒开）→ chunks
+     * （39 片 × 约 66KB，4 路并发 + 版本化缓存）→ detail（16 桶长文本按需）。
+     * 不再先试 /api/lectures（约 2.5MB 全量下载，长文本分离前是本地慢的根因）。
      * server.py 的 /api/lectures 保留供管理端/调试用，但前端列表不再走它。
-     * GitHub Pages 的 max-age=600 通过 cache:'default' 生效，二次访问秒开。
+     * GitHub Pages 的 max-age=600 通过 cache:'default' 生效，二次访问秒开；
+     * 版本化缓存（chunks.json 清单的 updatedAt 进分片 URL）见下方 _loadChunks。
      */
     // 最近一次抓取运行时间（2026-09-10）：独立小文件，由 CI 每次运行刷新，
     // 与数据版本 updatedAt 分离，见 displayUpdatedAt 的说明。
@@ -26,8 +27,8 @@ Object.assign(APP_METHODS, {
     },
 
     loadLectures() {
-      // 本地与公网统一走静态分片路径，不再先试 /api/lectures（7.4MB 全量下载慢）。
-      // latest.json 70KB 首屏秒开 → 后台 4 路并发拉 8 分片 → 长文本按需。
+      // 本地与公网统一走静态分片路径，不再先试 /api/lectures（约 2.5MB 全量下载慢）。
+      // latest.json 约 105KB 首屏秒开 → 后台 4 路并发拉 39 分片 → 长文本按需。
       this._loadStaticLatest();
     },
 
@@ -48,8 +49,8 @@ Object.assign(APP_METHODS, {
     },
 
     // 整批收编长文本：本地 /api/lectures 与静态 latest.json 的条目都**内联**简介/摘要
-    // （本地后端不做长文本分离，公网 latest.json 内联的是截断预览），必须收进旁路，
-    // 否则 hasBio/absRaw 恒空 → 简介与摘要整行不显示。
+    // （本地后端不做长文本分离，公网 latest.json 的 LATEST_PREVIEW_LEN=0 即全文内联、
+    // 不截断），必须收进旁路，否则 hasBio/absRaw 恒空 → 简介与摘要整行不显示。
     _absorbAll(arr) {
       for (const it of arr) this._absorbLongText(it);
       this.all = arr;
@@ -60,9 +61,9 @@ Object.assign(APP_METHODS, {
       // cache-busting（2026-10-13）：同 _loadLastRun——latest.json 是「更新于」的回退源
       // （displayUpdatedAt = lastRunAt || updatedAt，updatedAt 即来自本文件），旧副本会让
       // 日期退回数据日。no-store 语义本就要求每次重新获取，加唯一时间戳只是让不遵守该
-      // 指令的中间层也无旧副本可用；70KB 回源与 no-store 的既有成本相同。
+      // 指令的中间层也无旧副本可用；105KB 回源与 no-store 的既有成本相同。
       //
-      // 失败重试（2026-10-13）：latest.json 一失败就会掉进 7.4MB 无长文本的降级路径
+      // 失败重试（2026-10-13）：latest.json 一失败就会掉进 2.6MB 无长文本的降级路径
       // （_loadFullSingle），首屏退化成「最简版」、简介摘要要等用户滚动才补——用户实测
       // 遇到过（其网络中间层与 last_run.json 卡旧副本同源）。抖动与未部署是两种处置：
       // 先重试两次（800ms/1600ms 退避，与 _loadChunks 同口径），仍失败才降级；
@@ -250,7 +251,7 @@ Object.assign(APP_METHODS, {
     absRaw(l) { const t = this._ltOf(l); return (t && t.abstract) || ''; },
 
     _absorbLongText(l) {
-      // latest.json 的 50 条内联了截断预览，这里收进 _longText（_ltFull 不置位，
+      // latest.json 的 50 条内联了完整长文本（LATEST_PREVIEW_LEN=0），这里收进 _longText（_ltFull 不置位，
       // 展开时仍会拉全文覆盖它）
       const bio = l.speakerBio, abs = l.abstract;
       if (bio || abs) {
@@ -271,10 +272,10 @@ Object.assign(APP_METHODS, {
     async _ltManifestJson() {
       if (this._ltManifest) return this._ltManifest;
       // no-store（2026-10-12 与分片同因）：清单仅 ~600B，若走 default 命中旧副本，
-      // 下方桶 URL 会带旧版本戳去取**旧桶覆盖新 latest 的截断预览**，与分片同一类
+      // 下方桶 URL 会带旧版本戳去取**旧桶覆盖新 latest 的内联长文本**，与分片同一类
       // 混龄覆盖。与 chunks.json 同口径恒新，桶按版本戳隔离。
       // cache-busting（2026-10-13）：同 _loadLastRun——清单旧副本会让桶 URL 带旧版本戳，
-      // 命中旧桶缓存覆盖新 latest 的截断预览（与分片同一类混龄事故）。
+      // 命中旧桶缓存覆盖新 latest 的内联长文本（与分片同一类混龄事故）。
       const r = await fetch('lectures/detail/manifest.json?t=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) throw new Error('detail-manifest-' + r.status);
       this._ltManifest = await r.json();

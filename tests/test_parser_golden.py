@@ -31,6 +31,7 @@ golden-case 回归测试（Q3）——锁定 parser 关键案例，防止改候�
 import os
 import re
 import sys
+import time as _time
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -318,9 +319,45 @@ class GoldenTest(_GoldenCacheMixin):
         self.assertEqual(r.get('speakerAffiliation'), '网络中心')
 
 
+# 单例超时与慢例观测（2026-10-14 P2-7）：ctld4299/4410 等含外链图的用例，
+# parse_detail 会随图片可达性检查访问 statics.scnu.edu.cn，跨境网络下单例可达
+# 数分钟；deploy gate job 上限 30min，无兜底时单例挂起会耗光整个 job 时间预算
+# 误红。正常用例远小于 300s（纯兜底防挂起，不改写任何断言语义）；
+# >30s 的用例打印 [SLOW] 观测行，便于持续定位耗时趋势。
+_CASE_TIMEOUT = 300
+
+
+def _with_timeout(case):
+    """把 _make_test 生成的用例包上单例超时（线程 join，超时即 fail）。"""
+    test = _make_test(case)
+
+    def wrapped(self):
+        import threading
+        t0 = _time.time()
+        box = {}
+
+        def run():
+            try:
+                box['r'] = test(self)
+            except BaseException as e:  # noqa: BLE001 —— 原样回抛给 unittest
+                box['err'] = e
+        th = threading.Thread(target=run, daemon=True)
+        th.start()
+        th.join(_CASE_TIMEOUT)
+        if th.is_alive():
+            self.fail(f'单例超时（>{_CASE_TIMEOUT}s）：疑似网络挂起'
+                      f'（外链图不可达？），请检查 fixture 与源站')
+        if 'err' in box:
+            raise box['err']
+        dt = _time.time() - t0
+        if dt > 30:
+            print(f'[SLOW] {case["url"]} 单例耗时 {dt:.1f}s', file=sys.stderr)
+    return wrapped
+
+
 for _i, _c in enumerate(CASES):
     _slug = _c['url'].rstrip('/').split('/')[-1].replace('.html', '')
-    setattr(GoldenTest, f'test_{_i:02d}_{_slug}', _make_test(_c))
+    setattr(GoldenTest, f'test_{_i:02d}_{_slug}', _with_timeout(_c))
 
 
 def _judge_available():

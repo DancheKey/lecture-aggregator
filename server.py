@@ -30,12 +30,54 @@ SITE_DIR = os.path.join(ROOT, 'site')
 DATA_DIR = os.path.join(ROOT, 'data')
 SCRAPER = os.path.join(ROOT, 'scraper', 'scraper.py')
 SOURCES_PATH = os.path.join(ROOT, 'scraper', 'sources.yaml')
+# 信息源 URL 白名单（2026-10-14 P2-4）：与 scraper.scraper.DEFAULT_ALLOWED_DOMAINS
+# 对齐——写接口若放进校外/内网地址，scraper 每轮会把它记 failed_sources →
+# CI gate 红 + 全局水位冻结（自伤 DoS）。⚠ 改这里必须同步改 scraper 的常量，
+# 两侧一致性由 tests/test_server.py::TestSourcesUrlValidation 守护。
+SOURCE_ALLOWED_DOMAINS = ('scnu.edu.cn',)
 # 确保 scripts/ 与 scraper/ 下的共享模块可被导入（excluded_urls、field_vocab）
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 from excluded_urls import load_excluded, is_record_excluded
 from frontend_fields import strip_frontend_fields
 import field_vocab as _fv
+
+
+def _is_allowed_source_url(u):
+    """信息源 URL 校验：http/https 且 host∈*.scnu.edu.cn（P2-4）。
+
+    与 scraper.fetch 的域名白名单同口径；非字符串/空串/非常规 scheme/校外域名
+    一律判否（调用方返回 400，不落盘）。
+    """
+    from urllib.parse import urlparse
+    if not isinstance(u, str) or not u.strip():
+        return False
+    try:
+        p = urlparse(u.strip())
+    except Exception:
+        return False
+    if p.scheme not in ('http', 'https'):
+        return False
+    host = (p.hostname or '').lower()
+    return any(host == d or host.endswith('.' + d) for d in SOURCE_ALLOWED_DOMAINS)
+
+
+def _validate_source_urls(base, list_urls):
+    """校验一条信息源的 base 与 list_urls；返回错误消息或 None（全部合法）。"""
+    if base and not _is_allowed_source_url(base):
+        return ('base 必须是 http(s)://*.scnu.edu.cn 下的地址'
+                f'（收到：{base[:80]}）')
+    for i, lu in enumerate(list_urls or []):
+        if isinstance(lu, str):
+            if not _is_allowed_source_url(lu):
+                return (f'list_urls[{i}] 必须是 http(s)://*.scnu.edu.cn 下的地址'
+                        f'（收到：{lu[:80]}）')
+        elif isinstance(lu, dict):
+            u = lu.get('url')
+            if u is not None and not _is_allowed_source_url(u):
+                return (f'list_urls[{i}].url 必须是 http(s)://*.scnu.edu.cn 下的地址'
+                        f'（收到：{str(u)[:80]}）')
+    return None
 
 
 def _warn(msg):
@@ -544,6 +586,16 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({'ok': False, 'message': 'name 和 base 为必填项'}, 400)
             return
         data = self._load_sources()
+        # 重名校验（P2-4）：重名源会扰乱按源名索引的 PAGESTOP 基线
+        if any((s.get('name') or '').strip() == name for s in data['sources']):
+            self._send_json({'ok': False, 'message': f'信息源名称「{name}」已存在'}, 400)
+            return
+        # URL 白名单校验（P2-4）：校外/内网地址会被 scraper 记 failed_sources →
+        # CI gate 红 + 全局水位冻结，写接口侧先行拦截
+        url_err = _validate_source_urls(base, list_urls)
+        if url_err:
+            self._send_json({'ok': False, 'message': url_err}, 400)
+            return
         # 条数上限：超限直接 400，不落盘（与既有校验同一返回形态）
         if len(data['sources']) >= MAX_SOURCES:
             self._send_json({'ok': False,
@@ -581,6 +633,18 @@ class Handler(SimpleHTTPRequestHandler):
         for k in ('name', 'campus', 'base', 'list_urls'):
             if k in body:
                 src[k] = body[k]
+        # 重名校验（P2-4）：改名后不得与**其他**源重名
+        _new_name = (src.get('name') or '').strip()
+        if any((s.get('name') or '').strip() == _new_name
+               for j, s in enumerate(data['sources']) if j != idx):
+            self._send_json({'ok': False, 'message': f'信息源名称「{_new_name}」已存在'}, 400)
+            return
+        # URL 白名单校验（P2-4）：同 POST，PUT 改 base/list_urls 同样拦截校外地址
+        url_err = _validate_source_urls((src.get('base') or '').strip(),
+                                        src.get('list_urls') or [])
+        if url_err:
+            self._send_json({'ok': False, 'message': url_err}, 400)
+            return
         self._save_sources(data)
         self._send_json({'ok': True, 'source': src})
 

@@ -74,6 +74,24 @@ const unused = [...cssDefined].filter(c => !templateUsed.has(c));
 if (unused.length) console.log('INFO | CSS 中定义但模板未使用的类: ' + unused.join(',') + '（死 CSS，可清理）');
 else console.log('INFO | 无死 CSS');
 
+// 7) _measureClamp 签名必须覆盖「整体更换卡片 DOM」的筛选维度（2026-10-14 P2-1）
+// 背景：签名变才重测溢出。onlineOnly（线上筛选）/ farFutureOpen（远期折叠 items
+// 从 [] 变全部）都在第 1 页原位整体换 DOM 且不触发翻页——漏进签名则测量被跳过，
+// 新卡片无溢出记录，「展开摘要/展开简介」按钮静默缺失（与 10-02 B2 同根）。
+// ⚠ 未来新增「整体换 DOM」的筛选维度时，必须同步补进 sig（此处会红）。
+const sigM = /const sig = \[([\s\S]*?)\]\.join\('\|'\)/.exec(display);
+check('_measureClamp 签名可定位', !!sigM);
+if (sigM) {
+  const sigText = sigM[1];
+  for (const dim of ['onlineOnly', 'farFutureOpen']) {
+    check(
+      '签名覆盖 this.' + dim + '（整体更换卡片 DOM，漏则新卡片无展开按钮）',
+      new RegExp('this\\.' + dim + '\\b').test(sigText),
+      'sig=' + sigText.replace(/\s+/g, ' ').slice(0, 120)
+    );
+  }
+}
+
 console.log('');
 console.log((fail === 0 ? '[PASS] ' : '[FAIL] ') + '折叠类名一致性 ' + pass + ' 项通过, ' + fail + ' 项失败');
 process.exit(fail === 0 ? 0 : 1);
