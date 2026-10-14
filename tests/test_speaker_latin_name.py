@@ -173,6 +173,32 @@ class EndToEndTest(unittest.TestCase):
         r = parse(html, 'http://maths.scnu.edu.cn/a/20261013/8854.html')
         self.assertEqual(r.get('speaker'), '陈树敏')
 
+    def test_03_括号尾随空格的单位行不被邀请人吞并(self):
+        """maths 8182 回归（2026-10-14）：独立单位行紧随「(邀请人：X )」之后。
+
+        病灶：拍平文本中邀请人正则的后瞻锚点最近落在单位行之后的
+        「报告人简介」，值部分把「X ) 西安电子科技大学」整段吞进邀请人并
+        从待扫描文本移除——下一行的独立单位行随之丢失，speakerAffiliation
+        长期为空。修复：邀请人值在右括号处停止。
+        """
+        html = PAGE.replace('报　告　人： Quoc-Hung NGUYEN 副研究员 (邀请人：袁源)',
+                            '报　告　人： 薄立军 教授 (邀请人：杨舟 )')
+        html = html.replace('<p>　　　　　　中国科学院数学与系统科学研究院</p>',
+                            '<p>　　　　　　　　　　　西安电子科技大学</p>')
+        r = parse(html, 'http://maths.scnu.edu.cn/a/20241109/8182.html')
+        self.assertEqual(r.get('speakerAffiliation'), '西安电子科技大学',
+                         '下一行独立单位被邀请人正则吞并：%r'
+                         % r.get('speakerAffiliation'))
+        self.assertEqual(r.get('inviter'), '杨舟', '邀请人分离被破坏')
+
+    def test_04_无括号邀请人形态不回归(self):
+        """「邀请人：数学科学学院」无右括号边界，行为须与修复前一致。"""
+        html = PAGE.replace(' Quoc-Hung NGUYEN 副研究员 (邀请人：袁源)',
+                            ' 陈树敏 教授 (邀请人：数学科学学院 )')
+        r = parse(html, 'http://maths.scnu.edu.cn/a/20250418/8320.html')
+        self.assertEqual(r.get('inviter'), '数学科学学院',
+                         '无括号邀请人值被提前截断：%r' % r.get('inviter'))
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
