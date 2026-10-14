@@ -1,4 +1,20 @@
 'use strict';
+// 防点击劫持（2026-10-14 P1-1）：与 index.html 的 app.core.js、stats.html 的
+// stats.js 顶部 IIFE 是同款逻辑的**三份同源拷贝**之一，改动须三处同步。
+// 公网 GitHub Pages 无法下发 X-Frame-Options / CSP frame-ancestors 响应头
+// （meta 里的 frame-ancestors 会被浏览器忽略），故用「预隐藏 class + 顶层
+// 放行」兜底：html.pre-hidden 由 visits-trend.css（渲染阻塞，先于首帧）
+// 置为 display:none，被嵌入时页面不可见、不可点；顶层访问才移除还原。
+// ⚠ 本 IIFE 必须位于 'use strict' **之后**：严格模式指令只对脚本首条语句
+// 生效，若把 IIFE 提前，'use strict' 会沦为函数内的普通字符串表达式。
+(function () {
+  if (window.top === window.self) {
+    var root = typeof document !== 'undefined' && document.documentElement;
+    if (root && root.classList) root.classList.remove('pre-hidden');
+    return;
+  }
+  try { window.top.location.replace(window.self.location); } catch (e) {}
+})();
 var META = {};
 var SNAPS = [];
 

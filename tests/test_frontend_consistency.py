@@ -17,6 +17,7 @@
 import importlib.util
 import json
 import os
+import re
 import sys
 import unittest
 
@@ -521,6 +522,70 @@ class TestExcludedUrlRecordScope(unittest.TestCase):
                 "data = [r for r in data if (r.get('sourceUrl') or '').rstrip('/') not in excluded]",
                 code,
                 f'{rel} 仍在手写只比主 sourceUrl 的过滤')
+
+
+class TestFrameGuardCoverage(unittest.TestCase):
+    """三页防点击劫持三件套必须在位（2026-10-14 P1-1 一修 + 二补 trend 页）。
+
+    背景：GitHub Pages 不能下发 X-Frame-Options / frame-ancestors 响应头
+    （meta 里的 frame-ancestors 会被浏览器忽略），三个 HTML 页用同一套
+    「预隐藏 class + 顶层放行」兜底。三处 IIFE 是同源拷贝（app.core.js /
+    stats.js / gen_visits_trend.py 的 JS 常量），单边漏改 = 该页对点击
+    劫持裸奔，且**没有任何报错**——故固化为断言。
+
+    注意 trend 页落点与两页不同：该页 CSP 禁 'unsafe-inline'，CSS 规则与
+    IIFE 分别落**外链** visits-trend.css / visits-trend.js（由生成器产物），
+    与 index/stats 的 head 内联 <style> 等效（link 渲染阻塞，先于首帧）。
+    本类同时锁模板与产物，防「只改模板忘跑生成器」与「只改产物被 CI 覆盖」。
+    """
+    SITE = os.path.join(ROOT, 'site')
+
+    def _read(self, *parts):
+        with open(os.path.join(self.SITE, *parts), encoding='utf-8') as f:
+            return f.read()
+
+    def test_60_三页html均带预隐藏class(self):
+        for page in ('index.html', 'stats.html', 'visits-trend.html'):
+            html = self._read(page)
+            m = re.search(r'<html[^>]*>', html)
+            self.assertTrue(m, f'{page} 无 <html> 标签')
+            self.assertIn('pre-hidden', m.group(0),
+                          f'{page} 的 <html> 缺 pre-hidden class——'
+                          f'被第三方 iframe 嵌入时页面第一帧就可见、可点')
+
+    def test_61_三页均有display_none规则(self):
+        # index/stats 的规则在 head 内联 <style>（其 CSP 放行 unsafe-inline）；
+        # trend 的规则在外链 visits-trend.css（其 CSP 只有 'self'）。
+        for page in ('index.html', 'stats.html'):
+            html = self._read(page)
+            self.assertRegex(html, r'\.pre-hidden\s*\{\s*display:\s*none',
+                             f'{page} 无 .pre-hidden{{display:none}} 规则——'
+                             f'预隐藏 class 是空操作，iframe 里页面照常显示')
+        css = self._read('visits-trend.css')
+        self.assertRegex(css, r'\.pre-hidden\s*\{\s*display:\s*none',
+                         'visits-trend.css 无 .pre-hidden{display:none} 规则')
+
+    def test_62_三处js均有顶层放行逻辑(self):
+        for js in ('app.core.js', 'stats.js', 'visits-trend.js'):
+            text = self._read(js)
+            self.assertIn('window.top === window.self', text,
+                          f'{js} 缺顶层判定——预隐藏后无人还原，顶层访客看到白屏')
+            self.assertIn("classList.remove('pre-hidden')", text,
+                          f'{js} 顶层分支未移除 pre-hidden class')
+            self.assertIn('window.top.location.replace', text,
+                          f'{js} 被嵌入分支未尝试顶层跳转')
+
+    def test_63_trend页三件套来自生成器模板(self):
+        """产物必须与模板同步：直接改产物会被次日 CI 的生成器覆盖（10-08 踩坑）。"""
+        with open(os.path.join(ROOT, 'scripts', 'gen_visits_trend.py'),
+                  encoding='utf-8') as f:
+            tpl = f.read()
+        self.assertIn('class="pre-hidden"', tpl,
+                      'gen_visits_trend.py 的 html 模板缺 pre-hidden class')
+        self.assertIn('.pre-hidden{display:none}', tpl,
+                      'gen_visits_trend.py 的 CSS 常量缺 .pre-hidden 规则')
+        self.assertIn("classList.remove('pre-hidden')", tpl,
+                      'gen_visits_trend.py 的 JS 常量缺顶层放行 IIFE')
 
 
 if __name__ == '__main__':

@@ -1,4 +1,12 @@
 
+/* 防点击劫持预隐藏（2026-10-14 P1-1）：与 index.html/stats.html 同一方案，
+   但落点不同——本页 CSP 是 style-src 'self'（2026-10-02 收紧时禁掉
+   'unsafe-inline'），head 内联 <style> 会被浏览器拒绝执行，故规则必须放
+   本外链 CSS。<link> 是渲染阻塞资源，先于首帧生效，与内联 <style> 等效。
+   还原动作在 visits-trend.js 顶部 IIFE（defer，DOM 解析后执行）确认顶层
+   访问后移除 class。⚠ 三处拷贝（app.core.js/stats.js/visits-trend.js 的
+   IIFE）与三处 .pre-hidden 规则改动须同步。 */
+.pre-hidden{display:none}
 *{box-sizing:border-box}
 body{margin:0;padding:36px 20px 48px;background:#F7F7F5;color:#2C2C2A;
   font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;

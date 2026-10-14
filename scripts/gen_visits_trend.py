@@ -50,6 +50,14 @@ DATA_PATH = os.path.join(OUT_DIR, DATA_NAME)
 
 # 样式与脚本单独放常量：避免大括号与 f-string 冲突
 CSS = """
+/* 防点击劫持预隐藏（2026-10-14 P1-1）：与 index.html/stats.html 同一方案，
+   但落点不同——本页 CSP 是 style-src 'self'（2026-10-02 收紧时禁掉
+   'unsafe-inline'），head 内联 <style> 会被浏览器拒绝执行，故规则必须放
+   本外链 CSS。<link> 是渲染阻塞资源，先于首帧生效，与内联 <style> 等效。
+   还原动作在 visits-trend.js 顶部 IIFE（defer，DOM 解析后执行）确认顶层
+   访问后移除 class。⚠ 三处拷贝（app.core.js/stats.js/visits-trend.js 的
+   IIFE）与三处 .pre-hidden 规则改动须同步。 */
+.pre-hidden{display:none}
 *{box-sizing:border-box}
 body{margin:0;padding:36px 20px 48px;background:#F7F7F5;color:#2C2C2A;
   font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
@@ -109,6 +117,22 @@ tbody tr:hover td{background:#FCFCFB}
 # 2026-10-02：JS 不再内联数据（META/SNAPS 改由 fetch 载入同目录的
 # visits-trend-data.json）。目的是让页面能去掉 CSP 的 script-src 'unsafe-inline'。
 JS = """'use strict';
+// 防点击劫持（2026-10-14 P1-1）：与 index.html 的 app.core.js、stats.html 的
+// stats.js 顶部 IIFE 是同款逻辑的**三份同源拷贝**之一，改动须三处同步。
+// 公网 GitHub Pages 无法下发 X-Frame-Options / CSP frame-ancestors 响应头
+// （meta 里的 frame-ancestors 会被浏览器忽略），故用「预隐藏 class + 顶层
+// 放行」兜底：html.pre-hidden 由 visits-trend.css（渲染阻塞，先于首帧）
+// 置为 display:none，被嵌入时页面不可见、不可点；顶层访问才移除还原。
+// ⚠ 本 IIFE 必须位于 'use strict' **之后**：严格模式指令只对脚本首条语句
+// 生效，若把 IIFE 提前，'use strict' 会沦为函数内的普通字符串表达式。
+(function () {
+  if (window.top === window.self) {
+    var root = typeof document !== 'undefined' && document.documentElement;
+    if (root && root.classList) root.classList.remove('pre-hidden');
+    return;
+  }
+  try { window.top.location.replace(window.self.location); } catch (e) {}
+})();
 var META = {};
 var SNAPS = [];
 
@@ -453,7 +477,12 @@ def main():
     }
 
     html = f"""<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
+<html lang="zh-CN" class="pre-hidden"><head><meta charset="utf-8">
+<!-- 防点击劫持预隐藏（2026-10-14 P1-1）：与 index.html/stats.html 同方案。
+     .pre-hidden 规则在 visits-trend.css、还原 IIFE 在 visits-trend.js 顶部
+     （本页 CSP 禁 unsafe-inline，两者都不能内联进 head），详见两个常量注释。
+     ⚠ 本 HTML 是产物：改动须落本模板，直接改 site/visits-trend.html 会被
+     次日 CI 的 gen_visits_trend.py 覆盖（2026-10-08 已踩过坑）。 -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- CSP（2026-10-02）：本报告页此前是全站唯一无 CSP 的页面（2026-09-30 评审 P5），
      补 CSP 时因脚本与数据整体内联而被迫放行 script-src 'unsafe-inline'。

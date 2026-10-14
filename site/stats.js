@@ -2,6 +2,9 @@
 // stats.html 的 <head> 内联 `html{display:none}` 先于首帧隐藏页面，本脚本
 // （defer）确认顶层访问后还原。原 try/catch 实现在 sandbox iframe 下静默
 // 失效（location 赋值不抛异常），详见 app.core.js 顶部注释。
+// ⚠ 同源拷贝共三份：app.core.js / 本文件 / visits-trend.js（后者在
+// scripts/gen_visits_trend.py 的 JS 常量顶部），逻辑改动须三处同步；
+// trend 页的 .pre-hidden 规则落其外链 CSS（该页 CSP 禁 unsafe-inline）。
 (function () {
   if (window.top === window.self) {
     // 顶层访问：移除预隐藏 class 还原（三层守卫容忍无 DOM 环境，同 app.core.js）

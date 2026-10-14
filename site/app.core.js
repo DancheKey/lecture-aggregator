@@ -11,6 +11,10 @@
 // 但 sandbox iframe（无 allow-top-navigation）下该赋值是**静默失败**，catch
 // 永不执行，页面照常渲染在攻击者页面对点击劫持敞开。「预隐藏 + 顶层放行」
 // 不再依赖异常路径：顶层访问还原，被嵌入则保持隐藏（跳出尝试失败也无妨）。
+// ⚠ 本 IIFE 是同源逻辑的**三份拷贝**之一（2026-10-14 二修补 trend 页时补齐
+// 互认）：本文件 / stats.js / scripts/gen_visits_trend.py 的 JS 常量顶部，
+// 逻辑改动须三处同步。trend 页的 .pre-hidden 规则落其外链 CSS（该页 CSP
+// 禁 unsafe-inline，不能内联 head），与两页的内联 <style> 等效。
 (function () {
   if (window.top === window.self) {
     // 顶层访问：移除预隐藏 class 还原。三层守卫容忍无 DOM 环境（node vm

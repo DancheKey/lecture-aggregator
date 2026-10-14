@@ -249,12 +249,23 @@ def fetch(url, _retries=3, allowed_domains=None):
             return _decode_html(bytes(content))
         except requests.exceptions.RequestException as e:
             last_err = e
+            # 重试前释放未读完的 stream 响应：iter_content 中途断流时 r 仍持有
+            # 连接，不 close 只能等 GC——多轮重试会同时挂着多条僵尸连接。
+            # （requests.get 本身失败时 r 尚未赋值，NameError 一并吞掉。）
+            try:
+                r.close()
+            except Exception:
+                pass
             if _i < _retries - 1:
                 time.sleep(min(1.5 * (2 ** _i), 8) + random.uniform(0, 0.4))
                 continue
             print(f'[WARN] fetch failed {url}: {last_err}', file=sys.stderr)
             return None
         except Exception as e:  # 非网络异常（如极端解码情况）：不重试，直接放弃
+            try:
+                r.close()
+            except Exception:
+                pass
             print(f'[WARN] fetch error {url}: {e}', file=sys.stderr)
             return None
     return None
