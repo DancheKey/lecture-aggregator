@@ -33,13 +33,18 @@ def _n1a_normalize(text, keep_word_boundaries=True):
     if not text:
         return text
 
-    def _cjk_space(m):
-        left, sp, right = m.group(1), m.group(2), m.group(3)
-        if keep_word_boundaries and len(left) >= 2 and len(right) >= 2:
-            return left + sp + right  # 保留词块边界（仅 OCR 路径）
-        return left + right           # 删除空格但保留两侧汉字（修复：原返回 '' 会连汉字一起吞掉）
+    if not keep_word_boundaries:
+        return _N1A_DROP.sub(lambda m: m.group(1) + m.group(3), text)
+    # keep_word_boundaries：两侧均为 >=2 字 CJK 词块的空格保留（词块边界）；
+    # 其余 CJK 间 1-2 空格删除（与旧实现同一正则、同一替换语义，含连珠删除行为）。
+    text = _N1A_KEEP.sub('\ue000', text)          # ① 占位保护词块空格
+    text = _N1A_DROP.sub(lambda m: m.group(1) + m.group(3), text)  # ② 删其余
+    return text.replace('\ue000', ' ')            # ③ 还原词块空格
 
-    return re.sub(r'([\u4e00-\u9fff])(\s{1,2})([\u4e00-\u9fff])', _cjk_space, text)
+
+# 修复版（2026-10-14）：词块空格保护/删除两条正则，见 _n1a_normalize 内注释
+_N1A_KEEP = re.compile(r'(?<=[\u4e00-\u9fff]{2})\s{1,2}(?=[\u4e00-\u9fff]{2})')
+_N1A_DROP = re.compile(r'([\u4e00-\u9fff])(\s{1,2})([\u4e00-\u9fff])')
 
 
 # N1f：康煕部首（U+2F00–U+2FDF）与 CJK 部首补充（U+2E80–U+2EFF）码位。
@@ -79,8 +84,16 @@ def _nfkc_radicals(text):
     return text
 
 
-def _n1_normalize(text, keep_word_boundaries=True, collapse_cjk_spaces=True):
+def _n1_normalize(text, keep_word_boundaries=False, collapse_cjk_spaces=True):
     """N1 通用预处理：全角标点统一为半角（冒号/逗号/括号/斜杠/分号/引号）。
+
+    keep_word_boundaries 默认 False（删除所有 CJK 间 1-2 空格）——这是
+    2026-10-14 前的**实际**行为：_n1a_normalize 的 O3a 判据当年是死代码
+    （正则只捕获单字、len(left)>=2 恒假），默认 True 与 False 同构。
+    _n1a_normalize 修复后默认值显式改为 False，以保持全部共用管线
+    （正文/表头/meta_head）行为逐字节不变。需要词块空格的调用方显式传 True：
+      · OCR 路径（3973，O3a 原始动机：海报姓名常被空格孤立成词）
+      · 讲者管线的 spaced 版（_st.text/_st.body_text，姓名/单位主判据）
 
     collapse_cjk_spaces=False 时跳过 N1a（保留 CJK 间原始空格）。
     用途：body_text_llm 旁路——LLM（模型 A/B）需要看到未折叠的原文证据
@@ -2891,6 +2904,33 @@ def _strip_footer(text):
     return text.strip()
 
 
+def _realign_spaced_cut(spaced, folded):
+    """把折叠版的页脚截断点回切到词块空格版（N1a 修复配套，2026-10-14）。
+
+    _strip_footer 的标记命中位置与 30% 阈值均按**字符数**判定：词块空格占位
+    会改变判定结果（maths 7710 实测——折叠版「联系我们」idx=301，差 2 字符
+    不过阈值；空格版 idx=331 过阈值，把 meta 区的「报告人」整段截掉，speaker
+    由「张宜」变空）。因此截断决策固定在折叠版上做，再用本函数按「去空格
+    逐字对齐」把同一截断点映射回空格版。
+
+    spaced 与 folded 去空格后必须逐字一致（_normalize_label_text 对两版的
+    标签折叠行为相同）；不一致时保守返回 spaced 原样（不截）。
+    """
+    target = folded.replace(' ', '').replace('\t', '')
+    if not target:
+        return spaced
+    n = 0
+    for i, ch in enumerate(spaced):
+        if ch.isspace():
+            continue
+        if n >= len(target) or ch != target[n]:
+            return spaced  # 对齐失败：保守不截
+        n += 1
+        if n == len(target):
+            return spaced[:i + 1]
+    return spaced
+
+
 def _normalize_label_text(text):
     """去除常见字段标签中因 CMS 拆分 span 而混入的空格，如「题 目」「地 点」「主 讲 人」。"""
     text = _n1e_normalize(text)  # N1e：混合中英文标签拆分（"时间/Time:" → "时间：Time："）
@@ -3648,7 +3688,7 @@ class _OcrSt:
       外层变量而 _st.text 永久陈旧 → 下游读 _st.text 拿到旧值，且 OCR 文字被拼到
       「未移除邀请人标签」的正文上。故 store 必须逐点改为写属性。
     """
-    __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text', 'body_text_html')
+    __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text', 'text_folded', 'body_text_folded', 'body_text_html')
 
 
 def _prep_doc_text(soup, list_title, _st):
@@ -3713,11 +3753,19 @@ def _prep_doc_text(soup, list_title, _st):
     if meta_parts:
         _st.text = _st.text + ' ' + ' '.join(meta_parts)
     _st.text = re.sub(r'\s+', ' ', _st.text).strip()
-    _st.text = _n1_normalize(_st.text)  # N1：全角标点统一为半角
-    _st.text = _normalize_label_text(_st.text)
-    # 截断全校级页脚/导航噪声（如「关于华南师范大学 | 统一认证 | 移动平台」），
-    # 否则 location/topic 等字段会一直吞到文末把页脚吃进来。
-    _st.text = _strip_footer(_st.text)
+    # N1a 词块空格修复（2026-10-14）：_st.text 改取「保留两侧>=2字词块空格」版，
+    # 作为讲者提取的姓名/单位主判据（源页「郭庆 华中师范大学」式的空格分隔）。
+    # ⚠ 页脚截断决策必须保持在折叠版上做——_strip_footer 的标记命中与 30%
+    # 阈值均按字符数判定，空格占位会改变结果（maths 7710 实测见
+    # _realign_spaced_cut 注释）。做法：折叠版截断后按去空格逐字对齐回切。
+    _text_folded = _strip_footer(_normalize_label_text(_n1_normalize(_st.text)))
+    _text_spaced = _normalize_label_text(
+        _n1_normalize(_st.text, keep_word_boundaries=True))
+    _st.text_folded = _text_folded
+    _st.text = _realign_spaced_cut(_text_spaced, _text_folded)
+    # 页脚截断已在上方 folded 版完成并经 _realign_spaced_cut 回切到空格版，
+    # 此处不再对空格版重复截断——_strip_footer 按字符位置判定（maths 7710
+    # 实测：空格版二次截断把 meta 区「报告人」整段切掉，speaker 变空）。
 
     # 提前定位正文容器；若正文几乎为空但含图片（如行知书院讲座海报），对图片 OCR 提取文字
     # 容器链保持原优先级（先到先得），但**首命中文本过短（<80字）时改取其余候选中最长者**：
@@ -3751,9 +3799,12 @@ def _prep_doc_text(soup, list_title, _st):
     # 但把折叠版喂给 A/B 会灭失姓名/职称边界证据，使 B 的「原文支持」判定失效
     # （idx772「彭斌 中学数学高级教师」实测教训，2026-09-09）。
     _st.body_text_llm = _n1_normalize(_st.body_text, collapse_cjk_spaces=False)
-    _st.body_text = _n1_normalize(_st.body_text)  # N1：全角标点统一为半角
-    _st.body_text = _normalize_label_text(_st.body_text)
-    _st.body_text = _strip_footer(_st.body_text)
+    # 同 _st.text：body_text 改取词块空格版，页脚截断决策在折叠版上做后回切。
+    _body_folded = _strip_footer(_normalize_label_text(_n1_normalize(_st.body_text)))
+    _body_spaced = _normalize_label_text(
+        _n1_normalize(_st.body_text, keep_word_boundaries=True))
+    _st.body_text = _realign_spaced_cut(_body_spaced, _body_folded)
+    _st.body_text_folded = _body_folded
     _st.body_text_llm = _normalize_label_text(_st.body_text_llm)
     _st.body_text_llm = _strip_footer(_st.body_text_llm)
     # JS 渲染站点（如 maths/physics）的正文容器可能只含导航骨架，但 meta description
@@ -3917,7 +3968,11 @@ def _collect_assets(soup, content_div, url, _st):
                         if _pdf_text:
                             _st.body_text = _st.body_text + '\n' + _pdf_text
                             _st.body_text_llm = _st.body_text_llm + '\n' + _pdf_text
+                            _st.body_text_folded = _st.body_text_folded + '\n' + _pdf_text
                             _st.text = _st.text + '\n' + _pdf_text
+                            # text_folded 同步追加（topic/location 提取用 folded 版，
+                            # 否则海报页 OCR 文本只进 spaced 版，folded 停在页脚截断处）
+                            _st.text_folded = _st.text_folded + '\n' + _pdf_text
                         # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
                         # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
                         _is_poster_pdf = ('海报' in (_abs_pdf or '')) or (len(_st.body_text.strip()) < 150) or (content_div and bool(content_div.find('iframe')))
@@ -3964,7 +4019,12 @@ def _collect_assets(soup, content_div, url, _st):
             # 一个分块（该页 ④ 块吞进整段海报文字，speaker/bio 被污染）。拆分段落
             # 只用这份 HTML 快照；纯海报页快照过短，下游自会回退合并文本。
             if not getattr(_st, 'body_text_html', ''):
-                _st.body_text_html = _st.body_text
+                # 快照取 folded 版（v5b3，yjsy 10265 回归）：拆分文本
+                # detect_multi_session 依赖 CJK 间无空格形态，spaced 版的
+                # 词块空格会破坏拆分（4 场 -> 2 场）。HEAD 的 body_text
+                # 本就是 folded；⚠ 另注意 raw 即使全空也是 ' '.join 的
+                # 分隔符空格（truthy），OCR 分支对无文字海报同样会走。
+                _st.body_text_html = getattr(_st, 'body_text_folded', '') or _st.body_text
             # 清理 OCR 中常见的顶部/底部噪声
             _st.ocr_text = _clean_ocr_text(raw)
             # N1（全角→半角 + N1a 去 CJK 内部空格）：OCR 文本也应归一化，确保标签可扫描。
@@ -3976,7 +4036,9 @@ def _collect_assets(soup, content_div, url, _st):
             # 重新归一化标签（N1/N1e），使 OCR 文本里的中英文标签也能被正确扫描
             _st.body_text = _normalize_label_text((_st.body_text + ' ' + _st.ocr_text).strip())
             _st.body_text_llm = _normalize_label_text((_st.body_text_llm + ' ' + _st.ocr_text).strip())
+            _st.body_text_folded = _normalize_label_text((_st.body_text_folded + ' ' + _st.ocr_text).strip())
             _st.text = _normalize_label_text((_st.text + ' ' + _st.ocr_text).strip())
+            _st.text_folded = _normalize_label_text((_st.text_folded + ' ' + _st.ocr_text).strip())
     return url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr
 
 
@@ -4239,6 +4301,7 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
 
 
 def _extract_topic_location(_st, result, title, loc_times):
+    _t = getattr(_st, "text_folded", None) or _st.text
     """阶段 5a：从正文抽取 topic 与 location（含 OCR/FB1-FB4 兜底），
     并把地点里分离出的时间区间回填 lectureStart/End。纯写入 result 与 loc_times。
     """
@@ -4284,7 +4347,7 @@ def _extract_topic_location(_st, result, title, loc_times):
     # 任意位置+必须冒号：解决 collapsed text 中「303室主题：X」无边界空格的情况
     _topic_pat_a2 = rf'主题[：:]\s*(.+?){TOPIC_STOP}'
     _topic_pat_b = rf'(?:讲座主题|沙龙主题|工作坊主题|报告主题|讲座题目|题目|报告题目|演讲题目|Topic|Title)[：:]\s*(.+?){TOPIC_STOP}'
-    m = re.search(_topic_pat_a, _st.text) or re.search(_topic_pat_a2, _st.text) or re.search(_topic_pat_b, _st.text)
+    m = re.search(_topic_pat_a, _t) or re.search(_topic_pat_a2, _t) or re.search(_topic_pat_b, _t)
     if m:
         tp = (m.group(1) or m.group(2) or m.group(3) or '').strip()
         # 清除首尾可能粘连的章节序号（「一、主题」式结构里值后可能带「二、」下一节序号）
@@ -4310,9 +4373,9 @@ def _extract_topic_location(_st, result, title, loc_times):
     # --- 地点（兼容「地点/课程地点/讲座地点/工作坊地点」+ 英文 Venue/Location）---
     # 值捕获用 [^\n]+?（不跨换行）+ LOC_STOP：单行场景靠字段标签截断，PDF/多行场景靠行尾截断。
     _loc_pat = rf'(?:课程地点|讲座地点|教学工作坊地点|地点|Venue|Location)[：:]\s*([^\n]+?){LOC_STOP}'
-    m = re.search(_loc_pat, _st.text)
+    m = re.search(_loc_pat, _t)
     # 跳过空值或被下一个字段标签填充的伪匹配（如 seri 页面"地点: 时间:"）
-    _search_loc = _st.text
+    _search_loc = _t
     while m:
         loc_val = m.group(1).strip()
         if loc_val and not re.match(
@@ -4327,7 +4390,7 @@ def _extract_topic_location(_st, result, title, loc_times):
         m2 = re.search(
             rf'(?:课程地点|讲座地点|教学工作坊地点|地点|Venue|Location)[：:]\s*'
             r'([^\n]+?)(?:\n\n|\n[一二三四五六七八九十]|面向对象|主讲人简介|报名|联系方式)',
-            _st.text)
+            _t)
         if m2 and m2.group(1).strip():
             m = m2
     if m:
@@ -4375,7 +4438,7 @@ def _extract_topic_location(_st, result, title, loc_times):
         # 且值须含地点特征词、不得以行政区开头（纯联系地址无楼栋室厅词）。
         _ma = re.search(
             rf'(?<!联系)(?<!通讯)(?<!邮寄)(?<!邮政)(?:地址|Address)[：:]\s*([^\n]+?){LOC_STOP}',
-            _st.text)
+            _t)
         if _ma:
             _v = re.sub(r'\s+', '', _ma.group(1)).strip()
             if re.search(r'(?:楼|室|厅|馆|栋|幢|教室|校区|校园|园区|会议室|报告厅|礼堂|场馆|实验室|中心)', _v) \
@@ -4386,7 +4449,7 @@ def _extract_topic_location(_st, result, title, loc_times):
         # 不得再含日期/时刻/非地点词——否则「授课时间:2016年10月12日…13:30-17:30 收看方式:
         # 方式一:…教师在线学习中心…」会因串里的「中心」二字误命中特征词，整段被当地点。
         if not _loc_fb:
-            for _mt in re.finditer(rf'时间[：:]\s*([^\n]+?){LOC_STOP}', _st.text):
+            for _mt in re.finditer(rf'时间[：:]\s*([^\n]+?){LOC_STOP}', _t):
                 _tv = _mt.group(1).strip()
                 if not re.search(r'\d\s*[：:]\s*\d', _tv):
                     continue
@@ -4410,24 +4473,24 @@ def _extract_topic_location(_st, result, title, loc_times):
         if not _loc_fb:
             # 平台推断（含「会议链接」指向的平台域名 meeting.tencent.com / zoom.us 等）
             _plat = ''
-            if re.search(r'腾\s*讯\s*会\s*议|tencent', _st.text, re.I):
+            if re.search(r'腾\s*讯\s*会\s*议|tencent', _t, re.I):
                 _plat = '腾讯会议'
-            elif re.search(r'zoom', _st.text, re.I):
+            elif re.search(r'zoom', _t, re.I):
                 _plat = 'Zoom'
-            elif re.search(r'webex', _st.text, re.I):
+            elif re.search(r'webex', _t, re.I):
                 _plat = 'Webex'
-            elif re.search(r'钉钉', _st.text):
+            elif re.search(r'钉钉', _t):
                 _plat = '钉钉'
-            elif re.search(r'飞书', _st.text):
+            elif re.search(r'飞书', _t):
                 _plat = '飞书'
-            elif re.search(r'腾讯课堂', _st.text):
+            elif re.search(r'腾讯课堂', _t):
                 _plat = '腾讯课堂'
             # ① 显式「会议号 / 会议 ID：N」标签（物理学院旧页写法「会议链接：URL 会议 ID：xxx xxx xxx」，
             #    以及 Zoom「ZOOM会议ID：873 9784 1982」），统一并入 location。
             _mid = re.search(
                 r'(?:会议\s*号|会议\s*ID|会议\s*号码|腾讯会议\s*号|Meeting\s*ID|入会码|会议入会码)'
                 r'[：:\s]*(\d{3}[\s-]?\d{3}[\s-]?\d{3}|\d{3}[\s-]\d{4}[\s-]\d{4}|\d{9,12})',
-                _st.text, re.I)
+                _t, re.I)
             if _mid and _plat:
                 _loc_fb = format_meeting_location(_plat, _mid.group(1))
             # ② 平台关键词紧邻号码（原 FB3，兜底①未命中的写法）
@@ -4435,7 +4498,7 @@ def _extract_topic_location(_st, result, title, loc_times):
                 _mp = re.search(
                     r'(腾\s*讯\s*会\s*议|Zoom|zoom|钉钉|飞书|腾讯课堂|Webex|webex|瞩目)'
                     r'[^\d\n]{0,10}?'
-                    r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{9,11})', _st.text)
+                    r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{9,11})', _t)
                 if _mp:
                     _p2 = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp.group(1), _mp.group(1))
                     _loc_fb = format_meeting_location(_p2, _mp.group(2))
@@ -4443,7 +4506,7 @@ def _extract_topic_location(_st, result, title, loc_times):
         # 正文无「地点：」标签、页脚地址被 FB1 正确拒绝时，从议程/正文括号内取第一个
         # 含楼栋室厅特征的片段；值须短（<=20 字）且不得是行政区/人名碎片。
         if not _loc_fb:
-            for _mb in re.finditer(r'[（(]([^（）()]{2,20})[)）]', _st.text):
+            for _mb in re.finditer(r'[（(]([^（）()]{2,20})[)）]', _t):
                 _bv = re.sub(r'\s+', '', _mb.group(1)).strip()
                 if not _bv or len(_bv) > 20:
                     continue
@@ -4613,7 +4676,10 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
         # 职务词表取自 field_vocab（单一事实源）。量词用懒匹配 `{2,6}?`：
         # 贪婪会先把「华众联创总经理」的 job 吃成「华众联创总」、再由单体「经理」收尾，
         # 把复合职务截断；懒匹配从短到长试，优先整词命中「总经理」（G4，2026-09-10）。
-        _inv_m = re.match(r'^(?P<job>[一-鿿·]{2,6}?' + _fv.ORG_TITLE_SUFFIX_RE.pattern + r')(?P<n>[一-鿿·]{2,4})$', sp)
+        # ⚠ N1a 词块空格修复（2026-10-14）后 sp 可能带空格（「网络中心主任 林南晖」），
+        # job 与 n 之间须容差空白，否则倒装拆分静默失效（ctld 432 实测：speaker
+        # 由「林南晖」变空、speakerTitle/affiliation 同时丢失）。
+        _inv_m = re.match(r'^(?P<job>[一-鿿·]{2,6}?' + _fv.ORG_TITLE_SUFFIX_RE.pattern + r')\s*(?P<n>[一-鿿·]{2,4})$', sp)
         if _inv_m and _inv_m.group('n') != _inv_m.group('job'):
             _it, _in = _inv_m.group('job'), _inv_m.group('n')
             if (_in != _it and _looks_like_real_name(_in)
@@ -4826,6 +4892,42 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
                     # 或「省市名 + 单位关键词」（上海大学/黑龙江大学），则末字属单位而非姓名，
                     # 回退 1 字。循环（上限 2 次）覆盖吞 2 字；每步要求 shorter 仍是有效人名，
                     # 否则停在当前 name（防连锁回退过头）。
+                    #
+                    # ── 2026-10-14 补「姓名+机构首字」粘连维度（物理/cs 模板，实测 20 条）──
+                    # 原守卫只认「校名 / 省市名」，而物理学院与计算机学院同一套 CMS 模板的
+                    # 标签行是「报告专家：马余强 中国科学院院士」，上游 N1a 折叠 CJK 间空格后
+                    # 到此为「马余强中国科学院院士」，4→2 字降序取名把机构首字吞进姓名：
+                    #   马余强中+国科学院 / 宗成庆中+科院自动化所 / 陈宇中+国工程物理学院…
+                    # 且 4810 行 rest 起点随之右移，affiliation 同步丢首字——库里
+                    # speakerAffiliation='国科学院' 与 speaker='马余强中' 是**同一处截断的两个症状**。
+                    #
+                    # 判据用**自洽性**而非机构词表：末字还给 rest 后，若
+                    #   name[-1] + rest == _extract_affiliation(rest 的完整串)
+                    # 则末字必属单位而非姓名。之所以不能用「末字+rest 是某机构前缀」判别，
+                    # 是因为粘连与末字巧合在字符串层完全同构：
+                    #   马余强中+国科学院 → 中国科学院（粘连） / 秦晓华+南师范大学 → 华南师范大学（巧合）
+                    # 两者拼接后都是合法完整机构，必须靠 **name 是否已达 4 字上限** 才能分开
+                    # （全库纯中文 speaker：3 字 2548 / 4 字仅 28，粘连样本全落在这 28 条里）。
+                    # ⚠ 绝不可简化为「末字 == 单位首字就回退」——会误杀秦晓华/华南师范大学、
+                    #   钟新华/华南农业大学、王震中/中国社会科学院、彭再云/云南师范大学、
+                    #   麻小南/南开大学 五例库内正确值。
+                    if len(name) >= 4 and rest:
+                        # 末字归还后的完整单位串（sp 去掉 name 前缀即为 rest 的全貌）
+                        _spliced = name[-1] + rest
+                        # 自洽判据：拼回后整串**以单位关键词收尾或含单位关键词**，
+                        # 即末字是单位的组成部分而非姓名的一部分。
+                        # ⚠ 不能用 `_extract_affiliation(_spliced) == _spliced` 做等值比较：
+                        #   该函数本就会剥尾职称与子单位（实测 '中国科学院院士'→'中国科学院'、
+                        #   '中国工程物理学院研究生院'→'中国工程物理学院'），等值恒不成立。
+                        _AFF_END_KW = re.compile(
+                            r'(?:大学|学院|研究院|研究所|研究中心|实验室|学系|学校|'
+                            r'科学院|自动化所|自动化研究所|所|院|馆|会|局|部|院系'
+                            r'|院士|教授|研究员|讲师|博士后|所院|学会)$')
+                        if _AFF_END_KW.search(_spliced):
+                            shorter = name[:-1]
+                            if len(shorter) >= 2 and _looks_like_real_name(shorter):
+                                name = shorter
+                                rest = sp[len(name):].strip()
                     if len(name) >= 3 and rest:
                         _UNIT_KW = (r'(?:大学|学院|研究院|研究所|研究中心|实验室|学系|学校)')
                         _UNIT_HEAD_RE = re.compile(rf'^[\u4e00-\u9fff]{{1,2}}{_UNIT_KW}')
@@ -5739,7 +5841,11 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     # （快照过短）或 HTML 拆不出 ≥2 场时回退合并文本，存量行为不变。
     _html_text = getattr(_st, 'body_text_html', '') or ''
     _use_html_split = bool(_html_text) and len(_html_text) >= 150
-    _split_text = _html_text if _use_html_split else _st.body_text
+    # 拆分文本取 folded 版（v5b2，yjsy 10265 回归）：detect_multi_session 的
+    # 标签/段落边界识别依赖 CJK 间无空格形态，spaced 版的词块空格会破坏
+    # 拆分（3 条 -> 1 条）。HEAD 的 body_text 本就是 folded，此为恢复。
+    _body_for_split = getattr(_st, 'body_text_folded', '') or _st.body_text
+    _split_text = _html_text if _use_html_split else _body_for_split
 
     def _detect_sessions_on(_txt):
         return detect_multi_session(
@@ -5751,7 +5857,7 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     _sessions_pre = _detect_sessions_on(_split_text)
     if _use_html_split and len(_sessions_pre or []) < 2:
         # HTML 正文拆不出多场（标签只在 OCR 里/纯海报页）→ 合并文本重试
-        _sessions_pre = _detect_sessions_on(_st.body_text)
+        _sessions_pre = _detect_sessions_on(_body_for_split)
     if not _sessions_pre and not skip_news_filter and is_news_record(result, poster_page=poster_only):
         print(f'[SKIP-RETRO] {url} publishTime={result.get("publishTime")} > lectureStart={result.get("lectureStart")}', file=sys.stderr)
         return None
@@ -6952,6 +7058,15 @@ def _extract_affiliation(rest):
     """
     if not rest:
         return ''
+    # 2026-10-15 v5c：双轨管线后本函数入参可能来自 spaced 轨（_st.text 保留词块空格），
+    # 源页 HTML 标签边界会在单位内部留下 CJK-CJK 空白（「（深圳大学 心理学院 教授）」），
+    # 而下方 _UNIT_RE 字符类不含空白 → 单位被截到首个空白（psy 2840 实测：
+    # '深圳大学心理学院'→'深圳大学'；em 5512：'暨南大学…'→'大学'）。
+    # folded 轨（HEAD 行为）从不含此类空白，折叠对 HEAD 输入是 no-op；
+    # 仅压 CJK 间空白，英文词内空白（'Duke University'）不受影响。
+    # 全部 11 个调用点的入参均来自管线文本（spaced 轨或 folded 轨），无 Raw OCR 直喂，
+    # 故入口折叠对所有调用点都是 HEAD 等价。
+    rest = re.sub(r'(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])', '', rest)
     # 主讲人标签值常把「姓名（单位）日期…时间…地点…」连写：单位之后紧跟日期/时间/地点等
     # 元数据片段。若不截断，会把「日期：3月3日时间：中午12:15，理6栋302」粘连进 affiliation
     # （如 physics 12933：温永立（量子所）日期：3月3日… → affiliation 变成「量子所)日期:3月3日」）。

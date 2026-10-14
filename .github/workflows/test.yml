@@ -167,6 +167,20 @@ jobs:
       - name: Run speaker name cut-point tests
         run: python tests/test_speaker_title_cut.py
 
+      # 姓名+机构粘连（2026-10-14）：N1a 的 O3a「两侧>=2字保留词块空格」
+      # 是死代码（正则只捕获单字、判据 len(left)>=2 恒假），CJK 间空格
+      # 实际被全删 → 讲者提取的空格优先路径（parsers.py 4780-4802，为
+      # bug 4267 设计）从未激活，「姓名 单位」被迫走 4→2 字降序 + 词表
+      # 守卫兜底，词表覆盖不全即双错（郭庆华中/中师范大学实测，源页
+      # physics 12852 原文「报告专家：郭庆 华中师范大学」有空格）。
+      # 本套件锁三层：①N1a 词块空格的保留/删除行为（主判据，单字侧删除
+      # 语义与旧实现逐字节一致）②无空格粘连下守卫归还末字（破坏验证用
+      # 无空格输入——带空格输入在 N1a 修复后恒绿，压不到守卫）③末字
+      # 巧合反例不得回退（秦晓华/华南师范大学等 8 例，2 字残名全部过
+      # _looks_like_real_name，纯规则原理上无法区分粘连与巧合）。
+      - name: Run speaker-affiliation glue guard tests
+        run: python tests/test_speaker_aff_glue_20261014.py
+
       # 英文主讲人姓名形态（2026-10-06，maths8855 回归）：源页
       # 「报告人: Quoc-Hung NGUYEN 副研究员」抓回后 speaker 为空——姓名校验的
       # 分隔符集不认连字符、英文姓名切分正则不认连字符段与全大写姓（NGUYEN），
