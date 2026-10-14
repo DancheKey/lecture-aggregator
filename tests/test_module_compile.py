@@ -28,6 +28,7 @@ server.py——那正是最容易悄悄坏掉的一类。
 import json
 import os
 import re
+import requests
 import sys
 import unittest
 
@@ -111,6 +112,38 @@ class CompileGateTest(unittest.TestCase):
             self.assertTrue(hasattr(mod, name), f'server.py 缺少符号 {name}')
 
 
+class _FakeRedirectResp:
+    """桩 HTTP 响应：只实现 fetch() 用到的接口（2026-10-14 P1-5 用例）。
+
+    status_code / headers.get('Location') / close() / iter_content() / text
+    （robots 分支读 r.text）。stream=True 下 fetch 只迭代 body，故
+    iter_content 一次性吐出全部内容即够。
+    """
+
+    def __init__(self, status, location=None, body=''):
+        self.status_code = status
+        self._headers = {'Location': location} if location else {}
+        self._body = body.encode('utf-8') if isinstance(body, str) else body
+        self.closed = False
+        self.raise_on_iter = False
+
+    @property
+    def headers(self):
+        return self._headers
+
+    @property
+    def text(self):
+        return self._body.decode('utf-8', 'replace')
+
+    def close(self):
+        self.closed = True
+
+    def iter_content(self, chunk_size=65536):
+        if self.raise_on_iter:
+            raise requests.exceptions.ConnectionError('桩：读到一半断流')
+        yield self._body
+
+
 class RobotsBeforeAllowlistTest(unittest.TestCase):
     """robots 查询必须排在域名白名单**之后**（2026-10-02 修复）。
 
@@ -121,6 +154,10 @@ class RobotsBeforeAllowlistTest(unittest.TestCase):
 
     本用例直接断言**不发生任何网络请求**，而不是断言调用顺序——
     顺序改一改就会失效，行为断言才稳。
+
+    2026-10-14 二补（P1-3/P1-5）：同类新增重定向链与协议用例。手动跟随
+    重定向后每一跳都重新过 scheme/域名白名单——302 跳外部域必须零第二跳；
+    file:// 等非常规 scheme 在任何请求前拒绝；超过 MAX_REDIRECTS 的链拒绝。
     """
 
     def _fetch_with_recorder(self, url, allowed):
@@ -158,11 +195,127 @@ class RobotsBeforeAllowlistTest(unittest.TestCase):
         self.assertTrue(any('robots.txt' in c for c in calls),
                         '白名单内 URL 应照常查询 robots.txt（合规检查被误短路了）')
 
-    def test_62_未传白名单时保持原行为(self):
-        """allowed_domains 为 None 的调用（若有）不得被新参数影响。"""
+    def test_62_不传白名单时默认白名单生效(self):
+        """allowed_domains=None 的调用走 DEFAULT_ALLOWED_DOMAINS，而非不设防。
+
+        语义变更（2026-10-14 P1-3）：旧实现 fetch 没有白名单参数，调用方
+        不传即不设防；新实现 None → 默认 ['scnu.edu.cn']。旧版本用例只
+        断言「scnu 域查 robots」，新旧语义下都通过，守护不了任何东西。
+
+        本用例双向锁新语义：白名单内照常查 robots（不误伤正常调用）；
+        白名单外必须**零请求**——若默认值被改回空/None（退化成不设防），
+        下面两个用例立即红。
+        """
         calls = self._fetch_with_recorder('http://x.scnu.edu.cn/a.html', None)
         self.assertTrue(any('robots.txt' in c for c in calls),
-                        '未传白名单时应照旧查 robots')
+                        '不传白名单时，白名单内 URL 应照常查 robots')
+        for url in ('http://evil.example.org/x.html',
+                    'http://169.254.169.254/latest/meta-data/'):
+            calls = self._fetch_with_recorder(url, None)
+            self.assertEqual(calls, [],
+                             f'不传白名单时 {url} 仍发起了 {len(calls)} 次请求：'
+                             f'{calls}——默认白名单没生效（退化成不设防）')
+
+    def _fetch_with_chain(self, url, chain, allowed=None, retries=1):
+        """按 chain 序列喂假响应（robots 调用固定 200 空文本=默认允许）。
+
+        chain: [{'status': 302, 'location': '...'}, {'status': 200, 'body': '...'}]
+        item 可带 'raise_iter': True —— iter_content 读到一半抛断流异常。
+        返回 (calls, result, resps)：calls 为全部 requests.get 的 URL 序列
+        （含 robots）；resps 为页面响应对象列表（可查 .closed）。
+        与 _fetch_with_recorder 的区别：桩不抛异常，而是按序列返回响应，
+        用于验证重定向跟随/拒绝路径的真实行为。
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            '_scr_chain_' + str(abs(hash(url)) % 100000),
+            os.path.join(ROOT, 'scraper', 'scraper.py'))
+        S = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(S)
+        calls = []
+        resps = []
+        seq = list(chain)
+
+        def fake_get(u, **kw):
+            calls.append(u)
+            if u.endswith('/robots.txt'):
+                return _FakeRedirectResp(200)
+            if seq:
+                item = seq.pop(0)
+                resp = _FakeRedirectResp(item['status'], item.get('location'),
+                                         item.get('body', ''))
+                resp.raise_on_iter = bool(item.get('raise_iter'))
+                resps.append(resp)
+                return resp
+            resp = _FakeRedirectResp(200, body='')
+            resps.append(resp)
+            return resp
+
+        # requests.get 是模块级共享属性：桩后必须还原，否则污染同进程
+        # 后续测试（_fetch_with_recorder 未还原是既有陋习，此处不延续）。
+        orig_get = S.requests.get
+        S.requests.get = fake_get
+        S._ROBOTS_CACHE.clear()
+        try:
+            result = S.fetch(url, _retries=retries, allowed_domains=allowed)
+        finally:
+            S.requests.get = orig_get
+        return calls, result, resps
+
+    def test_63_302跳白名单外零第二跳(self):
+        """首跳在白名单内、Location 指向外部域：拒绝且不向外部发任何请求。"""
+        calls, result, _resps = self._fetch_with_chain(
+            'http://a.scnu.edu.cn/x.html',
+            [{'status': 302, 'location': 'http://evil.example.org/y.html'}])
+        self.assertIsNone(result, '跳往白名单外的重定向必须拒绝')
+        page_calls = [c for c in calls if 'robots.txt' not in c]
+        self.assertEqual(page_calls, ['http://a.scnu.edu.cn/x.html'],
+                         f'只应请求首跳页面，实际：{page_calls}')
+        self.assertTrue(all('evil.example.org' not in c for c in calls),
+                        f'不得向白名单外域名发请求：{calls}')
+
+    def test_64_302跳白名单内正常跟随(self):
+        """站内相对路径跳转（高校 CMS 常见）必须跟随到 200 并取回正文。"""
+        calls, result, _resps = self._fetch_with_chain(
+            'http://a.scnu.edu.cn/x.html',
+            [{'status': 302, 'location': '/y.html'},
+             {'status': 200, 'body': '正文内容'}])
+        self.assertIn('正文内容', result or '',
+                      '白名单内 302 应被跟随并取回正文')
+        self.assertIn('http://a.scnu.edu.cn/y.html', calls,
+                      f'相对 Location 未按当前页解析为绝对地址：{calls}')
+
+    def test_65_file协议直接拒绝(self):
+        """非常规 scheme（file/gopher 等）在任何请求之前拒绝。"""
+        calls, result, _resps = self._fetch_with_chain('file:///etc/passwd', [])
+        self.assertIsNone(result)
+        self.assertEqual(calls, [], f'file:// 不应发起任何请求：{calls}')
+
+    def test_66_六连302超限拒绝(self):
+        """超过 MAX_REDIRECTS 的跳转链视为异常拒绝（防循环/绕站检测）。"""
+        chain = [{'status': 302, 'location': f'/r{i}.html'} for i in range(6)]
+        calls, result, _resps = self._fetch_with_chain(
+            'http://a.scnu.edu.cn/x.html', chain)
+        self.assertIsNone(result, '超过 5 跳的重定向链必须拒绝')
+        page_calls = [c for c in calls if 'robots.txt' not in c]
+        self.assertEqual(len(page_calls), 6,
+                         f'应在第 6 个页面处停止，实际请求 {len(page_calls)} 次：'
+                         f'{page_calls}')
+
+    def test_67_断流重试前关闭未读完响应(self):
+        """iter_content 中途断流：重试前必须 close（连接不能留给 GC）。
+
+        背景（2026-10-14 GLM 复核指出）：重试 except 分支未 close 未读完的
+        stream 响应，多轮重试会同时挂着多条僵尸连接。本用例断言断流的
+        那个响应对象确实被 close，且重试能成功取回正文。
+        """
+        chain = [{'status': 200, 'raise_iter': True},
+                 {'status': 200, 'body': '重试后正文'}]
+        calls, result, resps = self._fetch_with_chain(
+            'http://a.scnu.edu.cn/x.html', chain, retries=2)
+        self.assertIn('重试后正文', result or '', '断流后应重试并成功取回正文')
+        self.assertTrue(resps[0].closed,
+                        '断流的响应未被 close——连接泄漏给 GC 回收')
 
 
 class ScriptEntrypointTest(unittest.TestCase):
