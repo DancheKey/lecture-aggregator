@@ -17,6 +17,8 @@
   ② 动态：高并发写入不丢条目（修复前会实打实丢）。
 """
 import importlib.util
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -250,6 +252,107 @@ class LlmFailureWarnTest(unittest.TestCase):
         self.assertEqual(calls['n'], 3, '应重试满 3 次')
         self.assertIn('3 次重试均失败', err)
         self.assertIn('network unreachable', err)
+
+
+class TransientWriteFailureTest(unittest.TestCase):
+    """写侧瞬时占用不得静默丢条目（2026-10-14，test_53 本机偶红根因）。
+
+    根因实测（tmp/repro_cache_race.py，200 线程 × 8 轮）：Windows 上
+    `os.replace(tmp, p)` 在目标文件被 AV/索引器瞬时占用时抛
+    `PermissionError: WinError 5`，原实现 `except Exception: pass` 静默吞掉 →
+    该条缓存消失（表现为缓存命中率莫名下降、重复烧额度）。
+    本类锁三条：① 瞬时失败重试后条目仍在且不告警；② 重试耗尽必须留痕且
+    不破坏已有条目；③ 瞬时「读」失败不得被当成损坏去重建（那会把一次瞬时
+    故障放大成整库清空）。
+    """
+
+    def setUp(self):
+        self.tmpdir = _mk_tmpdir('llm_cache_tx_')
+        self.path = os.path.join(self.tmpdir, '.vlm_cache.json')
+        self._orig = llm_cache.cache_path
+        llm_cache.cache_path = lambda: self.path
+
+    def tearDown(self):
+        llm_cache.cache_path = self._orig
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _read_all(self):
+        import builtins
+        if not os.path.exists(self.path):
+            return {}
+        with builtins.open(self.path, encoding='utf-8') as f:
+            return json.load(f)
+
+    def test_61_瞬时替换失败重试后条目保留(self):
+        import unittest.mock as mock
+        real = os.replace
+        calls = {'n': 0}
+
+        def flaky(a, b):
+            calls['n'] += 1
+            if calls['n'] <= 2:                      # 前两次瞬时拒绝
+                raise PermissionError(5, 'Denied (transient)')
+            return real(a, b)
+
+        buf = io.StringIO()
+        with mock.patch('os.replace', flaky):
+            with contextlib.redirect_stderr(buf):
+                llm_cache.cache_set('k1', {'v': 1})
+        self.assertEqual(self._read_all().get('k1'), {'v': 1},
+                         '瞬时 replace 失败后条目丢失（重试未生效）')
+        self.assertEqual(calls['n'], 3, '应重试到第 3 次成功')
+        self.assertNotIn('WARN', buf.getvalue(), '重试成功不应告警')
+
+    def test_62_重试耗尽留痕且不破坏已有条目(self):
+        import unittest.mock as mock
+        llm_cache.cache_set('keep', 1)                # 先落一条已有条目
+
+        def always_fail(a, b):
+            raise PermissionError(5, 'Denied (persistent)')
+
+        buf = io.StringIO()
+        with mock.patch('os.replace', always_fail):
+            with contextlib.redirect_stderr(buf):
+                llm_cache.cache_set('new', 2)         # 不得抛
+        data = self._read_all()
+        self.assertEqual(data.get('keep'), 1, '写失败不得破坏已有条目')
+        self.assertNotIn('new', data)
+        self.assertIn('WARN', buf.getvalue(), '重试耗尽必须留痕（不得静默）')
+        self.assertIn('PermissionError', buf.getvalue())
+        self.assertFalse(os.path.exists(self.path + '.tmp'),
+                         '重试耗尽后应清理残片 .tmp')
+
+    def test_63_瞬时读失败不重建(self):
+        """读 OSError（瞬时不可读）≠ 文件损坏：必须放弃写入，不得用 {} 重建。
+
+        ⚠ 桩必须**只挡读、放行写**：首版桩对所有路径/permission 一律抛，
+        结果「读被挡 → 返空 → 写也被挡 → 兜底保住旧文件」使断言在
+        「无脑重建」的错误实现下依然绿（破坏验证抓到假绿）。桩的粒度必须
+        精确对应被测语义。
+        """
+        import builtins
+        llm_cache.cache_set('keep', 1)
+        real_open = builtins.open
+        cache_abs = os.path.abspath(self.path)
+
+        def deny_read(path, *a, **kw):
+            mode = a[0] if a else kw.get('mode', 'r')
+            if (os.path.abspath(str(path)) == cache_abs and 'r' in mode
+                    and '+' not in mode):
+                raise PermissionError(13, 'in use by another process')
+            return real_open(path, *a, **kw)
+
+        llm_cache.open = deny_read                    # 覆盖模块内 open 查找
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(buf):
+                llm_cache.cache_set('new', 2)
+        finally:
+            del llm_cache.open
+        data = self._read_all()
+        self.assertEqual(data, {'keep': 1},
+                         '瞬时读失败被当成损坏重建 → 整份缓存被单键覆盖')
+        self.assertIn('WARN', buf.getvalue())
 
 
 if __name__ == '__main__':
