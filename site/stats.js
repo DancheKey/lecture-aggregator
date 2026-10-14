@@ -1,13 +1,16 @@
-// 防点击劫持（2026-09-27 二轮审计 S-2）：公网 GitHub Pages 无法下发
-// X-Frame-Options / CSP frame-ancestors 响应头（meta 里的 frame-ancestors
-// 会被浏览器忽略），用 JS 兜底禁止被第三方页面嵌套；若对方沙箱化导航则
-// 隐藏本页内容。
+// 防点击劫持（2026-10-14 一修 P1-1，与 app.core.js 同一方案）：
+// stats.html 的 <head> 内联 `html{display:none}` 先于首帧隐藏页面，本脚本
+// （defer）确认顶层访问后还原。原 try/catch 实现在 sandbox iframe 下静默
+// 失效（location 赋值不抛异常），详见 app.core.js 顶部注释。
 (function () {
-  try {
-    if (window.top !== window.self) window.top.location.replace(window.self.location);
-  } catch (e) {
-    document.documentElement.style.display = 'none';
+  if (window.top === window.self) {
+    // 顶层访问：移除预隐藏 class 还原（三层守卫容忍无 DOM 环境，同 app.core.js）
+    var root = typeof document !== 'undefined' && document.documentElement;
+    if (root && root.classList) root.classList.remove('pre-hidden');
+    return;
   }
+  // 被嵌入：class 保留（head 内联 CSS 生效），仍尝试顶层跳转
+  try { window.top.location.replace(window.self.location); } catch (e) {}
 })();
 /* 木铎金声 · 讲座统计页（Vue 3）
  * 从 stats.html 外部化，避免内联脚本在 file:// 或严格 CSP 下被拦截。

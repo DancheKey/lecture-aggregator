@@ -151,6 +151,19 @@ def _can_fetch(url, allowed_domains=None):
     return rp.can_fetch('*', url)
 
 
+# 抓取域名白名单默认值（2026-10-14 P1-3）：fetch() 的 allowed_domains 不再有
+# 「不传就不设防」的选项。历史上默认 None = 跳过校验，安全性靠每个调用方记得
+# 传——任何新调用方沿用默认值，即可让页面内注入的 URL（如
+# http://169.254.169.254/...）打出真实请求。改为内置默认白名单；确需抓取
+# 授权域外的调试场景显式传参。
+DEFAULT_ALLOWED_DOMAINS = ['scnu.edu.cn']
+# 手动跟随重定向的跳数上限（2026-10-14 P1-5）：requests 默认
+# allow_redirects=True 只校验首跳 URL，302 跳内网/任意域会整体逃逸白名单。
+# 改为 allow_redirects=False + 逐跳校验；高校站点统一跳转/SSO 一般 1-2 跳，
+# 超过 5 跳视为异常拒绝。
+MAX_REDIRECTS = 5
+
+
 def fetch(url, _retries=3, allowed_domains=None):
     """下载页面并鲁棒解码。
 
@@ -159,35 +172,62 @@ def fetch(url, _retries=3, allowed_domains=None):
     返回 None，不重试（错误页无正文可解析）。重试耗尽仍失败返回 None
     （调用方按死链处理）。
 
-    安全加固（2026-08-15）：
+    安全加固（2026-08-15，2026-10-14 补强 P1-3/P1-5）：
       - 响应大小上限 20MB（stream=True 限量读取），避免超大响应撑爆内存；
       - 状态码校验：仅 200 视为成功，其余返回 None；
-      - 可选域名白名单 allowed_domains（如 ['scnu.edu.cn']），限制只允许抓取
-        本源或授权域名，防止页面内注入的恶意 URL 触发 SSRF；
-        None 表示跳过校验（兼容无白名单的调用场景）。
+      - 域名白名单 allowed_domains（None 时取 DEFAULT_ALLOWED_DOMAINS）：
+        只允许抓取本源或授权域名，防止页面内注入的恶意 URL 触发 SSRF；
+      - 重定向逐跳校验（P1-5）：allow_redirects=False + 手动跟随，首跳与
+        每一跳都重新过 scheme/域名白名单/robots——requests 默认只校验首跳，
+        302 跳内网会逃逸白名单；
       - robots.txt 合规（2026-09-07 接线）：尊重站点 Disallow 声明，
         按域名缓存一次解析结果；不可达/404 按惯例默认允许。
     """
     import random
-    from urllib.parse import urlparse
-    # robots.txt 合规（2026-09-07）：站点明确 Disallow 的路径直接跳过，不消耗
-    # 请求预算，也避免被源站拉黑；缓存于 _ROBOTS_CACHE 避免每个 URL 都重新解析。
-    # 2026-10-02：allowed_domains 一并传下去，让白名单判据前置到 robots 查询之前
-    # （原先白名单外 URL 仍会先白耗一次对外 robots 请求，见 _can_fetch 注释）。
-    if not _can_fetch(url, allowed_domains):
-        print(f'[WARN] fetch: robots.txt 禁止 {url}', file=sys.stderr)
+    from urllib.parse import urljoin, urlparse
+    # None = 内置默认白名单（不再有「不设防」选项）
+    allowed = allowed_domains or DEFAULT_ALLOWED_DOMAINS
+    # scheme 硬校验：只允许 http/https（挡住 file:// 等非常规 scheme）
+    if urlparse(url).scheme not in ('http', 'https'):
+        print(f'[WARN] fetch: scheme 不允许 {url}', file=sys.stderr)
         return None
     last_err = None
     for _i in range(_retries):
         try:
-            # 域名白名单校验（可选）：限制只允许抓取本源或授权域名
-            if allowed_domains:
-                host = urlparse(url).netloc
-                if not any(host == d or host.endswith('.' + d) for d in allowed_domains):
-                    print(f'[WARN] fetch: 域名不在白名单 {url}', file=sys.stderr)
+            # 逐跳校验 + 手动跟随重定向。robots 前置短路与域名白名单对首跳和
+            # 每一跳生效：白名单外 URL 在 _can_fetch 内短路（不查 robots），
+            # 随后被域名校验拒绝，全程零对外请求。
+            cur = url
+            for _hop in range(MAX_REDIRECTS + 1):
+                if not _can_fetch(cur, allowed):
+                    print(f'[WARN] fetch: robots.txt 禁止 {cur}', file=sys.stderr)
+                    return None
+                host = urlparse(cur).netloc
+                if not any(host == d or host.endswith('.' + d) for d in allowed):
+                    print(f'[WARN] fetch: 域名不在白名单 {cur}', file=sys.stderr)
                     return None
 
-            r = requests.get(url, headers=HEADERS, timeout=TIMEOUT, stream=True)
+                r = requests.get(cur, headers=HEADERS, timeout=TIMEOUT,
+                                 stream=True, allow_redirects=False)
+
+                if r.status_code not in (301, 302, 303, 307, 308):
+                    break
+                # 重定向：手动取下一跳，循环继续前重新过全部校验
+                loc = r.headers.get('Location') or ''
+                r.close()
+                if not loc:
+                    print(f'[WARN] fetch: 重定向无 Location {cur}', file=sys.stderr)
+                    return None
+                if _hop >= MAX_REDIRECTS:
+                    print(f'[WARN] fetch: 重定向超过 {MAX_REDIRECTS} 跳，拒绝 '
+                          f'{cur}', file=sys.stderr)
+                    return None
+                nxt = urljoin(cur, loc)
+                if urlparse(nxt).scheme not in ('http', 'https'):
+                    print(f'[WARN] fetch: 重定向目标 scheme 不允许 {nxt}',
+                          file=sys.stderr)
+                    return None
+                cur = nxt
 
             # 状态码校验：仅 200 视为成功，4xx/5xx 返回 None
             if r.status_code != 200:
@@ -1034,9 +1074,13 @@ def load_ledger(path=None):
 def save_ledger(path=None, merge=True):
     """原子写回台账。条目按 key 排序，保证相同内容产出相同字节（避免 CI 无谓提交）。
 
-    merge=True：写前先把盘上已有条目并入内存（内存优先）。局部重抓 / 分批重抓
-    会各自跑一个进程，若不合并，后跑的进程会用自己那份内存覆盖掉别的进程刚写入
-    的条目——本轮的判定结果就白丢了，收敛要多花好几轮。
+    merge=True：写前先把盘上已有条目并入内存（内存优先）。这样后写的进程不会
+    把别的进程刚写入的条目整体覆盖掉——但这是「读时快照 + last-writer-wins
+    合并」，**不是并发安全**：两个进程真正并发时，后写者仍会丢掉先写者在
+    「读取之后」新增的条目（原子写只保证读者不见半份文件，不解决写写竞争）。
+    当前 --out 仅测试/手动单进程使用（串行执行），无此问题；若将来并发分批
+    重抓，需调用侧保证串行或加文件锁——别把这个合并当多进程防护用（原注释
+    曾声称「多进程分批不互相覆盖」，与实现不符，2026-10-14 P1-4 修正）。
 
     2026-10-02 修复 B9（写侧）：merge 会把盘上**已过期**的条目重新并回 _LEDGER，
     随后原样写盘 → 台账永不瘦身，load 时报的「过期作废 N 条」在盘上一个都没少。
@@ -2227,11 +2271,16 @@ def main():
         now_iso = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).isoformat(timespec='seconds')
     # 写入带更新时间戳的包裹格式：{updatedAt, data}；前端与后端均兼容旧版纯数组。
     if args.out:
-        # 并行分批重抓：本源结果独立落盘，最后由驱动脚本汇总合并
-        with open(args.out, 'w', encoding='utf-8') as f:
-            json.dump({'updatedAt': now_iso, 'data': out}, f, ensure_ascii=False, indent=2)
+        # 并行分批重抓：本源结果独立落盘，最后由驱动脚本汇总合并。
+        # 走原子写（与下方 lectures.json 主路径同一机制，2026-10-14 P1-2）：
+        # 进程被 kill/崩溃时不留下截断的半份 JSON——驱动脚本合并时不会把
+        # 半份文件当有效输入。
+        _atomic_write_json(args.out, {'updatedAt': now_iso, 'data': out})
         print(f'[DONE] source={args.source} -> {args.out} ({len(out)} records)')
-        # 局部重抓也贡献台账（save_ledger 会与盘上条目合并，多进程分批不互相覆盖）
+        # 局部重抓也贡献台账。注意（2026-10-14 P1-4）：save_ledger 的 merge 是
+        # 「读时快照 + last-writer-wins 合并」，不是并发安全——两个进程真正并发
+        # 写时后写者仍会丢条目。当前 --out 仅测试/手动单进程使用（串行），无此
+        # 问题；若将来并发分批重抓，需调用侧保证串行或加文件锁。
         report_ledger()
         return
     data_dir = os.path.join(ROOT, 'data')

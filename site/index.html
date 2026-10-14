@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="pre-hidden">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -17,6 +17,12 @@
   <link rel="stylesheet" href="vendor/tailwind.css" />
   <script defer src="vendor/vue.global.prod.js"></script>
   <style>
+    /* 防点击劫持预隐藏（2026-10-14 P1-1）：CSS 先于首帧渲染生效，被第三方
+       iframe 嵌入时页面不可见、不可点；由 app.core.js（defer）确认顶层访问
+       后移除 class 还原。公网 GitHub Pages 无法下发 X-Frame-Options 头。
+       注意：必须用 class 控制而不能把 display 写在内联 style 上再清除——
+       清 inline 无法覆盖 stylesheet 规则（实测计算样式仍为 none）。 */
+    .pre-hidden { display: none; }
     [v-cloak] { display: none !important; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -719,7 +725,7 @@
 
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
-  <script defer src="app.core.js?v=542facedad"></script>
+  <script defer src="app.core.js?v=918154c544"></script>
   <script defer src="app.state.js?v=26d8dc0f72"></script>
   <script defer src="app.computed.js?v=500debd694"></script>
   <script defer src="app.display.js?v=a993718c1f"></script>

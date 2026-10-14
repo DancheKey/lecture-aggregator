@@ -1,16 +1,28 @@
 /* 木铎金声 · 华南师范大学学术讲座聚合前端（Vue 3，免构建，配合 Tailwind CDN）
  * 功能：讲座总数显示、校区/学院/年份/关键词 多维筛选、可点击 Tag 直达筛选、本地点赞去重。
  */
-// 防点击劫持（2026-09-27 二轮审计 S-2）：公网 GitHub Pages 无法下发
-// X-Frame-Options / CSP frame-ancestors 响应头（meta 里的 frame-ancestors
-// 会被浏览器忽略），用 JS 兜底禁止被第三方页面嵌套；若对方沙箱化导航则
-// 隐藏本页内容。
+// 防点击劫持（2026-10-14 一修 P1-1，替换 2026-09-27 S-2 有缺陷实现）：
+// 公网 GitHub Pages 无法下发 X-Frame-Options / CSP frame-ancestors 响应头
+// （meta 里的 frame-ancestors 会被浏览器忽略），防御分两层：
+//   ① index.html/stats.html 的 <head> 内联 `html{display:none}`——CSS 先于
+//      首帧渲染生效，被嵌入时页面在第一帧就不可见、不可点；
+//   ② 本脚本（defer，DOM 解析后执行）确认是顶层访问才还原 display。
+// 原实现的缺陷：try/catch 依赖 location 赋值抛 SecurityError 来触发隐藏，
+// 但 sandbox iframe（无 allow-top-navigation）下该赋值是**静默失败**，catch
+// 永不执行，页面照常渲染在攻击者页面对点击劫持敞开。「预隐藏 + 顶层放行」
+// 不再依赖异常路径：顶层访问还原，被嵌入则保持隐藏（跳出尝试失败也无妨）。
 (function () {
-  try {
-    if (window.top !== window.self) window.top.location.replace(window.self.location);
-  } catch (e) {
-    document.documentElement.style.display = 'none';
+  if (window.top === window.self) {
+    // 顶层访问：移除预隐藏 class 还原。三层守卫容忍无 DOM 环境（node vm
+    // 仿真的 documentElement 桩只有 style、没有 classList；有的测试干脆没有
+    // document）——原实现在顶层路径不碰 DOM 故从未需要这些桩；生产浏览器里
+    // documentElement/classList 必有，行为不受影响。
+    var root = typeof document !== 'undefined' && document.documentElement;
+    if (root && root.classList) root.classList.remove('pre-hidden');
+    return;
   }
+  // 被嵌入：class 保留（head 内联 CSS 的 .pre-hidden 生效），仍尝试顶层跳转
+  try { window.top.location.replace(window.self.location); } catch (e) {}
 })();
 const { createApp } = Vue;
 
