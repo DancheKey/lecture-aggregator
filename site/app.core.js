@@ -62,3 +62,126 @@ const SRC_REPORT_GAP_MS = 60000;
 
 // 各职责分片的方法都挂到这个对象上，由 app.js 组装进组件（免构建，靠 defer 保证加载顺序）。
 const APP_METHODS = {};
+
+/* ---------- 筛选状态 ↔ URL 同步（2026-10-23 第三批） ----------
+ * 进 URL 的内容维度（可分享/可回放）：campus / college / year / speaker /
+ *   q（= query 搜索词）/ field（= searchField 搜索维度）/ online（= onlineOnly）/ page。
+ * 不进 URL 的本机偏好：showLikedOnly（点赞是本机数据，分享给他人无意义）、
+ *   farFutureOpen 与各类展开态（同为 localStorage 本机偏好，已有独立持久化）。
+ * 写入约定：
+ *   - 筛选维度变化 → pushState（浏览器前进/后退可在筛选快照间回放）；
+ *   - 页码变化 → replaceState（翻页频繁，不污染历史栈）；
+ *   - 写前与当前 location.search 去重；popstate 回放期间抑制写回（防循环）。
+ * 单一事实源：校区白名单 CAMPUS_LIST 同时供 APP_STATE.campusList 与 URL 校验使用。
+ */
+const CAMPUS_LIST = ['石牌', '大学城', '佛山', '汕尾', '校级'];
+const URL_SEARCH_FIELDS = ['college', 'location', 'topic', 'abstract'];  // searchField 合法枚举
+
+// 解析 location.search → 原始覆盖对象（只含 URL 里实际出现且格式合法的键）。
+// format 校验在此做（year 四位数、field 枚举）；取值白名单校验（campus）在
+// normalizeUrlFilters 里做（其依赖的 campusList 属组件 state）。
+function parseUrlFilters() {
+  const out = {};
+  try {
+    const p = new URLSearchParams(location.search);
+    const get = (k) => (p.get(k) || '').trim();
+    const campus = get('campus');
+    if (campus) out.campus = campus;
+    const college = get('college');
+    if (college) out.college = college;
+    const year = get('year');
+    if (/^\d{4}$/.test(year)) out.year = year;
+    const speaker = get('speaker');
+    if (speaker) out.speaker = speaker;
+    const q = get('q');
+    if (q) out.query = q;
+    const field = get('field');
+    if (URL_SEARCH_FIELDS.includes(field)) out.searchField = field;
+    if (p.get('online') === '1') out.onlineOnly = true;
+    const page = parseInt(p.get('page'), 10);
+    if (page >= 2) out.page = page;   // page=1 与缺省等价，不写
+  } catch (e) { /* file:// 等受限环境：按无筛选处理 */ }
+  return out;
+}
+
+// 把解析结果归一化为完整 state 字段集（缺失/非法值一律回落空值），键名与
+// APP_STATE 字段一一对应（含 currentPage），data() 初始化与 popstate 回放
+// 共用，保证两条路径对同一 URL 给出同一状态。
+function normalizeUrlFilters(f, campusList) {
+  const wl = campusList || CAMPUS_LIST;
+  return {
+    campus: (f.campus && wl.includes(f.campus)) ? f.campus : '',
+    college: f.college || '',
+    year: f.year || '',
+    speaker: f.speaker || '',
+    query: f.query || '',
+    searchField: f.searchField || '',
+    onlineOnly: !!f.onlineOnly,
+    currentPage: f.page >= 2 ? f.page : 1,
+  };
+}
+
+// 组件 state → 查询串（只含非默认值；键序固定，便于与当前 URL 去重比较）
+function serializeUrlFilters(vm) {
+  const p = new URLSearchParams();
+  if (vm.campus) p.set('campus', vm.campus);
+  if (vm.college) p.set('college', vm.college);
+  if (vm.year) p.set('year', vm.year);
+  if (vm.speaker) p.set('speaker', vm.speaker);
+  if (vm.query && vm.query.trim()) p.set('q', vm.query.trim());
+  if (vm.searchField) p.set('field', vm.searchField);
+  if (vm.onlineOnly) p.set('online', '1');
+  if (vm.currentPage >= 2) p.set('page', String(vm.currentPage));
+  return p.toString();
+}
+
+Object.assign(APP_METHODS, {
+  // 从当前 URL 回放筛选（popstate）。同步赋值后用 $nextTick 恢复写回：
+  // Vue3 watch 回调在 nextTick 之前 flush，期间 _urlSyncSuppress 保持 true，
+  // 各维度 watch 触发的 _scheduleUrlSync 全部被抑制——不会把回放又写回 history。
+  _applyUrlFiltersFromUrl() {
+    const n = normalizeUrlFilters(parseUrlFilters(), this.campusList);
+    // 清掉挂起的写回（2026-10-14 竞态修复）：popstate 可能打断一个未触发的
+    // 防抖（如 450ms 搜索合并窗口内按「后退」）。不清则定时器照常触发
+    // _flushUrlSync，把「后退前」的旧筛选又 push 回历史栈——正好抵消用户的
+    // 后退操作，且 state 与 URL 从此分叉。
+    clearTimeout(this._urlSyncTimer);
+    this._urlSyncPendingPush = false;
+    this._urlSyncSuppress = true;
+    this.campus = n.campus;
+    this.college = n.college;
+    this.year = n.year;
+    this.speaker = n.speaker;
+    this.query = n.query;
+    this.searchField = n.searchField;
+    this.onlineOnly = n.onlineOnly;
+    this.currentPage = n.currentPage;   // 最后赋：前面各维度的既有 watch 会先重置页码
+    this.$nextTick(() => { this._urlSyncSuppress = false; });
+  },
+
+  // 防抖调度 URL 写入。push 语义一旦在本窗口内出现即保留（筛选变化通常伴随
+  // 页码重置，两次调度合并后必须仍是 push，否则筛选快照进不了历史栈）。
+  _scheduleUrlSync(push, delay) {
+    if (this._urlSyncSuppress) return;
+    this._urlSyncPendingPush = this._urlSyncPendingPush || !!push;
+    clearTimeout(this._urlSyncTimer);
+    this._urlSyncTimer = setTimeout(() => {
+      const usePush = this._urlSyncPendingPush;
+      this._urlSyncPendingPush = false;
+      this._flushUrlSync(usePush);
+    }, delay || 120);
+  },
+
+  _flushUrlSync(usePush) {
+    if (this._urlSyncSuppress) return;   // 回放窗口内的残留定时器一律不写（双保险）
+    const qs = serializeUrlFilters(this);
+    const target = qs ? '?' + qs : location.pathname;   // 清空筛选时收掉查询串
+    if ((qs ? '?' + qs : '') === (location.search || '')) return;  // 无变化不写
+    try {
+      if (usePush) history.pushState(null, '', target);
+      else history.replaceState(null, '', target);
+    } catch (e) { /* file:// 等不支持 history 写入的环境：静默降级 */ }
+  },
+
+  _onPopState() { this._applyUrlFiltersFromUrl(); },
+});

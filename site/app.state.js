@@ -5,8 +5,8 @@ const APP_STATE = function () {
       mtime: 0,
       updatedAt: '',   // 数据最后变化时间（ISO 字符串），来自后端 mtime 或静态文件 updatedAt
       lastRunAt: '',   // 最近一次抓取运行时间（来自 CI 写入的 lectures/last_run.json）
-      // 校区固定顺序（与 sources.yaml / 后端一致）
-      campusList: ['', '石牌', '大学城', '佛山', '汕尾', '校级'],
+      // 校区固定顺序（与 sources.yaml / 后端一致；白名单单一事实源在 app.core.js CAMPUS_LIST）
+      campusList: ['', ...CAMPUS_LIST],
       campus: '',
       college: '',
       year: '',

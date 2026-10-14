@@ -90,6 +90,7 @@ jobs:
             tests/js/app_forum_and_clamp.js
             tests/js/app_far_future_fold.js
             tests/js/app_campus_filter.js
+            tests/js/app_url_sync.js
             tests/js/visits_trend_render.js
             tests/js/app_topic_session.js
             tests/js/app_ltkey_consistency.js
