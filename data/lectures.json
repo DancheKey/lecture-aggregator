@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T12:35:15+08:00",
+  "updatedAt": "2026-10-14T14:14:02+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8857.html",
@@ -132,6 +132,35 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "2026年10月16日 物理学院学术报告（第56期）大湾区大学陈继尧副教授"
+    },
+    {
+      "sourceUrl": "http://iqm.scnu.edu.cn/a/20261014/564.html",
+      "images": [],
+      "college": "量子物质研究院",
+      "campus": "大学城",
+      "title": "肖杰——大型强子对撞机上近期多玻色子产生过程 的测量结果",
+      "topic": "大型强子对撞机上近期多玻色子产生过程的测量结果",
+      "lectureStart": "2026-10-15 14:00:00",
+      "lectureEnd": "2026-10-15 15:00:00",
+      "location": "理8栋118报告厅",
+      "speaker": "肖杰",
+      "speakerTitle": "博士后研究员",
+      "speakerAffiliation": "英国杜伦大学",
+      "inviter": "白世伟副研究员报告",
+      "speakerBio": "肖杰博士现为英国杜伦大学粒子物理唯象研究所( IPPP )博士后研究员,并在帝国理工学院作为访问研究员参与 CMS 实验。他于 2022 年获得北京大学粒子与核物理博士学位,并曾在意大利米兰比可卡大学开展联合博士研究。此前,他曾在法国里昂第一大学 IP2I 研究所从事 CMS 实验博士后研究。他的研究方向主要为大型强子对撞机上的实验粒子物理,包括希格斯玻色子性质测量、矢量玻色子散射以及超越标准模型新物理的搜寻,同时关注蒙特卡洛事例生成器的开发与调优。他长期参与 CMS 实验,并曾担任 CMS Physics Comparison and Generator Tunes Convener、CMS Generator Validation Convener ,目前担任 CMS Sherpa Contact 。",
+      "organizer": "量子物质研究院",
+      "publishTime": "2026-10-14 11:42:00",
+      "publishTimeSource": "position",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "多玻色子产生是精确检验标准模型电弱相互作用的重要途径,并为研究三重和四重规范玻色子耦合以及电弱对称性破缺机制提供了直接窗口。本报告将介绍大型强子对撞机( LHC )上 ATLAS 和 CMS 实验关于多玻色子产生的最新研究结果,涵盖双玻色子产生、矢量玻色子散射( VBS )和三玻色子产生等过程。 报告将重点讨论 Run 2 和 Run 3 数据带来的最新进展,包括高精度双玻色子截面测量、矢量玻色子散射及其极化研究,以及多个稀有三玻色子过程的新证据和观测。这些测量不仅能够以前所未有的精度检验标准模型,还可通过有效场论( EFT )框架对异常三重和四重规范耦合以及潜在的新物理效应施加严格限制。随着更多 Run 3 数据的积累,多玻色子过程将继续成为探索电弱相互作用和超越标准模型新物理的重要前沿。",
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "[2026年10月15日]肖杰——大型强子对撞机上近期多玻色子产生过程 的测量结果"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20261015/11187.html",
