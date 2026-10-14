@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
+<html lang="zh-CN" class="pre-hidden"><head><meta charset="utf-8">
+<!-- 防点击劫持预隐藏（2026-10-14 P1-1）：与 index.html/stats.html 同方案。
+     .pre-hidden 规则在 visits-trend.css、还原 IIFE 在 visits-trend.js 顶部
+     （本页 CSP 禁 unsafe-inline，两者都不能内联进 head），详见两个常量注释。
+     ⚠ 本 HTML 是产物：改动须落本模板，直接改 site/visits-trend.html 会被
+     次日 CI 的 gen_visits_trend.py 覆盖（2026-10-08 已踩过坑）。 -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- CSP（2026-10-02）：本报告页此前是全站唯一无 CSP 的页面（2026-09-30 评审 P5），
      补 CSP 时因脚本与数据整体内联而被迫放行 script-src 'unsafe-inline'。
@@ -11,7 +16,7 @@
      本地预览请用 start_local.bat 起本地 server。 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <title>站点访问量趋势</title>
-<link rel="stylesheet" href="visits-trend.css?v=ab9c67f5fa">
+<link rel="stylesheet" href="visits-trend.css?v=3f6db94cd7">
 </head>
 <body><div class="wrap">
 
@@ -32,7 +37,7 @@
   <h1>站点访问量趋势</h1>
   <p class="sub">数据来源 busuanzi（公网）每日快照 · 覆盖
     2026-09-10 至 2026-10-14</p>
-  <p class="subline">生成于 2026-10-14 01:18 · 台账 data/visits_history.json</p>
+  <p class="subline">生成于 2026-10-14 12:21 · 台账 data/visits_history.json</p>
 </header>
 
 <div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v">1,663</div><div class="kpi-d">较前次 +9</div></div><div class="kpi"><div class="kpi-k">累计访客数</div><div class="kpi-v">1,322</div><div class="kpi-d">较前次 +4</div></div><div class="kpi"><div class="kpi-k">日均新增访客</div><div class="kpi-v">12</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">35 天</div><div class="kpi-d">快照 32 条，缺 3 天</div></div></div>
@@ -76,5 +81,5 @@
 
 <p id="load-err" class="empty" hidden></p>
 </div>
-<script src="visits-trend.js?v=62e2ec1c7b" defer></script>
+<script src="visits-trend.js?v=bbb2b84154" defer></script>
 </body></html>
