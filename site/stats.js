@@ -78,24 +78,6 @@ createApp({
     // 当前展示模式：count（讲座数）/ visits（访问量）/ likes（点赞量）—— stats.html 直接引用 displayMode
     //（mode 计算属性已在 2026-08-13 清理冗余时删除，模板统一使用 displayMode）
 
-    // 当前校区筛选下的学院集合（'' = 全部学院）
-    // 双集合口径（2026-10-14 P2-2，与首页 filtered() 对齐）：归口校区 ∪ 实际举办校区。
-    // 早前只看 campusMap（学院→归口校区），校级讲座实际在大学城/石牌办的 232 条
-    // 在具体校区筛选中完全看不到；首页按 actualCampus 能筛到，两页口径分叉。
-    campusColleges() {
-      if (!this.campusFilter) return null;
-      const cmap = (this.summary && this.summary.campusMap) || {};
-      const amap = (this.summary && this.summary.campusActualMap) || {};
-      const set = new Set();
-      Object.entries(cmap).forEach(([college, campus]) => {
-        if (campus === this.campusFilter) set.add(college);
-      });
-      Object.entries(amap).forEach(([college, list]) => {
-        if (Array.isArray(list) && list.includes(this.campusFilter)) set.add(college);
-      });
-      return set;
-    },
-
     // 去重后讲座总数
     lectureCount() {
       return (this.summary && this.summary.lectureCount) || 0;
@@ -160,13 +142,14 @@ createApp({
       return m;
     },
 
-    // 行列表：每一行对应一个学院/部处（受校区 + 学院名双重过滤）
+    // 行列表：每一行对应一个学院/部处（受校区 + 学院名双重过滤）。
+    // 选中校区时 matrix 已切到 campusMatrix[campus]，行集合直接取矩阵键；
+    // 不再按「首见语义」的学院集合过滤——否则联合发布中主学院在别处
+    // 的讲座-单位对会被丢，合计与 campusMatrix 对不上（石牌 1758≠1760）。
     rows() {
       const key = this.sortBy.key;
       const order = this.sortBy.order;
-      const cols = this.campusColleges;
       const list = Object.keys(this.matrix).map(college => {
-        if (cols && !cols.has(college)) return null;
         const cells = this.years.map(y => this.matrix[college][y] || { count: 0, visits: 0, likes: 0 });
         const total = cells.reduce((a, b) => a + b.count, 0);
         const visitsTotal = cells.reduce((a, b) => a + b.visits, 0);
@@ -203,11 +186,10 @@ createApp({
     },
 
     // 每年合计：受校区筛选影响；count 来自矩阵累加，visits/likes 动态叠加。
+    // 矩阵在选中校区时已是该校区口径，无需再按学院集合过滤。
     yearTotals() {
-      const cols = this.campusColleges;
       const counts = {};
       Object.entries(this.matrix).forEach(([college, yearMap]) => {
-        if (cols && !cols.has(college)) return;
         Object.entries(yearMap).forEach(([y, c]) => { counts[y] = (counts[y] || 0) + (c.count || 0); });
       });
       const totals = {};
@@ -235,7 +217,6 @@ createApp({
           if (!hit) return;
         }
         cs.forEach(c => {
-          if (cols && !cols.has(c)) return;
           const t = totals[y] || { year: y, count: 0, visits: 0, likes: 0 };
           t.visits += (st.visits || 0);
           t.likes += (st.likes || 0);

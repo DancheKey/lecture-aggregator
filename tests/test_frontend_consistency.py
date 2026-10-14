@@ -614,9 +614,15 @@ class StatsCampusDualSetTest(unittest.TestCase):
         # 双集合都必须从 summary 里取（缺键时不得抛）
         self.assertIn("this.summary.campusActualMap", src,
                       'campusActualMap 未按 this.summary 防御性读取')
-        # 必须真的用它过滤（只引用不过滤=假消费：删掉 forEach 块断言仍绿的教训）
-        self.assertIn('list.includes(this.campusFilter)', src,
+        # 必须真的用它过滤（只引用不过滤=假消费：删掉 forEach 块断言仍绿的教训）。
+        # 2026-10-14 方案 A：matrix()/yearTotals() 的讲座级命中过滤统一用 cf 变量。
+        self.assertIn('al.includes(cf)', src,
                       'campusActualMap 未参与 campusFilter 过滤（假消费）')
+        # 行集合不得再按首见语义（campusMap 单归口）过滤矩阵行：
+        # campusMatrix 选中校区时已是该校区全量口径，任何额外行过滤都会
+        # 丢联合发布的讲座-单位对（曾致石牌合计 1758≠1760）。
+        self.assertNotIn('campusColleges', src,
+                         'stats.js 不得再消费 campusColleges（首见语义过滤，会丢讲座-单位对）')
 
     def test_62_产物含该键(self):
         p = os.path.join(ROOT, 'site', 'lectures', 'stats.json')
