@@ -22,6 +22,7 @@
   · 单源正常增长 / 有意清理后回落——不得误报
 """
 import io
+import importlib.util
 import json
 import os
 import shutil
@@ -226,6 +227,60 @@ class RealDataSanityTest(unittest.TestCase):
         rc, out = _run_invariants()
         self.assertEqual(rc, 0,
                          f'真实 data/lectures.json 未通过对账门禁：\n{out[-2000:]}')
+
+
+def _load_scraper_mod():
+    """从文件显式加载 scraper/scraper.py（scraper/ 无 __init__.py，直接 import
+    会命中同名命名空间包；同 tests/test_listdate.py 范式）。"""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        'scraper', 'scraper.py')
+    spec = importlib.util.spec_from_file_location('scraper.scraper', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class IncrementalMergeIndexTest(unittest.TestCase):
+    """增量融合跨源索引必须只含「实际在库」记录（2026-10-14 评审 P1-3）。
+
+    场景（无主讲人的大会多轮通知）：existing 里的第一轮通知被本轮第二轮
+    通知替换（del base_map[old_key]），但 existing 列表仍持有旧轮次。若跨源
+    索引从 existing 构建，随后到达的第三条同会议记录会与这条「死记录」
+    （college, date）命中 → merge 进已不在输出中的幽灵记录 → 第三条无声丢失。
+
+    为什么用无主讲人记录构造：cross_source_dedup 第一轮只给有有效主讲人的
+    记录分组（scraper.py:648-651），无主讲人记录不会在 new 内部先去重，
+    可稳定走到跨源索引判定这一步。
+    """
+
+    def test_08_索引不含被替换删除的死记录(self):
+        sc = _load_scraper_mod()
+        a1 = {'sourceUrl': 'http://x/math/round1.html', 'college': '数学科学学院',
+              'campus': '石牌', 'speaker': '',
+              'title': '控制理论学术研讨会：第一轮会议通知',
+              'lectureStart': '2026-10-01', 'publishTime': '2026-09-01'}
+        a2 = dict(a1, sourceUrl='http://x/math/round2.html',
+                  title='控制理论学术研讨会：第二轮会议通知',
+                  publishTime='2026-09-15')
+        b3 = dict(a1, sourceUrl='http://x/math/round3.html',
+                  title='控制理论学术研讨会：会议通知',
+                  publishTime='2026-09-20')
+        # 前置自检：构造数据必须真的触发「替换 + 死记录命中」两条机制
+        self.assertTrue(sc._has_round_marker(a2['title']), 'A2 应含轮次标记')
+        self.assertFalse(sc._has_round_marker(b3['title']), 'B3 不应含轮次标记')
+        self.assertGreaterEqual(
+            sc._topic_similarity(b3['title'], a1['title']), 0.6,
+            'B3 与 A1 相似度须 >=0.6（无主讲人路径命中判据），否则场景不成立')
+
+        out = sc.incremental_merge([a1], [a2, b3])
+        urls = {r.get('sourceUrl') for r in out}
+        self.assertNotIn(a1['sourceUrl'], urls, '旧轮次应已被第二轮通知替换删除')
+        self.assertIn(a2['sourceUrl'], urls, '第二轮通知应保留')
+        self.assertIn(
+            b3['sourceUrl'], urls,
+            '第三条记录被 merge 进已删除的幽灵记录而静默丢失（P1-3 回归：'
+            '跨源索引含死记录）')
+        self.assertEqual(len(out), 2, f'输出应恰为 第二轮+第三条，实得 {urls}')
 
 
 if __name__ == '__main__':

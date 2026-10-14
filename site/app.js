@@ -108,6 +108,14 @@ const app = createApp({
     speaker() { this._scheduleUrlSync(true, 120); },
     onlineOnly() { this._scheduleUrlSync(true, 120); },
     showLikedOnly() { this.currentPage = 1; },
+    // 页码越界钳位（2026-10-14 评审 P1-5）：URL 深链接可能带入超过总页数的
+    // page（数据增减后旧链接失效），静态上界（MAX_URL_PAGE）拦不住这种「合法
+    // 但越界」值。数据到达/筛选变化使 totalPages 变小时，把 currentPage 钳回
+    // 末页——否则 pagedUnits 切片越界，渲染出空白列表。
+    // 钳位会顺势触发上方 currentPage watcher 以 replace 语义更新 URL，不留脏链接。
+    totalPages(n) {
+      if (this.currentPage > n) this.currentPage = n;
+    },
     // 数据阶段从 partial 变 full 时，如果当前没有筛选，保持当前页；否则回到第一页
     dataStage(newVal, oldVal) {
       if (newVal === 'full') this.bumpCount();

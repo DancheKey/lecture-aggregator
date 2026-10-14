@@ -76,6 +76,10 @@ const APP_METHODS = {};
  */
 const CAMPUS_LIST = ['石牌', '大学城', '佛山', '汕尾', '校级'];
 const URL_SEARCH_FIELDS = ['college', 'location', 'topic', 'abstract'];  // searchField 合法枚举
+// URL page 参数静态上界（2026-10-14 评审 P1-5）：全库 3831 条 / 每页 25 满打满算
+// 154 页，1000 留足余量，只防「?page=99999」天文数字与数据增减后失效的旧深链接。
+// 真正的越界钳位由 watch.totalPages 按实际数据完成（见 app.js）。
+const MAX_URL_PAGE = 1000;
 
 // 解析 location.search → 原始覆盖对象（只含 URL 里实际出现且格式合法的键）。
 // format 校验在此做（year 四位数、field 枚举）；取值白名单校验（campus）在
@@ -99,7 +103,7 @@ function parseUrlFilters() {
     if (URL_SEARCH_FIELDS.includes(field)) out.searchField = field;
     if (p.get('online') === '1') out.onlineOnly = true;
     const page = parseInt(p.get('page'), 10);
-    if (page >= 2) out.page = page;   // page=1 与缺省等价，不写
+    if (page >= 2 && page <= MAX_URL_PAGE) out.page = page;   // page=1 与缺省等价，不写
   } catch (e) { /* file:// 等受限环境：按无筛选处理 */ }
   return out;
 }
@@ -117,7 +121,7 @@ function normalizeUrlFilters(f, campusList) {
     query: f.query || '',
     searchField: f.searchField || '',
     onlineOnly: !!f.onlineOnly,
-    currentPage: f.page >= 2 ? f.page : 1,
+    currentPage: (f.page >= 2 && f.page <= MAX_URL_PAGE) ? f.page : 1,
   };
 }
 

@@ -304,7 +304,9 @@ createApp({
               merged[url] = { ...(merged[url] || {}), ...serverSt };
             }
             this.lectureStats = merged;
-            localStorage.setItem(STAT_KEY, JSON.stringify(merged));
+            // 写侧单独容错（2026-10-14 评审 P1-6）：与 app.social.js 同模式——
+            // setItem 配额异常不得掉进 .catch 用本地旧值覆盖已合并的服务端值。
+            try { localStorage.setItem(STAT_KEY, JSON.stringify(merged)); } catch (e) { /* 保留内存态即可 */ }
           } else {
             this.lectureStats = localStats;
           }

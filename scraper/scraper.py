@@ -1563,7 +1563,11 @@ def incremental_merge(existing, new_records):
     existing_index = {}          # 有有效主讲人：(spk, date) -> [rec]
     no_speaker_index = {}        # 无有效主讲人但有单位：(college, date) -> [rec]
                                  #   覆盖大会/多轮通知（speaker 留空）的增量融合
-    for r in existing:
+    # 必须从 base_map.values() 而非 existing 构建（2026-10-14 评审 P1-3）：
+    # 上文多轮替换已 del base_map[old_key]，但 existing 仍持有旧轮次死记录；
+    # 死记录若入索引，新记录会与它 (spk,date)/(college,date) 命中 → merge 进
+    # 已不在输出中的幽灵记录 → 新记录无声丢失。索引口径 = 实际在库记录。
+    for r in base_map.values():
         spk = _normalize_speaker(r.get('speaker') or '')
         date = (r.get('lectureStart') or '')[:10]
         if not date or date.startswith('0000'):

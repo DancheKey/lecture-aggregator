@@ -11,6 +11,7 @@
 //      清掉（修复前：定时器触发 _flushUrlSync 把「后退前」的旧筛选 push 回去，
 //      抵消用户的后退操作，state 与 URL 分叉）
 //   T7 回放抑制：_applyUrlFiltersFromUrl 期间 _scheduleUrlSync 全部被抑制
+//   T8 页码上界 + watch.totalPages 钳位（P1-5：?page=99999 与失效旧深链接）
 //
 // 运行：node tests/js/app_url_sync.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -65,7 +66,9 @@ const sandbox = {
 sandbox.window.top = sandbox.window;
 sandbox.window.self = sandbox.window;
 sandbox.globalThis = sandbox;
-sandbox.Vue = { createApp: () => ({ config: {}, mount: noop }) };
+// 捕获 createApp 的 opts：T8 要取 watch.totalPages（P1-5 钳位接线）
+let appOpts = null;
+sandbox.Vue = { createApp: (opts) => { appOpts = opts; return { config: {}, mount: noop }; } };
 
 const ctx = vm.createContext(sandbox);
 for (const f of PARTS) {
@@ -208,6 +211,33 @@ setUrl('?field=topic');
   methods._scheduleUrlSync.call(vmThis, true, 120);
   ok(timers.length === 0 && vmThis._urlSyncPendingPush === false,
      `T7 suppress 期间调度被忽略`);
+}
+
+// ---- T8 页码上界 + totalPages 钳位（2026-10-14 评审 P1-5）----
+// 场景：① ?page=99999 天文数字不得进 state；② 数据/筛选变化使 totalPages 变小时，
+// currentPage 必须被钳回末页（否则 pagedUnits 切片越界渲染空白列表）。
+setUrl('?page=99999');
+{
+  const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(n.currentPage === 1, `T8 天文 page 回落: ${n.currentPage}`);
+}
+setUrl('?page=3');
+{
+  const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(n.currentPage === 3, `T8 合法 page 保留: ${n.currentPage}`);
+}
+setUrl('');
+{
+  const w = appOpts && appOpts.watch;
+  ok(!!w && typeof w.totalPages === 'function', 'T8 watch.totalPages 未接线（P1-5 钳位缺失）');
+  if (w && typeof w.totalPages === 'function') {
+    const over = { currentPage: 5 };
+    w.totalPages.call(over, 3);
+    ok(over.currentPage === 3, `T8 越界钳位: currentPage=${over.currentPage}（应钳为 3）`);
+    const within = { currentPage: 2 };
+    w.totalPages.call(within, 7);
+    ok(within.currentPage === 2, `T8 未越界不误动: currentPage=${within.currentPage}`);
+  }
 }
 
 console.log('');
