@@ -664,12 +664,20 @@ class DocNumbersSmokeTest(unittest.TestCase):
 
     策略：条数/片数等**日变数字**不硬锁（每天增量更新，写死即天天过期）；
     锁的是「旧值表述不得回退」+「与实测一致的稳定锚」（chunkSize）。
-    2026-10-14 批量更新过 7 处：chunk 500→100、3811→3830、8 分片→39、
-    「单文件 1475 行」→8 个 JS、2020→2009、app.data.js 三处体积/「截断预览」。
+
+    ⚠ `docs/` 整目录在 .gitignore（本地文档、不入库）→ CI 检出里不存在，
+    故读 docs 的用例必须 skipTest（同 test_ci_gate_coverage.py 的既有范式）。
+    2026-10-14 教训：本类首版直接 open → 本地全绿、CI 3 错误把门禁打红，
+    连带 deploy 被跳过。**新增「读本地未入库文件」的测试必须模拟 CI 条件
+    （临时移走该目录）验证一次。**
     """
 
     def _read(self, rel):
-        with open(os.path.join(ROOT, rel), encoding='utf-8') as f:
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            self.skipTest(f'{rel} 不存在（docs/ 与 .gitignore 同步，CI 上必然缺失）'
+                          '—— 该守卫仅本地生效')
+        with open(p, encoding='utf-8') as f:
             return f.read()
 
     def test_64_deploy分片条数与实测一致(self):
