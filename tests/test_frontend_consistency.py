@@ -710,5 +710,70 @@ class DocNumbersSmokeTest(unittest.TestCase):
                          'deploy.md 起始年份仍写 2020（实测最早 2009）')
 
 
+class CampusMatrixStatsTest(unittest.TestCase):
+    """统计页校区矩阵（方案 A，2026-10-14）：选中校区后数字必须与首页同口径。
+
+    背景：此前统计页选中校区只过滤「显示哪些行」，行内数字仍是单位全部校区
+    总数（社科处 116 vs 汕尾实际 1）——用户报告后确认方案 A：生成器预计算
+    「校区 × 学院 × 年份」矩阵（campusMatrix），stats.js 选中校区时改读它。
+    """
+
+    def test_68_生成器产出校区矩阵(self):
+        with open(os.path.join(ROOT, 'scripts', 'generate_frontend_data.py'),
+                  encoding='utf-8') as f:
+            src = f.read()
+        self.assertIn("'campusMatrix': campus_matrix", src,
+                      '生成器未产出 campusMatrix')
+        self.assertIn('matched_campuses', src,
+                      '生成器未按「归口 ∪ 实际举办」命中集合构建矩阵')
+
+    def test_69_统计页消费校区矩阵(self):
+        with open(os.path.join(ROOT, 'site', 'stats.js'), encoding='utf-8') as f:
+            src = f.read()
+        self.assertIn('this.summary.campusMatrix', src,
+                      'stats.js 未消费 campusMatrix')
+        # 真分支断言：选中校区时必须真的改读校区矩阵（只引用不分支 = 假消费）
+        self.assertRegex(
+            src, r'this\.campusFilter\s*\?\s*\(cm\[this\.campusFilter\]',
+            'stats.js 未按 campusFilter 分支切换矩阵来源（假消费）')
+        # 访问/点赞叠加段必须也有讲座级校区命中过滤（否则 count 与 visits 口径分叉）
+        self.assertIn('let hit = false', src,
+                      'stats.js 访问/点赞叠加段缺讲座级校区命中过滤')
+
+    def test_70_校区矩阵与首页口径一致(self):
+        """对账：campusMatrix 每格 == 按首页 filtered() 口径直接算出的讲座-单位对数。"""
+        sp = os.path.join(ROOT, 'site', 'lectures', 'stats.json')
+        lp = os.path.join(ROOT, 'site', 'lectures.json')
+        if not (os.path.exists(sp) and os.path.exists(lp)):
+            self.skipTest('stats.json / lectures.json 未生成（本地未跑生成器）')
+        with open(sp, encoding='utf-8') as f:
+            cm = (json.load(f) or {}).get('campusMatrix') or {}
+        with open(lp, encoding='utf-8') as f:
+            data = (json.load(f) or {}).get('data') or []
+        agg = {}
+        for l in data:
+            units, seen = [], set()
+            for c in [l.get('college')] + [s.get('college') for s in l.get('sources') or []]:
+                if c and c not in seen:
+                    seen.add(c)
+                    units.append(c)
+            matched = {l.get('campus')} | {s.get('campus') for s in l.get('sources') or []}
+            matched.discard(None)
+            matched.discard('')
+            if l.get('actualCampus'):
+                matched.add(l['actualCampus'])
+            for campus in matched:
+                for u in units:
+                    agg[(campus, u)] = agg.get((campus, u), 0) + 1
+        got = {}
+        for campus, colleges in cm.items():
+            for college, years in colleges.items():
+                got[(campus, college)] = sum(years.values())
+        diff = [k for k in set(got) | set(agg) if got.get(k) != agg.get(k)]
+        self.assertEqual(
+            got, agg,
+            f'校区矩阵与首页口径不一致（{len(diff)} 处，样例：{diff[:5]}）')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -238,6 +238,13 @@ def build_stats(data, updated_at):
     # 实际举办校区，供统计页按「归口 ∪ 实际举办」双集合筛选（与首页
     # app.computed.js filtered() 的 actualCampus 口径一致）。
     campus_actual = {}
+    # 校区 -> 学院 -> 年份 -> 讲座数（2026-10-14 方案 A）：统计页选中校区后的
+    # 计数矩阵。口径与首页 filtered() 完全一致——讲座命中校区 = 各归属单位的
+    # 归口校区 ∪ actualCampus；再按「讲座-单位」展开（与 matrix 同口径，联合
+    # 发布的讲座在每个相关单位各计一次）。此前统计页选中校区只过滤「显示哪些
+    # 行」，行内数字仍是单位全部校区总数（社科处 116 vs 汕尾实际 1），两页数字
+    # 对不上——用户 2026-10-14 报告并确认方案 A（生成器预计算）。
+    campus_matrix = {}
 
     for item in data:
         y = year_of(item)
@@ -277,6 +284,25 @@ def build_stats(data, updated_at):
         if _ac:
             for c in units:
                 campus_actual.setdefault(c, set()).add(_ac)
+        # 校区矩阵（方案 A）：讲座命中的校区 = 各归属单位的归口校区 ∪ actualCampus。
+        # 注意 matched 是讲座级集合（对该讲座的所有归属单位相同），因此
+        # campus_matrix[校区][单位][年份] = 该单位归属的、命中该校区的讲座数。
+        matched_campuses = set()
+        for c in units:
+            if c == primary_college:
+                uc = item.get('campus') or ''
+            else:
+                src = next((s for s in sources if s.get('college') == c), None)
+                uc = (src or {}).get('campus') or ''
+            if uc:
+                matched_campuses.add(uc)
+        if _ac:
+            matched_campuses.add(_ac)
+        for campus in matched_campuses:
+            cm = campus_matrix.setdefault(campus, {})
+            for c in units:
+                cm.setdefault(c, {})
+                cm[c][cell_year] = cm[c].get(cell_year, 0) + 1
         # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞。
         # cs = 该讲座归属的全部单位（含主学院与来源单位），供访问/点赞按单位展开归属；
         # c = 主学院（保留，供来源通知数等按主讲座口径统计）。
@@ -314,6 +340,8 @@ def build_stats(data, updated_at):
         'campusMap': campus_map,
         # 实际举办校区集合（P2-2）：set 不可 JSON 序列化，转排序列表
         'campusActualMap': {c: sorted(v) for c, v in campus_actual.items()},
+        # 校区矩阵（方案 A）：统计页选中校区后的计数来源（见上方注释）
+        'campusMatrix': campus_matrix,
     }
 
 

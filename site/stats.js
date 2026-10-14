@@ -108,9 +108,16 @@ createApp({
 
     // 学院 -> 年份 -> {count, visits, likes}
     // count 来自预计算矩阵；visits/likes 由最小讲座索引 + lectureStats 动态合并。
+    // 选中校区时 count 改读「校区 × 学院 × 年份」矩阵（2026-10-14 方案 A）：
+    // 每格 = 该学院在该校区（归口 ∪ 实际举办）的讲座数，与首页 campus+college
+    // 组合筛选完全一致。此前行内数字是单位全部校区总数（社科处 116 vs 汕尾
+    // 实际 1），两页对不上。未选校区时仍用全量矩阵，行为不变。
     matrix() {
       const m = {};
-      const rawMatrix = (this.summary && this.summary.matrix) || {};
+      const cm = (this.summary && this.summary.campusMatrix) || {};
+      const rawMatrix = this.campusFilter
+        ? (cm[this.campusFilter] || {})
+        : ((this.summary && this.summary.matrix) || {});
       // 先写入预计算的 count
       Object.entries(rawMatrix).forEach(([college, yearMap]) => {
         m[college] = {};
@@ -120,12 +127,28 @@ createApp({
       });
       // 再叠加访问/点赞：按该讲座归属的每个单位（cs）展开累加，
       // 与矩阵计数口径一致——联合发布的讲座其访问/点赞也在每个相关单位计入。
+      // 选中校区时按「讲座级命中」过滤：该讲座命中的校区 = 任一归属单位的
+      // 归口校区 ∪ 实际举办校区（与 campusMatrix 生成口径相同）；未命中则
+      // 整条跳过（其所有单位的访问/点赞都不计入该校区），否则行内
+      // 访问/点赞仍是全校区总数，与 count 口径分叉。
+      const cmapAll = (this.summary && this.summary.campusMap) || {};
+      const amapAll = (this.summary && this.summary.campusActualMap) || {};
+      const cf = this.campusFilter;
       const lectures = (this.summary && this.summary.lectures) || [];
       lectures.forEach(l => {
         const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
         if (!st.visits && !st.likes) return;
         const y = l.y || UNKNOWN_YEAR;
         const cols = (l.cs && l.cs.length) ? l.cs : [l.c || '未分类'];
+        if (cf) {
+          let hit = false;
+          cols.forEach(c => {
+            if (cmapAll[c] === cf) hit = true;
+            const al = amapAll[c];
+            if (Array.isArray(al) && al.includes(cf)) hit = true;
+          });
+          if (!hit) return;
+        }
         cols.forEach(c => {
           const cell = (m[c] && m[c][y]) || { count: 0, visits: 0, likes: 0 };
           cell.visits += (st.visits || 0);
@@ -190,6 +213,10 @@ createApp({
       const totals = {};
       this.years.forEach(y => { totals[y] = { year: y, count: counts[y] || 0, visits: 0, likes: 0 }; });
       const lectures = (this.summary && this.summary.lectures) || [];
+      // 讲座级校区命中（与 matrix() 叠加段同口径）：任一归属单位的归口 ∪ 实际举办。
+      const cmapAll = (this.summary && this.summary.campusMap) || {};
+      const amapAll = (this.summary && this.summary.campusActualMap) || {};
+      const cf = this.campusFilter;
       lectures.forEach(l => {
         const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
         if (!st.visits && !st.likes) return;
@@ -198,6 +225,15 @@ createApp({
         // 主学院不在当前校区、次学院在时，列里计入了、合计行却漏掉，
         // 「按访问数/点赞数」模式下合计行小于各列之和。
         const cs = (l.cs && l.cs.length) ? l.cs : [l.c || '未分类'];
+        if (cf) {
+          let hit = false;
+          cs.forEach(c => {
+            if (cmapAll[c] === cf) hit = true;
+            const al = amapAll[c];
+            if (Array.isArray(al) && al.includes(cf)) hit = true;
+          });
+          if (!hit) return;
+        }
         cs.forEach(c => {
           if (cols && !cols.has(c)) return;
           const t = totals[y] || { year: y, count: 0, visits: 0, likes: 0 };
