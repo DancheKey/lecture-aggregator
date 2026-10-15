@@ -4585,6 +4585,52 @@ LABELS = (
 STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|[*＊•·]|主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))'
 
 
+def _sp_glue_boundary_evidence(_st, name, rest):
+    """「姓名+机构首字」粘连判别的原文空格边界证据（2026-10-14 复核补）。
+
+    背景：粘连与「真实 4 字姓名 + 机构」在折叠文本上**完全同构**：
+        张文生中国科学院自动化研究所   （粘连：空格原在 生|中 之间，中被吞进 name）
+        陈谢沅澧国防科技大学智能科学学院（真名：空格原在 澧|防 之间）
+    两者 name 都取满 4 字、rest 看起来都"像完整机构"（「国科学院…」与
+    「国防科技大学…」在 _AFF_END_KW 判据下同真），任何基于折叠文本的
+    静态判据（机构词表 / rest 完整性 / 姓氏频率）都无法区分——粘连与巧合
+    本就是同一字符串的两种可能切分，只能靠**折叠前的原文空格位置**：
+
+        粘连 → name 末字**之后**无空白（末字已跨过原空格被吞进 name）
+        真名 → name 末字**之后**紧跟空白（空格分隔了姓名与机构）
+
+    sp 到 _extract_speaker 处已被 N1a 折叠（parsers.py:4800 注释），须回
+    _st.body_text_llm（未折叠旁路，3801 生成，保留 CJK 间原始空格）定位。
+
+    返回 True = 判定粘连（应拆末字）；False = 非粘连或无法判定（不拆）。
+    定位失败时**保守返回 False**——宁漏拆不误拆：漏拆的粘连可后修，
+    误拆把真实 4 字姓名砍成 3 字并把尾字塞进 affiliation 不可逆
+    （复核实测：陈谢沅澧→陈谢沅/aff='澧国防科技大学…'、松野诚也→松野诚）。
+
+    ⚠ 已知边界：若源页**本身无空格连写**真名+机构（作者没打空格），
+    本判据会把真名误判为粘连。无空格时确实无从区分，属不可消除歧义；
+    库内该形态存量已正确，且人工写通知一般会打空格，风险可接受。
+    """
+    _raw = (getattr(_st, 'body_text_llm', '') or ''
+            or getattr(_st, 'body_text', '') or '')
+    if not _raw:
+        return False
+    _key = re.sub(r'\s+', '', name + rest)
+    _raw_flat = re.sub(r'\s+', '', _raw)
+    _at = _raw_flat.find(_key)
+    if _at < 0:
+        return False
+    # 去空格坐标 → 原文坐标映射（name 末字后是否紧跟空白须在原文上判）
+    _idx_map = [i for i, ch in enumerate(_raw) if not ch.isspace()]
+    _end_of_name = _at + len(name) - 1
+    if _end_of_name >= len(_idx_map):
+        return False
+    _p = _idx_map[_end_of_name]
+    if _p + 1 < len(_raw) and _raw[_p + 1].isspace():
+        return False   # 末字后紧跟空白 → 空格分隔姓名与机构 → 真名，不拆
+    return True
+
+
 def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
                      title_year, url_year, publish_time, default_year,
                      _do_ocr, college):
@@ -4923,7 +4969,14 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
                             r'(?:大学|学院|研究院|研究所|研究中心|实验室|学系|学校|'
                             r'科学院|自动化所|自动化研究所|所|院|馆|会|局|部|院系'
                             r'|院士|教授|研究员|讲师|博士后|所院|学会)$')
-                        if _AFF_END_KW.search(_spliced):
+                        # ⚠ 2026-10-14 复核收紧：_AFF_END_KW 单独不足以拆——它对
+                        # 「陈谢沅澧+国防科技大学智能科学学院」（真实 4 字姓名）同样为真，
+                        # 复核实测会把真名砍成 3 字并把尾字塞进 affiliation
+                        # （aff='澧国防科技大学…'）。粘连与真名在折叠文本上同构，
+                        # 必须再要**原文空格边界证据**（见 _sp_glue_boundary_evidence）：
+                        # 末字后无空白=被吞的机构首字→拆；末字后有空白=真名→不拆。
+                        if (_AFF_END_KW.search(_spliced)
+                                and _sp_glue_boundary_evidence(_st, name, rest)):
                             shorter = name[:-1]
                             if len(shorter) >= 2 and _looks_like_real_name(shorter):
                                 name = shorter

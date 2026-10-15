@@ -1,22 +1,27 @@
 # -*- coding: utf-8 -*-
-"""姓名+机构首字粘连修复的回归门禁（2026-10-14，评审 P2）。
+"""姓名+机构首字粘连修复的回归门禁（2026-10-14，评审 P2 + 复核补）。
 
 物理学院 / 计算机学院同一套 CMS 模板的标签行形如
-「报告专家：马余强 中国科学院院士」。上游 N1a 规范化折叠 CJK 间空格后到达
-speaker 提取处为「马余强中国科学院院士」，4→2 字降序取姓名时把机构首字
-吞进姓名（speaker='马余强中'），且 rest 起点随之右移导致 affiliation
-同步丢首字（affiliation='国科学院'）——**同一处截断的两个症状**。
+「报告专家：马余强 中国科学院院士」。CJK 间空格被折叠后到达 speaker 提取处
+为「马余强中国科学院院士」，4→2 字降序取姓名时把机构首字吞进姓名
+（speaker='马余强中'），且 rest 起点随之右移导致 affiliation 同步丢首字
+（affiliation='国科学院'）——**同一处截断的两个症状**。
 
-修复在 parsers._extract_speaker 的单位首字守卫里新增「自洽」维度：
-仅当 name 已达 4 字上限、且末字还给 rest 后整串以单位关键词/职称收尾时，
-才把末字判为单位首字并回退 1 字。
+现状为两层保护：
+  ① N1a 词块空格主判据（两侧 >=2 字 CJK 空格保留，见 test_n1a_word_boundary_spaces）——
+     源页有空格时姓名/单位天然分开，不依赖词表；
+  ② _extract_speaker 的单位首字守卫（parsers.py:4914 起）——处理**源页无空格**
+     的折叠形态。2026-10-14 复核收紧：拆分除 _AFF_END_KW（末字归还后以单位词
+     收尾）外还须**原文空格边界证据**（_sp_glue_boundary_evidence）：末字后无
+     空白=被吞的机构首字→拆；末字后有空白=真名→不拆。复核实测单靠
+     _AFF_END_KW 会把真实 4 字姓名砍成 3 字（陈谢沅澧→陈谢沅、aff='澧国防…'）。
 
 ⚠ 本门禁同时锁住**反例**（末字巧合，库中值本就正确）——上一版用
 「机构通名前缀枚举」的修法正是因为误杀这批而废弃（实测把
 秦晓华/华南师范大学 改成 秦晓华南、彭再云/云南师范大学 改成 彭再云云）。
 前缀枚举不可行：粘连与巧合在字符串层完全同构
 （马余强中+国科学院 → 中国科学院   vs   秦晓华+南师范大学 → 华南师范大学），
-只能靠「name 是否已达 4 字上限」区分。
+只能靠「name 是否已达 4 字上限」+「原文空格位置」区分。
 """
 import os
 import sys
@@ -262,3 +267,69 @@ def test_affiliation_survives_tag_boundary_spaces():
     assert r.get('speaker') == '何振宏', f'speaker={r.get("speaker")!r}'
     assert r.get('speakerAffiliation') == '深圳大学心理学院', (
         f'单位被标签边界空格截断：affiliation={r.get("speakerAffiliation")!r}')
+
+
+# ---- 2026-10-14 复核补：守卫的原文空格边界证据 --------------------------------
+# 复核实测：单靠 _AFF_END_KW（末字归还后以单位词收尾即拆）会把**真实 4 字姓名**
+# 砍成 3 字并把尾字塞进 affiliation——
+#   陈谢沅澧 国防科技大学智能科学学院 → sp='陈谢沅澧'→'陈谢沅' + aff='澧国防科技大学…'
+#   松野诚也 日本明治学院大学…      → sp='松野诚也'→'松野诚' + aff='也日本明治…'
+# 粘连与真名在折叠文本上完全同构（rest 完整性也区分不了：两者 rest 都"像机构"），
+# 唯一可靠判据是 N1a 折叠**前**的原文空格位置：
+#   粘连 → name 末字之后无空白（「张文生 中国…」的「中」已跨空格被吞进 name）
+#   真名 → name 末字之后紧跟空白（「陈谢沅澧 国防…」的空格分隔姓名与机构）
+# 见 parsers._sp_glue_boundary_evidence。
+
+
+class _FakeSt:
+    """守卫只读 body_text_llm / body_text，构造最小替身。"""
+
+    def __init__(self, raw):
+        self.body_text_llm = raw
+        self.body_text = raw
+
+
+def test_boundary_evidence_detects_glue():
+    """原文中 name 末字之后无空白 → 判粘连（应拆）。"""
+    st = _FakeSt('报告专家：马余强 中国科学院院士')
+    assert parsers._sp_glue_boundary_evidence(st, '马余强中', '国科学院院士') is True
+    st = _FakeSt('报告人：张文生中国科学院自动化研究所')
+    assert parsers._sp_glue_boundary_evidence(st, '张文生中', '国科学院自动化研究所') is True
+
+
+def test_boundary_evidence_detects_real_4char_name():
+    """原文中 name 末字之后紧跟空白 → 判真名（不拆）。"""
+    st = _FakeSt('报告人：陈谢沅澧 国防科技大学智能科学学院')
+    assert parsers._sp_glue_boundary_evidence(
+        st, '陈谢沅澧', '国防科技大学智能科学学院') is False
+    st = _FakeSt('报告人：松野诚也 日本明治学院大学国际和平研究所')
+    assert parsers._sp_glue_boundary_evidence(
+        st, '松野诚也', '日本明治学院大学国际和平研究所') is False
+
+
+def test_boundary_evidence_conservative_on_locate_fail():
+    """原文定位失败（raw 缺失/不含该串）→ 保守判非粘连，宁漏拆不误拆。"""
+    st = _FakeSt('')
+    assert parsers._sp_glue_boundary_evidence(st, '马余强中', '国科学院院士') is False
+    st = _FakeSt('完全无关的正文内容')
+    assert parsers._sp_glue_boundary_evidence(st, '马余强中', '国科学院院士') is False
+
+
+# 端到端：真实 4 字姓名 + 机构（带空格，真实源页形态）——守卫不得误拆。
+# 修复前（_AFF_END_KW 单独判据）实测：陈谢沅澧→陈谢沅 / aff='澧国防科技大学…'。
+FOUR_CHAR_NAME_CASES = [
+    ('报告人：陈谢沅澧 国防科技大学智能科学学院', '陈谢沅澧', '国防科技大学智能科学学院'),
+    ('报告人：松野诚也 日本明治学院大学国际和平研究所', '松野诚也', None),
+    ('报告人：姆文当卡 民主共和国国家社会工作者学院', '姆文当卡', None),
+    ('报告人：王冠中 中国科学技术大学', '王冠中', '中国科学技术大学'),
+    ('报告人：范传东 东莞市教育局教研室', '范传东', None),
+]
+
+
+@pytest.mark.parametrize('text,exp_sp,exp_aff', FOUR_CHAR_NAME_CASES)
+def test_real_names_survive_glue_guard(text, exp_sp, exp_aff):
+    """真实姓名（含 4 字）在守卫存在时必须原样保留。"""
+    sp, aff = _parse(text)
+    assert sp == exp_sp, f'{text!r} speaker 应保持 {exp_sp!r}，实得 {sp!r}（守卫误拆真实姓名）'
+    if exp_aff is not None:
+        assert aff == exp_aff, f'{text!r} affiliation 应保持 {exp_aff!r}，实得 {aff!r}'
