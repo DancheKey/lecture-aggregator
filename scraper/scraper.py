@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
 from parsers import parse_detail, is_lecture, is_news_record  # noqa: E402
-from excluded_urls import load_excluded  # noqa: E402
+from excluded_urls import load_excluded, canon_url_key as _canon_url_key  # noqa: E402
 from env_flags import flag as env_flag  # noqa: E402  开关真值判定的单一事实源
 import field_vocab  # noqa: E402  讲者归一/职称词表单一事实源（B6 口径收敛）
 
@@ -925,50 +925,14 @@ def dedup(records):
 
 
 def _norm_url(u):
-    """归一化来源 URL：去尾斜杠，用于增量合并时基底/新增的键比对。"""
+    """归一化来源 URL：去尾斜杠，用于增量合并时基线/新增的键比对。"""
     return str(u or '').rstrip('/')
 
 
-# VSB 系站点同一篇文章存在两个 URL 形态（经管学院实证）：
-#   旧形态 http://em.scnu.edu.cn/a/20260924/11175.html
-#   新形态 https://module.scnu.edu.cn/article-3685-11175-1.html
-# 二者文章数字 ID 一致，指同一篇。仅 URL 字符串比对时互相认不出 → 增量轮
-# 每轮把已入库的老文章当新页面重抓重解析（实测 621 页，占单轮 1734 页的 36%）。
-#
-# ⛔ 归一化**必须限定站点组**：VSB 的文章 ID 是「每站独立编号」而非全局唯一，
-#   实测全库 352 个 ID 跨站重复（如 ID 22 同时是 lswh / geography 的两篇不同文章），
-#   故只有同一站点组内的两个域名才允许互相归一，跨站绝不合并。
-# 归一化仅用于「是否已抓」的跳过判定，**不改写 sourceUrl 原值**（溯源必须指回真实页面）。
-_VSB_ID_PATTERNS = (
-    re.compile(r'^https?://([a-z0-9.-]+)/a/\d{8}/(\d+)\.html$'),
-    re.compile(r'^https?://([a-z0-9.-]+)/article-\d+-(\d+)-1\.html$'),
-)
-# 同一内容站的不同域名（归一化后视为同一篇）。保守白名单，逐条实测添加。
-_VSB_SITE_GROUPS = (
-    frozenset(('em.scnu.edu.cn', 'module.scnu.edu.cn')),
-)
-
-
-def _canon_url_key(u):
-    """返回用于「是否已抓」比对的归一化键；无法归一时回退去尾斜杠的原 URL。
-
-    仅同站点组内的等价形态才折叠为同一键，跨站 ID 相同仍是不同键（见 _VSB_SITE_GROUPS 注释）。
-    """
-    s = str(u or '').rstrip('/')
-    if not s:
-        return s
-    low = s.lower()
-    for pat in _VSB_ID_PATTERNS:
-        m = pat.match(low)
-        if not m:
-            continue
-        host, art_id = m.group(1), m.group(2)
-        for grp in _VSB_SITE_GROUPS:
-            if host in grp:
-                # 用组内字典序最小域名作代表，保证两种形态算出同一个 key
-                return 'vsb::%s::%s' % (sorted(grp)[0], art_id)
-        break
-    return s
+# VSB 系站点同一篇文章存在两个 URL 形态（经管学院实证）的归一化 _canon_url_key
+# 已下沉至 scripts/excluded_urls.py::canon_url_key（2026-10-14）：is_excluded
+# 需要同一套归一，否则名单写 em 形态、记录是 module 形态时排除静默失效。
+# 本文件顶部 `from excluded_urls import canon_url_key as _canon_url_key` 导入。
 
 
 # ── 列表页条目日期就地过滤（2026-09-28）────────────────────────────────────
@@ -1011,9 +975,18 @@ def _listdate_skip_enabled():
 #   台账只装「抓过但没入库」的 URL，两个集合不相交。
 # ⚠ 条目 180 天后自动作废并重判一次，避免一次误判被永久固化（源站也可能换掉旧 URL 的内容）。
 # ⚠ 全量模式（--full）只写不读，保证「宁多抓不漏抓」；台账只服务增量轮。
+# ⚠ verdict 语义（2026-10-14 P1-4 扩展）：
+#   'rejected' = 抓过、判不入库（SKIP-NEWS / SKIP-RETRO），TTL 180 天
+#   'old'      = 抓过、条目日期早于基线，TTL 180 天
+#   'failed'   = 详情页取回/解析失败（网络/HTTP/parse 异常），TTL 7 天
+#     —— P1-4 修正：此前 detail_fails 只上报 err 不进台账，一个永久损坏的
+#        详情页（404/改版）每轮都失败 → failed_sources 永远非空 → 全局水位
+#        永久冻结、整条增量管线停摆。记入台账后下轮 fetch 前跳过，水位正常
+#        推进；7 天 TTL 到期自动重试一次（瞬时故障可恢复，永久故障重新登记）。
 _LEDGER_TTL_DAYS = 180
+_LEDGER_TTL_BY_VERDICT = {'failed': 7}   # P1-4：失败条目短 TTL，到期重试
 _LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0, 'dirty': 0}
-_LEDGER = {}  # {canon_url_key: {'v': 'rejected'|'old', 'd': 条目日期, 't': 首次记录日}}
+_LEDGER = {}  # {canon_url_key: {'v': 'rejected'|'old'|'failed', 'd': 条目日期, 't': 首次记录日}}
 
 # 键形态白名单：必须是 _canon_url_key 的两种产出之一——普通 URL，或 vsb 站点组的
 # `vsb::代表域名::文章ID`。加这道闸是因为台账键一旦带杂质（空白、方括号、=），
@@ -1038,12 +1011,17 @@ def _ledger_is_fresh(entry):
     判据，否则又是一处「同一语义两份实现」（这正是 2026-09-30 评审点名的缺陷模式）。
     读侧与写侧的语义一致性由 tests/test_ledger.py 的静态锁守卫。
 
+    2026-10-14 P1-4：支持按 verdict 分层 TTL——'failed' 条目 7 天到期重试
+    （瞬时故障可恢复），'rejected'/'old' 维持 180 天。
+
     缺 t 的条目保守返回 True（保留）：与读侧既定行为一致，不静默丢弃异常数据。
     """
     t = (entry or {}).get('t') or ''
     if not t:
         return True
-    limit = (datetime.date.today() - datetime.timedelta(days=_LEDGER_TTL_DAYS)).isoformat()
+    verdict = (entry or {}).get('v') or ''
+    ttl = _LEDGER_TTL_BY_VERDICT.get(verdict, _LEDGER_TTL_DAYS)
+    limit = (datetime.date.today() - datetime.timedelta(days=ttl)).isoformat()
     return t >= limit
 
 
@@ -1833,6 +1811,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     d = fetch(href, allowed_domains=['scnu.edu.cn'])
                     if not d:
                         detail_fails.append(href)   # P0-2：策略放行后的取回失败才记账
+                        # P1-4（2026-10-14）：记入台账（verdict='failed'，TTL 7 天），
+                        # 下轮 fetch 前跳过——否则永久损坏页每轮都失败 →
+                        # failed_sources 永远非空 → 全局水位永久冻结。
+                        ledger_add(_canon_url_key(href_norm), 'failed',
+                                   (item_date_map or {}).get(_canon_url_key(href_norm), ''))
                         continue
                     try:
                         recs = parse_detail(d, href, name, campus, year, list_title=txt,
@@ -1840,6 +1823,9 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     except Exception as e:
                         print(f'[WARN] parse failed {href}: {e}', file=sys.stderr)
                         detail_fails.append(href)   # P0-2：仅告警不改为记账上报
+                        # P1-4（2026-10-14）：同上，parse 异常也记入台账防冻结。
+                        ledger_add(_canon_url_key(href_norm), 'failed',
+                                   (item_date_map or {}).get(_canon_url_key(href_norm), ''))
                         continue
                     if recs is None:
                         print(f'[SKIP-NEWS] {name} | {txt} | {href}')
@@ -1933,6 +1919,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
         return local, f'{name}: {e}'
     # P0-2：详情页失败与列表页失败同口径——返回非空 err → main() 记入
     # failed_sources → 水位不推进，下轮重抓同区间自动补回；gate job 会发告警。
+    # P1-4（2026-10-14）：失败 URL 已在循环内记入台账（verdict='failed'，TTL 7 天），
+    # 下轮 fetch 前被 ledger_hit 跳过 → detail_fails 为空 → 本源正常推进水位。
+    # 因此水位只在**首次失败**时冻结一轮，之后自动放行；7 天后台账过期自动重试
+    # （瞬时故障可恢复，永久故障重新登记）。此前不进台账 → 永久损坏页每轮都失败
+    # → failed_sources 永远非空 → 全局水位永久冻结、整条增量管线停摆。
     if detail_fails:
         print(f'[DETAIL-FAIL] {name} | {len(detail_fails)} 页详情页取回/解析失败'
               f'（首个：{detail_fails[0]}）| 本次本源不推进水位', file=sys.stderr)

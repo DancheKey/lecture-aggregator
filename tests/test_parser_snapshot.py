@@ -104,7 +104,13 @@ if hasattr(P, 'get_text_provider'):
 
 # VLM 密封化：与 test_parser_golden 同一套手法 —— provider 指向不可达地址，
 # 命中录制缓存即返回（零真实 API 调用）；未命中则快速失败而不是静默跳过。
-P._load_vlm_configs = lambda: [{'model': 'snapshot-replay', 'api_key': 'unused',
+# ⚠ 2026-10-14：model 名必须与 golden 及 fixture 键一致（'golden-replay'）。
+#   两模块都在导入时桩 P._load_vlm_configs，后导入者覆盖前者；缓存键自 2026-10-14
+#   起纳入模型名（parsers.py:_vlm_extract_fields），模型名不一致会导致 golden 的
+#   test_07_65 等用例缓存未命中（fixture 键含 golden-replay）→ 触发不可达 provider
+#   → KeyError/连接失败。此前键不含模型名，两测试碰巧共享同一 fixture 条目掩盖了这一点。
+P._load_vlm_configs = lambda: [{'name': 'snapshot', 'model': 'golden-replay',
+                                'api_key': 'unused',
                                 'base_url': 'http://snapshot-test.invalid/vlm'}]
 P._vlm_cache_path = lambda: VLM_CACHE_FIXTURE
 P._vlm_cache_set = lambda key, val: None

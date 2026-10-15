@@ -54,7 +54,12 @@ const APP_COMPUTED = {
     years() {
       const set = new Set();
       this.all.forEach(l => { const y = this.yearOf(l); if (y) set.add(y); });
-      return Array.from(set).sort((a, b) => b.localeCompare(a));
+      // 「其他」（无年份）置底，与后端 generate 及 stats.js 口径一致（2026-10-14）
+      return Array.from(set).sort((a, b) => {
+        if (a === '其他') return 1;
+        if (b === '其他') return -1;
+        return b.localeCompare(a);
+      });
     },
 
     // 去重学院列表，按讲座数倒序，便于高频学院靠前。

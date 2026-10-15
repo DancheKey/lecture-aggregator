@@ -18,7 +18,8 @@ golden-case 回归测试（Q3）——锁定 parser 关键案例，防止改候�
 
   ⚠️ 新增 requires_vlm 用例时必须同步录制响应，否则 CI 必红。录制步骤：
     1) 本机配置真实 VLM key（.env 的 ZHIPU_API_KEY），正常跑一次解析让响应
-       落入生产缓存 data/.vlm_cache.json（缓存键 = 图片 URL 集合的 md5）；
+       落入生产缓存 data/.vlm_cache.json（缓存键 = 'vlm:' + 模型名 + ':' +
+       图片 URL 集合的 md5，2026-10-14 起纳入模型名，对齐文本通道）；
     2) 用探测脚本找出该用例命中的缓存键（monkeypatch _vlm_cache_get 记录 key），
        把对应条目追加进 tests/fixtures/vlm_cache.json 并提交。
 - ctld4409 原页已下线(404)且无本地副本，保留 may_404 skip 语义（文档化的唯一例外）。
@@ -43,7 +44,9 @@ import parsers as P
 
 # VLM 密封化：provider 配置打桩为「存在但不可达」（.invalid 为 RFC 6761 保留、永不解析）。
 # 配合缓存夹具：命中缓存直接返回（真实路径），缓存未命中才会请求该地址并快速失败。
-P._load_vlm_configs = lambda: [{'model': 'golden-replay', 'api_key': 'unused',
+# name 键必需：_vlm_try_one_provider 用 cfg['name'] 做限速分桶，缺失会 KeyError。
+P._load_vlm_configs = lambda: [{'name': 'golden', 'model': 'golden-replay',
+                                'api_key': 'unused',
                                 'base_url': 'http://golden-test.invalid/vlm'}]
 P._vlm_cache_path = lambda: VLM_CACHE_FIXTURE      # 只读仓库内夹具，不依赖/不污染本机生产缓存
 P._vlm_cache_set = lambda key, val: None           # 测试期不落盘新缓存

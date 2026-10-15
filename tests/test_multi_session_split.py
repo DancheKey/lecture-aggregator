@@ -382,7 +382,12 @@ class YjsyMultiLabelSplitTest(unittest.TestCase):
         if hasattr(parsers, 'get_text_provider'):
             parsers.get_text_provider = lambda: None
         # VLM 密封化：不可达地址，未命中缓存即快速失败（零真实 API 调用）
-        parsers._load_vlm_configs = lambda: [{'model': 'test-replay', 'api_key': 'unused',
+        # ⚠ 必须保存/还原 _load_vlm_configs：此前只赋值不还原，tearDown 后
+        #   parsers._load_vlm_configs 永久指向本桩；后续 golden/snapshot 运行时
+        #   拿到无 name 键的配置 → _vlm_try_one_provider KeyError（2026-10-14 实踩）。
+        self._orig_load_vlm = parsers._load_vlm_configs
+        parsers._load_vlm_configs = lambda: [{'name': 'multi-session',
+                                              'model': 'test-replay', 'api_key': 'unused',
                                               'base_url': 'http://snapshot-test.invalid/vlm'}]
         self._orig_img_to_text = parsers._img_to_text
         with open(YJSY_HTML_PATH, encoding='utf-8') as f:
@@ -390,6 +395,7 @@ class YjsyMultiLabelSplitTest(unittest.TestCase):
 
     def tearDown(self):
         parsers._img_to_text = self._orig_img_to_text
+        parsers._load_vlm_configs = self._orig_load_vlm
 
     def _parse(self, ocr_text):
         parsers._img_to_text = lambda _img: ocr_text

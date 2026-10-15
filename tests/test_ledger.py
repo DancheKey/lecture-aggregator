@@ -151,6 +151,60 @@ class LedgerTtlTest(unittest.TestCase):
         self.assertIn(U, S._LEDGER)
 
 
+class LedgerFailedVerdictTest(unittest.TestCase):
+    """P1-4（2026-10-14）：verdict='failed' 的详情页失败条目守卫。
+
+    背景：此前 detail_fails 只上报 err 不进台账，一个永久损坏的详情页
+    （404/改版）每轮都失败 → failed_sources 永远非空 → 全局水位永久冻结。
+    修复：失败 URL 记入台账 verdict='failed'，TTL 7 天（而非 180 天），
+    下轮 fetch 前跳过；7 天后自动重试一次。
+    """
+
+    def setUp(self):
+        _reset()
+
+    def test_failed_verdict_shorter_ttl(self):
+        # 'failed' 条目 7 天过期，'rejected' 180 天——分层 TTL
+        self.assertEqual(S._LEDGER_TTL_BY_VERDICT.get('failed'), 7)
+        self.assertEqual(S._LEDGER_TTL_DAYS, 180)
+
+    def test_failed_entry_expires_at_7_days(self):
+        # 恰好 8 天前的 'failed' 条目应过期（7 天 TTL + 1 天缓冲）
+        stale = (datetime.date.today() - datetime.timedelta(days=8)).isoformat()
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            with open(p, 'w', encoding='utf-8') as f:
+                json.dump({'entries': {U: {'v': 'failed', 'd': '', 't': stale}}}, f)
+            S.load_ledger(p)
+        self.assertNotIn(U, S._LEDGER, "8 天前的 failed 条目应已过期")
+
+    def test_failed_entry_fresh_at_6_days(self):
+        # 6 天前的 'failed' 条目仍在有效期内（7 天 TTL 内）
+        fresh = (datetime.date.today() - datetime.timedelta(days=6)).isoformat()
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            with open(p, 'w', encoding='utf-8') as f:
+                json.dump({'entries': {U: {'v': 'failed', 'd': '', 't': fresh}}}, f)
+            S.load_ledger(p)
+        self.assertIn(U, S._LEDGER, "6 天前的 failed 条目应在有效期内")
+
+    def test_rejected_not_affected_by_failed_ttl(self):
+        # 'rejected' 条目不受 'failed' 短 TTL 影响，仍用 180 天
+        edge = (datetime.date.today() - datetime.timedelta(days=TTL - 1)).isoformat()
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            with open(p, 'w', encoding='utf-8') as f:
+                json.dump({'entries': {U: {'v': 'rejected', 'd': '', 't': edge}}}, f)
+            S.load_ledger(p)
+        self.assertIn(U, S._LEDGER, "rejected 条目应维持 180 天 TTL")
+
+    def test_ledger_add_failed_verdict(self):
+        # ledger_add 支持 'failed' verdict
+        S.ledger_add(U, 'failed', '2026-10-14')
+        self.assertTrue(S.ledger_hit(U))
+        self.assertEqual(S._LEDGER[U]['v'], 'failed')
+
+
 class LedgerIoTest(unittest.TestCase):
     def setUp(self):
         _reset()

@@ -355,5 +355,67 @@ class TransientWriteFailureTest(unittest.TestCase):
         self.assertIn('WARN', buf.getvalue())
 
 
+class VlmCacheKeyTest(unittest.TestCase):
+    """VLM 缓存键纳入模型名（2026-10-14）。
+
+    背景：文本通道缓存键早已含模型名（llm_provider.py:468/:593），换模型自动
+    全量失效重抽；VLM 通道键不含模型名，模型升级（如 glm-4v-flash→glm-4v-plus）
+    后旧结果仍被命中、锁死，表现为「改了模型没效果」。
+    本类锁：① 换模型产生不同键（动态，走真实 _vlm_extract_fields）；
+    ② 同模型同 URL 键稳定（幂等）；③ 多 provider 时键含全部模型名。
+    """
+
+    def _capture_keys(self, img_urls, cfgs):
+        """调用真实 _vlm_extract_fields，捕获其计算的缓存键。
+
+        桩掉缓存读写与网络调用（_vlm_img_b64 / _vlm_try_one_provider），
+        仅让键计算路径执行——锁的是生产代码本身，不是复刻副本。
+        """
+        import parsers as P
+        captured = []
+        orig = (P._vlm_cache_get, P._vlm_cache_set,
+                P._vlm_img_b64, P._vlm_try_one_provider)
+        P._vlm_cache_get = lambda key: captured.append(key) or None
+        P._vlm_cache_set = lambda key, val: None
+        P._vlm_img_b64 = lambda u: None          # 图片下载失败 → 提前返 None，不触网
+        P._vlm_try_one_provider = lambda *a, **k: (None, False)
+        try:
+            P._vlm_extract_fields(img_urls, cfgs)
+        finally:
+            (P._vlm_cache_get, P._vlm_cache_set,
+             P._vlm_img_b64, P._vlm_try_one_provider) = orig
+        return captured
+
+    def test_70_换模型产生不同键(self):
+        """换模型必须产生不同缓存键（否则旧结果锁死、改模型没效果）。"""
+        keys = self._capture_keys(['http://x/a.jpg'], [{'model': 'm1'}])
+        keys2 = self._capture_keys(['http://x/a.jpg'], [{'model': 'm2'}])
+        self.assertEqual(len(keys), 1)
+        self.assertEqual(len(keys2), 1)
+        self.assertNotEqual(keys[0], keys2[0],
+                            '换模型必须产生不同缓存键')
+        self.assertTrue(keys[0].startswith('vlm:m1:'), keys[0])
+        self.assertTrue(keys2[0].startswith('vlm:m2:'), keys2[0])
+
+    def test_71_同模型同URL键稳定(self):
+        """URL 顺序无关（sorted），同模型同 URL 键必须稳定（重跑幂等）。"""
+        k1 = self._capture_keys(['http://x/b.jpg', 'http://x/a.jpg'],
+                                [{'model': 'm'}])
+        k2 = self._capture_keys(['http://x/a.jpg', 'http://x/b.jpg'],
+                                [{'model': 'm'}])
+        self.assertEqual(k1, k2, 'URL 顺序不得影响缓存键')
+
+    def test_72_多provider键含全部模型(self):
+        """agnes+zhipu 双通道时，键须含两个模型名（任一换模型都应失效）。"""
+        keys = self._capture_keys(
+            ['http://x/c.jpg'],
+            [{'model': 'agnes-3.0-flash'}, {'model': 'glm-4v-flash'}])
+        self.assertEqual(len(keys), 1)
+        self.assertIn('agnes-3.0-flash', keys[0])
+        self.assertIn('glm-4v-flash', keys[0])
+        self.assertTrue(keys[0].startswith('vlm:agnes-3.0-flash|glm-4v-flash:'),
+                        keys[0])
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

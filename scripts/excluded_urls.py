@@ -32,8 +32,43 @@
 """
 import json
 import os
+import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# ── VSB URL 归一化（2026-10-14 下沉自 scraper.py）────────────────────────────
+# 同一内容站的不同域名（归一化后视为同一篇）。保守白名单，逐条实测添加。
+_VSB_SITE_GROUPS = (
+    frozenset(('em.scnu.edu.cn', 'module.scnu.edu.cn')),
+)
+_VSB_ID_PATTERNS = (
+    re.compile(r'^https?://([a-z0-9.-]+)/a/\d{8}/(\d+)\.html$'),
+    re.compile(r'^https?://([a-z0-9.-]+)/article-\d+-(\d+)-1\.html$'),
+)
+
+
+def canon_url_key(u):
+    """返回用于「是否已抓 / 是否排除」比对的归一化键；无法归一时回退去尾斜杠的原 URL。
+
+    仅同站点组内的等价形态才折叠为同一键，跨站 ID 相同仍是不同键。
+    2026-10-14 从 scraper.py 下沉至此：is_excluded 需要同一套归一，
+    否则名单里写 em.scnu.edu.cn 形态、记录里是 module.scnu.edu.cn 形态时
+    排除判定失效（当前名单 322 条 0 条 vsb/module，属防御性加固）。
+    """
+    s = str(u or '').rstrip('/')
+    if not s:
+        return s
+    low = s.lower()
+    for pat in _VSB_ID_PATTERNS:
+        m = pat.match(low)
+        if not m:
+            continue
+        host, art_id = m.group(1), m.group(2)
+        for grp in _VSB_SITE_GROUPS:
+            if host in grp:
+                return 'vsb::%s::%s' % (sorted(grp)[0], art_id)
+        break
+    return s
 
 
 def load_excluded():
@@ -43,7 +78,8 @@ def load_excluded():
       - JSON 数组: ["http://...", ...]
       - JSON 对象: {"urls": ["http://...", ...]}
 
-    所有 URL 经 rstrip('/') 归一，确保尾斜杠差异不会导致排除遗漏。
+    所有 URL 经 canon_url_key 归一（rstrip('/') + VSB 站点组折叠），
+    确保尾斜杠差异与 VSB 域名变体不会导致排除遗漏。
     """
     p = os.path.join(ROOT, 'data', 'excluded_urls.json')
     if not os.path.exists(p):
@@ -52,9 +88,9 @@ def load_excluded():
         with open(p, 'r', encoding='utf-8') as f:
             raw = json.load(f)
         if isinstance(raw, list):
-            return {str(u).rstrip('/') for u in raw}
+            return {canon_url_key(u) for u in raw}
         if isinstance(raw, dict) and 'urls' in raw:
-            return {str(u).rstrip('/') for u in raw['urls']}
+            return {canon_url_key(u) for u in raw['urls']}
     except Exception:
         pass
     return set()
@@ -67,8 +103,12 @@ def is_excluded(url, excluded):
     语义一致但**都只看主 sourceUrl**——跨源合并记录（merged）另有 `sources[].sourceUrl`
     指向各来源页，其中任一被列入排除名单时，主URL 未被排除的合并记录照样上站。
     故把判断收敛到本函数，并新增 `is_record_excluded` 覆盖记录级语义。
+
+    2026-10-14：归一从 rstrip('/') 升级为 canon_url_key（VSB 站点组折叠），
+    确保名单与 scraper 的「是否已抓」判定用同一套键——否则名单写 em 形态、
+    记录是 module 形态时排除静默失效。
     """
-    return bool(url) and str(url).rstrip('/') in excluded
+    return bool(url) and canon_url_key(url) in excluded
 
 
 def record_urls(rec):

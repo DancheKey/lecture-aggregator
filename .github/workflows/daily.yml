@@ -134,9 +134,11 @@ jobs:
       # GitHub **不会**为它触发 test.yml/deploy.yml——意味着缓存戳、产物一致性、
       # 对账门禁等全部 pytest 门禁在**每日主部署路径上是失效的**。
       # 实证：趋势页裸引用戳（e83f608/426651d）在线上静默跑了近一周，test_99
-      # 抓不到，直到人工推送才变红。这里直跑与每日产物直接相关的 5 件测试
-      # （全部离线、合计约 25 秒；与 test.yml 同一调用方式，无需 pytest），
+      # 抓不到，直到人工推送才变红。这里直跑与每日产物直接相关的 9 件测试
+      # （全部离线、合计约 30 秒；与 test.yml 同一调用方式，无需 pytest），
       # 失败即红、阻断本轮提交与部署——门禁这才真正落在主路径上。
+      # ⚠ 门禁1-5 是代码行为门禁；门禁6-9（2026-10-14 P1-2）是数据依赖型门禁
+      #   （读生产库校验数据质量），补齐 deploy gate 在每日路径上的缺口。
       # ⚠ 2026-10-11：原本 5 个测试挤在**一个**步骤里，任一失败时日志只显示
       # 步骤名、看不出是哪个文件（CI 日志下载需仓库 admin 权限，排障者常拿不到）。
       # 拆成 5 个独立步骤后，Actions 页与 jobs API 直接显示失败的文件名；
@@ -183,6 +185,44 @@ jobs:
           set -uo pipefail
           python tests/test_new_source_full_scan.py > gate5.log 2>&1; rc=$?
           { echo "### 门禁5 新源全量扫描（rc=$rc）"; echo '```'; tail -25 gate5.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      # ---- 数据依赖型门禁（2026-10-14 P1-2 补齐）----
+      # daily 的数据提交用 GITHUB_TOKEN 推送，GitHub 不会触发 test.yml/deploy.yml，
+      # 因此 deploy gate 的 57 项门禁在每日主部署路径上全部失效。
+      # 以下 4 项是**读生产库**校验数据质量的门禁（与门禁1-5 的代码行为门禁互补），
+      # 全部离线、秒级完成；缺失时的静默风险：排除名单回潮、词表演进误杀真名、
+      # sourceCount 记账漂移、水位闸门失效——均只表现为「数据不对」而无任何报错。
+      - name: 门禁6 隐形记录守卫
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_audit_excluded_records.py > gate6.log 2>&1; rc=$?
+          { echo "### 门禁6 隐形记录守卫（rc=$rc）"; echo '```'; tail -25 gate6.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: 门禁7 语料门禁（speaker 词表反钉）
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_speaker_corpus_gate.py > gate7.log 2>&1; rc=$?
+          { echo "### 门禁7 语料门禁（rc=$rc）"; echo '```'; tail -25 gate7.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: 门禁8 sourceCount 记账一致性
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_source_count_consistency.py > gate8.log 2>&1; rc=$?
+          { echo "### 门禁8 sourceCount 记账一致性（rc=$rc）"; echo '```'; tail -25 gate8.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: 门禁9 水位闸门
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_main_water_gate.py > gate9.log 2>&1; rc=$?
+          { echo "### 门禁9 水位闸门（rc=$rc）"; echo '```'; tail -25 gate9.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $rc
 
       # 数据质量体检（2026-09-06）：每天抓取+修复后自动检查全库字段

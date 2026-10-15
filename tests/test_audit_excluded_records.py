@@ -88,6 +88,45 @@ class ExcludedFlagTest(unittest.TestCase):
                          '名单缺失/为空时不得误报（环境缺文件也须安全）')
 
 
+class VsbCanonNormalizationTest(unittest.TestCase):
+    """VSB 站点组归一化（2026-10-14，防御性加固）。
+
+    背景：_canon_url_key 已下沉至 excluded_urls.py，is_excluded 用同一套归一。
+    此前 is_excluded 只 rstrip('/')，名单写 em 形态、记录是 module 形态时排除
+    静默失效。当前名单 322 条 0 条 vsb/module，属预防性加固。
+    """
+
+    def test_01_em形态命中module记录(self):
+        """名单写 em.scnu.edu.cn，记录是 module.scnu.edu.cn → 必须命中。"""
+        # 直接构造合成名单（不依赖真实名单内容）
+        excluded = {excluded_urls.canon_url_key('http://em.scnu.edu.cn/a/20260924/11175.html')}
+        self.assertTrue(
+            excluded_urls.is_excluded('https://module.scnu.edu.cn/article-3685-11175-1.html', excluded),
+            'module 形态必须命中 em 形态的名单条目（VSB 站点组折叠）')
+
+    def test_02_module形态命中em记录(self):
+        """反向：名单写 module 形态，记录是 em 形态 → 也必须命中。"""
+        excluded = {excluded_urls.canon_url_key('https://module.scnu.edu.cn/article-3685-11175-1.html')}
+        self.assertTrue(
+            excluded_urls.is_excluded('http://em.scnu.edu.cn/a/20260924/11175.html', excluded),
+            'em 形态必须命中 module 形态的名单条目')
+
+    def test_03_跨站同ID不误合并(self):
+        """VSB 文章 ID 每站独立编号，跨站同 ID 不同文章 → 不得误命中。"""
+        excluded = {excluded_urls.canon_url_key('http://em.scnu.edu.cn/a/20260924/22.html')}
+        self.assertFalse(
+            excluded_urls.is_excluded('http://lswh.scnu.edu.cn/a/20260101/22.html', excluded),
+            '跨站同 ID 不同文章，不得误合并')
+
+    def test_04_非VSB形态仍rstrip归一(self):
+        """普通 URL 仍走 rstrip('/') 归一（尾斜杠差异不致排除遗漏）。"""
+        excluded = {'http://x.example.com/a/1.html'}
+        self.assertTrue(
+            excluded_urls.is_excluded('http://x.example.com/a/1.html/', excluded))
+        self.assertFalse(
+            excluded_urls.is_excluded('http://x.example.com/a/2.html', excluded))
+
+
 class RealDataRegressionTest(unittest.TestCase):
     """②③ 实库回归：CI 每次推送都对真实数据跑，再积累即红。"""
 

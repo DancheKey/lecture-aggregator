@@ -49,7 +49,11 @@ Object.assign(APP_METHODS, {
       if (l.lectureStart) return String(l.lectureStart).slice(0, 4);
       // 部分讲座未解析到具体时间，但发布时间或标题里含年份，据此归入对应年份（与 stats.js 保持一致）
       const m = (l.publishTime || '').match(/^(\d{4})/) || (l.title || '').match(/(\d{4})/);
-      return m ? m[1] : '';
+      // 无年份时返回「其他」而非 ''：与 generate_frontend_data.year_of 及 stats.js
+      // 的 UNKNOWN_YEAR 口径对齐（2026-10-14 P2-3）。此前返回 '' 导致：
+      //   ① 年份下拉不含「其他」项（years() 里 if (y) 把空串滤掉）；
+      //   ② 按年筛选时无年份讲座被永久排除（filtered() 里 '' !== 选中年份）。
+      return m ? m[1] : '其他';
     },
     // 判断是否「时间待定」。
     //

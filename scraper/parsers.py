@@ -1747,7 +1747,11 @@ def _vlm_extract_fields(img_urls, cfgs):
     from llm_provider import _is_neg, _neg_expired, _neg_marker
     if not cfgs or not img_urls:
         return None
-    key = _hash.md5('|'.join(sorted(img_urls)).encode('utf-8')).hexdigest()
+    # 缓存键纳入 provider+模型名：换模型（如 glm-4v-flash→glm-4v-plus）自动全量
+    # 失效重抽，不用手动清缓存（对齐 llm_provider 文本通道 :468/:593；此前 VLM 键
+    # 不含模型名，模型升级后旧结果仍被命中、锁死）。
+    _models = '|'.join(cfg.get('model', '') for cfg in cfgs)
+    key = 'vlm:' + _models + ':' + _hash.md5('|'.join(sorted(img_urls)).encode('utf-8')).hexdigest()
     cached = _vlm_cache_get(key)
     if _is_neg(cached):
         if not _neg_expired(cached):

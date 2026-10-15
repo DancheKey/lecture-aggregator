@@ -15,14 +15,16 @@
 //   ② 全量真实数据（data/lectures.json）逐条比对——样例想象不到的形态由它兜底。
 //
 // ⚠ 已知且**有意豁免**的口径差异（2026-10-11 实测，存量影响均为 0）：
-//   a) 兜底值：Python 返回 UNKNOWN_YEAR（'其他'），JS 返回 ''（空串被前端
-//      `if (y)` 过滤、不进年份下拉；统计页则归「其他」桶）。比对时视为等价。
-//   b) publishTime 带前导空白：Python `strip()[:4]` 命中，JS `/^(\d{4})/`
+//   a) publishTime 带前导空白：Python `strip()[:4]` 命中，JS `/^(\d{4})/`
 //      锚定串首不命中 → 走 title 兜底。全库实测 0 条踩中。
-//   c) publishTime 为 1~3 位纯数字：Python `[:4].isdigit()` 通过、返回短串；
+//   b) publishTime 为 1~3 位纯数字：Python `[:4].isdigit()` 通过、返回短串；
 //      JS 要求恰好 4 位起头、不命中 → 走 title 兜底。全库实测 0 条踩中。
-//   b/c 若未来真实数据踩中，② 会红——那时需要人工决策对齐哪一侧，而不是
+//   a/b 若未来真实数据踩中，② 会红——那时需要人工决策对齐哪一侧，而不是
 //   静默错位上线。这正是本门禁的目的。
+//
+// 2026-10-14（P2-3）：原「a) 兜底值分叉（py='其他' / js=''）」豁免已移除——
+//   两侧现统一返回 '其他'（app.display.js::yearOf 与 generate.year_of 对齐），
+//   等价关系简化为 js === py。
 //
 // 运行：node tests/js/app_year_consistency.js（纯 node + vm + python 子进程，无网络）
 // 可用 PYTHON 环境变量指定解释器（如 PYTHON="D:/Tools/Python 312/python.exe"）。
@@ -48,7 +50,7 @@ const CASES = [
   { name: 'title 内嵌年份', item: { lectureStart: '', publishTime: '', title: '第2025期活动' } },
   { name: 'title 5 位数字取前 4', item: { lectureStart: '', publishTime: '', title: '20255超大数字' } },
   { name: 'lectureStart 优先于 publishTime/title', item: { lectureStart: '2019-01-01', publishTime: '2026-01-01', title: '2018年' } },
-  { name: '全空 → 兜底（py=其他 / js=空串，豁免比对）', item: { lectureStart: '', publishTime: '', title: '' } },
+  { name: '全空 → 兜底「其他」（2026-10-14 起两侧一致）', item: { lectureStart: '', publishTime: '', title: '' } },
 ];
 
 (async () => {
@@ -121,8 +123,8 @@ print(json.dumps({
   const recs = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'lectures.json'), 'utf-8'))['data'];
 
   // ---------- 3) 比对 ----------
-  // 兜底差异豁免：py '其他' ↔ js ''（见文件头 a 项）。其余必须逐字相等。
-  const eq = (js, py) => js === py || (js === '' && py === '其他');
+  // 2026-10-14（P2-3）：兜底值已对齐（两侧均返回 '其他'），等价关系简化为逐字相等。
+  const eq = (js, py) => js === py;
   const errs = [];
 
   CASES.forEach((c, i) => {
@@ -159,7 +161,7 @@ print(json.dumps({
     [{ lectureStart: '', publishTime: '2026-01-02', title: 'x' }, '2026', 'publishTime 4 位开头应命中'],
     [{ lectureStart: '', publishTime: '', title: '第2025期' }, '2025', 'title 内嵌年份应兜底'],
     [{ lectureStart: '', publishTime: '', title: '20255x' }, '2025', '5 位数字应取前 4 位'],
-    [{ lectureStart: '', publishTime: '', title: '' }, '', '全空应返回空串（不是 undefined/null 字符串）'],
+    [{ lectureStart: '', publishTime: '', title: '' }, '其他', '全空应返回「其他」（与 Python UNKNOWN_YEAR 对齐，2026-10-14）'],
     [null, '', 'null 记录应返回空串且不抛错'],
     [{ lectureStart: '', publishTime: '发布于2026年', title: '2019' }, '2019', 'publishTime 开头非数字时应走 title 兜底'],
   ];
