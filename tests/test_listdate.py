@@ -59,5 +59,50 @@ class EffectiveListdateCutoffTest(unittest.TestCase):
             '2026-09-28')
 
 
+class SourceBaselineClampTest(unittest.TestCase):
+    """P1-1（2026-10-14）：_build_source_latest_date 基线钳制在今天。
+
+    此前取 max(lectureStart, publishTime) 无上界，lectureStart 可预支未来
+    （实测数学科学学院基线被拉到 2026-10-31），PAGESTOP 判据「整页条目日期
+    < 基线即停」在基线为未来时过于容易触发——第 1 页整页（过去日期）< 未来
+    基线即停，第 2 页的新内容漏抓。基线语义是「扫到哪了」，不可能超过今天。
+    """
+
+    def test_future_lecturestart_clamped_to_today(self):
+        import datetime
+        today = datetime.date.today().isoformat()[:10]
+        out = P._build_source_latest_date([
+            {'college': '数学科学学院', 'lectureStart': '2099-12-31'},
+        ])
+        self.assertEqual(out['数学科学学院'], today)
+
+    def test_past_dates_not_clamped(self):
+        # 过去日期不受钳制影响，行为与修复前一致
+        out = P._build_source_latest_date([
+            {'college': 'A学院', 'lectureStart': '2026-09-01'},
+            {'college': 'A学院', 'publishTime': '2026-08-15'},
+        ])
+        self.assertEqual(out['A学院'], '2026-09-01')
+
+    def test_future_publish_time_also_clamped(self):
+        # publishTime 罕见未来，但同样应被钳制
+        import datetime
+        today = datetime.date.today().isoformat()[:10]
+        out = P._build_source_latest_date([
+            {'college': 'B学院', 'publishTime': '2099-01-01'},
+        ])
+        self.assertEqual(out['B学院'], today)
+
+    def test_mixed_past_and_future_takes_past_max_then_clamp(self):
+        # 混合过去与未来：先取 max（未来），再钳制到今天
+        import datetime
+        today = datetime.date.today().isoformat()[:10]
+        out = P._build_source_latest_date([
+            {'college': 'C学院', 'lectureStart': '2026-09-20'},
+            {'college': 'C学院', 'lectureStart': '2099-06-01'},
+        ])
+        self.assertEqual(out['C学院'], today)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1247,7 +1247,15 @@ def _build_source_latest_date(existing):
     源名归一与 _process_source 的 name 保持一致（含跨子域归并：经管学院的详情页
     大量托管在 module.scnu.edu.cn，按域名分别统计会低估水位，故按 sources.yaml
     的 name 归并而非按 URL 域名）。
+
+    2026-10-14 P1-1 修正：基线**钳制在今天**。此前取 max(lectureStart, publishTime)
+    无上界，而 lectureStart 是讲座发生时间、可以是未来（实测数学科学学院基线被
+    拉到 2026-10-31）。PAGESTOP 判据「整页条目日期 < 基线即停」在基线为未来时
+    过于容易触发——第 1 页整页（最晚 10-14）< 10-31 即停，第 2 页的新内容漏抓
+    （实测 6 个源基线被未来讲座拉高）。基线的语义是「扫到哪了」，不可能超过
+    当前时间：一条未来讲座入库不等于「今天之后的内容都扫过了」。
     """
+    _today = datetime.date.today().isoformat()[:10]
     out = {}
     for r in (existing or []):
         name = r.get('college') or ''
@@ -1257,7 +1265,8 @@ def _build_source_latest_date(existing):
             v = (r.get(fld) or '')[:10]
             if len(v) == 10 and v > out.get(name, ''):
                 out[name] = v
-    return out
+    # 钳制：未来日期不得抬高基线（lectureStart 可预支未来，publishTime 罕见未来）
+    return {k: min(v, _today) for k, v in out.items()}
 
 
 def _cross_source_dup_with_existing(rec, existing_index, no_speaker_index=None):
@@ -1867,6 +1876,9 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                 # ⛔ 必须「整页」都早于基准才停：只跳过部分老条目会漏掉夹在中间的
                 # 新条目。抽不到任何条目日期时不停（宁可多翻不漏抓）。
                 # ⛔ 全量模式（--full）不启用：首次建库/重修必须翻到底补全历史。
+                # ⚠ 2026-10-14 P1-1：src_latest_date 已在 _build_source_latest_date
+                #   钳制在今天——未来讲座不再把基线拉到未来，避免「第 1 页整页
+                #   （过去日期）< 未来基线」就停、漏掉第 2 页新内容。
                 _stop_paging = False
                 if (is_incremental and src_latest_date and item_date_map
                         and not force_full):
