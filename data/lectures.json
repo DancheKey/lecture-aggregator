@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-15T13:58:25+08:00",
+  "updatedAt": "2026-10-15T19:35:58+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8857.html",
@@ -160,6 +160,36 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "2026年10月16日 物理学院学术报告（第56期）大湾区大学陈继尧副教授"
+    },
+    {
+      "sourceUrl": "http://life.scnu.edu.cn/a/20261015/6829.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/life/2026/1015/1792049997426261.png"
+      ],
+      "college": "生命科学学院",
+      "campus": "石牌",
+      "title": "学术讲座：蛋白酶系统对昆虫免疫的调控：从烟草天蚕到果蝇再到刚比亚按蚊的探索之旅",
+      "topic": "蛋白酶系统对昆虫免疫的调控：从烟草天蚕到果蝇再到刚比亚按蚊的探索之旅",
+      "lectureStart": "2026-10-16 02:30:00",
+      "lectureEnd": null,
+      "location": "昆虫所110会议室",
+      "speaker": "蒋浩波",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "美国俄克拉荷马州立大学",
+      "inviter": "",
+      "speakerBio": "蒋浩波，教授，现任美国俄克拉荷马州立大学昆虫学与植物病理学系荣聘席教授，同时担任Jess L. & Miriam B. Stevens 农业生物技术冠名讲席。1985年于华东理工大学获得生物化学学士学位，1994年在堪萨斯州立大学取得生物化学博士学位。先后在中国科学院上海生物技术研究中心、堪萨斯州立大学开展研究工作，2000年入职俄克拉荷马州立大学，历经助理教授、副教授、教授，2016年荣任Regents Professor。\n\n蒋浩波教授长期聚焦昆虫先天免疫分子生化机制，重点围绕酚氧化酶原激活通路、clip-结构域丝氨酸蛋白酶、丝氨酸蛋白酶抑制剂(serpin)开展系统研究，以烟草天蛾、冈比亚按蚊为主要研究模型，解析昆虫免疫识别、蛋白酶级联反应、黑化反应与Toll信号通路的调控机理。先后主持多项美国NIH R01/R21科研项目，累计经费超550万美元。兼任Insect Biochemistry and Molecular Biology等多个权威期刊编委。截至2026年9月，累计发表同行评议论文145篇、综述5篇、专著章节8篇，总引用20071次，H指数67，多项成果发表于PNAS、Science Advances等国际顶尖期刊，是昆虫先天免疫领域国际知名学者。",
+      "organizer": "生命科学学院",
+      "publishTime": "2026-10-15 15:37:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "host": "余小强",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026年10月16日学术讲座：蛋白酶系统对昆虫免疫的调控：从烟草天蚕到果蝇再到刚比亚按蚊的探索之旅"
     },
     {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20261014/564.html",
