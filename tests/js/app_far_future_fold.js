@@ -2,7 +2,7 @@
 //
 // 背景
 // ----
-// 用户诉求：① 超过 7 天的未开始讲座折叠成提示条（默认折叠、点击就地展开、刷新不丢）；
+// 用户诉求：① 超过 7 天的待开始讲座折叠成提示条（默认折叠、点击就地展开、刷新不丢）；
 //          ② 24h 内的讲座置顶（按最先开始顺序优先展示）。
 // DeepSeek 方案 A 只改 filtered 排序——不够：pagedGroups 组间排序原是日期倒序，
 // 分组后远期组会凭日期最大弹回首屏，两段式被层间抵消（test_03 守这个漏洞）。
@@ -96,7 +96,7 @@ function iso(msOffset) {
   const p2 = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}:00`;
 }
-// 一场「未开始」讲座：off=距 FIXED 的毫秒数；day 用于生成不同的 sourceUrl（避免同日折叠）
+// 一场「待开始」讲座：off=距 FIXED 的毫秒数；day 用于生成不同的 sourceUrl（避免同日折叠）
 function future(off, day, title) {
   return {
     sourceUrl: `http://x.scnu.edu.cn/f${day}`, title,
@@ -333,7 +333,7 @@ function makeCtx(allData, over) {
 
 // ---------- test_11：同日混合拆组（用户 12:33 截图反馈） ----------
 {
-  // 10-13 当天：06:00 已结束（+2h=08:00）+ 18:00 未开始；外加一个纯已结束日 10-12。
+  // 10-13 当天：06:00 已结束（+2h=08:00）+ 18:00 待开始；外加一个纯已结束日 10-12。
   const data = [
     at('2026-10-13 06:00:00', 1, '今天上午已散场'),
     at('2026-10-13 18:00:00', 2, '今天晚上'),

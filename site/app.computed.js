@@ -1,13 +1,13 @@
 // 派生计算（原 app.js 的 computed）。
 
-// 远期折叠（2026-10-13 用户拍板方案 B）：未开始且距今超过 FAR_FUTURE_DAYS 天的讲座，
+// 远期折叠（2026-10-13 用户拍板方案 B）：待开始且距今超过 FAR_FUTURE_DAYS 天的讲座，
 // 在列表「未来区」末尾折成一条提示条，点击就地展开（展开态存 localStorage）。
 //
 // 动机：全库 99.7% 是历史归档，纯日期倒序会让最远的未来讲座霸占首屏
 // （10-31 的讲座曾排在 10-13 前面）。与 24h 置顶（filtered 两段式排序）配套：
 // 排序管「谁在前」，折叠管「远的收起来」。
 //
-// ⚠ 阈值语义线：7 天同时是 app.display.js::statusInfo 的「倒计时 / 只写未开始」
+// ⚠ 阈值语义线：7 天同时是 app.display.js::statusInfo 的「倒计时 / 只写待开始」
 //   分界（2026-10-06 用户裁定），两边是同一条产品线，改这里必须同步那边。
 const FAR_FUTURE_DAYS = 7;
 // 折叠触发的最小条数（2026-10-13 用户调整）：≥3 条远期才折成提示条；
@@ -50,6 +50,19 @@ const APP_COMPUTED = {
       return seen.size;
     },
 
+    // 待开始讲座数（2026-10-16 计数行，口径乙见 app.display.js::isNotStarted）。
+    // 恒按全库 all 计、不受其他筛选影响（叠加语义：N 与结果数是两个数字，
+    // 后者看「当前筛选 X 场」行）。读一次 tick 建立响应式依赖（秒级心跳），
+    // 讲座开场瞬间 −1 实时跳变；O(n) 纯计数不碰排序，filtered 的固定 nowMs
+    // 设计不受影响。模板侧 v-if 控制：0 条时整行不显示（用户 2026-10-16 补充）。
+    upcomingCount() {
+      this.tick;   // 仅为建立响应式依赖（秒级心跳驱动重算）
+      const now = Date.now();
+      let n = 0;
+      for (const l of this.all) if (this.isNotStarted(l, now)) n++;
+      return n;
+    },
+
     // 数据中出现过的年份（倒序，字符串便于与下拉值比较）
     years() {
       const set = new Set();
@@ -86,7 +99,7 @@ const APP_COMPUTED = {
 
     // 是否有任何筛选条件激活（控制"清除"按钮显示）
     hasActiveFilter() {
-      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.speaker || this.onlineOnly);
+      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.speaker || this.onlineOnly || this.upcomingOnly);
     },
 
     // 长文本（简介/摘要）不再阻塞搜索（2026-09-30 用户定）：
@@ -97,12 +110,18 @@ const APP_COMPUTED = {
 
     // 复合筛选 + 按讲座时间倒序
     filtered() {
+      // 比较基准在函数入口一次取定（预计算状态，本次调用内不变）：排序注释里
+      // 讲的「不依赖 tick / 不每秒空转」约束针对的就是它，待开始筛选同源复用。
+      const nowMs = Date.now();
       const q = this.query.trim().toLowerCase();
       const list = this.all.filter(l => {
         if (this.showLikedOnly && !this.hasLiked(l.sourceUrl)) return false;
         // 线上讲座筛选（2026-10-13）：点卡片「# 线上」标签进入；isOnline 为派生
         // 字段（location 写的是参会方式而非实体地点），与校区筛选可叠加。
         if (this.onlineOnly && !l.isOnline) return false;
+        // 待开始筛选（2026-10-16 口径乙）：upcoming + 开始时间未到的时间待定；
+        // 不含进行中（已开场）、不含日期已过/无日期的 tbd。与其他筛选叠加。
+        if (this.upcomingOnly && !this.isNotStarted(l, nowMs)) return false;
         // 合并讲座可能跨校区/学院，任一来源匹配即保留
         if (this.campus) {
           const campuses = new Set([l.campus, ...(l.sources || []).map(s => s.campus)].filter(Boolean));
@@ -149,7 +168,7 @@ const APP_COMPUTED = {
         return true;
       });
       // 两段式排序（2026-10-13 用户拍板方案 B 第一层 + 用户后续三条规则）：
-      // **活段（未开始/进行中）按 lectureStart 升序**排在前，已结束/待定段维持
+      // **活段（待开始/进行中）按 lectureStart 升序**排在前，已结束/待定段维持
       // 日期倒序在后。
       //
       // 动机与规则来源：
@@ -165,11 +184,10 @@ const APP_COMPUTED = {
       //   ⑤ 当天组内时刻待定（tbd）排最后：占位 00:00/08:00 不是真实开场时刻，
       //     不占时间线最前（2026-10-13 用户截图反馈，见下方 tbdA/tbdB 分支）。
       //
-      // 基准取排序前固定的 nowMs（预计算状态，不比较时现算）：比较函数在毫秒级
+      // 基准取函数入口固定的 nowMs（已在 filtered 顶部声明）：比较函数在毫秒级
       // 跳变下会变成非全序；且不依赖 this.tick——排序是 computed，依赖 tick 会
       // 每秒重排 → 翻页内容抖动、3800 条排序每秒空转；交互（筛选/翻页/数据到达）
       // 自然触发重算即可，「开始→进行中」的实时迁移由徽章（statusInfo 读 tick）负责。
-      const nowMs = Date.now();
       const isLive = new Map();
       list.forEach(l => {
         const st = this.statusOf(l);
@@ -294,7 +312,7 @@ const APP_COMPUTED = {
       return units;
     },
 
-    // 远期折叠层（2026-10-13 方案 B 第二层）：把「未开始且 > FAR_FUTURE_DAYS 天」的
+    // 远期折叠层（2026-10-13 方案 B 第二层）：把「待开始且 > FAR_FUTURE_DAYS 天」的
     // 渲染单元收进一个 far-fold 容器，容器占据原第一个被折叠单元的位置（未来区末尾），
     // 后续单元依次前移——units 数组总长度不变（fold 恒为 1 个单元），分页计数稳定。
     // 仅当远期单元数 ≥ FAR_FOLD_MIN（3，2026-10-13 用户调整）才折叠；1-2 条走 flush 的
@@ -307,6 +325,9 @@ const APP_COMPUTED = {
     // 容器 recs 存的是 units（forum/single 原样），展开时 pagedGroups 直接把它们
     // 当作普通 items 走既有渲染分支（见 pagedGroups），零模板重复。
     foldedUnits() {
+      // 待开始筛选激活（2026-10-16 用户拍板）：远期不折叠，全部平铺——主动点
+      // 「待开始」就是为了看全未来讲座，折叠条违背本意；取消筛选后恢复折叠。
+      if (this.upcomingOnly) return this.units;
       const cutoff = Date.now() + FAR_FUTURE_DAYS * 86400000;
       const out = [];
       let far = [];

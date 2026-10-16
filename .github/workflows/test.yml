@@ -278,6 +278,12 @@ jobs:
       - name: Run campus filter tests
         run: node tests/js/app_campus_filter.js
 
+      # 未开始讲座计数 + 筛选（2026-10-16）：计数行点数字 → upcomingOnly 叠加筛选，
+      # 口径乙（upcoming + 开始时间未到的 tbd，不含进行中/过期 tbd）；无未开始时
+      # 计数行整行隐藏；远期折叠激活时放平；toggle/clearFilters/模板接线锁定
+      - name: Run upcoming filter tests
+        run: node tests/js/app_upcoming_filter.js
+
       # 访问量趋势报告渲染门禁（2026-10-02）：该页此前用 innerHTML 拼接渲染，
       # 而快照 note 是唯一来自台账的自由文本（经 json.dumps 内嵌进内联脚本），
       # 含 </script> 或 <img onerror=…> 即构成存储型 XSS。现已全部改为

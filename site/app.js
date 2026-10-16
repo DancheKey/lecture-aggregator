@@ -107,6 +107,7 @@ const app = createApp({
     // 讲者视图与线上筛选：入口方法（pickSpeaker/toggleOnline）已自设页码，此处只同步 URL
     speaker() { this._scheduleUrlSync(true, 120); },
     onlineOnly() { this._scheduleUrlSync(true, 120); },
+    upcomingOnly() { this._scheduleUrlSync(true, 120); },
     showLikedOnly() { this.currentPage = 1; },
     // 页码越界钳位（2026-10-14 评审 P1-5）：URL 深链接可能带入超过总页数的
     // page（数据增减后旧链接失效），静态上界（MAX_URL_PAGE）拦不住这种「合法

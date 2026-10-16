@@ -286,10 +286,28 @@
                 <template v-else>
                   共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
                 </template>
+                <!-- 待开始内联段（2026-10-16，A' 用户拍板；命名同日改「待开始」
+                     与徽章「进行中/已结束」对等）：紧跟总量后内联、不独占一行——
+                     默认统计区保持一行，无待开始讲座时本段 v-if 隐藏；字号颜色
+                     继承父容器（text-12pt/text-slate-500，与其它统计段一致）。
+                     点数字叠加「待开始」筛选（toggleUpcoming），再点数字或右侧
+                     深色片 × 取消；激活态数字高亮，「✕ 清除」由 hasActiveFilter 亮起。
+                     ⚠ upcomingOnly 激活时本段一并隐藏（&& !upcomingOnly）：此时数字
+                     与筛选片「待开始讲座」完全重复，且 chip 组 ~200px 需要这份宽度
+                     才能保住控件区一行；取消入口仍有筛选片 × 与「✕ 清除」。 -->
+                <template v-if="upcomingCount > 0 && !upcomingOnly">
+                  <span class="text-slate-300">·</span>
+                  待开始
+                  <button type="button" @click="toggleUpcoming()"
+                    class="px-2 py-0.5 rounded-full font-semibold transition"
+                    :class="upcomingOnly ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-100'"
+                    :title="upcomingOnly ? '点击取消待开始筛选' : '只看还没开始的讲座'">{{ upcomingCount }}</button>
+                  场
+                </template>
 
                 <template v-if="!hasActiveFilter && dataStage === 'full'">
                   <span class="text-slate-300">·</span>
-                  覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源通知
+                  覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源
                 </template>
                 <template v-if="filtered.length !== totalCount">
                   <span class="text-slate-300">·</span>
@@ -297,12 +315,16 @@
                 </template>
                 <template v-else-if="displayUpdatedAt && !hasActiveFilter && dataStage === 'full'">
                   <span class="text-slate-300">·</span>
-                  更新于 {{ displayUpdatedAt.slice(0, 10) }}
+                  <!-- 更新日期：当年显示「10月16日」（口语化且省宽），跨年才显示完整日期 -->
+                  更新于 {{ displayUpdatedAt.slice(0, 4) === String(new Date().getFullYear()) ? (Number(displayUpdatedAt.slice(5, 7)) + '月' + Number(displayUpdatedAt.slice(8, 10)) + '日') : displayUpdatedAt }}
                 </template>
               </div>
               <!-- 右侧筛选控件：桌面端单行右侧，移动端也保持单行（搜索+筛选同行） -->
               <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <!-- 搜索框：移动端弹性占满剩余空间，桌面端固定宽度 -->
+                <!-- 搜索框宽用 sm:w-44（176px，vendor 预编译产物里真实存在的类；
+                     曾误用 sm:w-36/w-40，均不在产物中静默失效、宽度退回 flex-1 撑满的
+                     ~228px，导致工具栏一行竞争零余量） -->
                 <div class="relative flex-1 sm:flex-none sm:w-44 min-w-0">
                   <input v-model="query" type="search" :placeholder="searchPlaceholder" @focus="warmLongText()"
                     class="w-full px-3 py-1.5 text-12pt rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
@@ -336,6 +358,13 @@
                     <button type="button" @click="toggleOnline()" aria-label="清除线上筛选"
                       class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
                   </span>
+                  <!-- 待开始筛选片（2026-10-16）：点计数行数字进入，× 或再点数字取消；
+                       激活时「✕ 清除」随之出现（hasActiveFilter 含 upcomingOnly） -->
+                  <span v-if="upcomingOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
+                    <span>待开始讲座</span>
+                    <button type="button" @click="toggleUpcoming()" aria-label="清除待开始筛选"
+                      class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+                  </span>
                   <button v-if="hasActiveFilter" @click="clearFilters()"
                     class="shrink-0 px-2 py-1.5 text-12pt rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
                     title="清除所有筛选条件">✕ 清除</button>
@@ -354,7 +383,7 @@
           <div v-if="loading" class="text-center text-slate-400 py-16 text-12pt">数据加载中…</div>
           <div v-else-if="filtered.length">
             <div v-for="g in pagedGroups" :key="g.key" class="mb-2">
-              <!-- 远期折叠组（2026-10-13 方案 B）：>7 天未开始讲座收在未来区末尾的一条提示条里。
+              <!-- 远期折叠组（2026-10-13 方案 B）：>7 天待开始讲座收在未来区末尾的一条提示条里。
                    折叠态 g.items 为空（只显示条）；展开态 items = 被折的 units，走下方与普通组
                    完全相同的渲染分支（分页不受影响：fold 容器恒占 1 个渲染单元位）。
                    展开态存 localStorage（toggleFarFuture），刷新不丢。 -->
@@ -453,7 +482,7 @@
               <template v-else>
               <article v-for="l in u.recs" :key="l.sourceUrl + (l.lectureIndex ? '#' + l.lectureIndex : '')"
                 class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
-                <!-- 元信息行：单位 · 时间（🕒 图标化）+ 右侧状态徽章（四态：进行中/即将开始/未开始/已结束） -->
+                <!-- 元信息行：单位 · 时间（🕒 图标化）+ 右侧状态徽章（四态：进行中/即将开始/待开始/已结束） -->
                 <div class="flex items-center gap-2 text-11pt mb-1.5 flex-nowrap">
                   <!-- 学院名：移动端（<640px）隐藏——窄屏下它会把「时间 + 倒计时徽章」挤出卡片右缘；
                        学院信息在卡片底部标签行已有，此处不必重复占用横向空间 -->
@@ -725,14 +754,14 @@
 
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
-  <script defer src="app.core.js?v=0cf50c3176"></script>
-  <script defer src="app.state.js?v=cbc02f2bfd"></script>
-  <script defer src="app.computed.js?v=36106e742a"></script>
-  <script defer src="app.display.js?v=61becdc8d2"></script>
-  <script defer src="app.social.js?v=49b25e40d2"></script>
+  <script defer src="app.core.js?v=c793fc5424"></script>
+  <script defer src="app.state.js?v=df4f6fc11b"></script>
+  <script defer src="app.computed.js?v=e7d9bca7a6"></script>
+  <script defer src="app.display.js?v=06b1400996"></script>
+  <script defer src="app.social.js?v=9d8623fb38"></script>
   <script defer src="app.data.js?v=d3c3b3d2f0"></script>
   <script defer src="app.admin.js?v=d02b198ebb"></script>
-  <script defer src="app.js?v=40c991daa4"></script>
+  <script defer src="app.js?v=d3edd614a5"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->

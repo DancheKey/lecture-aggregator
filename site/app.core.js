@@ -65,7 +65,8 @@ const APP_METHODS = {};
 
 /* ---------- 筛选状态 ↔ URL 同步（2026-10-23 第三批） ----------
  * 进 URL 的内容维度（可分享/可回放）：campus / college / year / speaker /
- *   q（= query 搜索词）/ field（= searchField 搜索维度）/ online（= onlineOnly）/ page。
+ *   q（= query 搜索词）/ field（= searchField 搜索维度）/ online（= onlineOnly）/
+ *   upcoming（= upcomingOnly，2026-10-16 加）/ page。
  * 不进 URL 的本机偏好：showLikedOnly（点赞是本机数据，分享给他人无意义）、
  *   farFutureOpen 与各类展开态（同为 localStorage 本机偏好，已有独立持久化）。
  * 写入约定：
@@ -102,6 +103,7 @@ function parseUrlFilters() {
     const field = get('field');
     if (URL_SEARCH_FIELDS.includes(field)) out.searchField = field;
     if (p.get('online') === '1') out.onlineOnly = true;
+    if (p.get('upcoming') === '1') out.upcomingOnly = true;
     const page = parseInt(p.get('page'), 10);
     if (page >= 2 && page <= MAX_URL_PAGE) out.page = page;   // page=1 与缺省等价，不写
   } catch (e) { /* file:// 等受限环境：按无筛选处理 */ }
@@ -121,6 +123,7 @@ function normalizeUrlFilters(f, campusList) {
     query: f.query || '',
     searchField: f.searchField || '',
     onlineOnly: !!f.onlineOnly,
+    upcomingOnly: !!f.upcomingOnly,
     currentPage: (f.page >= 2 && f.page <= MAX_URL_PAGE) ? f.page : 1,
   };
 }
@@ -135,6 +138,7 @@ function serializeUrlFilters(vm) {
   if (vm.query && vm.query.trim()) p.set('q', vm.query.trim());
   if (vm.searchField) p.set('field', vm.searchField);
   if (vm.onlineOnly) p.set('online', '1');
+  if (vm.upcomingOnly) p.set('upcoming', '1');
   if (vm.currentPage >= 2) p.set('page', String(vm.currentPage));
   return p.toString();
 }
@@ -159,6 +163,7 @@ Object.assign(APP_METHODS, {
     this.query = n.query;
     this.searchField = n.searchField;
     this.onlineOnly = n.onlineOnly;
+    this.upcomingOnly = n.upcomingOnly;
     this.currentPage = n.currentPage;   // 最后赋：前面各维度的既有 watch 会先重置页码
     this.$nextTick(() => { this._urlSyncSuppress = false; });
   },

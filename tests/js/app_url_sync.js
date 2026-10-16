@@ -1,7 +1,7 @@
 // 筛选状态 ↔ URL 同步测试（2026-10-14 第三批，step 实现 + 主审复核修复）。
 //
 // 锁定语义（实现在 site/app.core.js 尾部 + app.js 接线 + app.state.js 白名单）：
-//   T1 parse：?campus=大学城&year=2024&q=量子&online=1&page=3 → 归一化 state
+//   T1 parse：?campus=大学城&year=2024&q=量子&online=1&upcoming=1&page=3 → 归一化 state
 //   T2 非法值回落：campus 不在白名单 / year 非 4 位 / field 非枚举 / page<2 → 一律默认空值
 //   T3 serialize 往返：state → 查询串 → parse → normalize 与原 state 一致
 //   T4 serialize 空态 → 空查询串（收掉 ?）
@@ -12,6 +12,8 @@
 //      抵消用户的后退操作，state 与 URL 分叉）
 //   T7 回放抑制：_applyUrlFiltersFromUrl 期间 _scheduleUrlSync 全部被抑制
 //   T8 页码上界 + watch.totalPages 钳位（P1-5：?page=99999 与失效旧深链接）
+//   T9 upcoming 参数（2026-10-16 待开始筛选）：serialize 只在激活时带 upcoming=1、
+//      parse 回放归一化为 upcomingOnly，且 watch.upcomingOnly 已接线
 //
 // 运行：node tests/js/app_url_sync.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -85,20 +87,21 @@ const setUrl = (search) => {
 const fireTimers = () => { const due = timers; timers = []; due.forEach(t => t.fn()); };
 
 // ---- T1 parse + normalize ----
-setUrl('?campus=大学城&year=2024&q=%E9%87%8F%E5%AD%90&online=1&page=3');
+setUrl('?campus=大学城&year=2024&q=%E9%87%8F%E5%AD%90&online=1&upcoming=1&page=3');
 {
   const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
   ok(n.campus === '大学城', `T1 campus 解析: ${n.campus}`);
   ok(n.year === '2024', `T1 year 解析: ${n.year}`);
   ok(n.query === '量子', `T1 q 解析(解码): ${n.query}`);
   ok(n.onlineOnly === true, `T1 online 解析: ${n.onlineOnly}`);
+  ok(n.upcomingOnly === true, `T1 upcoming 解析: ${n.upcomingOnly}`);
   ok(n.currentPage === 3, `T1 page 解析: ${n.currentPage}`);
   ok(n.college === '' && n.speaker === '' && n.searchField === '',
      `T1 缺省键回落空值: ${JSON.stringify(n)}`);
 }
 
 // ---- T2 非法值回落 ----
-setUrl('?campus=月球&year=24&field=evil&page=1&online=0');
+setUrl('?campus=月球&year=24&field=evil&page=1&online=0&upcoming=0');
 {
   const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
   ok(n.campus === '', `T2 非法 campus 回落: ${n.campus}`);
@@ -106,6 +109,7 @@ setUrl('?campus=月球&year=24&field=evil&page=1&online=0');
   ok(n.searchField === '', `T2 非法 field 回落: ${n.searchField}`);
   ok(n.currentPage === 1, `T2 page<2 回落: ${n.currentPage}`);
   ok(n.onlineOnly === false, `T2 online=0 回落: ${n.onlineOnly}`);
+  ok(n.upcomingOnly === false, `T2 upcoming=0 回落: ${n.upcomingOnly}`);
 }
 setUrl('?field=topic');
 {
@@ -117,23 +121,25 @@ setUrl('?field=topic');
 {
   const state = {
     campus: '汕尾', college: '文学院', year: '2023', speaker: '张三',
-    query: ' 人工智慧 ', searchField: 'topic', onlineOnly: true, currentPage: 7,
+    query: ' 人工智慧 ', searchField: 'topic', onlineOnly: true,
+    upcomingOnly: true, currentPage: 7,
   };
   const qs = vm.runInContext('serializeUrlFilters', ctx)(state);
   setUrl('?' + qs);
   const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
   ok(n.campus === '汕尾' && n.college === '文学院' && n.year === '2023'
      && n.speaker === '张三' && n.query === '人工智慧' && n.searchField === 'topic'
-     && n.onlineOnly === true && n.currentPage === 7,
+     && n.onlineOnly === true && n.upcomingOnly === true && n.currentPage === 7,
      `T3 往返一致: qs=${qs} n=${JSON.stringify(n)}`);
-  ok(!/(^|&)q=$/.test(qs) && qs.includes('page=7'), `T3 只含非默认值: qs=${qs}`);
+  ok(!/(^|&)q=$/.test(qs) && qs.includes('page=7') && qs.includes('upcoming=1'),
+     `T3 只含非默认值: qs=${qs}`);
 }
 
 // ---- T4 空态 serialize → 空串 ----
 {
   const qs = vm.runInContext('serializeUrlFilters', ctx)({
     campus: '', college: '', year: '', speaker: '', query: '',
-    searchField: '', onlineOnly: false, currentPage: 1,
+    searchField: '', onlineOnly: false, upcomingOnly: false, currentPage: 1,
   });
   ok(qs === '', `T4 空态查询串应收空: "${qs}"`);
 }
@@ -238,6 +244,22 @@ setUrl('');
     w.totalPages.call(within, 7);
     ok(within.currentPage === 2, `T8 未越界不误动: currentPage=${within.currentPage}`);
   }
+}
+
+// ---- T9 upcoming 参数（2026-10-16 待开始筛选进 URL）----
+{
+  const qsOn = vm.runInContext('serializeUrlFilters', ctx)({
+    campus: '', college: '', year: '', speaker: '', query: '',
+    searchField: '', onlineOnly: false, upcomingOnly: true, currentPage: 1,
+  });
+  ok(qsOn === 'upcoming=1', `T9 激活时 serialize 应=upcoming=1: "${qsOn}"`);
+  setUrl('?upcoming=1');
+  const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(n.upcomingOnly === true, `T9 parse upcoming=1 → upcomingOnly=true: ${n.upcomingOnly}`);
+  setUrl('');
+  const w = appOpts && appOpts.watch;
+  ok(!!w && typeof w.upcomingOnly === 'function',
+     'T9 watch.upcomingOnly 未接线（URL 同步缺失）');
 }
 
 console.log('');

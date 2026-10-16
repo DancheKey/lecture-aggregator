@@ -116,7 +116,7 @@ Object.assign(APP_METHODS, {
     },
     // 状态判定（徽章展示与后续状态筛选共用）：
     //   tbd      时间待定 / 无有效开始时间
-    //   upcoming 未开始（now < lectureStart）
+    //   upcoming 待开始（now < lectureStart）
     //   ongoing  进行中（lectureStart ≤ now ≤ lectureEnd；end 缺失或早于 start 时按开始+2小时兜底，
     //            数据中 lectureEnd 覆盖率约六成，兜底保证「进行中」始终可判定）
     //   ended    已结束（now > lectureEnd）
@@ -147,6 +147,20 @@ Object.assign(APP_METHODS, {
       const now = Date.now();
       if (now < s) return 'upcoming';
       return now <= e ? 'ongoing' : 'ended';
+    },
+    // 「待开始」判定（2026-10-16 计数行 + 待开始筛选，口径乙，用户拍板）：
+    //   upcoming（明确未开场）∪ tbd 且开始时间戳未到（日期在未来/今天未过）
+    // 与 filtered 活段定义（isLive）同源，只是不含 ongoing——进行中已经开场。
+    // 日期已过/无日期的 tbd 不算待开始（其徽章本就是灰的，时间线早已翻篇）。
+    // nowMs 由调用方传入：计数行走 Date.now()（读 tick 实时重算），filtered
+    // 走函数入口固定的基准（不依赖 tick，保持排序不每秒空转的设计）。
+    isNotStarted(l, nowMs) {
+      const st = this.statusOf(l);
+      if (st === 'upcoming') return true;
+      if (st !== 'tbd') return false;
+      const s = l.lectureStart || '';
+      const ms = s ? new Date(String(s).replace(' ', 'T')).getTime() : 0;
+      return !!ms && ms >= nowMs;
     },
     // 状态徽章：label + 样式类（vendor 预编译 CSS 无绿色系，进行中用蓝 + 呼吸点）
     // labelShort：移动端（<640px）专用的紧凑文案。长倒计时「即将开始 · 还有 17 时 44 分 59 秒」
@@ -187,14 +201,15 @@ Object.assign(APP_METHODS, {
         countdown = `还有 ${dayGap} 天`;
         countdownShort = `${dayGap} 天`;
       }
-      // 颜色（2026-10-06 用户裁定）：**所有未开始的讲座统一用预告橙**，
-      // 差别只在文案——7 天内带倒计时（即将开始 · 还有 N 天），7 天外只写「未开始」。
+      // 颜色（2026-10-06 用户裁定）：**所有待开始的讲座统一用预告橙**，
+      // 差别只在文案——7 天内带倒计时（即将开始 · 还有 N 天），7 天外只写「待开始」
+      // （2026-10-16 命名对齐：与计数行/筛选片/「进行中·已结束」徽章同构，均指未开场）。
       // 此前 >7 天走灰底（bg-slate-100 text-slate-600），与「已结束/时间待定」同色系，
       // 十天后的预告看起来像过期条目（10-13 的讲座被误读成灰的）。
       // 灰色从此只属于 tbd/已结束：橙=预告、蓝=进行中、灰=已结束/待定，语义更干净。
       return diffMs <= 7 * DAY
         ? { label: '即将开始 · ' + countdown, labelShort: '还有 ' + countdownShort, cls: 'bg-orange-100 text-orange-600', dot: false }
-        : { label: '未开始', labelShort: '未开始', cls: 'bg-orange-100 text-orange-600', dot: false };
+        : { label: '待开始', labelShort: '待开始', cls: 'bg-orange-100 text-orange-600', dot: false };
     },
     truncate(s, maxLen) {
       if (!s) return '';

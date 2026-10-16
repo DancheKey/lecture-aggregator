@@ -15,6 +15,7 @@ const APP_STATE = function () {
       searchField: '',  // 搜索维度：''=全部 | college=单位 | location=地点 | topic=题目 | abstract=摘要
       showLikedOnly: false,  // 仅显示已点赞讲座
       onlineOnly: false,   // 仅显示线上讲座（点卡片「# 线上」标签进入，2026-10-13）
+      upcomingOnly: false, // 仅显示待开始讲座（点计数行「待开始 N 场」进入，2026-10-16）
       scraping: false,
       showMenu: false,    // 顶部栏更多操作下拉菜单
       showReport: false,  // 信息源报告弹窗显隐
@@ -36,7 +37,7 @@ const APP_STATE = function () {
       expandedAbstract: {}, // 卡片摘要的展开状态：sourceUrl -> bool（默认 3 行截断）
       expandedBio: {},      // 主讲简介的展开状态：sourceUrl -> bool（长文默认折叠）
       expandedForums: {},   // 论坛卡的展开状态：sourceUrl -> bool（缺省=筛选子集自动展开，2026-09-26 方案B）
-      // 远期折叠条（>7 天未开始讲座，2026-10-13 方案 B）的展开状态：true=展开被折的
+      // 远期折叠条（>7 天待开始讲座，2026-10-13 方案 B）的展开状态：true=展开被折的
       // 场次。初值 false（默认折叠）；mounted 时 loadFarFuture() 从 localStorage
       // 恢复上次选择（刷新不丢，同点赞/想听的本机偏好模式）。
       farFutureOpen: false,

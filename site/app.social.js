@@ -18,7 +18,7 @@ Object.assign(APP_METHODS, {
       } catch (e) { /* ignore quota/storage errors */ }
     },
 
-    /* ---------- 远期折叠条展开态（>7 天未开始讲座，2026-10-13 方案 B） ---------- */
+    /* ---------- 远期折叠条展开态（>7 天待开始讲座，2026-10-13 方案 B） ---------- */
     // 与点赞/想听同模式：纯本机偏好，存 localStorage，刷新/重开浏览器保留。
     loadFarFuture() {
       try {
@@ -229,7 +229,7 @@ Object.assign(APP_METHODS, {
     setCollege(c) { this.college = c; },
     setYear(y) { this.year = y; },
     toggleLikedFilter() { this.showLikedOnly = !this.showLikedOnly; this.campus = ''; this.college = ''; },
-    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.speaker = ''; this.onlineOnly = false; this.currentPage = 1; },
+    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.speaker = ''; this.onlineOnly = false; this.upcomingOnly = false; this.currentPage = 1; },
     /* ---------- 分页 ---------- */
     gotoPage(p) {
       if (p < 1 || p > this.totalPages) return;
@@ -256,6 +256,14 @@ Object.assign(APP_METHODS, {
     // 与其他标签筛选不同：无固定候选值列表，是布尔开关，再点一次即取消。
     toggleOnline() {
       this.onlineOnly = !this.onlineOnly;
+      this.currentPage = 1;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    // 待开始讲座筛选开关（2026-10-16）：点计数行「待开始 N 场」的数字进入，
+    // 再点数字或筛选片 × 取消。与线上开关同款：布尔开关、叠加于其他筛选、
+    // 入口方法自设页码（URL 同步由 app.js 的 upcomingOnly watch 负责）。
+    toggleUpcoming() {
+      this.upcomingOnly = !this.upcomingOnly;
       this.currentPage = 1;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
