@@ -3695,6 +3695,35 @@ class _OcrSt:
     __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text', 'text_folded', 'body_text_folded', 'body_text_html')
 
 
+def _meta_time_conflicts_with_body(body_text, meta_text):
+    """meta 摘要与正文各自解析出不相等的「日期+真时刻」→ True（抑制 meta 追加）。
+
+    背景（2026-10-16，life/6829）：编辑改了正文时间，meta description 残留旧时刻
+    （页面 meta 写「上午2:30」、正文已改「上午10:00」）。前 30 字去重守卫
+    （_prep_doc_text）因正文字面被白色 span 混淆（「时一间：」≠ meta「时间」）失效后
+    meta 被拼进 body_text；meta 里干净的「时间：」标签以 R1 authoritative-label
+    身份压过正文 R2 的正确结果，落库旧值 02:30。
+
+    裁决口径（两侧对称，同 default_year，不依赖 url/publish 参数）：
+      - 两侧都解析出**真时刻**（非 00:00 占位）且 datetime 不等 → 冲突，视作
+        「摘要未同步」，正文为准，不追加 meta（正文是详情页主体）；
+      - 任一侧缺日期/缺时刻（正文无时间、全靠 meta 的美术学院类页面属此类）
+        → 不算冲突，照旧追加——此时追加正是既有功能，不得误伤。
+    """
+    _y = datetime.date.today().year
+    tb = parse_cn_time(body_text, default_year=_y)
+    tm = parse_cn_time(meta_text, default_year=_y)
+    if not tb or not tm:
+        return False
+    sb = tb.get('start')
+    sm = tm.get('start')
+    if not sb or not sm:
+        return False
+    if (sb.hour, sb.minute) == (0, 0) or (sm.hour, sm.minute) == (0, 0):
+        return False
+    return sb != sm
+
+
 def _prep_doc_text(soup, list_title, _st):
     """阶段 1+2（预处理+正文定位）：标题定位 + 全文/正文双轨文本初始化。
 
@@ -3706,6 +3735,25 @@ def _prep_doc_text(soup, list_title, _st):
     # 规则 R4（表格归一）: 讲座日程表格就地替换为干净「字段：值」文本（消除原始表格噪声、
     # 修正字段顺序），须在后续 get_text / 字段抽取之前完成。
     _replace_schedule_tables_with_text(soup)
+    # 不可见样式节点剔除（2026-10-16，life/6829）：编辑用
+    # <span style="color:white">一</span> 在「时间」中插入视觉不可见字符
+    # （页面显示「时间：」，字面成「时一间：」），R1 权威标签正则不中，正文时间
+    # 只能走 R2；「地点」同理变「地一点」。视觉不可见即作者本意不显示 → 按呈现
+    # 语义摘除该节点，还原标签字面（配合 meta 冲突抑制双保险，见
+    # _meta_time_conflicts_with_body）。只认行内 style——外部 CSS 类的隐藏
+    # 无法离线判定，不做猜测。
+    # ⚠ color 前须断言非 [-\w]：否则会命中 `background-color: #FFFFFF` 的子串
+    #   （iqm_189 实测：整段「报告人：陈洁 助理研究员」被误剔，speaker 变空）。
+    _HIDDEN_STYLE_RE = re.compile(
+        r'(?i)(?<![-\w])color\s*:\s*(?:white|#fff|transparent)'
+        r'|visibility\s*:\s*hidden|display\s*:\s*none'
+        r'|font-size\s*:\s*0(?:px|pt|em)?')
+    for _node in list(soup.find_all(True)):
+        if _node.decomposed:
+            continue
+        _style = _node.get('style') or ''
+        if _style and _HIDDEN_STYLE_RE.search(_style):
+            _node.decompose()
     # 列表页标题通常就是干净的讲座标题，优先使用；否则回退到详情页 h1/title
     # 注意：部分站点（如 io 国际交流合作处）的 <h1> 是栏目名（"通知公告"）而非文章标题，
     # 真正标题在 <h3> 或 <title> 标签中。需检测并跳过栏目名。
@@ -3827,10 +3875,17 @@ def _prep_doc_text(soup, list_title, _st):
         _meta_head = re.sub(r'\s+', '', _meta_head)[:30]
         _body_flat = re.sub(r'\s+', '', _st.body_text)
         if not _meta_head or _meta_head not in _body_flat:
-            _st.body_text = _st.body_text + ' ' + ' '.join(meta_parts)
-            _st.body_text = re.sub(r'\s+', ' ', _st.body_text).strip()
-            _st.body_text_llm = _st.body_text_llm + ' ' + ' '.join(meta_parts)
-            _st.body_text_llm = re.sub(r'\s+', ' ', _st.body_text_llm).strip()
+            # 时间冲突抑制（2026-10-16，life/6829）：前 30 字守卫失效不等于「正文
+            # 真的不含 meta」——正文标签被白色 span 混淆（时一间/地一点）时守卫必
+            # 失效，而 meta 里残留的旧「时间：」会以 R1 权威标签身份压过正文正确
+            # 值。追加前补一层语义检测：两侧各有不相等的真时刻 → 正文为准，不追加。
+            if _meta_time_conflicts_with_body(_st.body_text, ' '.join(meta_parts)):
+                pass
+            else:
+                _st.body_text = _st.body_text + ' ' + ' '.join(meta_parts)
+                _st.body_text = re.sub(r'\s+', ' ', _st.body_text).strip()
+                _st.body_text_llm = _st.body_text_llm + ' ' + ' '.join(meta_parts)
+                _st.body_text_llm = re.sub(r'\s+', ' ', _st.body_text_llm).strip()
     return title, meta_parts, content_div
 
 

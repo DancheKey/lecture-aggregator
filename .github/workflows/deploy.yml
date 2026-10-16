@@ -109,6 +109,7 @@ jobs:
             tests/test_llm_cache.py
             tests/test_audit_html_escape.py
             tests/test_title_vocab_convergence.py
+            tests/test_meta_time_conflict_20261016.py
         run: |
           set -euo pipefail
           rc=0

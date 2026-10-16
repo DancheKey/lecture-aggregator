@@ -345,6 +345,13 @@ jobs:
       - name: Run title vocab convergence tests
         run: python tests/test_title_vocab_convergence.py
 
+      # meta 旧时刻压过正文门禁（2026-10-16，life/6829）：正文时间标签被白色
+      # span 混淆（时一间/地一点）时，meta description 残留的旧「时间：」会以
+      # R1 权威标签身份压过正文正确值。修复=冲突抑制+剔除不可见节点，本套件
+      # 锁「落库=正文值」与「美术学院类 meta 补时刻功能不受误伤」两个方向。
+      - name: Run meta time conflict tests
+        run: python tests/test_meta_time_conflict_20261016.py
+
       # 缓存并发门禁（2026-10-02）：data/.vlm_cache.json 曾被 parsers 与
       # llm_provider 各持一把**互不可见**的锁，两边都做「整文件读→改→写回」，
       # 单进程多线程下互相覆盖整批条目 → 缓存命中下降 → 重复烧付费 API 额度。
