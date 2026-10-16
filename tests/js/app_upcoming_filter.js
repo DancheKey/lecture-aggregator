@@ -187,7 +187,7 @@ const count = cm => computed.upcomingCount.call(cm);
 // ---------- T6：模板接线静态断言 ----------
 {
   ok(/v-if="upcomingCount > 0 && !upcomingOnly"/.test(INDEX_HTML),
-     'T6 计数行应有 v-if="upcomingCount > 0 && !upcomingOnly"（无待开始隐藏；激活态一并隐藏避免与筛选片重复并省宽保控件区一行）');
+     'T6 计数行应有 v-if="upcomingCount > 0 && !upcomingOnly"（仅 upcoming 自身激活时隐藏以避免与筛选片重复；其余筛选态仍显示以保持第一行统计完整）');
   ok(/@click="toggleUpcoming\(\)"/.test(INDEX_HTML),
      'T6 计数行数字/筛选片应绑定 toggleUpcoming');
   ok(/v-if="upcomingOnly"/.test(INDEX_HTML),

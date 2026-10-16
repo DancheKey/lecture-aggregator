@@ -91,6 +91,17 @@
     .search-clear:hover { color: #1e293b; background-color: #e2e8f0; }
     /* 搜索框：为右侧清除按钮留出空间（所有尺寸） */
     .search-pad { padding-left: .75rem; padding-right: 2.25rem; }
+    /* 工具栏统计段响应式宽度（方案B' 单一 flex-wrap 流）：移动端独占整行，控件与筛选片
+       换行到下方（搜索框因此可正常 flex-1 伸缩，不被统计+字段下拉挤压塌陷）；桌面端
+       (≥640px) 内容宽、与控件同流。显式声明而非 sm:w-auto——后者不在预编译产物里会静默失效。 */
+    .toolbar-stats { width: 100%; }
+    @media (min-width: 640px) { .toolbar-stats { width: auto; max-width: 100%; } }
+    /* 工具栏搜索框固定宽 176px（11rem，等同旧 sm:w-44）：置于 shrink-0 控件块内，
+       若用 flex-1 会因块宽=内容宽而塌陷；固定宽让控件块宽度确定、可整块 wrap。 */
+    .toolbar-search { width: 11rem; }
+    /* 控件块 max-width:100%：移动端夹到容器宽、激活内部 flex-wrap 分堆（否则 shrink-0
+       会让宽控件块溢出致横向滚动）；桌面端内容宽 < 容器，不影响 shrink-0 整块 wrap。 */
+    .toolbar-controls { max-width: 100%; }
     /* 信息源报告弹窗：纯自定义 CSS，不依赖 vendor/tailwind.css 预编译产物
        （该产物是按需子集，新增 utility 类会静默失效，故此处显式声明） */
     .src-mask {
@@ -270,9 +281,16 @@
     <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
           <!-- 统计 + 筛选工具栏：同一行，筛选时左侧文字切换为"当前筛选"，避免控件跳行 -->
           <div v-if="!loading" class="mb-5">
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <!-- 左侧统计文字：桌面端单行左侧 -->
-              <div class="text-12pt text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
+            <!-- 工具栏：单一左对齐 flex-wrap 流（2026-10-16 方案B'）。统计+搜索+字段+年份+筛选片
+                 连贯排列、左对齐；一行放得下就一行（填满不掏空），放不下时靠后的筛选片自然
+                 wrap 到第二行、第一行保持完整。取代早期 justify-between 两端对齐（右侧掏空 +
+                 筛选片被迫孤行，观感稀疏）。⚠ gap 用 gap-2（产物真实存在）；gap-x-2/gap-y-2
+                 分轴 gap 不在预编译产物里、列间距会静默失效导致元素贴在一起。搜索框宽 sm:w-44
+                 （176px，产物真实存在；sm:w-36/w-40 不在产物会静默失效、退回 flex-1 撑满）。 -->
+            <div class="flex flex-wrap items-center gap-2">
+              <!-- 统计文字：左起，桌面端不压缩（shrink-0 保持可读），内部按段 flex-wrap。
+                   .toolbar-stats：移动端独占整行（控件换行下方、搜索可正常伸缩），桌面端内容宽同流。 -->
+              <div class="toolbar-stats text-12pt text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
                 <template v-if="dataStage === 'partial'">
                   已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
                   <span class="text-slate-300">·</span>
@@ -288,13 +306,9 @@
                 </template>
                 <!-- 待开始内联段（2026-10-16，A' 用户拍板；命名同日改「待开始」
                      与徽章「进行中/已结束」对等）：紧跟总量后内联、不独占一行——
-                     默认统计区保持一行，无待开始讲座时本段 v-if 隐藏；字号颜色
-                     继承父容器（text-12pt/text-slate-500，与其它统计段一致）。
-                     点数字叠加「待开始」筛选（toggleUpcoming），再点数字或右侧
-                     深色片 × 取消；激活态数字高亮，「✕ 清除」由 hasActiveFilter 亮起。
-                     ⚠ upcomingOnly 激活时本段一并隐藏（&& !upcomingOnly）：此时数字
-                     与筛选片「待开始讲座」完全重复，且 chip 组 ~200px 需要这份宽度
-                     才能保住控件区一行；取消入口仍有筛选片 × 与「✕ 清除」。 -->
+                     仅 upcoming 自身激活时本段 v-if 隐藏（避免与筛选片「待开始讲座」数字
+                     重复）；其余筛选态（讲者/年份等）下仍显示，让第一行统计保持完整。
+                     字号颜色继承父容器。点数字叠加「待开始」筛选，再点数字或筛选片 × 取消。 -->
                 <template v-if="upcomingCount > 0 && !upcomingOnly">
                   <span class="text-slate-300">·</span>
                   待开始
@@ -305,7 +319,7 @@
                   场
                 </template>
 
-                <template v-if="!hasActiveFilter && dataStage === 'full'">
+                <template v-if="dataStage === 'full'">
                   <span class="text-slate-300">·</span>
                   覆盖 <span class="font-semibold text-slate-800">{{ displaySource }}</span> 条来源
                 </template>
@@ -313,62 +327,58 @@
                   <span class="text-slate-300">·</span>
                   当前筛选 <span class="font-bold text-slate-900">{{ filtered.length }}</span> 场
                 </template>
-                <template v-else-if="displayUpdatedAt && !hasActiveFilter && dataStage === 'full'">
+                <template v-if="displayUpdatedAt && dataStage === 'full'">
                   <span class="text-slate-300">·</span>
                   <!-- 更新日期：当年显示「10月16日」（口语化且省宽），跨年才显示完整日期 -->
                   更新于 {{ displayUpdatedAt.slice(0, 4) === String(new Date().getFullYear()) ? (Number(displayUpdatedAt.slice(5, 7)) + '月' + Number(displayUpdatedAt.slice(8, 10)) + '日') : displayUpdatedAt }}
                 </template>
               </div>
-              <!-- 右侧筛选控件：桌面端单行右侧，移动端也保持单行（搜索+筛选同行） -->
-              <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <!-- 搜索框：移动端弹性占满剩余空间，桌面端固定宽度 -->
-                <!-- 搜索框宽用 sm:w-44（176px，vendor 预编译产物里真实存在的类；
-                     曾误用 sm:w-36/w-40，均不在产物中静默失效、宽度退回 flex-1 撑满的
-                     ~228px，导致工具栏一行竞争零余量） -->
-                <div class="relative flex-1 sm:flex-none sm:w-44 min-w-0">
-                  <input v-model="query" type="search" :placeholder="searchPlaceholder" @focus="warmLongText()"
-                    class="w-full px-3 py-1.5 text-12pt rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
-                  <button v-if="query" type="button" @click="query = ''"
-                    class="search-clear"
-                    aria-label="清空搜索" title="清空搜索">×</button>
-                </div>
-                <select v-model="searchField" class="flex-none w-auto text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
-                  <option value="">全部</option>
-                  <option value="college">单位</option>
-                  <option value="location">地点</option>
-                  <option value="topic">题目</option>
-                  <option value="abstract">摘要</option>
-                </select>
-                <select v-model="year" class="flex-none w-auto text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
-                  <option value="">年份</option>
-                  <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-                </select>
-                <!-- 讲者筛选片 + 清除按钮：移动端整组独占第二行（第一行搜索框因此变宽），
-                     桌面端接在同行右端。不用 flex-none——整组占位由 w-full / sm:w-auto 控制。 -->
-                <div v-if="speaker || hasActiveFilter" class="flex flex-wrap items-center gap-2 w-full sm:w-auto min-w-0">
-                  <span v-if="speaker" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt min-w-0">
-                    <span class="truncate">讲者：{{ speaker }}</span>
-                    <button type="button" @click="clearSpeaker" aria-label="清除讲者筛选"
-                      class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
-                  </span>
-                  <!-- 线上讲座筛选片（2026-10-13）：点卡片「# 线上」标签后在此显示激活态，
-                       × 或再点卡片标签取消；与讲者片同款深色样式，激活时清「✕ 清除」按钮随之出现 -->
-                  <span v-if="onlineOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
-                    <span>线上讲座</span>
-                    <button type="button" @click="toggleOnline()" aria-label="清除线上筛选"
-                      class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
-                  </span>
-                  <!-- 待开始筛选片（2026-10-16）：点计数行数字进入，× 或再点数字取消；
-                       激活时「✕ 清除」随之出现（hasActiveFilter 含 upcomingOnly） -->
-                  <span v-if="upcomingOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
-                    <span>待开始讲座</span>
-                    <button type="button" @click="toggleUpcoming()" aria-label="清除待开始筛选"
-                      class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
-                  </span>
-                  <button v-if="hasActiveFilter" @click="clearFilters()"
-                    class="shrink-0 px-2 py-1.5 text-12pt rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
-                    title="清除所有筛选条件">✕ 清除</button>
-                </div>
+              <!-- 筛选控件区打包为单一左对齐块（shrink-0 整块化）：两行均靠左（用户定，
+                   靠左更美观）。放得下与统计同行（统计左起、控件紧随其右）；放不下则【整块】
+                   wrap 到第二行靠左——绝不只把多出来的部分挪下去（半行溢出观感差）。
+                   内部 flex-wrap 容纳各控件与筛选片。 -->
+              <div class="toolbar-controls flex flex-wrap items-center gap-2 shrink-0 min-w-0">
+              <!-- 搜索框：固定宽 176px（.toolbar-search）；不用 flex-1——在 shrink-0 块内会塌陷 -->
+              <div class="relative toolbar-search min-w-0">
+                <input v-model="query" type="search" :placeholder="searchPlaceholder" @focus="warmLongText()"
+                  class="w-full px-3 py-1.5 text-12pt rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
+                <button v-if="query" type="button" @click="query = ''"
+                  class="search-clear"
+                  aria-label="清空搜索" title="清空搜索">×</button>
+              </div>
+              <select v-model="searchField" class="flex-none w-auto text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                <option value="">全部</option>
+                <option value="college">单位</option>
+                <option value="location">地点</option>
+                <option value="topic">题目</option>
+                <option value="abstract">摘要</option>
+              </select>
+              <select v-model="year" class="flex-none w-auto text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                <option value="">年份</option>
+                <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+              </select>
+              <!-- 筛选片（讲者/线上/待开始）+ 清除：控件块末尾，随整块靠右 / 整块换行到第二行 -->
+              <!-- 讲者筛选片：点卡片主讲人名字进入 -->
+              <span v-if="speaker" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt min-w-0">
+                <span class="truncate">讲者：{{ speaker }}</span>
+                <button type="button" @click="clearSpeaker" aria-label="清除讲者筛选"
+                  class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+              </span>
+              <!-- 线上讲座筛选片（2026-10-13）：点卡片「# 线上」标签后激活，× 或再点取消 -->
+              <span v-if="onlineOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
+                <span>线上讲座</span>
+                <button type="button" @click="toggleOnline()" aria-label="清除线上筛选"
+                  class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+              </span>
+              <!-- 待开始筛选片（2026-10-16）：点计数行数字进入，× 或再点数字取消 -->
+              <span v-if="upcomingOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
+                <span>待开始讲座</span>
+                <button type="button" @click="toggleUpcoming()" aria-label="清除待开始筛选"
+                  class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+              </span>
+              <button v-if="hasActiveFilter" @click="clearFilters()"
+                class="shrink-0 px-2 py-1.5 text-12pt rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
+                title="清除所有筛选条件">✕ 清除</button>
               </div>
             </div>
           </div>
