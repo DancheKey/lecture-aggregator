@@ -172,14 +172,16 @@ class CronDocConsistencyTest(unittest.TestCase):
         ——分钟级排期下会把 12:17 误判成 12:00，本门禁反而变假红拦路。
         2026-10-13：三班重排为五班（09:18/14:18/18:18/00:18/06:18 北京时间），
         班次数由 3 改锁 5——单班延迟无法消除（10-12 实测 7~9h），以班次密度换覆盖。
+        2026-10-16：五班减为三班（00:18/08:18/13:18 UTC = 08:18/16:18/21:18 北京时间）——
+        调度延迟常使相邻班次重复抓同一区间，五班收益递减；先减到三班观察，故改锁 3。
         """
         with open(self.DAILY_YML, encoding='utf-8') as f:
             text = f.read()
         ts = []
         for m in re.finditer(r"-\s*cron:\s*['\"]?(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*['\"]?", text):
             ts.append((int(m.group(2)), int(m.group(1))))   # (时, 分)
-        self.assertEqual(len(ts), 5,
-                         f'daily.yml 的 cron 班次数异常（解析到 {ts}，当前锁 5 班）——'
+        self.assertEqual(len(ts), 3,
+                         f'daily.yml 的 cron 班次数异常（解析到 {ts}，当前锁 3 班）——'
                          f'改班次时请同步 deploy.md、site/app.admin.js 的文案'
                          f'以及本断言的班次数')
         return ['%02d:%02d' % (h, mi) for h, mi in sorted(ts)]
@@ -189,7 +191,7 @@ class CronDocConsistencyTest(unittest.TestCase):
         """UTC 'HH:MM' 列表 → 北京时间 'HH:MM' 列表（+8h，分钟不变）。"""
         return ['%02d:%02d' % ((int(t[:2]) + 8) % 24, int(t[3:])) for t in utc_times]
 
-    def test_06_cron班次为五班且升序(self):
+    def test_06_cron班次为三班且升序(self):
         ts = self._cron_times()
         self.assertEqual(ts, sorted(set(ts)))
 
