@@ -28,10 +28,12 @@
 | 任何时候 | CI（test.yml/deploy.yml）每次 push 都跑全量，是最终防线；本地漏跑会被拦 |
 
 - golden（`tests/test_parser_golden.py`）：31 个真实历史页面的解析回归锁，HTML
-  夹具 + 逐字段断言。VLM 走录制回放（`tests/fixtures/vlm_cache.json`，未录制必红）。
-- 已知慢点：海报页 VLM 回放未命中的用例回退 `_do_ocr`，**现场下载图片 + CPU 跑
-  rapidocr**，单例 33~73s（全量约 17 分钟）。OCR 录制回放（`_img_to_text` stub，
-  键含图片 URL 哈希）落地后应降至分钟级——落地后删除本条。
+  夹具 + 逐字段断言。VLM 与 OCR 均走**录制回放**（`tests/fixtures/vlm_cache.json`
+  / `ocr_cache.json`，未录制必红）。模块在 import parsers 前 setdefault
+  `SCNU_LLM_TEXT/RICH=0` 锁纯规则基线（与 CI 无密钥态一致）——此前本地 .env
+  默认开双轨、逐例真实调用大模型，全量 ~17 分钟且随网络波动；现全量 ~10s。
+  双轨验证显式 `SCNU_LLM_TEXT=1 python tests/test_parser_golden.py`；
+  OCR 重录：`SCNU_OCR_RECORD=1 python tests/test_parser_golden.py` 后提交夹具。
 
 ## 3. 数据更新后必须重新生成前端切片
 

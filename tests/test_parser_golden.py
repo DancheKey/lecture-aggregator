@@ -20,8 +20,20 @@ golden-case 回归测试（Q3）——锁定 parser 关键案例，防止改候�
     1) 本机配置真实 VLM key（.env 的 ZHIPU_API_KEY），正常跑一次解析让响应
        落入生产缓存 data/.vlm_cache.json（缓存键 = 'vlm:' + 模型名 + ':' +
        图片 URL 集合的 md5，2026-10-14 起纳入模型名，对齐文本通道）；
-    2) 用探测脚本找出该用例命中的缓存键（monkeypatch _vlm_cache_get 记录 key），
-       把对应条目追加进 tests/fixtures/vlm_cache.json 并提交。
+  2) 用探测脚本找出该用例命中的缓存键（monkeypatch _vlm_cache_get 记录 key），
+     把对应条目追加进 tests/fixtures/vlm_cache.json 并提交。
+- OCR 同构「录制回放」（2026-10-16）：海报 OCR 响应固化在
+  tests/fixtures/ocr_cache.json，测试桩 parsers._img_to_text（只替换文本产出，
+  **不**桩 _do_ocr——那会绕过「快照 body_text_html」等已记录的逻辑分支）。
+  键 = 'ocr:rapidocr:v1:' + sha1(归一化图片 URL)（身份+版本前缀，引擎/协议
+  变更时改前缀即整体作废）。未录制 → 断言红（与 VLM 同哲学，不静默回退真实
+  OCR）。⚠ 新增海报用例需同步录制：
+     SCNU_OCR_RECORD=1 python tests/test_parser_golden.py   （真实跑一遍并写回夹具）
+- 本地跑法（2026-10-16，999s→~22s 教训）：本模块在 import parsers **之前**
+  setdefault SCNU_LLM_TEXT/RICH=0，锁纯规则基线（与 CI 无密钥态一致）。不加
+  守卫时本地 .env 密钥使双轨默认开启，每例真实调用大模型（单例 20~70s、全量
+  ~17 分钟且随网络波动）。要双轨验证：显式 SCNU_LLM_TEXT=1 python tests/…
+  （setdefault 不覆盖已显式设置的 shell 环境）。
 - ctld4409 原页已下线(404)且无本地副本，保留 may_404 skip 语义（文档化的唯一例外）。
 
 断言：条数 / speaker 列表 / topic 无垃圾值（如 ctld4391 旧值 '0- 17'）/
@@ -32,13 +44,24 @@ golden-case 回归测试（Q3）——锁定 parser 关键案例，防止改候�
 import os
 import re
 import sys
+import json
 import time as _time
+import atexit
+import hashlib
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 FIXDIR = os.path.join(ROOT, 'tests', 'fixtures', 'html')
 VLM_CACHE_FIXTURE = os.path.join(ROOT, 'tests', 'fixtures', 'vlm_cache.json')
+
+# 纯规则基线守卫（2026-10-16）：必须在 import parsers **之前**——_USE_LLM_TEXT/RICH
+# 是导入时求值的模块级常量。本地 .env 默认开双轨时 golden 会逐例真实调用大模型
+# （单例 20~70s、全量 ~17 分钟且随网络波动）；setdefault 与 CI 无密钥态对齐到
+# 纯规则（实测 999s → ~22s），且不覆盖显式 shell 环境（双轨验证仍可 TEXT=1 跑）。
+# .env 的加载（dotenv override=False）发生在 parsers 导入链内，晚于此处、无法翻转。
+os.environ.setdefault('SCNU_LLM_TEXT', '0')
+os.environ.setdefault('SCNU_LLM_RICH', '0')
 
 import parsers as P
 
@@ -71,6 +94,87 @@ for _name in ('cache_path', 'cache_set'):
     assert getattr(_LC, _name).__module__ != __name__, \
         f'_LC.{_name} 在模块导入阶段被改写（{__name__}）——' \
         f'打桩只能在 _GoldenCacheMixin.setUp/tearDown 内做，否则全进程常驻'
+
+# ── OCR 录制回放（2026-10-16）────────────────────────────────────
+# 纯规则基线下海报页 OCR 仍是活网络腿（现场下载图片 + CPU 跑 rapidocr：单例
+# 1~4s × 若干例，且源站换图/宕机会让断言假红——破坏 golden「密封化」承诺）。
+# 与 VLM 同构做录制回放，夹具 tests/fixtures/ocr_cache.json。
+# 只桩 P._img_to_text（文本产出的唯一入口，_do_ocr/_mks_raw 等调用方都经它）；
+# **不**桩 _do_ocr——其体内有「快照 body_text_html」「N1 归一化」等已记录的
+# 逻辑分支，桩掉即绕过，回放就不再测那条路。
+OCR_CACHE_FIXTURE = os.path.join(ROOT, 'tests', 'fixtures', 'ocr_cache.json')
+
+
+def _ocr_key(img):
+    """夹具键：'ocr:rapidocr:v1:' + sha1(归一化图片 URL)。
+
+    身份+版本前缀（仿 vlm:golden-replay: 键改造经验）：引擎或协议变更时改
+    前缀即可整体作废重录。bytes/本地路径（PDF 转图产物）按内容哈希——
+    路径因机器而异，URL 归一化口径与 parsers._img_to_text 内一致。
+    """
+    if isinstance(img, bytes):
+        body = img
+    else:
+        s = str(img)
+        if s.startswith('//'):
+            s = 'https:' + s
+        elif s.startswith('/statics.'):
+            s = 'https:' + s
+        if s.startswith(('http://', 'https://')):
+            body = s.encode('utf-8')
+        else:
+            try:
+                with open(s, 'rb') as f:
+                    body = f.read()
+            except OSError:
+                body = s.encode('utf-8')
+    return 'ocr:rapidocr:v1:' + hashlib.sha1(body).hexdigest()
+
+
+_OCR_RECORD_MODE = os.environ.get('SCNU_OCR_RECORD') == '1'
+_orig_img_to_text = P._img_to_text
+if os.path.exists(OCR_CACHE_FIXTURE):
+    with open(OCR_CACHE_FIXTURE, encoding='utf-8') as _f:
+        _ocr_fixture = json.load(_f)
+else:
+    _ocr_fixture = {}
+_ocr_recorded = {}
+
+
+def _img_to_text_replay(img):
+    key = _ocr_key(img)
+    if _OCR_RECORD_MODE:
+        _val = _orig_img_to_text(img)
+        _ocr_recorded[key] = _val
+        return _val
+    if key in _ocr_fixture:
+        return _ocr_fixture[key]
+    raise AssertionError(
+        f'OCR 未录制：{key}（图片 {str(img)[:90]}）。'
+        f'录制方法：SCNU_OCR_RECORD=1 python tests/test_parser_golden.py，'
+        f'然后提交 tests/fixtures/ocr_cache.json')
+
+
+P._img_to_text = _img_to_text_replay
+
+
+def _flush_ocr_record():
+    if not (_OCR_RECORD_MODE and _ocr_recorded):
+        return
+    _ocr_fixture.update(_ocr_recorded)
+    with open(OCR_CACHE_FIXTURE, 'w', encoding='utf-8', newline='\n') as _f:
+        json.dump(_ocr_fixture, _f, ensure_ascii=False, indent=2)
+    print(f'[ocr-record] 录制 {len(_ocr_recorded)} 条 → {OCR_CACHE_FIXTURE}')
+
+
+atexit.register(_flush_ocr_record)
+
+# VLM 缓存未命中时 _vlm_extract_fields 会先 _vlm_img_b64 下载图片（在 provider
+# 调用之前，本地有 VLM key 时即发生活网络，CI 因 cfgs=[] 不触发）。golden 的
+# VLM 密封只要「缓存命中即回放」（4391 在此桩之前就命中返回），未命中一律
+# None——桩掉图片下载让未命中零网络早退，与无 key 态等价（负标记写入本就被
+# 上面的 _vlm_cache_set 空桩拦掉，无行为损失）。
+P._vlm_img_b64 = lambda u: None
 
 # 垃圾 topic 特征（历史上由表格/页眉误读产生）：如 '0- 17' / '0 -12' / 纯序号
 _FORBIDDEN_TOPIC = ('0-', '0 -', '0—')
