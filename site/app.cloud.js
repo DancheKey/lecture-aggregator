@@ -1,10 +1,10 @@
 // 云端共享计数层（2026-10-17 上线）：讲座 URL 维度的 访问/点赞/想听 全局累计。
 // 目标：Supabase REST API，裸 fetch 零 SDK 依赖（保持本站零 CDN 架构）。
 //
-// 配置来源：site/supabase-config.json（仅本机存在、刻意不入库），形如
+// 配置来源：site/supabase-config.json（随站发布，2026-10-18 起入库），形如
 //   { "url": "https://<项目ref>.supabase.co", "anonKey": "eyJ..." }
-// 缺失 / 空值 / 读取失败 = 云端禁用，调用方照旧走 /api 与本机降级链，
-// 行为与本层上线前完全一致（公网用户无感）。
+// anon key 为公开设计（见下安全模型）。缺失 / 空值 / 读取失败 = 云端禁用，
+// 调用方照旧走 /api 与本机降级链，行为与本层上线前完全一致。
 //
 // 安全模型：anon key 公开是 Supabase 的设计定位（同 reCAPTCHA site key），
 // 真正的闸门在数据库侧——RLS + RPC 增量函数内钳值域（见迁移 SQL 注释），
