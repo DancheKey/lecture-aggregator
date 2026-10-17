@@ -52,6 +52,8 @@ jobs:
         run: python tests/test_cited_judge.py
       - name: Run bio-bracket tests
         run: python tests/test_bio_bracket.py
+      - name: Run bio-stop-words tests
+        run: python tests/test_bio_stop_words.py
       - name: Run location-prefix tests
         run: python tests/test_location_prefix.py
       - name: Run frontend schema guard tests

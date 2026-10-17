@@ -62,6 +62,7 @@ jobs:
             tests/test_hybrid.py
             tests/test_cited_judge.py
             tests/test_bio_bracket.py
+            tests/test_bio_stop_words.py
             tests/test_location_prefix.py
             tests/test_frontend_schema.py
             tests/test_parser_snapshot.py
