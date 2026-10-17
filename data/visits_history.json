@@ -1,5 +1,5 @@
 {
-  "source": "busuanzi.aspark.cc",
+  "source": "supabase",
   "siteUrl": "https://danchekey.github.io/lecture-aggregator/",
   "snapshots": [
     {
@@ -386,6 +386,17 @@
       "uv_delta": 4,
       "pv_delta": 11,
       "note": ""
+    },
+    {
+      "date": "2026-10-18",
+      "capturedAt": "2026-10-18T02:32:54+08:00",
+      "site_pv": 1743,
+      "site_uv": null,
+      "page_pv": null,
+      "page_uv": null,
+      "uv_delta": null,
+      "pv_delta": 19,
+      "note": "计数源切换为自建 Supabase（2026-10-18），UV 停更"
     }
   ]
 }
