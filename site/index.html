@@ -9,8 +9,10 @@
        - 访问量使用 busuanzi.aspark.cc（国内可用的免费计数服务，兼容原版不蒜子写法），
          script-src / connect-src 需放行 busuanzi.aspark.cc；localStorage 5 分钟缓存防重复计数。
        - 「报告信息源问题」弹窗把内容 POST 到 Web3Forms（静态站无后端的转发通道），
-         connect-src 必须放行其接口域名，否则浏览器会当场掐断该请求。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc/js; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc https://api.web3forms.com; object-src 'none'; base-uri 'self'; form-action 'self'" />
+         connect-src 必须放行其接口域名，否则浏览器会当场掐断该请求。
+       - 讲座访问/点赞/想听的云端共享计数走 Supabase（仅当本机存在 supabase-config.json
+         时启用，未配置时零外联），connect-src 放行 *.supabase.co。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc/js; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc https://api.web3forms.com https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <!-- footer-counter.js 动态加载 busuanzi，5 分钟内不重复计数 -->
   <meta name="referrer" content="no-referrer" />
   <title>木铎金声</title>
@@ -788,7 +790,8 @@
   <script defer src="app.state.js?v=f2d1e1e82d"></script>
   <script defer src="app.computed.js?v=e7d9bca7a6"></script>
   <script defer src="app.display.js?v=1520f114d4"></script>
-  <script defer src="app.social.js?v=c1a2b927b5"></script>
+  <script defer src="app.cloud.js?v=6db35233b7"></script>
+  <script defer src="app.social.js?v=d3897d155f"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=93b542d74c"></script>

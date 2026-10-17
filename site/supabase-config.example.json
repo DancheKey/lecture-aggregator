@@ -1,0 +1,4 @@
+{
+  "url": "https://<项目ref>.supabase.co",
+  "anonKey": "<anon public key，Supabase 设计为可公开>"
+}

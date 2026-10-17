@@ -295,25 +295,38 @@ createApp({
       let localStats = {};
       try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
       catch (e) { localStats = {}; }
-      fetch('/api/lecture/stats', { cache: 'no-store' })
-        // 2026-10-17 复核 P2-8：补 r.ok，与 app.social.js 同构实现保持一致
-        // （本文件 :385 已是此风格；404/5xx 走 throw 进 catch 回落本机值）。
-        .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
-        .then(j => {
-          if (j && j.stats) {
-            const merged = { ...localStats };
-            for (const [url, serverSt] of Object.entries(j.stats)) {
-              merged[url] = { ...(merged[url] || {}), ...serverSt };
-            }
-            this.lectureStats = merged;
-            // 写侧单独容错（2026-10-14 评审 P1-6）：与 app.social.js 同模式——
-            // setItem 配额异常不得掉进 .catch 用本地旧值覆盖已合并的服务端值。
-            try { localStorage.setItem(STAT_KEY, JSON.stringify(merged)); } catch (e) { /* 保留内存态即可 */ }
-          } else {
-            this.lectureStats = localStats;
+      // 2026-10-17 云端优先链：与 app.social.js 同构——Supabase 批量读全表，
+      // 无配置/失败退回本地 /api，再降级本机。合并与写侧容错三条链共用。
+      LectureCloud.fetchAll().then(cloudStats => {
+        if (cloudStats) {
+          const merged = { ...localStats };
+          for (const [url, serverSt] of Object.entries(cloudStats)) {
+            merged[url] = { ...(merged[url] || {}), ...serverSt };
           }
-        })
-        .catch(() => { this.lectureStats = localStats; });
+          this.lectureStats = merged;
+          // 写侧单独容错（2026-10-14 评审 P1-6）：与 app.social.js 同模式——
+          // setItem 配额异常不得掉进 .catch 用本地旧值覆盖已合并的服务端值。
+          try { localStorage.setItem(STAT_KEY, JSON.stringify(merged)); } catch (e) { /* 保留内存态即可 */ }
+          return;
+        }
+        return fetch('/api/lecture/stats', { cache: 'no-store' })
+          // 2026-10-17 复核 P2-8：补 r.ok，与 app.social.js 同构实现保持一致
+          // （本文件 :385 已是此风格；404/5xx 走 throw 进 catch 回落本机值）。
+          .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
+          .then(j => {
+            if (j && j.stats) {
+              const merged = { ...localStats };
+              for (const [url, serverSt] of Object.entries(j.stats)) {
+                merged[url] = { ...(merged[url] || {}), ...serverSt };
+              }
+              this.lectureStats = merged;
+              try { localStorage.setItem(STAT_KEY, JSON.stringify(merged)); } catch (e) { /* 保留内存态即可 */ }
+            } else {
+              this.lectureStats = localStats;
+            }
+          })
+          .catch(() => { this.lectureStats = localStats; });
+      });
     },
     // 顶部数字「从 1 滚动增长」动画：数据到达后平滑定格到真实值。
     // 不预设硬上限，避免旧数值（如 950）在屏幕上「定格」等待。

@@ -91,7 +91,8 @@ function sameJson(a, b) {
 async function runSocial(fetchImpl, setItemImpl) {
   const { ctx, store } = makeCtx({ fetchImpl, setItemImpl });
   store['lecture_stats_v1'] = JSON.stringify(LOCAL);
-  loadParts(ctx, ['app.core.js', 'app.social.js']);
+  // app.cloud.js 须先于 app.social.js 加载（const 声明，防 TDZ；与 index.html 同序）
+  loadParts(ctx, ['app.core.js', 'app.cloud.js', 'app.social.js']);
   const fn = vm.runInContext('APP_METHODS.loadLectureStats', ctx);
   const self = makeThis();
   fn.call(self);
@@ -106,7 +107,8 @@ async function runStats(fetchImpl, setItemImpl) {
   vm.runInContext(`
     Vue = { createApp(opts) { globalThis.__opts = opts; return { mount() {} }; } };
   `, ctx);
-  loadParts(ctx, ['stats.js']);
+  // app.cloud.js 须先于 stats.js 加载（与 stats.html 同序）
+  loadParts(ctx, ['app.cloud.js', 'stats.js']);
   const fn = vm.runInContext('__opts.methods.loadLectureStats', ctx);
   const self = makeThis();
   fn.call(self);

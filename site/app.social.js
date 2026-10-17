@@ -74,27 +74,39 @@ Object.assign(APP_METHODS, {
       this.lectureStats[url].likes = next;
       this.saveLikes();
       this.saveLocalStats();
-      // toast 不先于 fetch 无条件报成功（C1-c）：按真实结果分支提示
+      // toast 不先于 fetch 无条件报成功（C1-c）：按真实结果分支提示。
+      // 2026-10-17 云端优先链：有 supabase-config.json 时走 Supabase 全局共享计数；
+      // 无配置 / 云端失败 → 退回本地 server /api → 再降级本机（原链保持不动）。
       const endpoint = willLike ? 'like' : 'unlike';
-      fetch('/api/lecture/' + endpoint, {
-        method: 'POST', cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      })
-        .then(r => (r && r.ok ? r.json() : null))
-        .then(j => {
-          if (j && j.ok && typeof j.likes === 'number') {
-            // 后端权威值覆盖本机乐观值
-            if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
-            this.lectureStats[url].likes = j.likes;
-            this.saveLocalStats();
-            this.showToast(willLike ? '点赞成功' : '已取消点赞');
-          } else {
-            // 后端失败 / 被节流 / 公网无后端：本机状态已生效，不冒称服务端成功
-            this.showToast('已本地记录');
-          }
+      LectureCloud.bump('like', url, delta).then(cloud => {
+        if (cloud && typeof cloud.likes === 'number') {
+          // 云端权威值覆盖本机乐观值
+          if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
+          this.lectureStats[url].likes = cloud.likes;
+          this.saveLocalStats();
+          this.showToast(willLike ? '点赞成功' : '已取消点赞');
+          return;
+        }
+        return fetch('/api/lecture/' + endpoint, {
+          method: 'POST', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
         })
-        .catch(() => { this.showToast('已本地记录'); }); // 离线：本机值已生效
+          .then(r => (r && r.ok ? r.json() : null))
+          .then(j => {
+            if (j && j.ok && typeof j.likes === 'number') {
+              // 后端权威值覆盖本机乐观值
+              if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0 };
+              this.lectureStats[url].likes = j.likes;
+              this.saveLocalStats();
+              this.showToast(willLike ? '点赞成功' : '已取消点赞');
+            } else {
+              // 后端失败 / 被节流 / 公网无后端：本机状态已生效，不冒称服务端成功
+              this.showToast('已本地记录');
+            }
+          })
+          .catch(() => { this.showToast('已本地记录'); }); // 离线：本机值已生效
+      });
     },
 
     /* ---------- 本地「想听」（同一浏览器去重，逻辑与点赞对称） ---------- */
@@ -138,25 +150,35 @@ Object.assign(APP_METHODS, {
       this.lectureStats[url].wants = next;
       this.saveWants();
       this.saveLocalStats();
-      // toast 不先于 fetch 无条件报成功（C1-c，与点赞对称）：按真实结果分支提示
+      // toast 不先于 fetch 无条件报成功（C1-c，与点赞对称）：按真实结果分支提示。
+      // 2026-10-17 云端优先链：同 toggleLike——Supabase → 本地 /api → 本机。
       const endpoint = willWant ? 'want' : 'unwant';
-      fetch('/api/lecture/' + endpoint, {
-        method: 'POST', cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      })
-        .then(r => (r && r.ok ? r.json() : null))
-        .then(j => {
-          if (j && j.ok && typeof j.wants === 'number') {
-            if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
-            this.lectureStats[url].wants = j.wants;
-            this.saveLocalStats();
-            this.showToast(willWant ? '已标记想听' : '已取消想听');
-          } else {
-            this.showToast('已本地记录');
-          }
+      LectureCloud.bump('want', url, willWant ? 1 : -1).then(cloud => {
+        if (cloud && typeof cloud.wants === 'number') {
+          if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
+          this.lectureStats[url].wants = cloud.wants;
+          this.saveLocalStats();
+          this.showToast(willWant ? '已标记想听' : '已取消想听');
+          return;
+        }
+        return fetch('/api/lecture/' + endpoint, {
+          method: 'POST', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
         })
-        .catch(() => { this.showToast('已本地记录'); }); // 离线：本机值已生效
+          .then(r => (r && r.ok ? r.json() : null))
+          .then(j => {
+            if (j && j.ok && typeof j.wants === 'number') {
+              if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0 };
+              this.lectureStats[url].wants = j.wants;
+              this.saveLocalStats();
+              this.showToast(willWant ? '已标记想听' : '已取消想听');
+            } else {
+              this.showToast('已本地记录');
+            }
+          })
+          .catch(() => { this.showToast('已本地记录'); }); // 离线：本机值已生效
+      });
     },
     // 显示计数：超过 300 显示 "300+"，避免被攻击造成虚高数字
     capDisplay(n) {
@@ -180,12 +202,16 @@ Object.assign(APP_METHODS, {
         s.lastVisit = now;
         this.lectureStats[url] = s;
         this.saveLocalStats();
-        // 仅在本机未节流时才通知后端（后端自身也有节流，此为双重防护，并避免无意义请求）
-        fetch('/api/lecture/visit', {
-          method: 'POST', cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url }),
-        }).catch(() => {});
+        // 仅在本机未节流时才通知后端（后端自身也有节流，此为双重防护，并避免无意义请求）。
+        // 2026-10-17：云端（Supabase）优先，无配置/失败时静默退回本地 /api；两者皆无=纯本机。
+        LectureCloud.bump('visit', url, 1).then(cloud => {
+          if (cloud) return;
+          fetch('/api/lecture/visit', {
+            method: 'POST', cache: 'no-store',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+          }).catch(() => {});
+        });
       }
     },
     // 加载每条讲座的访问/点赞/想听：优先后端，失败降级本机 localStorage。
@@ -198,26 +224,39 @@ Object.assign(APP_METHODS, {
       let localStats = {};
       try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
       catch (e) { localStats = {}; }
-      fetch('/api/lecture/stats', { cache: 'no-store' })
-        // 2026-10-17 复核 P2-8：补 r.ok——公网 404 页此前靠 HTML 解析抛异常才落到
-        // 下方 catch（与 latest.json 2026-10-13 修复前同款模式），改走正常判断路径。
-        .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
-        .then(j => {
-          if (j && j.stats) {
-            const merged = { ...localStats };
-            for (const [url, serverSt] of Object.entries(j.stats)) {
-              merged[url] = { ...(merged[url] || {}), ...serverSt };
-            }
-            this.lectureStats = merged;
-            // 写侧单独容错（2026-10-14 评审 P1-6）：localStorage 配额满/
-            // 隐私模式下 setItem 抛 QuotaExceededError，若不让它在此止住，
-            // 会掉进下方 .catch 用本地旧值覆盖掉已合并的服务端权威数据。
-            try { localStorage.setItem(STAT_KEY, JSON.stringify(merged)); } catch (e) { /* 保留内存态即可 */ }
-          } else {
-            this.lectureStats = localStats;
+      // 2026-10-17 云端优先链：Supabase 批量读全表（一次请求拿全部讲座计数）；
+      // 无配置/失败 → 本地 server /api → 本机。合并与写侧容错逻辑三条链共用。
+      LectureCloud.fetchAll().then(cloudStats => {
+        if (cloudStats) {
+          const merged = { ...localStats };
+          for (const [url, serverSt] of Object.entries(cloudStats)) {
+            merged[url] = { ...(merged[url] || {}), ...serverSt };
           }
-        })
-        .catch(() => { this.lectureStats = localStats; });
+          this.lectureStats = merged;
+          // 写侧单独容错（2026-10-14 评审 P1-6）：localStorage 配额满/
+          // 隐私模式下 setItem 抛 QuotaExceededError，若不让它在此止住，
+          // 会掉进下方 .catch 用本地旧值覆盖掉已合并的服务端权威数据。
+          try { localStorage.setItem(STAT_KEY, JSON.stringify(merged)); } catch (e) { /* 保留内存态即可 */ }
+          return;
+        }
+        return fetch('/api/lecture/stats', { cache: 'no-store' })
+          // 2026-10-17 复核 P2-8：补 r.ok——公网 404 页此前靠 HTML 解析抛异常才落到
+          // 下方 catch（与 latest.json 2026-10-13 修复前同款模式），改走正常判断路径。
+          .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
+          .then(j => {
+            if (j && j.stats) {
+              const merged = { ...localStats };
+              for (const [url, serverSt] of Object.entries(j.stats)) {
+                merged[url] = { ...(merged[url] || {}), ...serverSt };
+              }
+              this.lectureStats = merged;
+              try { localStorage.setItem(STAT_KEY, JSON.stringify(merged)); } catch (e) { /* 保留内存态即可 */ }
+            } else {
+              this.lectureStats = localStats;
+            }
+          })
+          .catch(() => { this.lectureStats = localStats; });
+      });
     },
     showToast(msg, ms = 2000) {
       this.toast.message = msg;

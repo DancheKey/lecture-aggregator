@@ -7,8 +7,10 @@
        - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
          站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
        - 访问量使用 busuanzi.aspark.cc（国内可用的免费计数服务，兼容原版不蒜子写法），
-         script-src / connect-src 需放行 busuanzi.aspark.cc；localStorage 5 分钟缓存防重复计数。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc/js; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc; object-src 'none'; base-uri 'self'; form-action 'self'" />
+         script-src / connect-src 需放行 busuanzi.aspark.cc；localStorage 5 分钟缓存防重复计数。
+       - 讲座访问/点赞/想听的云端共享计数走 Supabase（仅当本机存在 supabase-config.json
+         时启用，未配置时零外联），connect-src 放行 *.supabase.co。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://busuanzi.aspark.cc/js; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://busuanzi.aspark.cc https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <!-- footer-counter.js 动态加载 busuanzi，5 分钟内不重复计数 -->
   <meta name="referrer" content="no-referrer" />
   <title>各学院讲座统计 - 木铎金声</title>
@@ -217,7 +219,8 @@
 
   </div>
 
-  <script defer src="stats.js?v=30da7f42cc"></script>
+  <script defer src="app.cloud.js?v=6db35233b7"></script>
+  <script defer src="stats.js?v=9452107844"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 stats.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->

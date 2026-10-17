@@ -147,3 +147,6 @@ docs/code-review-2026-*.html
 docs/_data_cleanup_review.html
 docs/feedback-analysis-plan.html
 data/admin_token.json
+
+# ===== 云端共享计数配置（Supabase，仅本机；模板见 supabase-config.example.json）=====
+site/supabase-config.json

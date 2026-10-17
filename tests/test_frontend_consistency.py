@@ -437,6 +437,8 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
             'site/app.js', 'site/app.core.js', 'site/app.state.js',
             'site/app.computed.js', 'site/app.display.js', 'site/app.social.js',
             'site/app.data.js', 'site/app.admin.js',
+            'site/app.cloud.js',                       # 云端共享计数层（2026-10-17）
+            'site/supabase-config.example.json',       # 配置模板（真实配置 .gitignore，不入库）
         }
         missing = [u for u in uncovered if u not in known_static]
         self.assertEqual(missing, [],
