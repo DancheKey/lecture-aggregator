@@ -41,6 +41,10 @@ const APP_STATE = function () {
       // 场次。初值 false（默认折叠）；mounted 时 loadFarFuture() 从 localStorage
       // 恢复上次选择（刷新不丢，同点赞/想听的本机偏好模式）。
       farFutureOpen: false,
+      // 工具栏 wrap 实测（2026-10-17）：控件块是否被 flex-wrap 挤到统计段下方。
+      // false=同行（搜索框恒 176px，文字与控件间留空间）；true=第二行（grow 铺满、
+      // 搜索框伸缩填充）。由 _measureClamp 末尾 DOM 实测写入（复用 _clampSig 守卫）。
+      toolbarWrapped: false,
       // ---- clamp 溢出实测（2026-09-29）----
       // 「展开简介/摘要」按钮是否出现，改由 DOM 实测决定（内容真的被 clamp 裁掉才给按钮），
       // 取代原「按字符数估行数」的阈值：同一段文字在 375px 与 1440px 下行数差 3~4 倍，

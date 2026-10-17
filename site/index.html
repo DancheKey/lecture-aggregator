@@ -101,11 +101,9 @@
     .toolbar-search { width: 11rem; flex-grow: 1; }
     /* 控件块 max-width:100%：移动端夹到容器宽、激活内部 flex-wrap 分堆（否则 shrink-0
        会让宽控件块溢出致横向滚动）；桌面端内容宽 < 容器，不影响 shrink-0 整块 wrap。 */
-    .toolbar-controls { max-width: 100%; flex-grow: 1; }
-    /* partial 加载态：关掉 grow 让 ml-auto 独享剩余空间——实测 Chromium 中
-       flex-grow:1 与 margin-left:auto 并存时 grow 赢（auto margin 拿 0），
-       故必须显式 grow:0 才能贴右且不被拉长。 */
-    .toolbar-controls.is-static { flex-grow: 0; }
+    .toolbar-controls { max-width: 100%; flex-grow: 0; }
+    /* wrap 到第二行后由 JS 实测挂 is-wrap：grow 铺满整行 + 搜索框伸缩填充 */
+    .toolbar-controls.is-wrap { flex-grow: 1; }
     /* 信息源报告弹窗：纯自定义 CSS，不依赖 vendor/tailwind.css 预编译产物
        （该产物是按需子集，新增 utility 类会静默失效，故此处显式声明） */
     .src-mask {
@@ -294,7 +292,7 @@
             <div class="flex flex-wrap items-center gap-2">
               <!-- 统计文字：左起，桌面端不压缩（shrink-0 保持可读），内部按段 flex-wrap。
                    .toolbar-stats：移动端独占整行（控件换行下方、搜索可正常伸缩），桌面端内容宽同流。 -->
-              <div class="toolbar-stats text-12pt text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
+              <div ref="toolbarStats" class="toolbar-stats text-12pt text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
                 <template v-if="dataStage === 'partial'">
                   已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
                   <span class="text-slate-300">·</span>
@@ -337,20 +335,21 @@
                   更新于 {{ displayUpdatedAt.slice(0, 4) === String(new Date().getFullYear()) ? (Number(displayUpdatedAt.slice(5, 7)) + '月' + Number(displayUpdatedAt.slice(8, 10)) + '日') : displayUpdatedAt }}
                 </template>
               </div>
-              <!-- 筛选控件区打包为单一整块：full 态两行均靠左（用户定，靠左更美观）。
-                   放得下与统计同行（统计左起、控件紧随其右）；放不下则【整块】wrap 到
-                   第二行靠左——绝不只把多出来的部分挪下去（半行溢出观感差）。
-                   wrap 到第二行后控件块 flex-grow:1 占满整行：搜索框 flex:1 1 11rem 吸收
-                   剩余空间拉长铺满（左靠左、右缘贴容器右），字段/年份/chips/清除保持内容宽
-                   ——叠加筛选项越多搜索框越短，但整行始终铺满（用户 2026-10-17 定）。
-                   partial 加载态（dataStage !== 'full'）临时挂 ml-auto 贴右缘：此时统计文字短
-                   （「已加载 N+ 场讲座 · 完整数据加载中...」），控件紧随统计会右侧留空；且 N 从
-                   50 涨到全量的过程中控件会跟着文字向右蠕动。ml-auto 优先级高于 flex-grow，
-                   故该态贴右但不拉长（搜索框保持 176px），加载期间位置完全稳定。
-                   full 态撤销 ml-auto——恢复两行靠左 + 第二行铺满。移动端统计独占整行，
-                   ml-auto 无空间可推，控件仍靠左；max-width:100% 夹到容器宽激活内部分堆。 -->
-              <div class="toolbar-controls flex flex-wrap items-center gap-2 min-w-0"
-                   :class="{ 'ml-auto': dataStage !== 'full', 'is-static': dataStage !== 'full' }">
+              <!-- 筛选控件区打包为单一整块。两种行位（JS 实测 toolbarWrapped，见
+                   app.display.js _measureClamp 末尾；CSS 无法感知 flex-wrap 行位）：
+                   · 同行（与统计在第一行）：grow:0、宽=内容宽 338——搜索框恒 176px，
+                     统计文字与控件之间留空间不拥挤（用户 2026-10-17 定；四位数默认态
+                     与五位数后的筛选态分别落在两种行位）。
+                   · wrap（被挤到第二行）：is-wrap → grow:1 占满整行——搜索框
+                     flex-grow:1 吸收剩余空间拉长铺满（左靠左、右缘贴容器右），
+                     字段/年份/chips/清除保持内容宽；叠加筛选项越多搜索框越短。
+                   partial 加载态（dataStage !== 'full'）额外挂 ml-auto 贴右缘：统计文字短
+                   （「已加载 N+ 场讲座 · 完整数据加载中...」），且 N 从 50 涨到全量的过程中
+                   控件位置完全稳定；该态统计短恒同行（grow:0），ml-auto 独享剩余空间。
+                   移动端统计独占整行，控件恒在第二行（is-wrap 铺满）；
+                   max-width:100% 夹到容器宽激活内部分堆。 -->
+              <div ref="toolbarControls" class="toolbar-controls flex flex-wrap items-center gap-2 min-w-0"
+                   :class="{ 'ml-auto': dataStage !== 'full', 'is-wrap': toolbarWrapped }">
               <!-- 搜索框：固定宽 176px（.toolbar-search）；不用 flex-1——在 shrink-0 块内会塌陷 -->
               <div class="relative toolbar-search min-w-0">
                 <input v-model="query" type="search" :placeholder="searchPlaceholder" @focus="warmLongText()"
@@ -778,9 +777,9 @@
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=c793fc5424"></script>
-  <script defer src="app.state.js?v=df4f6fc11b"></script>
+  <script defer src="app.state.js?v=a3d1eb2f2d"></script>
   <script defer src="app.computed.js?v=e7d9bca7a6"></script>
-  <script defer src="app.display.js?v=06b1400996"></script>
+  <script defer src="app.display.js?v=a4246ef812"></script>
   <script defer src="app.social.js?v=9d8623fb38"></script>
   <script defer src="app.data.js?v=d3c3b3d2f0"></script>
   <script defer src="app.admin.js?v=d668812db1"></script>

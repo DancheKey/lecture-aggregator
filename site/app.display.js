@@ -271,6 +271,20 @@ Object.assign(APP_METHODS, {
     /* ---------- clamp 溢出实测（决定「展开简介/摘要」按钮显隐） ---------- */
     _measureClamp() {
       if (typeof document === 'undefined') return;
+      // 工具栏 wrap 检测的行位源：统计段/控件块实测宽（2026-10-17）。
+      // 必须进签名——行位翻转不仅由本签名已枚举的筛选维度引起，还可来自
+      // ① upcomingOnly（2026-10-16 新增的筛选维度，本签名漏了它：默认态首测后
+      //    点「待开始」→ 统计藏段 + 控件加 chip → 几何翻转但 sig 不变 → 跳过检测 →
+      //    第二行退化成 338px 靠左不铺满，静默无报错。与 B2/P2-1 同根第三次）；
+      // ② displayUpdatedAt 异步到达（last_run.json 后到，统计多一段）；
+      // ③ 芯片宽受字体/内容波动。
+      // 逐项枚举必有漏（已漏两次），故直接量两侧实测宽进签名——宽任何变化即重测。
+      // wrap 态 ctrlW 恒等于容器宽（grow 铺满），该态无需因 chip 增减重测（结果恒 True），
+      // 同行态 ctrlW=内容宽，chip 增减即变 → 会触发重测，正确。
+      const statsEl0 = this.$refs.toolbarStats, ctrlEl0 = this.$refs.toolbarControls;
+      const toolbarGeo = statsEl0 && ctrlEl0
+        ? Math.round(statsEl0.getBoundingClientRect().width) + 'x' + Math.round(ctrlEl0.getBoundingClientRect().width)
+        : '';
       // 签名守卫：只在本页内容/筛选/展开态/视口宽度变化时重测。
       // 必须要有——页面有秒级 tick（倒计时）会每秒触发 updated，否则每秒重排测量。
       // 2026-09-30 补 _longText 键数：长文本是后到的（detail 桶），到达后卡片上会**新出现**
@@ -292,7 +306,7 @@ Object.assign(APP_METHODS, {
         this.all.length, this.dataStage, window.innerWidth,
         Object.keys(this._longText).length,
         JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio),
-        this.onlineOnly, this.farFutureOpen].join('|');
+        this.onlineOnly, this.farFutureOpen, toolbarGeo].join('|');
       if (sig === this._clampSig) return;
       this._clampSig = sig;
       const next = {};
@@ -311,6 +325,16 @@ Object.assign(APP_METHODS, {
       // 每次重算（而非只增不减）：字体加载完成/换行重排造成的瞬时溢出会被自动纠正，
       // 不会留下「内容其实没被裁却挂着展开按钮」的假阳性。
       if (JSON.stringify(next) !== JSON.stringify(this._clampOverflow)) this._clampOverflow = next;
+      // 工具栏 wrap 实测（2026-10-17）：控件块是否被 flex-wrap 挤到统计段下方（第二行）。
+      // 同行 → 不挂 is-wrap（grow:0，搜索框恒 176px，统计文字与控件之间留空间不拥挤）；
+      // wrap  → 挂 is-wrap（grow:1 铺满整行，搜索框伸缩填充剩余空间）。
+      // 复用 _clampSig 守卫：依赖项（dataStage/筛选态/all.length/innerWidth）全在签名里，
+      // 秒级 tick 不会触发重测；partial 态统计短恒同行，full 筛选态/窄窗/五位数统计恒 wrap。
+      const statsEl = this.$refs.toolbarStats, ctrlEl = this.$refs.toolbarControls;
+      if (statsEl && ctrlEl) {
+        const wrapped = ctrlEl.getBoundingClientRect().top - statsEl.getBoundingClientRect().top > 4;
+        if (wrapped !== this.toolbarWrapped) this.toolbarWrapped = wrapped;
+      }
     },
     // 渲染后测量：updated 每次都会调，用 setTimeout(0) 合并同帧内的多次调用并
     // 避开「在 updated 中同步改 state」的递归；resize 亦复用（行数随宽度变化）
