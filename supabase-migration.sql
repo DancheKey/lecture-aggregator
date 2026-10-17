@@ -67,84 +67,10 @@ grant execute on function increment_like(text, int) to anon;
 grant execute on function increment_want(text, int) to anon;
 grant execute on function increment_visit(text, int) to anon;
 
--- ⑤ 存量导入（本地 data/lecture_stats.json）。
---   用 on conflict do nothing 而非 do update：重复执行不得把云端已产生的真实
---   增量覆盖回本地旧值（2026-10-17 决策）；需要校准请人工核对后单独处理。
+-- ⑤ 存量导入：默认不生成（2026-10-17 决策：云端从零积累）。
+--   启用方式：python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql
+--   即使用户启用，也用 on conflict do nothing——重复执行不得把云端已产生的
+--   真实增量覆盖回本地旧值；需要校准请人工核对后单独处理。
 
-insert into lecture_stats (url, visits, likes, wants) values ('http://abdn.scnu.edu.cn/a/20230504/362.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://cs.scnu.edu.cn/a/20160613/2386.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://cs.scnu.edu.cn/a/20261008/6008.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://ctld.scnu.edu.cn/a/20190920/1031.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://ctld.scnu.edu.cn/a/20201222/1280.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://ctld.scnu.edu.cn/a/20211202/1453.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://ctld.scnu.edu.cn/a/20221212/4108.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://ctld.scnu.edu.cn/a/20230602/4267.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://ctld.scnu.edu.cn/a/20231120/4268.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20140504/3716.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20140508/3717.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20160108/4169.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20161008/5100.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20171102/5891.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20171202/5983.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20190112/6769.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20190509/6973.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20200108/7635.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20200109/7636.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20230920/9717.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20260924/11175.html', 2, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20261015/11187.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20261019/11186.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://em.scnu.edu.cn/a/20261019/11209.html', 2, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://ibc.scnu.edu.cn/a/20250107/2779.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://iqm.scnu.edu.cn/a/20211122/189.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://iqm.scnu.edu.cn/a/20230329/282.html', 2, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://iqm.scnu.edu.cn/a/20250410/442.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://iqm.scnu.edu.cn/a/20250526/449.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://iqm.scnu.edu.cn/a/20260921/557.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://jky.scnu.edu.cn/a/20241029/5920.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://life.scnu.edu.cn/a/20260626/6781.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://life.scnu.edu.cn/a/20260626/6782.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://life.scnu.edu.cn/a/20260725/6792.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://life.scnu.edu.cn/a/20261012/6827.html', 2, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://lswh.scnu.edu.cn/a/20141124/5.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://lswh.scnu.edu.cn/a/20250320/51.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20240611/8036.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20241109/8182.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20250112/8260.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20260407/8681.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20260925/8850.html', 2, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20261006/8855.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20261013/8854.html', 1, 2, 1) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20261014/8856.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20261015/8866.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://maths.scnu.edu.cn/a/20261016/8867.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20130701/192.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20160113/961.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20170222/1226.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20170612/1305.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20170624/1322.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20190311/1703.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20191105/1840.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20260324/2940.html', 2, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://psy.scnu.edu.cn/a/20260707/2990.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://skc.scnu.edu.cn/a/20150923/196.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://swc.scnu.edu.cn/collaborative/2021/0705/34.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://swc.scnu.edu.cn/collaborative/2021/0707/3.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://xz.scnu.edu.cn/a/20240116/127.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('http://xz.scnu.edu.cn/a/20251114/301.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-10806-1.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-10815-1.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-10862-1.html', 2, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-10878-1.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-11064-1.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-11157-1.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-11158-1.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-3762-1.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://module.scnu.edu.cn/article-3685-7542-1.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://physics.scnu.edu.cn/a/20191118/806.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://physics.scnu.edu.cn/a/20220513/11930.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://physics.scnu.edu.cn/a/20230920/12437.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://physics.scnu.edu.cn/a/20240112/12574.html', 1, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://physics.scnu.edu.cn/a/20260602/13312.html', 2, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://physics.scnu.edu.cn/a/20261012/13403.html', 3, 0, 0) on conflict (url) do nothing;
-insert into lecture_stats (url, visits, likes, wants) values ('https://yjsy.scnu.edu.cn/a/20261012/10265.html', 2, 0, 0) on conflict (url) do nothing;
+-- ⑤ 存量导入：未启用（默认）。如需导入本地历史计数，
+--    运行 python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql

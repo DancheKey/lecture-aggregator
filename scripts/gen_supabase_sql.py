@@ -1,10 +1,21 @@
 #!/usr/bin/env python3
-# 生成 Supabase 迁移 SQL：安全约束 + RPC 增量函数 + 存量数据导入。
-# 用法：python scripts/gen_supabase_sql.py > supabase-migration.sql
+# 生成 Supabase 迁移 SQL：列兜底 + 值域约束 + RPC 增量函数 + RLS。
+# 用法：
+#   python scripts/gen_supabase_sql.py                 # 仅结构（默认，不含存量导入）
+#   python scripts/gen_supabase_sql.py --with-existing # 额外导入本地 data/lecture_stats.json
 # 然后在 Supabase 控制台 SQL Editor 粘贴执行（一次即可，幂等）。
+# 说明：存量导入用 on conflict do nothing，绝不覆盖云端已产生的真实增量；
+# 2026-10-17 用户决策：云端从零积累，默认不带存量。
 import json
 import os
 import sys
+
+# Windows 上 stdout 文本模式会把 \n 翻译成 \r\n，重定向出的 SQL 带 CRLF；
+# git 入库虽会 normalize，但消除写盘时的 CRLF 可免去每次 commit 的行尾警告。
+try:
+    sys.stdout.reconfigure(newline='\n')
+except Exception:
+    pass
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATS_PATH = os.path.join(ROOT, 'data', 'lecture_stats.json')
@@ -83,9 +94,10 @@ grant execute on function increment_like(text, int) to anon;
 grant execute on function increment_want(text, int) to anon;
 grant execute on function increment_visit(text, int) to anon;
 
--- ⑤ 存量导入（本地 data/lecture_stats.json）。
---   用 on conflict do nothing 而非 do update：重复执行不得把云端已产生的真实
---   增量覆盖回本地旧值（2026-10-17 决策）；需要校准请人工核对后单独处理。
+-- ⑤ 存量导入：默认不生成（2026-10-17 决策：云端从零积累）。
+--   启用方式：python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql
+--   即使用户启用，也用 on conflict do nothing——重复执行不得把云端已产生的
+--   真实增量覆盖回本地旧值；需要校准请人工核对后单独处理。
 """
 
 
@@ -94,14 +106,18 @@ def sql_str(s):
 
 
 def main():
-    if not os.path.exists(STATS_PATH):
+    with_existing = '--with-existing' in sys.argv
+    if with_existing and not os.path.exists(STATS_PATH):
         sys.exit('找不到 ' + STATS_PATH)
+    print(HEADER.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS))
+    if not with_existing:
+        print('-- ⑤ 存量导入：未启用（默认）。如需导入本地历史计数，')
+        print('--    运行 python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql')
+        return
     with open(STATS_PATH, encoding='utf-8') as f:
         raw = json.load(f)
     # 兼容两种形态：裸 dict（url→统计）或 {stats: {...}} 包装
     items = raw.get('stats', raw) if isinstance(raw, dict) else {}
-
-    print(HEADER.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS))
     rows = 0
     for url, st in sorted(items.items()):
         v = int(st.get('visits', 0) or 0)
