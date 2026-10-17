@@ -420,9 +420,7 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
             if os.path.isfile(full) and not f.startswith('.'):
                 actual.append('site/' + f)
         # .nojekyll 等配置文件不需要被合并清单列出（不入库也不影响部署）
-        # supabase-config.json：本机私有配置（.gitignore，永不入库/部署），
-        #   CI 上不存在故不会误伤公网门禁；本机跑测试时豁免（2026-10-18）。
-        skip = {'site/.nojekyll', 'site/supabase-config.json'}
+        skip = {'site/.nojekyll'}
         uncovered = [r for r in actual
                      if r not in skip
                      and not any(fnmatch.fnmatch(r, p) for p in self.paths)]
@@ -440,7 +438,8 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
             'site/app.computed.js', 'site/app.display.js', 'site/app.social.js',
             'site/app.data.js', 'site/app.admin.js',
             'site/app.cloud.js',                       # 云端共享计数层（2026-10-17）
-            'site/supabase-config.example.json',       # 配置模板（真实配置 .gitignore，不入库）
+            'site/supabase-config.json',               # 云端配置（2026-10-18 起入库随部署）
+            'site/supabase-config.example.json',       # 配置模板
         }
         missing = [u for u in uncovered if u not in known_static]
         self.assertEqual(missing, [],

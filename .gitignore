@@ -148,5 +148,7 @@ docs/_data_cleanup_review.html
 docs/feedback-analysis-plan.html
 data/admin_token.json
 
-# ===== 云端共享计数配置（Supabase，仅本机；模板见 supabase-config.example.json）=====
-site/supabase-config.json
+# ===== 云端共享计数配置（Supabase）=====
+# 2026-10-18 起入库随部署：anon key 公开是 Supabase 设计定位（同 reCAPTCHA
+# site key），公网云端层依赖它（不发布则页脚降级静态快照、点赞/想听无法跨设备）。
+# 真正的闸门在数据库侧（RLS + RPC 钳位），见 supabase-migration.sql。
