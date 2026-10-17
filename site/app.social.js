@@ -199,7 +199,9 @@ Object.assign(APP_METHODS, {
       try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
       catch (e) { localStats = {}; }
       fetch('/api/lecture/stats', { cache: 'no-store' })
-        .then(r => r.json())
+        // 2026-10-17 复核 P2-8：补 r.ok——公网 404 页此前靠 HTML 解析抛异常才落到
+        // 下方 catch（与 latest.json 2026-10-13 修复前同款模式），改走正常判断路径。
+        .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
         .then(j => {
           if (j && j.stats) {
             const merged = { ...localStats };
@@ -225,8 +227,11 @@ Object.assign(APP_METHODS, {
     },
 
     /* ---------- 筛选交互 ---------- */
+    // 2026-10-17 复核 P1-2：setCollege 补清 showLikedOnly，与 setCampus 对称——
+    // 「只看已赞」与其他筛选互斥（口径源头是 toggleLikedFilter：清 campus/college
+    // 不清 year）。setYear 刻意不清：反向入口与源头保持同一口径，勿"顺手修过头"。
     setCampus(c) { this.campus = c; this.showLikedOnly = false; },
-    setCollege(c) { this.college = c; },
+    setCollege(c) { this.college = c; this.showLikedOnly = false; },
     setYear(y) { this.year = y; },
     toggleLikedFilter() { this.showLikedOnly = !this.showLikedOnly; this.campus = ''; this.college = ''; },
     clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.speaker = ''; this.onlineOnly = false; this.upcomingOnly = false; this.currentPage = 1; },

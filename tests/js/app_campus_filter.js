@@ -227,6 +227,28 @@ const titles = cm => cm.filtered.map(l => l.title).sort().join(',');
   ok(cm.onlineOnly === false, 'T12 clearFilters 应清除线上筛选');
 }
 
+// ---------- T13：筛选入口与「只看已赞」互斥对称（2026-10-17 复核 P1-2） ----------
+// 口径源头是 toggleLikedFilter：它清 campus/college 不清 year ⇒ 反向入口里
+// setCampus/setCollege 应清 showLikedOnly、setYear 不应清（防"顺手修过头"锁死）。
+{
+  const cm = makeCtx({ showLikedOnly: true, campus: '石牌', college: '文学院', year: '2026' });
+  methods.setCampus.call(cm, '大学城');
+  ok(cm.showLikedOnly === false, 'T13a setCampus 应清 showLikedOnly（回归锁）');
+  cm.showLikedOnly = true;
+  methods.setCollege.call(cm, '历史学院');
+  ok(cm.showLikedOnly === false, 'T13b setCollege 应清 showLikedOnly（2026-10-17 补对称）');
+  cm.showLikedOnly = true;
+  methods.setYear.call(cm, '2025');
+  ok(cm.showLikedOnly === true, 'T13c setYear 不应清 showLikedOnly（toggleLikedFilter 不清 year）');
+  const cm2 = makeCtx({ showLikedOnly: false, campus: '石牌', college: '文学院', year: '2026' });
+  methods.toggleLikedFilter.call(cm2);
+  ok(cm2.showLikedOnly === true && cm2.campus === '' && cm2.college === '',
+     'T13d toggleLikedFilter 开启时清 campus/college（口径源头）');
+  ok(cm2.year === '2026', 'T13e toggleLikedFilter 不清 year（口径源头）');
+  methods.toggleLikedFilter.call(cm2);
+  ok(cm2.showLikedOnly === false, 'T13f toggleLikedFilter 再点恢复');
+}
+
 // ---------- 汇总 ----------
 if (errs.length) {
   console.log(`[FAIL] ${errs.length} 项`);

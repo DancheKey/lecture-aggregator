@@ -296,7 +296,9 @@ createApp({
       try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
       catch (e) { localStats = {}; }
       fetch('/api/lecture/stats', { cache: 'no-store' })
-        .then(r => r.json())
+        // 2026-10-17 复核 P2-8：补 r.ok，与 app.social.js 同构实现保持一致
+        // （本文件 :385 已是此风格；404/5xx 走 throw 进 catch 回落本机值）。
+        .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
         .then(j => {
           if (j && j.stats) {
             const merged = { ...localStats };

@@ -94,6 +94,9 @@ LECTURE_STATS_PATH = os.path.join(DATA_DIR, 'lecture_stats.json')  # 每条讲�
 
 _scrape_lock = threading.Lock()
 _stat_lock = threading.Lock()
+# sources.yaml CRUD 的读改写串行（2026-10-17 复核 P2-5）：此前三个写接口是裸
+# read-modify-write，两并发请求会互相覆盖丢更新（_scrape_lock 只罩抓取）。
+_sources_lock = threading.Lock()
 
 # ---- 访问量 / 点赞统计的运行时状态（文件持久化 + 内存防刷窗口） ----
 _site_visits = {'total': 0}            # 站点总访问量
@@ -585,76 +588,84 @@ class Handler(SimpleHTTPRequestHandler):
         if not name or not base:
             self._send_json({'ok': False, 'message': 'name 和 base 为必填项'}, 400)
             return
-        data = self._load_sources()
-        # 重名校验（P2-4）：重名源会扰乱按源名索引的 PAGESTOP 基线
-        if any((s.get('name') or '').strip() == name for s in data['sources']):
-            self._send_json({'ok': False, 'message': f'信息源名称「{name}」已存在'}, 400)
-            return
-        # URL 白名单校验（P2-4）：校外/内网地址会被 scraper 记 failed_sources →
-        # CI gate 红 + 全局水位冻结，写接口侧先行拦截
-        url_err = _validate_source_urls(base, list_urls)
-        if url_err:
-            self._send_json({'ok': False, 'message': url_err}, 400)
-            return
-        # 条数上限：超限直接 400，不落盘（与既有校验同一返回形态）
-        if len(data['sources']) >= MAX_SOURCES:
-            self._send_json({'ok': False,
-                             'message': f'信息源已达上限 {MAX_SOURCES} 条，请先删除不再使用的源'}, 400)
-            return
-        new_src = {'name': name, 'campus': campus or '', 'base': base, 'list_urls': list_urls}
-        data['sources'].append(new_src)
-        self._save_sources(data)
+        # 2026-10-17 复核 P2-5：load→save 段包锁（校验失败的 return 在 with 内即释放）。
+        with _sources_lock:
+            data = self._load_sources()
+            # 重名校验（P2-4）：重名源会扰乱按源名索引的 PAGESTOP 基线
+            if any((s.get('name') or '').strip() == name for s in data['sources']):
+                self._send_json({'ok': False, 'message': f'信息源名称「{name}」已存在'}, 400)
+                return
+            # URL 白名单校验（P2-4）：校外/内网地址会被 scraper 记 failed_sources →
+            # CI gate 红 + 全局水位冻结，写接口侧先行拦截
+            url_err = _validate_source_urls(base, list_urls)
+            if url_err:
+                self._send_json({'ok': False, 'message': url_err}, 400)
+                return
+            # 条数上限：超限直接 400，不落盘（与既有校验同一返回形态）
+            if len(data['sources']) >= MAX_SOURCES:
+                self._send_json({'ok': False,
+                                 'message': f'信息源已达上限 {MAX_SOURCES} 条，请先删除不再使用的源'}, 400)
+                return
+            new_src = {'name': name, 'campus': campus or '', 'base': base, 'list_urls': list_urls}
+            data['sources'].append(new_src)
+            self._save_sources(data)
         self._send_json({'ok': True, 'index': len(data['sources']) - 1, 'source': new_src})
 
     def _api_sources_put(self, idx):
-        data = self._load_sources()
-        if idx < 0 or idx >= len(data['sources']):
-            self._send_json({'ok': False, 'message': f'索引 {idx} 超出范围（共 {len(data["sources"])} 条）'}, 404)
-            return
-        # 2026-09-27 二轮审计 S-4：同 POST，改走 _read_body_json 统一守卫。
-        body = self._read_body_json()
-        if not body:
-            self._send_json({'ok': False, 'message': '无效的 JSON'}, 400)
-            return
-        # 类型校验：防止把 list_urls 写成字符串等非预期类型导致 scraper 读取 sources.yaml 崩溃
-        for k in ('name', 'campus', 'base'):
-            if k in body and not isinstance(body[k], str):
-                self._send_json({'ok': False, 'message': f'{k} 必须为字符串'}, 400)
+        # 2026-10-17 复核 P2-5：同 POST 包锁。_read_body_json 的慢速 body 读也落在
+        # 锁内（须先 load 才能做 404 索引校验，不为它重排 404/400 既有错误优先级；
+        # 本地 Origin+token 双守卫内的本机请求，15s 上限可接受）。
+        with _sources_lock:
+            data = self._load_sources()
+            if idx < 0 or idx >= len(data['sources']):
+                self._send_json({'ok': False, 'message': f'索引 {idx} 超出范围（共 {len(data["sources"])} 条）'}, 404)
                 return
-        if 'list_urls' in body:
-            if not isinstance(body['list_urls'], list):
-                self._send_json({'ok': False, 'message': 'list_urls 必须为数组'}, 400)
+            # 2026-09-27 二轮审计 S-4：同 POST，改走 _read_body_json 统一守卫。
+            body = self._read_body_json()
+            if not body:
+                self._send_json({'ok': False, 'message': '无效的 JSON'}, 400)
                 return
-            for i, lu in enumerate(body['list_urls']):
-                if not isinstance(lu, (str, dict)):
-                    self._send_json({'ok': False, 'message': f'list_urls[{i}] 必须为字符串或对象'}, 400)
+            # 类型校验：防止把 list_urls 写成字符串等非预期类型导致 scraper 读取 sources.yaml 崩溃
+            for k in ('name', 'campus', 'base'):
+                if k in body and not isinstance(body[k], str):
+                    self._send_json({'ok': False, 'message': f'{k} 必须为字符串'}, 400)
                     return
-        src = data['sources'][idx]
-        for k in ('name', 'campus', 'base', 'list_urls'):
-            if k in body:
-                src[k] = body[k]
-        # 重名校验（P2-4）：改名后不得与**其他**源重名
-        _new_name = (src.get('name') or '').strip()
-        if any((s.get('name') or '').strip() == _new_name
-               for j, s in enumerate(data['sources']) if j != idx):
-            self._send_json({'ok': False, 'message': f'信息源名称「{_new_name}」已存在'}, 400)
-            return
-        # URL 白名单校验（P2-4）：同 POST，PUT 改 base/list_urls 同样拦截校外地址
-        url_err = _validate_source_urls((src.get('base') or '').strip(),
-                                        src.get('list_urls') or [])
-        if url_err:
-            self._send_json({'ok': False, 'message': url_err}, 400)
-            return
-        self._save_sources(data)
+            if 'list_urls' in body:
+                if not isinstance(body['list_urls'], list):
+                    self._send_json({'ok': False, 'message': 'list_urls 必须为数组'}, 400)
+                    return
+                for i, lu in enumerate(body['list_urls']):
+                    if not isinstance(lu, (str, dict)):
+                        self._send_json({'ok': False, 'message': f'list_urls[{i}] 必须为字符串或对象'}, 400)
+                        return
+            src = data['sources'][idx]
+            for k in ('name', 'campus', 'base', 'list_urls'):
+                if k in body:
+                    src[k] = body[k]
+            # 重名校验（P2-4）：改名后不得与**其他**源重名
+            _new_name = (src.get('name') or '').strip()
+            if any((s.get('name') or '').strip() == _new_name
+                   for j, s in enumerate(data['sources']) if j != idx):
+                self._send_json({'ok': False, 'message': f'信息源名称「{_new_name}」已存在'}, 400)
+                return
+            # URL 白名单校验（P2-4）：同 POST，PUT 改 base/list_urls 同样拦截校外地址
+            url_err = _validate_source_urls((src.get('base') or '').strip(),
+                                            src.get('list_urls') or [])
+            if url_err:
+                self._send_json({'ok': False, 'message': url_err}, 400)
+                return
+            self._save_sources(data)
         self._send_json({'ok': True, 'source': src})
 
     def _api_sources_delete(self, idx):
-        data = self._load_sources()
-        if idx < 0 or idx >= len(data['sources']):
-            self._send_json({'ok': False, 'message': f'索引 {idx} 超出范围（共 {len(data["sources"])} 条）'}, 404)
-            return
-        removed = data['sources'].pop(idx)
-        self._save_sources(data)
+        # 2026-10-17 复核 P2-5：同 POST/PUT 包锁。
+        with _sources_lock:
+            data = self._load_sources()
+            if idx < 0 or idx >= len(data['sources']):
+                self._send_json({'ok': False, 'message': f'索引 {idx} 超出范围（共 {len(data["sources"])} 条）'}, 404)
+                return
+            removed = data['sources'].pop(idx)
+            self._save_sources(data)
         self._send_json({'ok': True, 'removed': removed})
 
     def _match_sources_index(self, path):
@@ -935,6 +946,11 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.split('?')[0] == '/api/lecture/stats':
             return self._api_lecture_stats_get()
         if self.path.split('?')[0] == '/api/lectures':
+            # 2026-10-17 复核 P1-3：GET 数据端点中唯一漏守卫的（visits/stats/sources
+            # 均有 _is_local_origin）。响应体虽受同源策略保护外站读不到，外站仍可借
+            # 访客浏览器反复触发 2.5MB 全量序列化；本地前端同源调用不受影响。
+            if not self._is_local_origin():
+                return self._send_json({'ok': False, 'message': '跨站请求被拒绝'}, 403)
             path = os.path.join(DATA_DIR, 'lectures.json')
             # N4（2026-09-22 批次 B）：删除 since 增量死分支——前端自 2026-08-05
             # 起已统一全量加载（曾因先传新 mtime 被判 unchanged、页面不刷新），
@@ -1059,6 +1075,27 @@ class Handler(SimpleHTTPRequestHandler):
                                      'message': '采集失败（请确认运行 server.py 的 Python 已安装 '
                                                 'requests/bs4/rapidocr 等依赖，详见服务端日志）'}, 500)
                     return
+                # 切片刷新（2026-10-17 复核 P0）：前端列表读 site/lectures/*.json 静态分片
+                # （app.data.js loadLectures → _loadStaticLatest），CI（daily.yml:119）抓取后
+                # 会跑 generate_frontend_data，本地此前漏接——只抓不生成时页面读旧切片、
+                # 新数据永远不出现（2026-08-05 修的「抓取后不刷新」随静态化重构回归）。
+                # 生成失败不回滚抓取（data/lectures.json 已是新数据），但明确告知调用方。
+                # 解释器用 sys.executable：生成器依赖（标准库 + excluded_urls + field_vocab）
+                # 本进程已全部 import 过，环境必然可用。
+                gen_note = ''
+                try:
+                    gen = subprocess.run(
+                        [sys.executable, os.path.join(ROOT, 'scripts', 'generate_frontend_data.py')],
+                        cwd=ROOT, capture_output=True, text=True, timeout=120,
+                    )
+                    if gen.returncode != 0:
+                        tail = (gen.stderr or gen.stdout or '')[-1500:]
+                        print(f'[API-WARN] /api/scrape 后切片生成失败 returncode={gen.returncode}', file=sys.stderr)
+                        print(tail, file=sys.stderr)
+                        gen_note = '；切片刷新失败（页面可能仍为旧数据，请手动运行 python scripts/generate_frontend_data.py）'
+                except Exception as e:
+                    print(f'[API-WARN] /api/scrape 后切片生成异常: {e!r}', file=sys.stderr)
+                    gen_note = '；切片刷新异常（详见服务端日志）'
                 path = os.path.join(DATA_DIR, 'lectures.json')
                 count = 0
                 mtime = os.path.getmtime(path) if os.path.exists(path) else 0
@@ -1066,7 +1103,7 @@ class Handler(SimpleHTTPRequestHandler):
                     with open(path, 'r', encoding='utf-8') as f:
                         raw = json.load(f)
                     count = len(raw.get('data', [])) if isinstance(raw, dict) else len(raw)
-                self._send_json({'ok': True, 'count': count, 'mtime': mtime, 'message': '抓取完成'})
+                self._send_json({'ok': True, 'count': count, 'mtime': mtime, 'message': '抓取完成' + gen_note})
             except subprocess.TimeoutExpired:
                 self._send_json({'ok': False, 'message': '抓取超时（>10 分钟）'}, 500)
             except Exception as e:

@@ -116,7 +116,9 @@ async function runStats(fetchImpl, setItemImpl) {
 
 (async () => {
   const errs = [];
-  const okFetch = () => Promise.resolve({ json: () => Promise.resolve(SERVER) });
+  // ok:true 是真实 Response 的标准属性（2026-10-17 P2-8 两实现补 r.ok 检查后，
+  // mock 须完整模拟；缺 ok 会被 !r.ok 误判为失败响应——真实浏览器无此形态）。
+  const okFetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve(SERVER) });
   const badFetch = () => Promise.reject(new Error('offline'));
   const quotaSet = (k, v, store) => { throw new Error('QuotaExceededError'); };
   const normalSet = (k, v, store) => { store[k] = String(v); };

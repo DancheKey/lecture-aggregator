@@ -29,8 +29,9 @@ const app = createApp({
     this.loadFarFuture();   // 远期折叠条展开态（localStorage 恢复，2026-10-13 方案 B）
     // 启动秒级心跳：驱动「即将开始」徽章的倒计时（statusInfo 内读取 this.tick 触发响应式）
     this._tickTimer = setInterval(() => { this.tick = Date.now(); }, 1000);
-    // 公网静态托管不要先等 /api/lectures 超时；先秒开 latest.json，后台再补全量。
-    // 本地后端（127.0.0.1/localhost）仍优先 /api/lectures，保证数据最新。
+    // 先秒开 latest.json，后台再补全量（本地与公网统一走静态分片路径）。
+    // 原注释「本地后端仍优先 /api/lectures」自静态化重构后已不成立——loadLectures
+    // 只是 _loadStaticLatest 的包装（app.data.js），2026-10-17 复核修正。
     // IPv6 回环时浏览器返回的 hostname 是「[::1]」（带方括号），一并覆盖
     // 「更新于」用的运行时间与数据版本无关，两条加载路径都要拉取：
     // 公网静态托管走 _loadStaticLatest()，若只在 loadLectures() 里拉就会永远显示数据日。
