@@ -45,7 +45,9 @@ const LectureCloud = (function () {
                     .then(rows => {
                         const out = {};
                         for (const row of (rows || [])) {
-                            if (row && row.url) {
+                            // `__` 前缀是保留键（__site__=全站 PV、历史探测行），
+                            // 不是讲座 URL，过滤掉防止混入统计与讲座 map。
+                            if (row && row.url && !/^__/.test(row.url)) {
                                 out[row.url] = {
                                     visits: +row.visits || 0,
                                     likes: +row.likes || 0,

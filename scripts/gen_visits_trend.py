@@ -3,12 +3,18 @@
 
 数据来源：
     data/visits_history.json —— 由 scripts/fetch_visits_snapshot.py 每日在 CI 中
-    从 busuanzi 取快照累积而成（用 GET，不计数）。这是公网访问量的**唯一本地备份**：
-    busuanzi 是外部免费服务，一旦它失效，累计访问量只在这个台账里还活着。
+    从 Supabase 取快照累积而成（GET 纯读）。这是公网访问量的**唯一本地备份**。
+
+口径迁移（2026-10-18，勿混淆）：
+    - 2026-09-10 ~ 2026-10-17：busuanzi.aspark.cc，含 PV 与 UV（独立访客）。
+    - 现行：自建 Supabase 只有 PV。UV 依赖 busuanzi 服务端按 IP 去重，
+      自建无法复现 → **UV 停更**（新快照 UV 字段为 null，表格显示「—」）。
+      图表主轴从「累计访客数」改为「累计访问次数」（台账历史 PV 数据完整，
+      曲线全程连续无断点）。种子 1724 = busuanzi 末值，两段口径无缝衔接。
 
 与旧的 gen_visits_report.py 的区别（勿混淆）：
     gen_visits_report.py  ← data/visits.json（**本地 localhost** 访问，server.py 写的）
-    本脚本                ← data/visits_history.json（**公网**访问，CI 从 busuanzi 取的）
+    本脚本                ← data/visits_history.json（**公网**访问，CI 取的）
 
 输出：
     site/visits-trend.html（2026-09-30 起从 reports/ 移入 site/）
@@ -24,10 +30,11 @@
       多一次请求的代价可忽略。
     - 报告页面无 CSP meta，内联 SVG/JS 可直接运行；唯一外链是回主站的 <a>。
 
-图表设计（2026-09-14 改版）：
-    手绘内联 SVG 双轴组合图 —— 累计访客折线（左轴，按数据 min/max 自适应）
-    + 日增访客柱（右轴）。缺失快照的日期保留在横轴上，不假装连续。
-    范围切换与表格展开由前端 JS 完成，故 file:// 直接打开也能交互。
+图表设计（2026-10-18 改版：主轴 UV → PV）：
+    手绘内联 SVG 双轴组合图 —— 累计访问次数折线（左轴，按数据 min/max 自适应）
+    + 每日新增访问柱（右轴）。缺失快照的日期保留在横轴上，不假装连续。
+    范围切换与表格展开由前端 JS 完成。历史 UV 数据保留在明细表中（显示到
+    2026-10-17 为止，其后为「—」），不再上主图。
 
 用法：
     python scripts/gen_visits_trend.py
@@ -197,8 +204,7 @@ function renderChart() {
     clear(box);
     var e = el('div', null, 'empty');
     e.appendChild(document.createTextNode(
-      '仅 1 条快照（' + s0.date + '）：累计访问次数 ' + fmt(s0.site_pv)
-      + ' 次 / 累计访客数 ' + fmt(s0.site_uv) + ' 人。'));
+      '仅 1 条快照（' + s0.date + '）：累计访问次数 ' + fmt(s0.site_pv) + ' 次。'));
     e.appendChild(el('br'));
     e.appendChild(document.createTextNode('至少需要 2 条快照才能绘制趋势线。'));
     box.appendChild(e);
@@ -211,13 +217,16 @@ function renderChart() {
   var pw = R - L, ph = B - T;
   function xOf(s) { return L + (dn(s.date) - t0) / span * pw; }
 
-  var uvs = snaps.map(function (s) { return Number(s.site_uv) || 0; });
-  var yT = niceTicks(Math.min.apply(null, uvs), Math.max.apply(null, uvs), 3);
+  // 2026-10-18 改版：主轴从「累计访客数(UV)」换为「累计访问次数(PV)」——
+  // 计数源迁到自建 Supabase 后 UV 无法复现（曾依赖 busuanzi 服务端 IP 去重），
+  // 而台账历史 PV 数据完整，曲线全程连续。历史 UV 保留在明细表（null 显示「—」）。
+  var pvs = snaps.map(function (s) { return Number(s.site_pv) || 0; });
+  var yT = niceTicks(Math.min.apply(null, pvs), Math.max.apply(null, pvs), 3);
   var yLo = yT[0], yHi = yT[yT.length - 1];
   function yL(v) { return B - (v - yLo) / ((yHi - yLo) || 1) * ph; }
 
   var dmax = Math.max.apply(null, snaps.map(function (s) {
-    return Math.max(0, Number(s.uv_delta) || 0);
+    return Math.max(0, Number(s.pv_delta) || 0);
   }));
   var dT = niceTicks(0, dmax || 1, 2);
   var dHi = dT[dT.length - 1] || 1;
@@ -251,28 +260,28 @@ function renderChart() {
 
   var bw = Math.min(36, Math.max(1.5, pw / snaps.length * 0.7));
   snaps.forEach(function (s) {
-    var v = Math.max(0, Number(s.uv_delta) || 0);
+    var v = Math.max(0, Number(s.pv_delta) || 0);
     if (!v) return;
     var x = xOf(s) - bw / 2, y = yR(v), h = B - y;
     var rect = sv('rect', { x: x.toFixed(1), y: y.toFixed(1), width: bw.toFixed(1),
                             height: h.toFixed(1), rx: 3, fill: '#C9DDF3' });
-    rect.appendChild(sv('title', {}, s.date + ' 日新增访客 ' + v + ' 人'));
+    rect.appendChild(sv('title', {}, s.date + ' 新增访问 ' + v + ' 次'));
     g.appendChild(rect);
   });
 
   g.appendChild(sv('polyline', {
     points: snaps.map(function (s) {
-      return xOf(s).toFixed(1) + ',' + yL(Number(s.site_uv) || 0).toFixed(1);
+      return xOf(s).toFixed(1) + ',' + yL(Number(s.site_pv) || 0).toFixed(1);
     }).join(' '),
     fill: 'none', stroke: '#185FA5', 'stroke-width': 2.5,
     'stroke-linejoin': 'round', 'stroke-linecap': 'round'}));
 
   var showVal = snaps.length <= 8;
   snaps.forEach(function (s, i) {
-    var x = xOf(s), y = yL(Number(s.site_uv) || 0);
+    var x = xOf(s), y = yL(Number(s.site_pv) || 0);
     var c = sv('circle', { cx: x.toFixed(1), cy: y.toFixed(1), r: 4,
                            fill: '#ffffff', stroke: '#185FA5', 'stroke-width': 2.5 });
-    c.appendChild(sv('title', {}, s.date + ' 累计访客数 ' + fmt(s.site_uv) + ' 人'));
+    c.appendChild(sv('title', {}, s.date + ' 累计访问 ' + fmt(s.site_pv) + ' 次'));
     g.appendChild(c);
     if (showVal) {
       var anchor = 'middle', lx = x;
@@ -280,7 +289,7 @@ function renderChart() {
       else if (i === snaps.length - 1) { anchor = 'end'; lx = x - 9; }
       g.appendChild(sv('text', { x: lx.toFixed(1), y: (y - 12).toFixed(1), 'font-size': 12,
                                  fill: '#185FA5', 'text-anchor': anchor },
-                       fmt(s.site_uv)));
+                       fmt(s.site_pv)));
     }
   });
 
@@ -320,10 +329,10 @@ function renderChart() {
 
   clear(box);
   var svg = sv('svg', { viewBox: '0 0 680 250', width: '100%', role: 'img',
-                         'aria-label': '累计访客数折线与日新增访客柱状组合趋势图' });
+                         'aria-label': '累计访问次数折线与每日新增访问柱状组合趋势图' });
   svg.appendChild(sv('title', {}, '站点访问量趋势'));
   svg.appendChild(sv('desc', {}, snaps[0].date + ' 至 '
-    + snaps[snaps.length - 1].date + ' 的累计访客数折线与每日新增访客柱状图。'));
+    + snaps[snaps.length - 1].date + ' 的累计访问次数折线与每日新增访问柱状图。'));
   svg.appendChild(g);
   box.appendChild(svg);
 
@@ -332,7 +341,7 @@ function renderChart() {
   cap.appendChild(el('b', span + 1));
   cap.appendChild(document.createTextNode(' 天 · 快照 '));
   cap.appendChild(el('b', snaps.length));
-  cap.appendChild(document.createTextNode(' 条 · 左轴累计访客数（人），右轴日新增访客'
+  cap.appendChild(document.createTextNode(' 条 · 左轴累计访问次数，右轴每日新增访问'
     + missTxt));
   box.appendChild(cap);
 }
@@ -430,19 +439,30 @@ def parse_date(s):
 
 
 def build_kpis(snaps):
-    first, last = snaps[0], snaps[-1]
+    first = snaps[0]
+    last = snaps[-1]
     d0, d1 = parse_date(first.get('date')), parse_date(last.get('date'))
     span_days = (d1 - d0).days if (d0 and d1) else 0
-    uv0, uv1 = int(first.get('site_uv') or 0), int(last.get('site_uv') or 0)
-    per_day = round((uv1 - uv0) / span_days) if span_days > 0 else None
+
+    # 2026-10-18 改版：UV 停更后 KPI 从「访客」全部换为「访问次数(PV)」口径。
+    pv1 = int(last.get('site_pv') or 0)
+    pv0 = int(first.get('site_pv') or 0)
+    total_gain = max(pv1 - pv0, 0)
+
+    # 近 7 条快照的新增访问之和（不含首条自身，故取 8 条窗口）
+    win = snaps[-8:]
+    recent7 = sum(max(int(s.get('pv_delta') or 0), 0) for s in win[1:])
+
+    per_day = round(total_gain / span_days) if span_days > 0 else None
 
     def delta(v):
         return f'较前次 +{int(v or 0):,}'
 
     cards = [
-        ('累计访问次数', f"{int(last.get('site_pv') or 0):,}", delta(last.get('pv_delta'))),
-        ('累计访客数', f'{uv1:,}', delta(last.get('uv_delta'))),
-        ('日均新增访客', f'{per_day:,}' if per_day is not None else '—',
+        ('累计访问次数', f'{pv1:,}', delta(last.get('pv_delta'))),
+        ('近 7 条快照新增', f'{recent7:,}',
+         f'覆盖 {win[0].get("date", "")} 起共 {len(win) - 1} 次快照'),
+        ('日均新增访问', f'{per_day:,}' if per_day is not None else '—',
          '按首末快照间隔计' if span_days > 0 else '间隔不足，暂不可算'),
         ('时间跨度', f'{span_days + 1} 天',
          f'快照 {len(snaps)} 条' + (
@@ -469,7 +489,7 @@ def main():
     # 收紧为 "'self'"——内联脚本无法满足 script-src 'self'。
     payload = {
         'meta': {
-            'source': 'busuanzi（公网）',
+            'source': '自建 Supabase（2026-10-18 起；2026-09-10~10-17 为 busuanzi）',
             'siteUrl': 'https://danchekey.github.io/lecture-aggregator/',
             'generatedAt': now,
         },
@@ -513,7 +533,7 @@ def main():
 
 <header>
   <h1>站点访问量趋势</h1>
-  <p class="sub">数据来源 busuanzi（公网）每日快照 · 覆盖
+  <p class="sub">数据来源：自建 Supabase 每日快照（2026-10-17 前为 busuanzi）· 覆盖
     {first.get('date', '')} 至 {last.get('date', '')}</p>
   <p class="subline">生成于 {now} · 台账 data/visits_history.json</p>
 </header>
@@ -528,8 +548,8 @@ def main():
       <button type="button" data-range="0">全部</button>
     </div>
     <div class="legend">
-      <span><i class="sw-line"></i>累计访客数</span>
-      <span><i class="sw-bar"></i>日新增访客</span>
+      <span><i class="sw-line"></i>累计访问次数</span>
+      <span><i class="sw-bar"></i>每日新增访问</span>
     </div>
   </div>
   <div id="chart"></div>
@@ -550,9 +570,11 @@ def main():
 
 <div class="foot">
   <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。<br>
-  <b>累计访客数</b>：按访客去重，同一访客重复访问不再累加。<br>
-  「日新增」= 本次快照 − 上一条记录；负值一律记 0 并标注（意味着对方计数器重置）。
-  每日由 CI 用 GET 取数（不计数，避免污染统计）。<br>
+  <b>累计访客数 / 日新增访客</b>：依赖 busuanzi 服务端按 IP 去重，自建计数无法复现，
+  <b>2026-10-18 起停更</b>——明细表仅保留历史值（2026-10-17 及以前），其后显示「—」。<br>
+  2026-10-18 起计数源切换为自建 Supabase（种子 1730 = busuanzi 切换时刻实时值，
+  两段口径同为「页面打开次数」，无缝衔接）；「每日新增访问」= 本次快照 − 上一条记录，
+  负值一律记 0 并标注。<br>
   横轴按<b>真实日期等距</b>绘制，缺失快照的日期不跳过、不补 0，避免把断档画成连续趋势；
   左轴按数据范围自适应（累计值不从 0 起算，否则曲线会被压平贴顶）。
 </div>

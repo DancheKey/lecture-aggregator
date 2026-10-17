@@ -420,7 +420,9 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
             if os.path.isfile(full) and not f.startswith('.'):
                 actual.append('site/' + f)
         # .nojekyll 等配置文件不需要被合并清单列出（不入库也不影响部署）
-        skip = {'site/.nojekyll'}
+        # supabase-config.json：本机私有配置（.gitignore，永不入库/部署），
+        #   CI 上不存在故不会误伤公网门禁；本机跑测试时豁免（2026-10-18）。
+        skip = {'site/.nojekyll', 'site/supabase-config.json'}
         uncovered = [r for r in actual
                      if r not in skip
                      and not any(fnmatch.fnmatch(r, p) for p in self.paths)]
@@ -635,36 +637,32 @@ class StatsCampusDualSetTest(unittest.TestCase):
         self.assertIn('campusActualMap', s, '产物 stats.json 缺 campusActualMap')
 
 
-class BusuanziCspScopeTest(unittest.TestCase):
-    """CSP 对 busuanzi 的 script-src 必须收敛到具体文件路径（2026-10-14 P2-3）。
+class SupabasePvCspTest(unittest.TestCase):
+    """PV 计数源迁移（2026-10-18 busuanzi → 自建 Supabase）后的 CSP 门禁。
 
-    原 CSP 放行整个 busuanzi.aspark.cc 域：镜像站任一路径被挂马即可在页面上下文
-    执行任意 JS。已收敛为仅 /js 一个文件（SRI 不可行：对方无 CORS 头，加了反而
-    加载失败，详见 footer-counter.js 注释）。connect-src 保留整域（计数 API 路径
-    随版本可能变，不能收敛）。
+    迁移后 busuanzi 必须**彻底消失**（script-src 与 connect-src 均不得残留——
+    残留即说明某处还在加载第三方脚本或调其 API）；云端计数域
+    https://*.supabase.co 必须在 connect-src（页脚与讲座计数都靠它）。
     """
 
-    def test_63_script_src不含裸域放行(self):
-        with open(os.path.join(ROOT, 'site', 'index.html'), encoding='utf-8') as f:
+    def _csp(self, html_name):
+        with open(os.path.join(ROOT, 'site', html_name), encoding='utf-8') as f:
             html = f.read()
         m = re.search(r'content="([^"]*Content-Security-Policy[^"]*)"', html)
         if not m:
             m = re.search(r'<meta http-equiv="Content-Security-Policy"\s+content="([^"]*)"', html)
         self.assertIsNotNone(m, '未找到 CSP meta')
-        csp = m.group(1)
-        # script-src 段内不得出现裸域（必须以 /js 结尾）
-        ss = re.search(r'script-src ([^;]+)', csp)
-        self.assertIsNotNone(ss, 'CSP 缺 script-src')
-        seg = ss.group(1)
-        self.assertNotRegex(seg, r'busuanzi\.aspark\.cc(?!/js)\b',
-                            'script-src 仍是裸域放行（应收敛到 /js 具体路径）')
-        self.assertIn('https://busuanzi.aspark.cc/js', seg,
-                      'script-src 缺少 busuanzi /js 具体路径')
-        # connect-src 保留整域（计数 API）不得被误收敛
-        cs = re.search(r'connect-src ([^;]+)', csp)
-        self.assertIsNotNone(cs, 'CSP 缺 connect-src')
-        self.assertIn('https://busuanzi.aspark.cc', cs.group(1),
-                      'connect-src 丢了 busuanzi 计数 API 域名（计数会失效）')
+        return m.group(1)
+
+    def test_63_busuanzi彻底退场(self):
+        for name in ('index.html', 'stats.html'):
+            csp = self._csp(name)
+            self.assertNotIn('busuanzi', csp,
+                             f'{name} CSP 仍残留 busuanzi（迁移后应彻底移除）')
+            cs = re.search(r'connect-src ([^;]+)', csp)
+            self.assertIsNotNone(cs, f'{name} CSP 缺 connect-src')
+            self.assertIn('https://*.supabase.co', cs.group(1),
+                          f'{name} connect-src 缺 https://*.supabase.co（云端计数会失效）')
 
 
 class DocNumbersSmokeTest(unittest.TestCase):

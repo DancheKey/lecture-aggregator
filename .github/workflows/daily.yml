@@ -107,12 +107,16 @@ jobs:
           SCNU_LLM_TEXT: '1'
         run: python scraper/scraper.py
 
-      # 访问量快照（2026-09-10）：用 GET 取 busuanzi 当日累计值落盘入库。
-      # 必须走 GET——该端点 POST 会计数 +1，用 POST 会每天给自家 PV 灌水。
+      # 访问量快照（2026-10-18 起改自建 Supabase）：GET 纯读 lecture_stats 专用行
+      # __site__ 的 PV 值落盘入库（绝不调 increment_* RPC——那会给自家 PV 灌水）。
       # 取数失败不阻断：脚本内部以 ::warning:: 告警并退出 0，
       # 避免外部服务抖动影响讲座数据的正常更新与部署。
-      # 台账是公网访问量的唯一本地备份——busuanzi 一旦失效，历史只在这里还活着。
-      - name: 抓取访问量快照（busuanzi）
+      # 台账是公网访问量的唯一本地备份——历史 busuanzi 段（含 UV）与新段（仅 PV）
+      # 同账共存，趋势页对 null 字段显示「—」。
+      - name: 抓取访问量快照（Supabase）
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: python scripts/fetch_visits_snapshot.py
 
       - name: 同步静态数据源并生成前端切片

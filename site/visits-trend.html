@@ -35,12 +35,12 @@
 
 <header>
   <h1>站点访问量趋势</h1>
-  <p class="sub">数据来源 busuanzi（公网）每日快照 · 覆盖
+  <p class="sub">数据来源：自建 Supabase 每日快照（2026-10-17 前为 busuanzi）· 覆盖
     2026-09-10 至 2026-10-17</p>
-  <p class="subline">生成于 2026-10-17 09:23 · 台账 data/visits_history.json</p>
+  <p class="subline">生成于 2026-10-17 22:14 · 台账 data/visits_history.json</p>
 </header>
 
-<div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v">1,724</div><div class="kpi-d">较前次 +11</div></div><div class="kpi"><div class="kpi-k">累计访客数</div><div class="kpi-v">1,360</div><div class="kpi-d">较前次 +4</div></div><div class="kpi"><div class="kpi-k">日均新增访客</div><div class="kpi-v">13</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">38 天</div><div class="kpi-d">快照 35 条，缺 3 天</div></div></div>
+<div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v">1,724</div><div class="kpi-d">较前次 +11</div></div><div class="kpi"><div class="kpi-k">近 7 条快照新增</div><div class="kpi-v">136</div><div class="kpi-d">覆盖 2026-10-10 起共 7 次快照</div></div><div class="kpi"><div class="kpi-k">日均新增访问</div><div class="kpi-v">17</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">38 天</div><div class="kpi-d">快照 35 条，缺 3 天</div></div></div>
 
 <div class="card">
   <div class="toolbar">
@@ -50,8 +50,8 @@
       <button type="button" data-range="0">全部</button>
     </div>
     <div class="legend">
-      <span><i class="sw-line"></i>累计访客数</span>
-      <span><i class="sw-bar"></i>日新增访客</span>
+      <span><i class="sw-line"></i>累计访问次数</span>
+      <span><i class="sw-bar"></i>每日新增访问</span>
     </div>
   </div>
   <div id="chart"></div>
@@ -72,14 +72,16 @@
 
 <div class="foot">
   <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。<br>
-  <b>累计访客数</b>：按访客去重，同一访客重复访问不再累加。<br>
-  「日新增」= 本次快照 − 上一条记录；负值一律记 0 并标注（意味着对方计数器重置）。
-  每日由 CI 用 GET 取数（不计数，避免污染统计）。<br>
+  <b>累计访客数 / 日新增访客</b>：依赖 busuanzi 服务端按 IP 去重，自建计数无法复现，
+  <b>2026-10-18 起停更</b>——明细表仅保留历史值（2026-10-17 及以前），其后显示「—」。<br>
+  2026-10-18 起计数源切换为自建 Supabase（种子 1730 = busuanzi 切换时刻实时值，
+  两段口径同为「页面打开次数」，无缝衔接）；「每日新增访问」= 本次快照 − 上一条记录，
+  负值一律记 0 并标注。<br>
   横轴按<b>真实日期等距</b>绘制，缺失快照的日期不跳过、不补 0，避免把断档画成连续趋势；
   左轴按数据范围自适应（累计值不从 0 起算，否则曲线会被压平贴顶）。
 </div>
 
 <p id="load-err" class="empty" hidden></p>
 </div>
-<script src="visits-trend.js?v=bbb2b84154" defer></script>
+<script src="visits-trend.js?v=1af6ae8005" defer></script>
 </body></html>

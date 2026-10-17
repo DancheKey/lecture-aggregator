@@ -79,8 +79,7 @@ function renderChart() {
     clear(box);
     var e = el('div', null, 'empty');
     e.appendChild(document.createTextNode(
-      '仅 1 条快照（' + s0.date + '）：累计访问次数 ' + fmt(s0.site_pv)
-      + ' 次 / 累计访客数 ' + fmt(s0.site_uv) + ' 人。'));
+      '仅 1 条快照（' + s0.date + '）：累计访问次数 ' + fmt(s0.site_pv) + ' 次。'));
     e.appendChild(el('br'));
     e.appendChild(document.createTextNode('至少需要 2 条快照才能绘制趋势线。'));
     box.appendChild(e);
@@ -93,13 +92,16 @@ function renderChart() {
   var pw = R - L, ph = B - T;
   function xOf(s) { return L + (dn(s.date) - t0) / span * pw; }
 
-  var uvs = snaps.map(function (s) { return Number(s.site_uv) || 0; });
-  var yT = niceTicks(Math.min.apply(null, uvs), Math.max.apply(null, uvs), 3);
+  // 2026-10-18 改版：主轴从「累计访客数(UV)」换为「累计访问次数(PV)」——
+  // 计数源迁到自建 Supabase 后 UV 无法复现（曾依赖 busuanzi 服务端 IP 去重），
+  // 而台账历史 PV 数据完整，曲线全程连续。历史 UV 保留在明细表（null 显示「—」）。
+  var pvs = snaps.map(function (s) { return Number(s.site_pv) || 0; });
+  var yT = niceTicks(Math.min.apply(null, pvs), Math.max.apply(null, pvs), 3);
   var yLo = yT[0], yHi = yT[yT.length - 1];
   function yL(v) { return B - (v - yLo) / ((yHi - yLo) || 1) * ph; }
 
   var dmax = Math.max.apply(null, snaps.map(function (s) {
-    return Math.max(0, Number(s.uv_delta) || 0);
+    return Math.max(0, Number(s.pv_delta) || 0);
   }));
   var dT = niceTicks(0, dmax || 1, 2);
   var dHi = dT[dT.length - 1] || 1;
@@ -133,28 +135,28 @@ function renderChart() {
 
   var bw = Math.min(36, Math.max(1.5, pw / snaps.length * 0.7));
   snaps.forEach(function (s) {
-    var v = Math.max(0, Number(s.uv_delta) || 0);
+    var v = Math.max(0, Number(s.pv_delta) || 0);
     if (!v) return;
     var x = xOf(s) - bw / 2, y = yR(v), h = B - y;
     var rect = sv('rect', { x: x.toFixed(1), y: y.toFixed(1), width: bw.toFixed(1),
                             height: h.toFixed(1), rx: 3, fill: '#C9DDF3' });
-    rect.appendChild(sv('title', {}, s.date + ' 日新增访客 ' + v + ' 人'));
+    rect.appendChild(sv('title', {}, s.date + ' 新增访问 ' + v + ' 次'));
     g.appendChild(rect);
   });
 
   g.appendChild(sv('polyline', {
     points: snaps.map(function (s) {
-      return xOf(s).toFixed(1) + ',' + yL(Number(s.site_uv) || 0).toFixed(1);
+      return xOf(s).toFixed(1) + ',' + yL(Number(s.site_pv) || 0).toFixed(1);
     }).join(' '),
     fill: 'none', stroke: '#185FA5', 'stroke-width': 2.5,
     'stroke-linejoin': 'round', 'stroke-linecap': 'round'}));
 
   var showVal = snaps.length <= 8;
   snaps.forEach(function (s, i) {
-    var x = xOf(s), y = yL(Number(s.site_uv) || 0);
+    var x = xOf(s), y = yL(Number(s.site_pv) || 0);
     var c = sv('circle', { cx: x.toFixed(1), cy: y.toFixed(1), r: 4,
                            fill: '#ffffff', stroke: '#185FA5', 'stroke-width': 2.5 });
-    c.appendChild(sv('title', {}, s.date + ' 累计访客数 ' + fmt(s.site_uv) + ' 人'));
+    c.appendChild(sv('title', {}, s.date + ' 累计访问 ' + fmt(s.site_pv) + ' 次'));
     g.appendChild(c);
     if (showVal) {
       var anchor = 'middle', lx = x;
@@ -162,7 +164,7 @@ function renderChart() {
       else if (i === snaps.length - 1) { anchor = 'end'; lx = x - 9; }
       g.appendChild(sv('text', { x: lx.toFixed(1), y: (y - 12).toFixed(1), 'font-size': 12,
                                  fill: '#185FA5', 'text-anchor': anchor },
-                       fmt(s.site_uv)));
+                       fmt(s.site_pv)));
     }
   });
 
@@ -202,10 +204,10 @@ function renderChart() {
 
   clear(box);
   var svg = sv('svg', { viewBox: '0 0 680 250', width: '100%', role: 'img',
-                         'aria-label': '累计访客数折线与日新增访客柱状组合趋势图' });
+                         'aria-label': '累计访问次数折线与每日新增访问柱状组合趋势图' });
   svg.appendChild(sv('title', {}, '站点访问量趋势'));
   svg.appendChild(sv('desc', {}, snaps[0].date + ' 至 '
-    + snaps[snaps.length - 1].date + ' 的累计访客数折线与每日新增访客柱状图。'));
+    + snaps[snaps.length - 1].date + ' 的累计访问次数折线与每日新增访问柱状图。'));
   svg.appendChild(g);
   box.appendChild(svg);
 
@@ -214,7 +216,7 @@ function renderChart() {
   cap.appendChild(el('b', span + 1));
   cap.appendChild(document.createTextNode(' 天 · 快照 '));
   cap.appendChild(el('b', snaps.length));
-  cap.appendChild(document.createTextNode(' 条 · 左轴累计访客数（人），右轴日新增访客'
+  cap.appendChild(document.createTextNode(' 条 · 左轴累计访问次数，右轴每日新增访问'
     + missTxt));
   box.appendChild(cap);
 }
