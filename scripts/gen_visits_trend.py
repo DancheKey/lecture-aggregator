@@ -8,9 +8,10 @@
 口径迁移（2026-10-18，勿混淆）：
     - 2026-09-10 ~ 2026-10-17：busuanzi.aspark.cc，含 PV 与 UV（独立访客）。
     - 现行：自建 Supabase 只有 PV。UV 依赖 busuanzi 服务端按 IP 去重，
-      自建无法复现 → **UV 停更**（新快照 UV 字段为 null，表格显示「—」）。
-      图表主轴从「累计访客数」改为「累计访问次数」（台账历史 PV 数据完整，
-      曲线全程连续无断点）。种子 1724 = busuanzi 末值，两段口径无缝衔接。
+      自建无法复现 → **本页已不再体现 UV**（页面文案、图表、明细表全部移除；
+      台账里的历史 UV 字段保留作存档，但不再出片展示）。
+      图表主轴为「累计访问次数」（台账历史 PV 数据完整，曲线全程连续无断点）。
+      种子 1730 = busuanzi 切换时刻实时值，两段口径无缝衔接。
 
 与旧的 gen_visits_report.py 的区别（勿混淆）：
     gen_visits_report.py  ← data/visits.json（**本地 localhost** 访问，server.py 写的）
@@ -30,11 +31,11 @@
       多一次请求的代价可忽略。
     - 报告页面无 CSP meta，内联 SVG/JS 可直接运行；唯一外链是回主站的 <a>。
 
-图表设计（2026-10-18 改版：主轴 UV → PV）：
+图表设计（2026-10-18 改版：主轴 UV → PV；同日彻底移除 UV）：
     手绘内联 SVG 双轴组合图 —— 累计访问次数折线（左轴，按数据 min/max 自适应）
     + 每日新增访问柱（右轴）。缺失快照的日期保留在横轴上，不假装连续。
-    范围切换与表格展开由前端 JS 完成。历史 UV 数据保留在明细表中（显示到
-    2026-10-17 为止，其后为「—」），不再上主图。
+    范围切换与表格展开由前端 JS 完成。明细表仅 日期 / 累计访问次数 /
+    日新增访问 / 备注 四列，UV 相关列已删除。
 
 用法：
     python scripts/gen_visits_trend.py
@@ -219,7 +220,7 @@ function renderChart() {
 
   // 2026-10-18 改版：主轴从「累计访客数(UV)」换为「累计访问次数(PV)」——
   // 计数源迁到自建 Supabase 后 UV 无法复现（曾依赖 busuanzi 服务端 IP 去重），
-  // 而台账历史 PV 数据完整，曲线全程连续。历史 UV 保留在明细表（null 显示「—」）。
+  // 而台账历史 PV 数据完整，曲线全程连续。UV 已从本页彻底移除（含明细表列）。
   var pvs = snaps.map(function (s) { return Number(s.site_pv) || 0; });
   var yT = niceTicks(Math.min.apply(null, pvs), Math.max.apply(null, pvs), 3);
   var yLo = yT[0], yHi = yT[yT.length - 1];
@@ -356,9 +357,7 @@ function renderTable() {
     var tr = el('tr');
     tr.appendChild(el('td', s.date));
     tr.appendChild(el('td', fmt(s.site_pv)));
-    tr.appendChild(el('td', fmt(s.site_uv)));
     tr.appendChild(el('td', fmt(s.pv_delta)));
-    tr.appendChild(el('td', fmt(s.uv_delta)));
     // note 是本页唯一的自由文本（来自抓取脚本写入的台账），一律按纯文本落地。
     var last = el('td', null, 'l');
     if (s.note) last.appendChild(el('span', s.note, 'note'));
@@ -562,16 +561,16 @@ def main():
 </div>
 <div class="tbl">
   <table>
-    <thead><tr><th>日期</th><th>累计访问次数</th><th>累计访客数</th>
-    <th>日新增访问</th><th>日新增访客</th><th class="l">备注</th></tr></thead>
+    <thead><tr><th>日期</th><th>累计访问次数</th>
+    <th>日新增访问</th><th class="l">备注</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
 </div>
 
 <div class="foot">
-  <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。<br>
-  <b>累计访客数 / 日新增访客</b>：依赖 busuanzi 服务端按 IP 去重，自建计数无法复现，
-  <b>2026-10-18 起停更</b>——明细表仅保留历史值（2026-10-17 及以前），其后显示「—」。<br>
+  <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。
+  本页只统计<b>页面访问次数</b>，不再统计独立访客数（UV）——UV 原依赖 busuanzi
+  服务端按 IP 去重，自建计数拿不到该信息，2026-10-18 起已从本页移除。<br>
   2026-10-18 起计数源切换为自建 Supabase（种子 1730 = busuanzi 切换时刻实时值，
   两段口径同为「页面打开次数」，无缝衔接）；「每日新增访问」= 本次快照 − 上一条记录，
   负值一律记 0 并标注。<br>

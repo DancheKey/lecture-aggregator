@@ -94,7 +94,7 @@ function renderChart() {
 
   // 2026-10-18 改版：主轴从「累计访客数(UV)」换为「累计访问次数(PV)」——
   // 计数源迁到自建 Supabase 后 UV 无法复现（曾依赖 busuanzi 服务端 IP 去重），
-  // 而台账历史 PV 数据完整，曲线全程连续。历史 UV 保留在明细表（null 显示「—」）。
+  // 而台账历史 PV 数据完整，曲线全程连续。UV 已从本页彻底移除（含明细表列）。
   var pvs = snaps.map(function (s) { return Number(s.site_pv) || 0; });
   var yT = niceTicks(Math.min.apply(null, pvs), Math.max.apply(null, pvs), 3);
   var yLo = yT[0], yHi = yT[yT.length - 1];
@@ -231,9 +231,7 @@ function renderTable() {
     var tr = el('tr');
     tr.appendChild(el('td', s.date));
     tr.appendChild(el('td', fmt(s.site_pv)));
-    tr.appendChild(el('td', fmt(s.site_uv)));
     tr.appendChild(el('td', fmt(s.pv_delta)));
-    tr.appendChild(el('td', fmt(s.uv_delta)));
     // note 是本页唯一的自由文本（来自抓取脚本写入的台账），一律按纯文本落地。
     var last = el('td', null, 'l');
     if (s.note) last.appendChild(el('span', s.note, 'note'));

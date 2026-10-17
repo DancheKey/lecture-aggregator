@@ -522,12 +522,13 @@ def write_visits_snapshot():
     payload = {
         'date': last.get('date', ''),
         'capturedAt': last.get('capturedAt', ''),
+        # 2026-10-18：UV 停更（自建计数无法按 IP 去重），site_uv 一并移出 payload——
+        # 留着会退化为恒 0 的脏值，而它的唯一消费方 footer-counter.js 只读 site_pv。
         'site_pv': int(last.get('site_pv') or 0),
-        'site_uv': int(last.get('site_uv') or 0),
     }
     atomic_write_json(os.path.join(SITE_DIR, 'visits.json'), payload)
     print(f"[done] visits.json: 截至 {payload['date']} "
-          f"累计 pv={payload['site_pv']} uv={payload['site_uv']}")
+          f"累计 pv={payload['site_pv']}")
 
 
 def main():

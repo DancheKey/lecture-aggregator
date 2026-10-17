@@ -89,6 +89,20 @@ const js = fs.readFileSync(path.join(SITE, 'visits-trend.js'), 'utf-8');
 const data = JSON.parse(
   fs.readFileSync(path.join(SITE, 'visits-trend-data.json'), 'utf-8'));
 
+// ---------- ⑦ UV 已下线，不得回潮（2026-10-18） ----------
+// 计数源迁到自建 Supabase 后 UV（独立访客数）无法复现（原依赖 busuanzi 服务端
+// 按 IP 去重），已从趋势页全部移除：明细表删掉「累计访客数 / 日新增访客」两列，
+// 图表主轴改为访问次数。此处锁住「展示层不再读 UV 字段」——页面若重新消费
+// site_uv/uv_delta，它们在新快照里恒为 null，表格会变成整列「—」的死数据。
+// 注：页脚说明里解释「为什么不统计访客数」是允许的，故只禁字段引用与表头列名。
+for (const [label, src, bad] of [
+  ['趋势页 HTML 表头', html, /<th>(累计|日新增)访客/],
+  ['visits-trend.js 渲染', js, /s\.site_uv|s\.uv_delta/],
+  ['生成脚本模板', genSrc, /fmt\(s\.site_uv\)|fmt\(s\.uv_delta\)|<th>累计访客数/],
+]) {
+  if (bad.test(src)) errs.push(`${label} 仍在体现 UV（${bad}）——UV 已于 2026-10-18 下线`);
+}
+
 function mkNode(tag) {
   return {
     tagName: tag, children: [], attrs: {}, _text: '', className: '',
