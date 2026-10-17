@@ -118,7 +118,9 @@ createApp({
       const cf = this.campusFilter;
       const lectures = (this.summary && this.summary.lectures) || [];
       lectures.forEach(l => {
-        const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
+        // 2026-10-18：索引键由 u（源页 URL）改为 k（讲座级计数键）——同一源页
+        // 拆出的 N 场各有其键，逐条累加不再把一份计数放大 N 倍。
+        const st = this.lectureStats[l.k || l.u] || { visits: 0, likes: 0 };
         if (!st.visits && !st.likes) return;
         const y = l.y || UNKNOWN_YEAR;
         const cols = (l.cs && l.cs.length) ? l.cs : [l.c || '未分类'];
@@ -200,7 +202,9 @@ createApp({
       const amapAll = (this.summary && this.summary.campusActualMap) || {};
       const cf = this.campusFilter;
       lectures.forEach(l => {
-        const st = this.lectureStats[l.u] || { visits: 0, likes: 0 };
+        // 2026-10-18：索引键由 u（源页 URL）改为 k（讲座级计数键）——同一源页
+        // 拆出的 N 场各有其键，逐条累加不再把一份计数放大 N 倍。
+        const st = this.lectureStats[l.k || l.u] || { visits: 0, likes: 0 };
         if (!st.visits && !st.likes) return;
         const y = l.y || UNKNOWN_YEAR;
         // 与 matrix 同口径——按讲座归属的全部单位（cs）展开、逐单位过校区筛选。

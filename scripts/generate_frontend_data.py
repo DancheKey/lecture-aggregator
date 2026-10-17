@@ -158,6 +158,31 @@ def latest_preview(item):
     return preview
 
 
+def count_key(item):
+    """讲座级计数键（2026-10-18）——访问/点赞/想听的云端主键。
+
+    规则：有 lectureIndex（多场拆分的一页）时 = `sourceUrl~lectureIndex`，
+    否则 = sourceUrl。
+
+    ⚠ 分隔符必须是 URL 无保留字符（RFC 3986 unreserved），**不可用 `#`**——
+    2026-10-18 实测：PostgREST 的 `url=eq.<键>` 会把 `#` 及其后内容当作 URL
+    片段丢弃，写进去的是 `a.html#1`、查回来的却是 `a.html`（静默错行）。
+    `~` 与字母数字同属 unreserved，拼在查询值里无需百分号编码。
+    同理排除 `? & = + / :` 等保留字符。
+
+    ⚠ 必须与前端不一致即事故：site/app.social.js 只消费本字段、不再自己拼键，
+    故改规则只需改这里（tests/js/count_key_uniqueness.js 有门禁锁唯一性与规则）。
+
+    兼容性取舍：单场讲座保持无后缀键，使改造前已写入云端的计数（30+ 行真实
+    访问/点赞）零迁移继续可读；只有 94 个多场源页会分裂出讲座级键。
+    """
+    src = item.get('sourceUrl') or ''
+    idx = item.get('lectureIndex')
+    if idx is not None and src:
+        return f'{src}~{idx}'
+    return src
+
+
 def year_of(item):
     """与 stats.js 保持一致的年份提取逻辑。"""
     if item.get('lectureStart'):
@@ -312,6 +337,9 @@ def build_stats(data, updated_at):
         #   同一口径——同一条内的重复 URL 只算一次。
         lectures.append({
             'u': primary_url,
+            # 计数键（2026-10-18）：与分片数据的 ck 同一函数产出。统计页按 k 取
+            # 云端计数；多场拆分后同一 u 会有多个不同 k，逐条累加不再重复计同一份。
+            'k': count_key(item),
             'y': y or UNKNOWN_YEAR,
             'c': primary_college,
             'cs': units,
@@ -390,6 +418,13 @@ def with_unit(item, url_dates):
         it['isOnline'] = True
     # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
     it['speakerKeys'] = speaker_keys(item.get('speaker'))
+    # 计数键（2026-10-18）：讲座级唯一键，访问/点赞/想听的云端主键。
+    #   - 单场讲座（无 lectureIndex）：= sourceUrl，与改造前的键逐字一致，
+    #     故全站 90% 的存量云端计数无需任何迁移。
+    #   - 多场拆分（含 lectureIndex）：= sourceUrl#lectureIndex，
+    #     同页的 N 场各自成键，修复「点一场 N 场同增」「统计页 1 次点赞累加 N 次」。
+    #     该页整页级的计数（首页合并卡片单元）仍用无后缀的 sourceUrl，两者互不干扰。
+    it['ck'] = count_key(item)
     return strip_frontend_fields(it)
 
 

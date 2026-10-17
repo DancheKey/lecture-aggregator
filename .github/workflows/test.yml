@@ -348,6 +348,7 @@ jobs:
           node tests/js/app_year_consistency.js
           node tests/js/app_url_sync.js
           node tests/js/stats_quota_guard.js
+          node tests/js/count_key_uniqueness.js
           python tests/test_main_water_gate.py
 
       # 审计报告转义门禁（2026-10-02）：audit_fields.py 的 HTML 报告把抓来的

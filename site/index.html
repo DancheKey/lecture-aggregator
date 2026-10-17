@@ -452,7 +452,7 @@
                   </span>
                 </div>
                 <h2 class="text-15pt font-semibold leading-snug mb-2">
-                  <a :href="safeUrl(u.url)" target="_blank" rel="noopener noreferrer" @click="recordVisit(u.url)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ u.head.title }}</a>
+                  <a :href="safeUrl(u.url)" target="_blank" rel="noopener noreferrer" @click="recordVisit(u.ck)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ u.head.title }}</a>
                 </h2>
                 <div class="text-12pt text-slate-600 space-y-1 mb-2">
                   <div v-if="u.head.location" class="flex items-center gap-2">
@@ -496,22 +496,22 @@
                   <button v-if="u.head.isOnline" @click="toggleOnline()"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># 线上</button>
                   <div class="card-actions flex items-center gap-2 shrink-0">
-                    <button @click="toggleWant(u.url, $event)"
-                      :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.url) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
+                    <button @click="toggleWant(u.ck, $event)"
+                      :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
                       title="想听就点^_^">
-                      <span class="min-w-badge text-center">{{ capDisplay(wantCount(u.url)) }}</span>
+                      <span class="min-w-badge text-center">{{ capDisplay(wantCount(u.ck)) }}</span>
                     </button>
-                    <button @click="toggleLike(u.url, $event)"
-                      :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(u.url) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
+                    <button @click="toggleLike(u.ck, $event)"
+                      :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(u.ck) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
                       title="喜欢就赞^_^">
-                      <span class="min-w-badge text-center">{{ capDisplay(likeCount(u.url)) }}</span>
+                      <span class="min-w-badge text-center">{{ capDisplay(likeCount(u.ck)) }}</span>
                     </button>
                   </div>
                 </div>
               </article>
               <!-- 普通单场卡：原卡片标记零改动（l 为单元内唯一记录的别名） -->
               <template v-else>
-              <article v-for="l in u.recs" :key="l.sourceUrl + (l.lectureIndex ? '#' + l.lectureIndex : '')"
+              <article v-for="l in u.recs" :key="l.ck"
                 class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
                 <!-- 元信息行：单位 · 时间（🕒 图标化）+ 右侧状态徽章（四态：进行中/即将开始/待开始/已结束） -->
                 <div class="flex items-center gap-2 text-11pt mb-1.5 flex-nowrap">
@@ -536,7 +536,7 @@
                 </div>
                 <!-- 标题 -->
                 <h2 class="text-15pt font-semibold leading-snug mb-2">
-                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.sourceUrl)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}<span v-if="l.isMultiLecture && l.lectureIndex != null && !topicHasSession(l.topic, l.lectureIndex)">（第{{ l.lectureIndex }}{{ l.unitType === 'session' ? '场' : '期' }}）</span></a>
+                  <a :href="safeUrl(l.sourceUrl)" target="_blank" rel="noopener noreferrer" @click="recordVisit(l.ck)" class="text-slate-900 hover:text-slate-700 hover:underline">{{ l.title }}<span v-if="l.isMultiLecture && l.lectureIndex != null && !topicHasSession(l.topic, l.lectureIndex)">（第{{ l.lectureIndex }}{{ l.unitType === 'session' ? '场' : '期' }}）</span></a>
                 </h2>
                 <!-- 结构化详情：图标 + 字段名 + 值 三段式（回应反馈#9「字段太灰、界限不分明」）；
                      顺序：题目 → 地点 → 主讲 → 简介（超两行折叠）→ 摘要（默认六行，可展开），
@@ -635,34 +635,34 @@
                   <!-- 多来源切换按钮（2026-10-13 用户裁定挪到标签行末尾）：展开各官方
                        原文链接的入口，琥珀色高亮以示「可展开更多内容」，与普通筛选标签
                        （灰底可点击筛选）视觉区分。 -->
-                  <button v-if="l.merged" @click="toggleSources(l.sourceUrl)"
-                    class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-12pt border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.sourceUrl] ? '▲' : '▼' }}</button>
+                  <button v-if="l.merged" @click="toggleSources(l.ck)"
+                    class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-12pt border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.ck] ? '▲' : '▼' }}</button>
                   <!-- 想听 + 点赞：包成一个整体（.card-actions）——避免「想听被 ml-auto 留在上一行右端、
                        点赞被迫换行到下一行左端」的割裂。移动端整组随标签流式排列（放不下则整组换行，
                        两按钮仍相邻同行）；桌面端由 .card-actions 的媒体查询恢复右推。 -->
                   <div class="card-actions flex items-center gap-2 shrink-0">
-                  <button @click="toggleWant(l.sourceUrl, $event)"
-                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
+                  <button @click="toggleWant(l.ck, $event)"
+                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(l.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
                     title="想听就点^_^">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" :fill="hasWanted(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" :fill="hasWanted(l.ck) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                     </svg>
-                    <span class="min-w-badge text-center">{{ capDisplay(wantCount(l.sourceUrl)) }}</span>
+                    <span class="min-w-badge text-center">{{ capDisplay(wantCount(l.ck)) }}</span>
                   </button>
-                  <button @click="toggleLike(l.sourceUrl, $event)"
-                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(l.sourceUrl) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
+                  <button @click="toggleLike(l.ck, $event)"
+                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(l.ck) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
                     title="喜欢就赞^_^">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.sourceUrl) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.ck) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linejoin="round" d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
                     </svg>
-                    <span class="min-w-badge text-center">{{ capDisplay(likeCount(l.sourceUrl)) }}</span>
+                    <span class="min-w-badge text-center">{{ capDisplay(likeCount(l.ck)) }}</span>
                   </button>
                   </div>
                 </div>
                 <!-- 多来源：展开各官方原文链接 -->
-                <div v-if="l.merged && expanded[l.sourceUrl]" class="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
+                <div v-if="l.merged && expanded[l.ck]" class="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
                   <a v-for="s in l.sources" :key="s.sourceUrl" :href="safeUrl(s.sourceUrl)" target="_blank" rel="noopener noreferrer"
-                    @click="recordVisit(l.sourceUrl)"
+                    @click="recordVisit(l.ck)"
                     class="flex items-center gap-2 text-12pt text-blue-600 hover:text-blue-800 hover:underline">
                     <span class="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-11pt">{{ s.college }}</span>
                     <span class="truncate">{{ s.title || s.sourceUrl }}</span>
@@ -787,10 +787,10 @@
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=5e3372093c"></script>
   <script defer src="app.state.js?v=f2d1e1e82d"></script>
-  <script defer src="app.computed.js?v=e7d9bca7a6"></script>
+  <script defer src="app.computed.js?v=3a6e44e2ff"></script>
   <script defer src="app.display.js?v=1520f114d4"></script>
   <script defer src="app.cloud.js?v=ddd4f786a2"></script>
-  <script defer src="app.social.js?v=d3897d155f"></script>
+  <script defer src="app.social.js?v=5b59a85841"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=93b542d74c"></script>

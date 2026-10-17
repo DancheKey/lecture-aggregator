@@ -21,7 +21,10 @@ import unittest
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_ROOT, 'scraper'))
 
-DERIVED_KEYS = {'unitType', 'speakerKeys', 'b', 'actualCampus', 'isOnline'}
+# ck（2026-10-18）：讲座级计数键，由生成器/server 派生，不在源数据 data/lectures.json 里。
+# 规则单点在 generate_frontend_data.count_key（server.py 的镜像实现须逐字一致，
+# 由 test_frontend_consistency::test_synthetic_pipelines_equal 锁住两边同构）。
+DERIVED_KEYS = {'unitType', 'speakerKeys', 'b', 'actualCampus', 'isOnline', 'ck'}
 # 前端已按职责分片（app.core/state/computed/display/social/data/admin），
 # 字段引用分散在各分片里——这里动态发现，避免再拆/再合时扫描清单过时导致假绿或假红。
 _FRONTEND_FILES = ('site/index.html',) + tuple(

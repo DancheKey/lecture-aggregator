@@ -61,6 +61,12 @@ FRONTEND_KEEP = frozenset({
     # 线上举办（2026-10-13 用户要求）：location 写参会方式（腾讯会议/Zoom/会议号等）
     # 即 True，仅 True 落字段；前端标签行显示「# 线上」
     'isOnline',
+    # 计数键（2026-10-18）：访问/点赞/想听的云端主键。讲座级唯一——
+    # 单场讲座 = sourceUrl（与旧键逐字一致，存量计数零迁移）；
+    # 多场拆分的一页 = sourceUrl#lectureIndex，使同一页的 N 场各自独立计数，
+    # 不再「点一场、N 场同时 +1 / 统计页把 1 次点赞累加 N 次」。
+    # 由 with_unit() 派生，前端 app.social.js / stats.js / app.computed.js 消费。
+    'ck',
     'b',  # 长文本所在桶号（0-15）：展开某条时前端据此只拉那一桶 detail 分片
 })
 

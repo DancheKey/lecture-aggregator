@@ -261,6 +261,14 @@ def _attach_unit_types(data):
             it['isOnline'] = True
         # 讲者归一化键（2026-09-06）：前端讲者聚合视图用，多人各一键
         it['speakerKeys'] = _speaker_keys(item.get('speaker'))
+        # 讲座级计数键（2026-10-18）：规则须与 generate_frontend_data.count_key
+        # 逐字一致（单场 = sourceUrl，多场 = sourceUrl~lectureIndex；分隔符用 ~
+        # 而非 #，见 count_key 的注释：# 会被 PostgREST 查询静默截断）。
+        # 由 test_synthetic_pipelines_equal 锁住两端同构——本地 /api 与公网切片
+        # 若键不同，同一个赞在本地与公网会落到两行不同的计数上。
+        src = item.get('sourceUrl') or ''
+        idx = item.get('lectureIndex')
+        it['ck'] = f'{src}~{idx}' if (idx is not None and src) else src
         # 按白名单裁掉前端无消费者的内部字段（llmSelfExtract/qaRepaired 等）。
         # 必须与 generate_frontend_data.with_unit() 用同一份白名单，
         # 否则本地下发与公网静态切片字段集分叉，test_frontend_consistency 会失败。

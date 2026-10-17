@@ -285,7 +285,7 @@ const APP_COMPUTED = {
       this.filtered.forEach(l => {
         const u = l.sourceUrl || '';
         if (!u) {
-          units.push({ type: 'single', recs: [l], key: 'x|' + (solo++) });
+          units.push({ type: 'single', recs: [l], key: 'x|' + (solo++), ck: l.ck || '' });
           return;
         }
         const k = groupKey(l);
@@ -295,6 +295,10 @@ const APP_COMPUTED = {
           const recs = this.filtered.filter(x => groupKey(x) === k);
           units.push({
             type: 'forum', url: u, recs, head: recs[0],
+            // 计数键（2026-10-18）：合并卡片单元代表「整张通知页」，其点赞/访问
+            // 记在无后缀的 sourceUrl 上（页面级），与展开后每场的 ck（讲座级）
+            // 互不干扰——点整页赞不会给某一场 +1，反之亦然。
+            ck: u,
             // 全集场次（未经筛选）：与 recs.length 在有筛选时才不同。
             // 数据尚未全量加载完时 all 少于 filtered 是可能的，取二者较大值兜底，
             // 保证 total >= recs.length 这个不变式（下游依赖它做「部分命中」判定）。
@@ -307,6 +311,7 @@ const APP_COMPUTED = {
         units.push({
           type: 'single', recs: [l],
           key: 's|' + (l.lectureIndex ?? 'x') + '|' + u,
+          ck: l.ck || u,
         });
       });
       return units;
