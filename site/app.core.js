@@ -38,7 +38,7 @@ const COUNT_CAP = 300;                    // 点赞/想听超过此值显示 "30
 
 // 注：顶部总数动画的时长参数（COUNT_DUR_MIN / COUNT_DUR_SOFT_CAP / COUNT_IDLE_DIV /
 // COUNT_DUR_MAX / COUNT_MS_PER_ITEM）已于 2026-09-30 随「阶梯跳变」改造一并删除 ——
-// 数字改为每个分片到达时直接落在已加载真实条数上（50 → 550 → 1050 …），不再插值，
+// 数字改为每个分片到达时直接落在已加载真实条数上（50 → 150 → 250 …），不再插值，
 // 因此不需要时长估算。详见 app.admin.js 文件头（含一处负数 bug 的根因分析）。
 
 // 配置项：若已部署「工作流触发代理」（持有 PAT 的 Cloudflare Worker / Vercel Function 等），

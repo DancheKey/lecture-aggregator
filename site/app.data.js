@@ -125,6 +125,8 @@ Object.assign(APP_METHODS, {
       }
       const chunks = (manifest && manifest.chunks) || [];
       if (!chunks.length) return this._loadFullSingle();
+      // 进度分母（清单自带 total，几十字节先于分片到手）：模板「已加载 X / Y」用。
+      this.chunkTotal = manifest.total || 0;
       this.dataStage = 'partial';
       // 分片 URL 按数据版本分桶（2026-10-12 混龄缓存事故）：
       // latest.json 是 no-store（恒新），而分片走 cache:'default' 命中 GitHub Pages

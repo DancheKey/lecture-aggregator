@@ -39,6 +39,12 @@
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden; text-overflow: ellipsis;
     }
+    /* 简介/摘要长文本两端对齐（2026-10-17 用户定）：默认左对齐右缘参差，
+       justify 后两侧整齐（中文效果最佳；末行不受影响、自然左对齐）。
+       ⚠ 不能写 Tailwind text-justify——产物是预编译子集、无此类，写了静默失效。
+       ⚠ clamp 折叠态是 -webkit-box：text-align 对盒内每一行仍生效（已实测），
+       但换实现（如改 flex/grid clamp）时须重测两端对齐是否仍然成立。 */
+    .lecture-prose { text-align: justify; }
     /* 字号 utility：vendor/tailwind.css 是预编译产物，未包含 text-12pt 等任意值类，
        这些类此前从未生效（全部落到浏览器默认 16px），是「字体不统一」观感的根源；
        在此显式定义三级字号，类名与模板中原任意值写法一一对应 */
@@ -294,7 +300,9 @@
                    .toolbar-stats：移动端独占整行（控件换行下方、搜索可正常伸缩），桌面端内容宽同流。 -->
               <div ref="toolbarStats" class="toolbar-stats text-12pt text-slate-500 flex flex-wrap items-center gap-1 shrink-0">
                 <template v-if="dataStage === 'partial'">
-                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><span class="text-slate-400">+</span> 场讲座
+                  <!-- 进度分母：清单 chunks.json 的 total 到手前（或降级路径无清单）
+                       退回「N+」旧文案；到手后显示「已加载 X / Y」真实进度 -->
+                  已加载 <span class="font-semibold text-slate-800">{{ displayTotal }}</span><template v-if="chunkTotal"><span class="text-slate-400"> / {{ chunkTotal }}</span></template><span v-else class="text-slate-400">+</span> 场讲座
                   <span class="text-slate-300">·</span>
                   <span class="text-slate-400">完整数据加载中…</span>
                 </template>
@@ -579,7 +587,7 @@
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold leading-relaxed">简介</span>
                     <div class="min-w-0 flex-1">
-                      <p :data-clamp-key="clampKey(l, 'bio')" :class="['text-slate-500 leading-relaxed', expandedBio[expKey(l, 'bio')] ? '' : 'line-clamp-2']">{{ bioText(l) }}</p>
+                      <p :data-clamp-key="clampKey(l, 'bio')" :class="['lecture-prose text-slate-500 leading-relaxed', expandedBio[expKey(l, 'bio')] ? '' : 'line-clamp-2']">{{ bioText(l) }}</p>
                       <button v-if="bioLong(l)" @click="toggleBio(l)"
                         class="block text-11pt text-blue-600 hover:text-blue-800 hover:underline mt-1">
                         {{ expandedBio[expKey(l, 'bio')] ? '收起简介 ▲' : '展开简介 ▼' }}
@@ -595,7 +603,7 @@
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold leading-relaxed">摘要</span>
                     <div class="min-w-0 flex-1">
-                      <p :data-clamp-key="clampKey(l, 'abs')" :class="['text-slate-600 leading-relaxed', expandedAbstract[expKey(l, 'abs')] ? '' : 'line-clamp-3']">{{ abstractOf(l) }}</p>
+                      <p :data-clamp-key="clampKey(l, 'abs')" :class="['lecture-prose text-slate-600 leading-relaxed', expandedAbstract[expKey(l, 'abs')] ? '' : 'line-clamp-3']">{{ abstractOf(l) }}</p>
                       <button v-if="abstractLong(l)" @click="toggleAbstract(l)"
                         class="block text-11pt text-blue-600 hover:text-blue-800 hover:underline mt-1">
                         {{ expandedAbstract[expKey(l, 'abs')] ? '收起摘要 ▲' : '展开摘要 ▼' }}
@@ -776,13 +784,13 @@
 
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
-  <script defer src="app.core.js?v=c793fc5424"></script>
-  <script defer src="app.state.js?v=a3d1eb2f2d"></script>
+  <script defer src="app.core.js?v=5e3372093c"></script>
+  <script defer src="app.state.js?v=f2d1e1e82d"></script>
   <script defer src="app.computed.js?v=e7d9bca7a6"></script>
   <script defer src="app.display.js?v=a4246ef812"></script>
   <script defer src="app.social.js?v=9d8623fb38"></script>
-  <script defer src="app.data.js?v=d3c3b3d2f0"></script>
-  <script defer src="app.admin.js?v=d668812db1"></script>
+  <script defer src="app.data.js?v=d7c1bd2321"></script>
+  <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=d3edd614a5"></script>
   <!-- footer-counter.js：动态加载 busuanzi + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值

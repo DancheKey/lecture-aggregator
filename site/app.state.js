@@ -64,6 +64,10 @@ const APP_STATE = function () {
       // 初值 0：mounted 时数据尚未加载，模板文案是「已加载 0+ 场讲座」。
       displayTotal: 0,
       displaySource: 0,
+      // 分片清单 chunks.json 的 total 字段（总条数），_loadChunks 拿到清单后写入。
+      // 加载中模板用它做进度分母：「已加载 1250 / 3835」；0 = 清单尚未到达
+      // （或走了整文件降级路径、旧清单无该字段），此时退回「N+」旧文案。
+      chunkTotal: 0,
       // 2026-10-02 移除 loadedChunks：它自称「分片加载断点续传」，但全仓只有
       // 3 处赋值（app.data.js 两处 + 此处声明）、**0 处读取**，断点续传从未实现。
       // 属只写不读的死字段——与 2026-09-22 清理的 LIKE_KEY 同一模式，
