@@ -235,6 +235,18 @@ jobs:
       - name: Run CI gate coverage meta tests
         run: python tests/test_ci_gate_coverage.py
 
+      # 云端计数（Supabase）迁移 SQL 结构守卫（2026-10-17 深夜漏洞复盘）：
+      # anon key 公开是设计定位，闸门全在 DB 侧——上线当晚实测 increment_like/
+      # want 缺 least 上钳，灌 p_delta=99999 可刷爆计数。本套件锁「三函数两路径
+      # 双钳 + check 上限 + RLS 只读授权 + 入库 SQL 与生成器逐字一致」。
+      - name: Run Supabase migration SQL structure guards
+        run: python tests/test_supabase_migration.py
+
+      # 云端计数前端层单测（2026-10-17）：vm 沙箱复现 app.cloud.js 的七类场景
+      # （无配置禁用 / 批量读解析 / 权威值 / 401 软失败 / 请求形态 / 配置缓存）。
+      - name: Run cloud stats frontend tests
+        run: node tests/js/cloud_stats.js
+
       # 解析器自动产出 timeUnknown（2026-10-03，方案 A）。
       # 08:00/00:00 是占位约定（源页只给日期时填充），但确有讲座真在 8:00 开始。
       # 此前该区分全靠人工在 data/lectures.json 里标注，而爬虫不产出该字段 →

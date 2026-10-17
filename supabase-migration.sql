@@ -24,18 +24,21 @@ alter table lecture_stats drop constraint if exists lecture_stats_likes_range;
 alter table lecture_stats drop constraint if exists lecture_stats_wants_range;
 alter table lecture_stats
   add constraint lecture_stats_visits_range check (visits between 0 and 1000000),
-  add constraint lecture_stats_likes_range check (likes between 0 and 100000),
-  add constraint lecture_stats_wants_range check (wants between 0 and 100000);
+  add constraint lecture_stats_likes_range check (likes between 0 and 1000),
+  add constraint lecture_stats_wants_range check (wants between 0 and 1000);
 
 -- ③ RPC 增量函数：前端只能 +/-1，写不了任意值（security definer = 以所有者权限跑，
 --    anon 无需表级 INSERT/UPDATE 权限；表级写权限保持关闭，只走函数这一道闸门）。
 --    insert 必须显式写全三列——只填目标列会依赖列默认值，缺默认值的表直接 23502。
+--    ⚠ 2026-10-17 深夜修复：update 与 insert 两条路径都必须 least 上钳——此前
+--    like/want 只有 greatest(...,0) 下钳，实测灌 p_delta=99999 可直接刷爆计数。
 create or replace function increment_like(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
 declare v lecture_stats;
 begin
-  insert into lecture_stats (url, visits, likes, wants) values (p_url, 0, greatest(p_delta, 0), 0)
-  on conflict (url) do update set likes = greatest(lecture_stats.likes + p_delta, 0)
+  insert into lecture_stats (url, visits, likes, wants)
+    values (p_url, 0, least(greatest(p_delta, 0), 1000), 0)
+  on conflict (url) do update set likes = least(greatest(lecture_stats.likes + p_delta, 0), 1000)
   returning * into v;
   return to_jsonb(v) - 'url';
 end $$;
@@ -44,8 +47,9 @@ create or replace function increment_want(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
 declare v lecture_stats;
 begin
-  insert into lecture_stats (url, visits, likes, wants) values (p_url, 0, 0, greatest(p_delta, 0))
-  on conflict (url) do update set wants = greatest(lecture_stats.wants + p_delta, 0)
+  insert into lecture_stats (url, visits, likes, wants)
+    values (p_url, 0, 0, least(greatest(p_delta, 0), 1000))
+  on conflict (url) do update set wants = least(greatest(lecture_stats.wants + p_delta, 0), 1000)
   returning * into v;
   return to_jsonb(v) - 'url';
 end $$;
@@ -54,7 +58,8 @@ create or replace function increment_visit(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
 declare v lecture_stats;
 begin
-  insert into lecture_stats (url, visits, likes, wants) values (p_url, greatest(p_delta, 0), 0, 0)
+  insert into lecture_stats (url, visits, likes, wants)
+    values (p_url, least(greatest(p_delta, 0), 1000000), 0, 0)
   on conflict (url) do update set visits = least(greatest(lecture_stats.visits + p_delta, 0), 1000000)
   returning * into v;
   return to_jsonb(v) - 'url';

@@ -76,6 +76,7 @@ jobs:
             tests/test_full_shrink_protection.py
             tests/test_new_source_full_scan.py
             tests/test_ci_gate_coverage.py
+            tests/test_supabase_migration.py
             tests/test_env_flags.py
             tests/test_speaker_normalize.py
             tests/test_speaker_duty_suffix.py
@@ -100,6 +101,7 @@ jobs:
             tests/js/app_merge_chunk.js
             tests/js/app_template_hygiene.js
             tests/js/stats_quota_guard.js
+            tests/js/cloud_stats.js
             tests/js/app_year_consistency.js
             tests/js/app_time_placeholder.js
             tests/test_main_water_gate.py
