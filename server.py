@@ -296,10 +296,13 @@ def _load_stat_files():
 
 
 def _atomic_write_json(path, obj):
-    """原子写 JSON：先写 .tmp 再 os.replace，避免中途崩溃留下半份文件。"""
+    """原子写 JSON：先写 .tmp 再 os.replace，避免中途崩溃留下半份文件。
+
+    indent=2 与 scraper/scraper.py::_atomic_write_json 保持一致（diff 可读）。
+    """
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
-        json.dump(obj, f, ensure_ascii=False)
+        json.dump(obj, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
 
 

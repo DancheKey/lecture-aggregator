@@ -1,4 +1,6 @@
 // 展示层：渲染单元、时间格式化、状态徽章、clamp 溢出实测、摘要/简介门禁。
+// statusOf 的 end≤start 异常 warn 去重集（见下方 statusOf 内注释）
+const _warnedBadEnd = new Set();
 Object.assign(APP_METHODS, {
     // 论坛卡展开状态：未显式操作过时，「筛选/搜索命中子集」自动展开（2026-09-26 方案B）
     isForumOpen(u) {
@@ -136,6 +138,15 @@ Object.assign(APP_METHODS, {
       if (endRaw && endRaw > s) {
         e = endRaw;
       } else {
+        // 两种进入情况需区分：endRaw 非零 = 源数据写了结束时间但 ≤ 开始时间
+        // （数据异常，开发期留痕）；endRaw 为 0 = 本来就只有开始时间（正常，
+        // 按默认时长兜底），不告警。statusOf 在秒级热路径上（计数行/徽章），
+        // 同一 sourceUrl 只 warn 一次，避免脏数据把控制台刷屏。
+        if (endRaw && !_warnedBadEnd.has(l.sourceUrl)) {
+          _warnedBadEnd.add(l.sourceUrl);
+          console.warn('[statusOf] lectureEnd ≤ lectureStart，按默认时长兜底：',
+            l.lectureStart, '→', l.lectureEnd, l.sourceUrl || '');
+        }
         e = s + 2 * 3600 * 1000;
         // 半日边界截断：start+2h 越过 12:00 / 18:00 / 22:00 中最早的适用边界即止
         const sd = new Date(s);
