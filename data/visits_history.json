@@ -397,6 +397,17 @@
       "uv_delta": null,
       "pv_delta": 27,
       "note": "计数源切换为自建 Supabase（2026-10-18），UV 停更"
+    },
+    {
+      "date": "2026-10-19",
+      "capturedAt": "2026-10-19T02:40:49+08:00",
+      "site_pv": 1751,
+      "site_uv": null,
+      "page_pv": null,
+      "page_uv": null,
+      "uv_delta": null,
+      "pv_delta": 0,
+      "note": ""
     }
   ]
 }
