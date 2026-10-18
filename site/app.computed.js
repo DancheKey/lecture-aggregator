@@ -285,10 +285,14 @@ const APP_COMPUTED = {
       this.filtered.forEach(l => {
         const u = l.sourceUrl || '';
         if (!u) {
-          // B3（2026-10-18）：ck 回退链补 l.sourceUrl——与 forum 单元
-          // （l.ck || u）口径一致，至少键非空；缺 ck 时 toggleLike 的
-          // if (!url) return 会静默无响应，回退到 sourceUrl 至少能计数。
-          units.push({ type: 'single', recs: [l], key: 'x|' + (solo++), ck: l.ck || l.sourceUrl || '' });
+          // sourceUrl 为空时 ck 也必为空（生成器 count_key 只由 sourceUrl 派生，
+          // 实测 3835 条无此情况）。回退只做防御：保证 ck 是字符串而非
+          // undefined——模板 {{ l.ck }} 与 toggleLike 的 if (!url) return
+          // 都对 undefined 更不友好。⚠ 2026-10-18 复查：此前这里写的是
+          // l.ck || l.sourceUrl || ''，但本分支 l.sourceUrl 恒为空串，
+          // 该回退是死代码，已删；真正可达的回退在下方有 URL 的
+          // single 分支（ck: l.ck || u）。
+          units.push({ type: 'single', recs: [l], key: 'x|' + (solo++), ck: l.ck || '' });
           return;
         }
         const k = groupKey(l);

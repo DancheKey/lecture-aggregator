@@ -7,8 +7,9 @@
 //      hasLiked(ck) 查新键 → 图标不高亮，但云端计数还在，再点一次会 +1。
 //      全站 94 个多场源页受影响。修法：migrateCountKeys() 把旧键按
 //      「页面 → 该页全部场次」展开；旧键保留（合并卡 ck 仍是无后缀 URL）。
-//   B3 数据缺 ck 时 single 单元的 ck 回退——回退链须含 sourceUrl，
-//      否则键为空串，toggleLike 的 if (!url) return 静默无响应。
+//   B3 数据缺 ck 时 single 单元的 ck 回退——有 URL 的分支回退为
+//       sourceUrl（可达路径）；无 URL 分支 sourceUrl 恒空，回退只保证
+//       键是字符串而非 undefined，不再写 l.sourceUrl（那是死代码）。
 //
 // 运行：node tests/js/count_key_migration.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -195,14 +196,16 @@ function mkSingle() {
 
 // ================= B3 静态断言：回退链源码形态 =================
 {
-  // 288 行 !u 分支里 l.sourceUrl 恒为空串，行为上与前态不可区分
-  // （缺 ck 且无 URL 时两者都得 ''）——静态断言是唯一防回潮手段
-  // （同 app_template_hygiene.js 的静态分析补位模式）。
+  // 无 URL 分支（!u）的 l.sourceUrl 恒为空串，回退到它等于没回退——
+  // 2026-10-18 复查删掉了这段死代码，静态断言锁住「别再把它加回来」。
+  // 真正可达的回退在下方 single（有 URL）分支：ck: l.ck || u。
   const src = fs.readFileSync(path.join(SITE, 'app.computed.js'), 'utf-8');
-  ok(src.includes('ck: l.ck || l.sourceUrl || \'\''),
-     'B3 静态：app.computed.js 的 single 回退链须为 l.ck || l.sourceUrl || \'\'（防回潮）');
+  ok(src.includes("ck: l.ck || ''"),
+     'B3 静态：app.computed.js 的 !u 分支回退链须为 l.ck || \'\'（该分支 sourceUrl 恒空，勿再加 l.sourceUrl 死回退）');
   ok(/ck: l\.ck \|\| u\b/.test(src),
      'B3 静态：single（有 URL）回退链须为 l.ck || u');
+  ok(!src.includes("ck: l.ck || l.sourceUrl"),
+     'B3 静态：不得存在 l.ck || l.sourceUrl 形态——在 !u 分支里它是死代码，在别处会掩盖真正的回退位置');
 }
 
 if (errs.length) {

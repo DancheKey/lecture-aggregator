@@ -8,7 +8,7 @@ insert 两条路径只有 greatest(...,0) 下钳、没有 least 上钳——持 
 p_delta=99999 即可把 likes/wants 刷爆（表级 RLS 挡得住直接 INSERT/UPDATE，
 挡不住函数内部逻辑漏洞；check 约束上限 10 万也过松）。
 
-本套件锁死六类红线：
+本套件锁死九类红线：
   ① 三个增量函数齐全；
   ② 每个函数的 insert 与 on conflict 两条路径都必须 least(greatest(...)) 双钳
      （当晚漏洞正是 like/want 两函数缺 least，update 路径最先失守）；
@@ -18,11 +18,18 @@ p_delta=99999 即可把 likes/wants 刷爆（表级 RLS 挡得住直接 INSERT/U
      逐字一致——单一事实源可验证（当晚用户两次「跑了个寂寞」的根因之一就是
      编辑器旧内容/手改 SQL，生成器必须能被测试校准）；
   ⑥ 2026-10-18 两项实测修复：p_url 长度守卫（空键/8000 字符行可被匿名建出，
-     拖慢 fetchAll 并混入统计 map）与 visit 单次上钳 100（原 100 万一次 curl
-     即可把无 capDisplay 的页脚 PV 刷成门面事故）。
+     拖慢 fetchAll 并让行数可被无限灌高）与 visit 单次上钳 100（原 100 万一次
+     curl 即可把无 capDisplay 的页脚 PV 刷成门面事故）；
+  ⑦ 2026-10-18 复查补：RLS 必须显式 enable（原 SQL 只有 create policy——
+     Supabase 默认 anon 有全表 ALL 权限，RLS 关着时 policy 形同虚设）；
+  ⑧ 2026-10-18 复查补：p_url 前缀守卫（只限长度挡不住 'a'/'b'… 批量造行），
+     并用 site/lectures.json 全量 ck 实测该规则零误伤；
+  ⑨ 2026-10-18 复查补：docs/supabase-patch-current.sql 必须由
+     scripts/gen_supabase_patch.py 同源产出（手拼补丁会静默过期）。
 
 只用标准库；读仓库内文件，无网络、无 key、无 Supabase 依赖。
 """
+import json
 import os
 import re
 import subprocess
@@ -32,6 +39,9 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SQL_PATH = os.path.join(ROOT, 'supabase-migration.sql')
 GEN_PATH = os.path.join(ROOT, 'scripts', 'gen_supabase_sql.py')
+PATCH_PATH = os.path.join(ROOT, 'supabase-patch-current.sql')
+PATCH_GEN = os.path.join(ROOT, 'scripts', 'gen_supabase_patch.py')
+LECTURES_JSON = os.path.join(ROOT, 'site', 'lectures.json')
 
 FUNCS = ('increment_like', 'increment_want', 'increment_visit')
 
@@ -52,6 +62,11 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             raise unittest.SkipTest('supabase-migration.sql 不存在（云端计数未启用）')
         with open(SQL_PATH, encoding='utf-8') as f:
             cls.sql = f.read()
+        if os.path.exists(PATCH_PATH):
+            with open(PATCH_PATH, encoding='utf-8') as f:
+                cls.patch = f.read()
+        else:
+            cls.patch = None
 
     def test_00_三函数齐全(self):
         for n in FUNCS:
@@ -80,7 +95,10 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         """S1（2026-10-18 实测）：三个函数都必须校验 p_url，越界抛 22023。
 
         实测背景：此前零校验，anon 持 key 可建空键行与 8000 字符行——
-        既拖慢 fetchAll 全表拉取，空键行还绕过前端 /^__/ 过滤混进统计 map。
+        危害是污染表 + fetchAll 全表拉取被拖慢 + 行数可被无限灌高。
+        （注意：空串键并不会「混进前端统计 map」——app.cloud.js 的
+        row.url 为空串是 falsy，已被 if (row && row.url) 拦掉；那条
+        说法是 2026-10-18 首版注释的误判，已修正。）
         """
         for n in FUNCS:
             body = _func_body(self.sql, n)
@@ -118,6 +136,87 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             b = _func_body(self.sql, n)
             self.assertIn('d := least(greatest(p_delta, 0), 1000);', b,
                           f'{n} 的单次增量应钳 1000（本次只降 visit，勿顺手动它）')
+
+    def test_07_rls必须显式开启(self):
+        """P1-2（2026-10-18 复查）：SQL 要 enable row level security，不能只建 policy。
+
+        原 SQL 只有 create policy。Supabase 对新表默认授 anon 全表 ALL 权限，
+        RLS 未开启时 policy 形同虚设——照本 SQL 重建库 = 匿名可绕过 RPC 直写
+        整表，所有钳制全部失效。本库实测 RLS 已开，此句是幂等兜底 + 防重建库漏开。
+        """
+        self.assertIn(
+            'alter table lecture_stats enable row level security;',
+            self.sql, '缺 enable row level security——policy 在但 RLS 关着 = 完全裸奔')
+        # 语义顺序：先开 RLS 再建策略（反过来也能跑，但先开后建才是正意）
+        enable_at = self.sql.index('enable row level security')
+        policy_at = self.sql.index('create policy "anon read"')
+        self.assertLess(enable_at, policy_at, 'enable RLS 应早于 create policy')
+
+    def test_08_p_url前缀守卫(self):
+        """P1-3（2026-10-18 复查）：只限长度挡不住批量造行，必须校验前缀。
+
+        p_url='a'、'b'… 每个都满足 1..300 字符，anon 可无限建行；行数灌到
+        触发 Supabase Max Rows（默认 1000）截断后，部分讲座计数会静默读不到。
+        真实键 100% 是 http(s):// 地址或 __ 保留族（与 app.cloud.js 的
+        /^__/ 过滤同口径）。
+        """
+        for n in FUNCS:
+            body = _func_body(self.sql, n)
+            self.assertIn("p_url !~* '^(https?://|__)'", body,
+                          f'{n} 缺 p_url 前缀守卫——只限长度挡不住批量造行')
+            guard_at = body.index("p_url !~* '^(https?://|__)'")
+            insert_at = body.index('insert into lecture_stats')
+            self.assertLess(guard_at, insert_at,
+                            f'{n} 的前缀守卫在 insert 之后——非法键仍会先建行')
+
+    def test_08b_前缀守卫零误伤真实键(self):
+        """用 site/lectures.json 全量 ck 实测**SQL 里的**守卫规则：改规则前先量化影响面。
+
+        关键：正则必须从 self.sql 里抽出来，不能在测试里另写一份。否则把生成器
+        的规则改严（如 https-only）时本测试照旧绿——2026-10-18 破坏验证 D3
+        就是这么漏的（测的是自己的正则，不是被测对象的规则）。
+        """
+        if not os.path.exists(LECTURES_JSON):
+            self.skipTest('site/lectures.json 不存在')
+        with open(LECTURES_JSON, encoding='utf-8') as f:
+            items = json.load(f).get('data', [])
+        cks = [x.get('ck') for x in items if isinstance(x, dict) and x.get('ck')]
+        self.assertTrue(cks, 'lectures.json 里读不到任何 ck')
+        # 从 SQL 抽守卫正则（三处应一致，任一处不同即视为漂移）
+        pats = set(re.findall(r"p_url !~\* '([^']+)'", self.sql))
+        self.assertTrue(pats, 'SQL 里抽不到 p_url 前缀守卫正则')
+        self.assertEqual(len(pats), 1,
+                         f'三个函数的前缀守卫正则不一致：{pats}——应统一由单一常量派生')
+        pat = pats.pop()
+        # 防「改松」：.* 等于没拦；必须真的限制协议
+        self.assertNotIn('.*', pat, f'守卫正则 {pat!r} 含 .*，等于没拦')
+        self.assertIn('http', pat, f'守卫正则 {pat!r} 未限制协议，挡不住任意短键批量造行')
+        bad = [c for c in cks if not re.match(pat, c, re.IGNORECASE)]
+        self.assertEqual(bad, [],
+                         f'{len(bad)}/{len(cks)} 条真实 ck 不满足守卫规则 {pat!r}，'
+                         f'放行后会 400 静默降级：{bad[:3]}')
+        longest = max(len(c) for c in cks)
+        self.assertLessEqual(
+            longest, 300,
+            f'最长真实 ck 达 {longest} 字符，超过 MAX_URL_LEN=300——放行后该讲座点赞会静默失败')
+
+    def test_09_云端补丁与生成器同源(self):
+        """P3-8（2026-10-18 复查）：补丁必须由 gen_supabase_patch.py 产出。
+
+        手拼补丁（说明头 + 粘一份 SQL）没有任何机制阻止它过期——生成器一改，
+        补丁静默漂移，用户照旧文件跑 = 修了个寂寞。本测试用 --stdout 重新
+        产出并与入库文件逐字比对。
+        """
+        if self.patch is None:
+            self.skipTest('docs/supabase-patch-current.sql 不存在（云端计数未启用）')
+        r = subprocess.run([sys.executable, PATCH_GEN, '--stdout'],
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, '补丁生成器运行失败: ' + r.stderr[-300:])
+        norm = lambda s: s.replace('\r\n', '\n')
+        self.assertEqual(
+            norm(r.stdout), norm(self.patch),
+            'docs/supabase-patch-current.sql 与 gen_supabase_patch.py 产出不一致——'
+            '请重新生成（python scripts/gen_supabase_patch.py）而非手改补丁')
 
     def test_02_check约束存在且上限合理(self):
         caps = dict(re.findall(r'check \((\w+) between 0 and (\d+)\)', self.sql))

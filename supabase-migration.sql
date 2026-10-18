@@ -34,9 +34,12 @@ alter table lecture_stats
 --    like/want 只有 greatest(...,0) 下钳，实测灌 p_delta=99999 可直接刷爆计数。
 --    ⚠ 2026-10-18 修订（两项，均有实测依据）：
 --       S1 p_url 守卫：此前对 p_url 零校验，anon 实测可建空键行与 8000 字符行
---          （fetchAll 全表拉取被拖慢、空键行绕过前端 /^__/ 过滤混进统计 map）。
---          现入口校验 1..300 字符，越界抛 22023（PostgREST 400，前端 catch 后
---          静默降级，对正常调用零影响——真实键最长约 120 字符）。
+--          （拖慢 fetchAll 全表拉取，并让表行数可被无限灌高）。现入口两道
+--          校验：长度 1..300，且前缀必须 http(s):// 或 __（保留键族，与前端
+--          fetchAll 的 /^__/ 过滤同口径）——只限长度挡不住「p_url='a'/'b'…」
+--          批量造行，行数灌到触发分页截断后部分讲座计数会静默读不到。
+--          越界一律抛 22023（PostgREST 400，前端 catch 后静默降级，对正常
+--          调用零影响——真实键最长 71 字符，且 100% 是 http(s) 地址）。
 --       S2 visit 单次上钳 100 万→100：原值下一次 curl 就能把页脚 PV（无 capDisplay）
 --          刷成门面事故。d 变量统一承载「钳过的单次增量」，insert 与 on conflict
 --          两条路径共用同一个 d，杜绝两路上钳值漂移；累计总量仍由 1000000 兜底。
@@ -46,6 +49,9 @@ declare v lecture_stats; d int;
 begin
   if p_url is null or length(p_url) = 0 or length(p_url) > 300 then
     raise exception 'p_url must be 1..300 chars' using errcode = 22023;
+  end if;
+  if p_url !~* '^(https?://|__)' then
+    raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
   d := least(greatest(p_delta, 0), 1000);
   insert into lecture_stats (url, visits, likes, wants)
@@ -62,6 +68,9 @@ begin
   if p_url is null or length(p_url) = 0 or length(p_url) > 300 then
     raise exception 'p_url must be 1..300 chars' using errcode = 22023;
   end if;
+  if p_url !~* '^(https?://|__)' then
+    raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
+  end if;
   d := least(greatest(p_delta, 0), 1000);
   insert into lecture_stats (url, visits, likes, wants)
     values (p_url, 0, 0, d)
@@ -77,6 +86,9 @@ begin
   if p_url is null or length(p_url) = 0 or length(p_url) > 300 then
     raise exception 'p_url must be 1..300 chars' using errcode = 22023;
   end if;
+  if p_url !~* '^(https?://|__)' then
+    raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
+  end if;
   d := least(greatest(p_delta, 0), 100);
   insert into lecture_stats (url, visits, likes, wants)
     values (p_url, d, 0, 0)
@@ -85,7 +97,12 @@ begin
   return to_jsonb(v) - 'url';
 end $$;
 
--- ④ RLS：anon 只读 + 可执行三个函数；表级写权限一律不授（写入只走 RPC）
+-- ④ RLS：先确保行级安全真的开着——policy 存在但 RLS 关闭 = 完全裸奔。
+--    ⚠ 2026-10-18 复查补：原 SQL 只有 create policy，漏了 enable。Supabase 对
+--    新表默认给 anon 全表 ALL 权限，RLS 未开启时 policy 形同虚设，匿名可绕过
+--    RPC 直接 INSERT/UPDATE 任意值（本库实测 RLS 已开，此句是幂等兜底，
+--    防止照本 SQL 重建库时漏开）。enable 重复执行无副作用。
+alter table lecture_stats enable row level security;
 drop policy if exists "anon read" on lecture_stats;
 create policy "anon read" on lecture_stats for select using (true);
 grant execute on function increment_like(text, int) to anon;
