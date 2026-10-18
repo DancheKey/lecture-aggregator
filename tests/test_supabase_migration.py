@@ -210,7 +210,7 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         if self.patch is None:
             self.skipTest('supabase-patch-current.sql 不存在（仓库根；云端计数未启用）')
         r = subprocess.run([sys.executable, PATCH_GEN, '--stdout'],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(r.returncode, 0, '补丁生成器运行失败: ' + r.stderr[-300:])
         norm = lambda s: s.replace('\r\n', '\n')
         self.assertEqual(
@@ -241,7 +241,8 @@ class TestSupabaseMigrationSql(unittest.TestCase):
 
     def test_04_入库SQL与生成器一致(self):
         """单一事实源：手改 SQL 会被本测试抓住（生成器重新产出比对）。"""
-        r = subprocess.run([sys.executable, GEN_PATH], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, GEN_PATH], capture_output=True,
+                           text=True, encoding='utf-8')
         self.assertEqual(r.returncode, 0, '生成器运行失败: ' + r.stderr[-300:])
         norm = lambda s: s.replace('\r\n', '\n')
         self.assertEqual(

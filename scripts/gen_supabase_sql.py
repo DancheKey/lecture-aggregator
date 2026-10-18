@@ -12,8 +12,11 @@ import sys
 
 # Windows 上 stdout 文本模式会把 \n 翻译成 \r\n，重定向出的 SQL 带 CRLF；
 # git 入库虽会 normalize，但消除写盘时的 CRLF 可免去每次 commit 的行尾警告。
+# encoding='utf-8'：SQL 注释含 ⚠ 等非 GBK 字符，Windows 默认 cp936 下 print 直接
+# UnicodeEncodeError 崩溃（2026-10-18 实测，test_04/test_09 本地红）；控制台路径
+# 不受影响（WindowsConsoleIO 走 WriteConsoleW 原生 Unicode）。
 try:
-    sys.stdout.reconfigure(newline='\n')
+    sys.stdout.reconfigure(newline='\n', encoding='utf-8')
 except Exception:
     pass
 

@@ -27,6 +27,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GEN_SQL = os.path.join(ROOT, 'scripts', 'gen_supabase_sql.py')
 OUT_PATH = os.path.join(ROOT, 'supabase-patch-current.sql')
 
+# --stdout 模式输出的正文含 ⚠ 等非 GBK 字符：Windows 默认 cp936 下 write 崩溃
+# （与 gen_supabase_sql.py 同款问题，2026-10-18 修复）。
+try:
+    sys.stdout.reconfigure(newline='\n', encoding='utf-8')
+except Exception:
+    pass
+
 # 说明头：静态字符串（不含时间戳等易变量，保证同源比对确定性）
 HEADER = """-- ============================================================
 -- 讲座聚合站 · Supabase 云端补丁（当前唯一应跑的一份）
@@ -65,7 +72,8 @@ HEADER = """-- ============================================================
 
 def build():
     """返回补丁全文（说明头 + 同源 SQL）。"""
-    r = subprocess.run([sys.executable, GEN_SQL], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, GEN_SQL], capture_output=True,
+                   text=True, encoding='utf-8')
     if r.returncode != 0:
         sys.exit('gen_supabase_sql.py 运行失败: ' + r.stderr[-400:])
     sql = r.stdout.replace('\r\n', '\n')
