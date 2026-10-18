@@ -3,8 +3,8 @@
 //
 // 配置来源：site/supabase-config.json（随站发布，2026-10-18 起入库），形如
 //   { "url": "https://<项目ref>.supabase.co", "anonKey": "eyJ..." }
-// anon key 为公开设计（见下安全模型）。缺失 / 空值 / 读取失败 = 云端禁用，
-// 调用方照旧走 /api 与本机降级链，行为与本层上线前完全一致。
+// anon key 为公开设计（见下安全模型）。缺失 / 空值 / 读取失败 / 本机开发环境
+// （见 isLocalDev）= 云端禁用，调用方照旧走 /api 与本机降级链，行为与本层上线前完全一致。
 //
 // 安全模型：anon key 公开是 Supabase 的设计定位（同 reCAPTCHA site key），
 // 真正的闸门在数据库侧——RLS + RPC 增量函数内钳值域（见迁移 SQL 注释），
@@ -12,14 +12,31 @@
 const LectureCloud = (function () {
     let configPromise = null;
 
+    // 本地开发环境短路（2026-10-18）：本机（localhost / 127.0.0.1 / file:）默认不打云端，
+    // 防止本地反复刷新把公网真实计数刷虚高。短路时 loadConfig 直接 resolve(null)，
+    // 与「配置缺失 / 读取失败」完全同路——调用方照旧走 /api 与本机降级链，
+    // 行为与云端层上线前一致（见文件头注释）。
+    // 逃生门：localStorage.forceCloud === '1' 时强制走云端（验证真实写入效果用）。
+    // 判据只认 hostname / 协议；公网域名（*.github.io 等）永不经此分支。
+    function isLocalDev() {
+        var local = typeof location !== 'undefined' &&
+            (location.protocol === 'file:' ||
+             /^(localhost|127\.0\.0\.1)$/.test(location.hostname || ''));
+        if (!local) return false;
+        try { return localStorage.getItem('forceCloud') !== '1'; }
+        catch (e) { return true; }   // 隐私模式等 localStorage 异常：保守短路，宁可少写也不污染云端
+    }
+
     function loadConfig() {
         if (!configPromise) {
-            configPromise = fetch('supabase-config.json', { cache: 'no-store' })
-                .then(r => { if (!r.ok) throw new Error('config-' + r.status); return r.json(); })
-                .then(j => (j && j.url && j.anonKey)
-                    ? { url: String(j.url).replace(/\/+$/, ''), anonKey: String(j.anonKey) }
-                    : null)
-                .catch(() => null);   // 404 / 解析失败 / 空值 = 静默禁用
+            configPromise = isLocalDev()
+                ? Promise.resolve(null)   // 本地开发：一个云端请求都不发
+                : fetch('supabase-config.json', { cache: 'no-store' })
+                    .then(r => { if (!r.ok) throw new Error('config-' + r.status); return r.json(); })
+                    .then(j => (j && j.url && j.anonKey)
+                        ? { url: String(j.url).replace(/\/+$/, ''), anonKey: String(j.anonKey) }
+                        : null)
+                    .catch(() => null);   // 404 / 解析失败 / 空值 = 静默禁用
         }
         return configPromise;
     }

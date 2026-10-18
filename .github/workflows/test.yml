@@ -263,6 +263,14 @@ jobs:
       - name: Run cloud pagination loop tests
         run: node tests/js/cloud_pagination.js
 
+      # 本机开发环境短路门禁（2026-10-18 方案 B）：localhost/127.0.0.1/file: 下
+      # LectureCloud 直接按云端禁用处理（一个请求都不发），本地反复刷新不再虚增
+      # 公网计数；localStorage.forceCloud=1 为逃生门（强制走云端验真实写入）。
+      # 锁公网域名不短路 / 本机三形态短路 / 逃生门 / localStorage 异常保守短路 /
+      # fetchAll 读侧双侧行为。
+      - name: Run cloud local shortcircuit tests
+        run: node tests/js/cloud_local_shortcircuit.js
+
       # 解析器自动产出 timeUnknown（2026-10-03，方案 A）。
       # 08:00/00:00 是占位约定（源页只给日期时填充），但确有讲座真在 8:00 开始。
       # 此前该区分全靠人工在 data/lectures.json 里标注，而爬虫不产出该字段 →
