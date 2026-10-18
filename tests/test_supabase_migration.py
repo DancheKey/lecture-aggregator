@@ -208,7 +208,7 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         产出并与入库文件逐字比对。
         """
         if self.patch is None:
-            self.skipTest('docs/supabase-patch-current.sql 不存在（云端计数未启用）')
+            self.skipTest('supabase-patch-current.sql 不存在（仓库根；云端计数未启用）')
         r = subprocess.run([sys.executable, PATCH_GEN, '--stdout'],
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, '补丁生成器运行失败: ' + r.stderr[-300:])

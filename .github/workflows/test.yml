@@ -235,6 +235,15 @@ jobs:
       - name: Run CI gate coverage meta tests
         run: python tests/test_ci_gate_coverage.py
 
+      # 分层验证映射完整性（2026-10-18 甲方案）：scripts/select_tests.py 的
+      # 文件→测试映射表防腐化。背景：门禁涨到 677 pytest + 21 node 后，每次
+      # 改动跑全套 + 纯净检出复跑达 5-6 分钟，瓶颈是「每次都全量」而非测试
+      # 数量。分层后改动中只跑相关组（实测 13s），推送前才跑全套。本门锁
+      # 四类红线：新增测试/源码忘了归组即红、未知文件升级 ALL 安全默认、
+      # FULL_ONLY 元测试不被子集组漏跑、典型改动分组结果正确。
+      - name: Run layered test-mapping integrity tests
+        run: python tests/test_layer_mapping.py
+
       # 云端计数（Supabase）迁移 SQL 结构守卫（2026-10-17 深夜漏洞复盘）：
       # anon key 公开是设计定位，闸门全在 DB 侧——上线当晚实测 increment_like/
       # want 缺 least 上钳，灌 p_delta=99999 可刷爆计数。本套件锁「三函数两路径

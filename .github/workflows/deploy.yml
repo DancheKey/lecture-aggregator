@@ -76,6 +76,7 @@ jobs:
             tests/test_full_shrink_protection.py
             tests/test_new_source_full_scan.py
             tests/test_ci_gate_coverage.py
+            tests/test_layer_mapping.py
             tests/test_supabase_migration.py
             tests/test_env_flags.py
             tests/test_speaker_normalize.py
