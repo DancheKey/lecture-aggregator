@@ -120,6 +120,11 @@ const app = createApp({
     },
     // 数据阶段从 partial 变 full 时，如果当前没有筛选，保持当前页；否则回到第一页
     dataStage(newVal, oldVal) {
+      // 计数键过渡期迁移（2026-10-18 B1）：数据每次到达（partial 50 条 → full
+      // 全量）都触发一次；函数幂等（只补缺失新键），partial 先迁一部分、
+      // full 到齐补齐剩余。挂此处而非 mounted：迁移需要 this.all 判定多场页，
+      // 而 mounted 时数据尚未加载（loadLikes/loadWants 早于任何 fetch）。
+      this.migrateCountKeys();
       if (newVal === 'full') this.bumpCount();
       if (oldVal === 'partial' && newVal === 'full') {
         if (!this.query && !this.campus && !this.college && !this.year && !this.showLikedOnly) {

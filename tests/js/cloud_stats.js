@@ -10,6 +10,7 @@
 //   T5 REST 401（墙/无权限）→ fetchAll resolve null（软失败降级）
 //   T6 请求形态：URL /rest/v1/rpc/increment_<kind>、双 header、body {p_url,p_delta}
 //   T7 配置只加载一次（Promise 缓存，重复调用不发重复请求）
+//   T8 fetchAll 带 limit=5000（全表拉取兜底，2026-10-18 S1）
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
@@ -153,7 +154,24 @@ async function run() {
     console.log('T7 配置 Promise 缓存（只加载一次）  pass');
   }
 
-  console.log('cloud_stats: 7/7 pass');
+  // T8：fetchAll 必须带 limit（2026-10-18 审查报告 S1）——全表拉取无分页
+  // 上限，行数被灌爆（空键/超长键建行）时单次响应体会拖慢每页统计加载。
+  {
+    let seenUrl = null;
+    const { cloud } = loadCloud((url) => {
+      if (url === 'supabase-config.json') {
+        return jsonResp({ url: 'https://x.supabase.co', anonKey: 'k' });
+      }
+      seenUrl = url;
+      return jsonResp([]);
+    });
+    await cloud.fetchAll();
+    assert.ok(seenUrl && seenUrl.includes('limit=5000'),
+              'T8 fetchAll 的请求须带 limit=5000 兜底，实得: ' + seenUrl);
+    console.log('T8 fetchAll 带 limit=5000（全表拉取兜底）  pass');
+  }
+
+  console.log('cloud_stats: 8/8 pass');
 }
 
 run().catch(e => { console.error(e); process.exit(1); });

@@ -8,7 +8,7 @@ insert 两条路径只有 greatest(...,0) 下钳、没有 least 上钳——持 
 p_delta=99999 即可把 likes/wants 刷爆（表级 RLS 挡得住直接 INSERT/UPDATE，
 挡不住函数内部逻辑漏洞；check 约束上限 10 万也过松）。
 
-本套件锁死四类红线：
+本套件锁死六类红线：
   ① 三个增量函数齐全；
   ② 每个函数的 insert 与 on conflict 两条路径都必须 least(greatest(...)) 双钳
      （当晚漏洞正是 like/want 两函数缺 least，update 路径最先失守）；
@@ -16,7 +16,10 @@ p_delta=99999 即可把 likes/wants 刷爆（表级 RLS 挡得住直接 INSERT/U
   ④ RLS 只读策略 + 三个函数对 anon 授权在位；
   ⑤ 入库的 supabase-migration.sql 与 scripts/gen_supabase_sql.py 的当前产出
      逐字一致——单一事实源可验证（当晚用户两次「跑了个寂寞」的根因之一就是
-     编辑器旧内容/手改 SQL，生成器必须能被测试校准）。
+     编辑器旧内容/手改 SQL，生成器必须能被测试校准）；
+  ⑥ 2026-10-18 两项实测修复：p_url 长度守卫（空键/8000 字符行可被匿名建出，
+     拖慢 fetchAll 并混入统计 map）与 visit 单次上钳 100（原 100 万一次 curl
+     即可把无 capDisplay 的页脚 PV 刷成门面事故）。
 
 只用标准库；读仓库内文件，无网络、无 key、无 Supabase 依赖。
 """
@@ -55,16 +58,66 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             self.assertIn('function ' + n + '(', self.sql, '缺增量函数 ' + n)
 
     def test_01_两路径双钳(self):
-        """insert 与 on conflict 都必须 least(greatest(...))——当晚漏洞即缺此。"""
+        """insert 与 on conflict 都必须 least(greatest(...))——当晚漏洞即缺此。
+
+        2026-10-18 起单次钳收敛到 d 变量（`d := least(greatest(p_delta, 0), cap)`
+        一行，insert 的 values 与 on conflict 的 `+ d` 共用同一个钳过的值），
+        故每个函数体仍是恰好 2 处 least(greatest(：d 定义一处 + update 外层
+        总量钳一处。改成 1 处 = 某条路径没了上钳；改成 3 处 = 又回到了两路
+        各写一份钳值、会漂移的旧形态。
+        """
         for n in FUNCS:
             body = _func_body(self.sql, n)
             n_least = body.count('least(greatest(')
             self.assertEqual(
                 n_least, 2,
-                f'{n} 的 least(greatest 应恰好 2 处（insert 行 + on conflict 行），'
+                f'{n} 的 least(greatest 应恰好 2 处（d 定义 + update 总量钳），'
                 f'实得 {n_least}——缺 least 上钳即可被灌大 delta 刷爆计数')
             self.assertGreaterEqual(
                 body.count('greatest('), 2, f'{n} 丢失 greatest 下钳（负数 delta 可把计数压成负）')
+
+    def test_05_p_url长度守卫(self):
+        """S1（2026-10-18 实测）：三个函数都必须校验 p_url，越界抛 22023。
+
+        实测背景：此前零校验，anon 持 key 可建空键行与 8000 字符行——
+        既拖慢 fetchAll 全表拉取，空键行还绕过前端 /^__/ 过滤混进统计 map。
+        """
+        for n in FUNCS:
+            body = _func_body(self.sql, n)
+            self.assertIn('p_url is null', body, f'{n} 缺 p_url null 守卫')
+            self.assertIn('length(p_url) = 0', body, f'{n} 缺空键守卫')
+            # 带 then 结尾作边界：'300' 是 '3000' 的前缀，无边界断言会把
+            # 上限被改松（如 3000）的破坏误判为通过。
+            self.assertIn('length(p_url) > 300 then', body, f'{n} 缺超长键守卫（上限 300）')
+            self.assertIn('errcode = 22023', body,
+                          f'{n} 守卫未用 22023（invalid_parameter_value）——'
+                          f'PostgREST 需 4xx 才能让前端 catch 后静默降级')
+            # 守卫必须位于函数体入口（任何建行语句之前），否则先建行后拒绝
+            guard_at = body.index('length(p_url) = 0')
+            insert_at = body.index('insert into lecture_stats')
+            self.assertLess(guard_at, insert_at,
+                            f'{n} 的 p_url 守卫在 insert 之后——空/超长键仍会先建行')
+
+    def test_06_visit单次上钳100(self):
+        """S2（2026-10-18）：visit 单次增量钳 100，累计总量钳 100 万不变。
+
+        原单次上钳 = 总量上限 = 100 万，一次 curl 就能把页脚 PV（无 capDisplay）
+        刷成门面事故。分工：d := 行钳**单次 delta**（100），update 外层钳
+        **累计总量**（1000000）——两者不可互相替代。
+        """
+        body = _func_body(self.sql, 'increment_visit')
+        # 尾部分号作边界：'100' 是 '1000000' 的前缀，无边界断言会把单次钳
+        # 被改回 100 万的破坏误判为通过（这正是 S2 修掉的原始形态）。
+        self.assertIn('d := least(greatest(p_delta, 0), 100);', body,
+                      'increment_visit 的单次增量未钳到 100')
+        self.assertIn(
+            'set visits = least(greatest(lecture_stats.visits + d, 0), 1000000)',
+            body, 'increment_visit 的累计总量上限应为 100 万（PV 量级，勿误改）')
+        # like/want 的单次钳保持 1000（与显示层 capDisplay 300+ 匹配）
+        for n in ('increment_like', 'increment_want'):
+            b = _func_body(self.sql, n)
+            self.assertIn('d := least(greatest(p_delta, 0), 1000);', b,
+                          f'{n} 的单次增量应钳 1000（本次只降 visit，勿顺手动它）')
 
     def test_02_check约束存在且上限合理(self):
         caps = dict(re.findall(r'check \((\w+) between 0 and (\d+)\)', self.sql))

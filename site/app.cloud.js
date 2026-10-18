@@ -36,10 +36,13 @@ const LectureCloud = (function () {
         // 拿配置（Promise<config|null>；null=云端禁用）。内部缓存，重复调用不发请求。
         config: loadConfig,
         // 批量读全表 → { url: { visits, likes, wants } }；任一环节失败返回 null。
+        // limit=5000（2026-10-18 审查报告 S1）：全表拉取无分页上限，行数被灌爆
+        // （空键/超长键建行）时单次响应体会拖慢每页统计加载。5000 远超真实量级
+        // （讲座 3835 条 + 保留行），是纯兜底，不影响正常读取。
         fetchAll() {
             return loadConfig().then(cfg => {
                 if (!cfg) return null;
-                return fetch(cfg.url + '/rest/v1/lecture_stats?select=url,visits,likes,wants',
+                return fetch(cfg.url + '/rest/v1/lecture_stats?select=url,visits,likes,wants&limit=5000',
                     { cache: 'no-store', headers: headers(cfg) })
                     .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
                     .then(rows => {

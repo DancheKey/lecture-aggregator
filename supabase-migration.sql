@@ -1,5 +1,5 @@
 -- ============================================================
--- 讲座聚合站 · Supabase 迁移 SQL（2026-10-17 生成，可重复执行）
+-- 讲座聚合站 · Supabase 迁移 SQL（2026-10-18 修订，可重复执行）
 -- 执行位置：Supabase 控制台 → SQL Editor → 粘贴整段运行
 -- 前置：已建表 lecture_stats(url text PK, visits int8, likes int8, wants int8) 且已开 RLS
 -- ============================================================
@@ -32,35 +32,55 @@ alter table lecture_stats
 --    insert 必须显式写全三列——只填目标列会依赖列默认值，缺默认值的表直接 23502。
 --    ⚠ 2026-10-17 深夜修复：update 与 insert 两条路径都必须 least 上钳——此前
 --    like/want 只有 greatest(...,0) 下钳，实测灌 p_delta=99999 可直接刷爆计数。
+--    ⚠ 2026-10-18 修订（两项，均有实测依据）：
+--       S1 p_url 守卫：此前对 p_url 零校验，anon 实测可建空键行与 8000 字符行
+--          （fetchAll 全表拉取被拖慢、空键行绕过前端 /^__/ 过滤混进统计 map）。
+--          现入口校验 1..300 字符，越界抛 22023（PostgREST 400，前端 catch 后
+--          静默降级，对正常调用零影响——真实键最长约 120 字符）。
+--       S2 visit 单次上钳 100 万→100：原值下一次 curl 就能把页脚 PV（无 capDisplay）
+--          刷成门面事故。d 变量统一承载「钳过的单次增量」，insert 与 on conflict
+--          两条路径共用同一个 d，杜绝两路上钳值漂移；累计总量仍由 1000000 兜底。
 create or replace function increment_like(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
-declare v lecture_stats;
+declare v lecture_stats; d int;
 begin
+  if p_url is null or length(p_url) = 0 or length(p_url) > 300 then
+    raise exception 'p_url must be 1..300 chars' using errcode = 22023;
+  end if;
+  d := least(greatest(p_delta, 0), 1000);
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, 0, least(greatest(p_delta, 0), 1000), 0)
-  on conflict (url) do update set likes = least(greatest(lecture_stats.likes + p_delta, 0), 1000)
+    values (p_url, 0, d, 0)
+  on conflict (url) do update set likes = least(greatest(lecture_stats.likes + d, 0), 1000)
   returning * into v;
   return to_jsonb(v) - 'url';
 end $$;
 
 create or replace function increment_want(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
-declare v lecture_stats;
+declare v lecture_stats; d int;
 begin
+  if p_url is null or length(p_url) = 0 or length(p_url) > 300 then
+    raise exception 'p_url must be 1..300 chars' using errcode = 22023;
+  end if;
+  d := least(greatest(p_delta, 0), 1000);
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, 0, 0, least(greatest(p_delta, 0), 1000))
-  on conflict (url) do update set wants = least(greatest(lecture_stats.wants + p_delta, 0), 1000)
+    values (p_url, 0, 0, d)
+  on conflict (url) do update set wants = least(greatest(lecture_stats.wants + d, 0), 1000)
   returning * into v;
   return to_jsonb(v) - 'url';
 end $$;
 
 create or replace function increment_visit(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
-declare v lecture_stats;
+declare v lecture_stats; d int;
 begin
+  if p_url is null or length(p_url) = 0 or length(p_url) > 300 then
+    raise exception 'p_url must be 1..300 chars' using errcode = 22023;
+  end if;
+  d := least(greatest(p_delta, 0), 100);
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, least(greatest(p_delta, 0), 1000000), 0, 0)
-  on conflict (url) do update set visits = least(greatest(lecture_stats.visits + p_delta, 0), 1000000)
+    values (p_url, d, 0, 0)
+  on conflict (url) do update set visits = least(greatest(lecture_stats.visits + d, 0), 1000000)
   returning * into v;
   return to_jsonb(v) - 'url';
 end $$;

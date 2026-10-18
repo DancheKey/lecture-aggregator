@@ -341,6 +341,10 @@ jobs:
       #     否则首页显示 3860 而非 3810；原测试用简化版 merge，未执行真实函数体。
       #  ③ main() 水位闸门：failed_sources 非空时冻结 last_scrape 是增量正确性的
       #     铁律（水位越过失败时段 → 该时段讲座永远补不回）；原覆盖只有源码字面量断言。
+      #  ④ count_key_uniqueness（2026-10-18）：讲座级计数键 ck 的存在性/唯一性/
+      #     规则/模板防回潮（多场页共用裸 URL 键会把一次点赞在统计页放大成 N 份）；
+      #  ⑤ count_key_migration（2026-10-18）：ck 下沉过渡期的旧键→新键
+      #     localStorage 迁移（幂等/写回）与缺 ck 时 single 单元键回退（B3）。
       - name: Run frontend data-flow behavior tests
         run: |
           node tests/js/app_ltkey_consistency.js
@@ -349,6 +353,7 @@ jobs:
           node tests/js/app_url_sync.js
           node tests/js/stats_quota_guard.js
           node tests/js/count_key_uniqueness.js
+          node tests/js/count_key_migration.js
           python tests/test_main_water_gate.py
 
       # 审计报告转义门禁（2026-10-02）：audit_fields.py 的 HTML 报告把抓来的

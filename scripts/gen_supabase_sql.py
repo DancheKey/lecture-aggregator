@@ -27,9 +27,19 @@ CAP_VISITS = 1_000_000
 # 校园讲座真实量级，又与显示层 300+ 封顶留足余量，刷的成本收益比骤降。
 CAP_LIKES = 1_000
 CAP_WANTS = 1_000
+# 2026-10-18 修复（审查报告 S2）：visit 的单次增量上钳。前端每次只 +1、CI 快照
+# 只读、存量导入走 SQL 不经过 RPC——单次钳到 100 对真实用量零影响；而原值
+# 100 万意味着一次 curl 就能把页脚 PV（无 capDisplay）刷成门面事故。
+# 注意与 CAP_VISITS 的分工：本常量钳**单次 delta**，CAP_VISITS 钳**累计总量**。
+CAP_STEP_VISITS = 100
+# p_url 长度上限（审查报告 S1）：增量 RPC 此前对 p_url 零校验，anon 持 key 者
+# 实测可建空键行与 8000 字符行——既污染表（fetchAll 全表拉取被拖慢），空键行
+# 还会绕过前端的 /^__/ 过滤混进讲座统计 map。真实键 = 源页 URL（最长约 120
+# 字符）或 `源页URL~场次序号`，300 留足余量；超范围直接 400 拒绝建行。
+MAX_URL_LEN = 300
 
 HEADER = """-- ============================================================
--- 讲座聚合站 · Supabase 迁移 SQL（2026-10-17 生成，可重复执行）
+-- 讲座聚合站 · Supabase 迁移 SQL（2026-10-18 修订，可重复执行）
 -- 执行位置：Supabase 控制台 → SQL Editor → 粘贴整段运行
 -- 前置：已建表 lecture_stats(url text PK, visits int8, likes int8, wants int8) 且已开 RLS
 -- ============================================================
@@ -62,35 +72,55 @@ alter table lecture_stats
 --    insert 必须显式写全三列——只填目标列会依赖列默认值，缺默认值的表直接 23502。
 --    ⚠ 2026-10-17 深夜修复：update 与 insert 两条路径都必须 least 上钳——此前
 --    like/want 只有 greatest(...,0) 下钳，实测灌 p_delta=99999 可直接刷爆计数。
+--    ⚠ 2026-10-18 修订（两项，均有实测依据）：
+--       S1 p_url 守卫：此前对 p_url 零校验，anon 实测可建空键行与 8000 字符行
+--          （fetchAll 全表拉取被拖慢、空键行绕过前端 /^__/ 过滤混进统计 map）。
+--          现入口校验 1..300 字符，越界抛 22023（PostgREST 400，前端 catch 后
+--          静默降级，对正常调用零影响——真实键最长约 120 字符）。
+--       S2 visit 单次上钳 100 万→100：原值下一次 curl 就能把页脚 PV（无 capDisplay）
+--          刷成门面事故。d 变量统一承载「钳过的单次增量」，insert 与 on conflict
+--          两条路径共用同一个 d，杜绝两路上钳值漂移；累计总量仍由 {cap_v} 兜底。
 create or replace function increment_like(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
-declare v lecture_stats;
+declare v lecture_stats; d int;
 begin
+  if p_url is null or length(p_url) = 0 or length(p_url) > {max_len} then
+    raise exception 'p_url must be 1..{max_len} chars' using errcode = 22023;
+  end if;
+  d := least(greatest(p_delta, 0), {cap_l});
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, 0, least(greatest(p_delta, 0), {cap_l}), 0)
-  on conflict (url) do update set likes = least(greatest(lecture_stats.likes + p_delta, 0), {cap_l})
+    values (p_url, 0, d, 0)
+  on conflict (url) do update set likes = least(greatest(lecture_stats.likes + d, 0), {cap_l})
   returning * into v;
   return to_jsonb(v) - 'url';
 end $$;
 
 create or replace function increment_want(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
-declare v lecture_stats;
+declare v lecture_stats; d int;
 begin
+  if p_url is null or length(p_url) = 0 or length(p_url) > {max_len} then
+    raise exception 'p_url must be 1..{max_len} chars' using errcode = 22023;
+  end if;
+  d := least(greatest(p_delta, 0), {cap_w});
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, 0, 0, least(greatest(p_delta, 0), {cap_w}))
-  on conflict (url) do update set wants = least(greatest(lecture_stats.wants + p_delta, 0), {cap_w})
+    values (p_url, 0, 0, d)
+  on conflict (url) do update set wants = least(greatest(lecture_stats.wants + d, 0), {cap_w})
   returning * into v;
   return to_jsonb(v) - 'url';
 end $$;
 
 create or replace function increment_visit(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
-declare v lecture_stats;
+declare v lecture_stats; d int;
 begin
+  if p_url is null or length(p_url) = 0 or length(p_url) > {max_len} then
+    raise exception 'p_url must be 1..{max_len} chars' using errcode = 22023;
+  end if;
+  d := least(greatest(p_delta, 0), {cap_step_v});
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, least(greatest(p_delta, 0), {cap_v}), 0, 0)
-  on conflict (url) do update set visits = least(greatest(lecture_stats.visits + p_delta, 0), {cap_v})
+    values (p_url, d, 0, 0)
+  on conflict (url) do update set visits = least(greatest(lecture_stats.visits + d, 0), {cap_v})
   returning * into v;
   return to_jsonb(v) - 'url';
 end $$;
@@ -117,7 +147,8 @@ def main():
     with_existing = '--with-existing' in sys.argv
     if with_existing and not os.path.exists(STATS_PATH):
         sys.exit('找不到 ' + STATS_PATH)
-    print(HEADER.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS))
+    print(HEADER.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS,
+                        cap_step_v=CAP_STEP_VISITS, max_len=MAX_URL_LEN))
     if not with_existing:
         print('-- ⑤ 存量导入：未启用（默认）。如需导入本地历史计数，')
         print('--    运行 python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql')

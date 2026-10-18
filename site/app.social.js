@@ -133,6 +133,49 @@ Object.assign(APP_METHODS, {
         localStorage.setItem(WANTED_KEY, JSON.stringify(Array.from(this.wantedUrls)));
       } catch (e) { /* ignore quota/storage errors */ }
     },
+
+    /* ---------- 计数键下沉过渡期迁移（2026-10-18 B1，一次性） ---------- */
+    // ck 改造前，多场拆分讲座的赞/想听记在**页面级**裸 URL 上（likedUrls/
+    // wantedUrls 里存的是无后缀键）；改造后展开场次查 sourceUrl~N 新键 →
+    // 老用户「已赞」状态丢失（图标不高亮），而云端计数还在，再点一次会 +1
+    // （用户以为自己没赞过）。全站 94 个多场源页受影响。
+    // 迁移规则：旧键 →「该页全部场次的新键」都标记（与改造前共享语义一致：
+    // 改造前点一个赞全页 N 场都高亮）。旧键本身**保留**——合并卡的 ck 仍是无
+    // 后缀 URL（页面级），保留才能让合并卡的已赞状态与计数继续自洽；单场页
+    // ck 逐字等于旧键，天然无需迁移。
+    // 幂等：只补缺失的新键，重复调用无副作用——故可挂在每个数据阶段变化处
+    // （partial 的 latest 50 条先迁一部分，full 到齐再补齐剩余）。
+    migrateCountKeys() {
+      const all = this.all || [];
+      if (!all.length) return;   // 数据未就绪：等下次数据阶段变化时再跑
+      const multi = new Map();   // sourceUrl -> Set(lectureIndex)
+      all.forEach(l => {
+        if (l && l.sourceUrl && l.lectureIndex != null) {
+          let s = multi.get(l.sourceUrl);
+          if (!s) { s = new Set(); multi.set(l.sourceUrl, s); }
+          s.add(l.lectureIndex);
+        }
+      });
+      if (!multi.size) return;
+      // 先收集再统一 add：避免 Set.forEach 期间插入的新键被迭代到
+      // （虽含 ~ 会被跳过，但不依赖该巧合）。
+      const expand = (set) => {
+        const add = [];
+        set.forEach(old => {
+          if (old.indexOf('~') !== -1) return;    // 已是新键
+          const idxs = multi.get(old);
+          if (!idxs) return;                       // 单场页：ck 与旧键逐字一致
+          idxs.forEach(i => add.push(old + '~' + i));
+        });
+        let touched = false;
+        add.forEach(k => { if (!set.has(k)) { set.add(k); touched = true; } });
+        return touched;
+      };
+      let dirty = false;
+      if (this.likedUrls && expand(this.likedUrls)) dirty = true;
+      if (this.wantedUrls && expand(this.wantedUrls)) dirty = true;
+      if (dirty) { this.saveLikes(); this.saveWants(); }
+    },
     wantCount(url) {
       const s = this.lectureStats[url];
       if (s && typeof s.wants === 'number') return s.wants;

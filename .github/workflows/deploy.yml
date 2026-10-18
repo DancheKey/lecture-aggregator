@@ -102,6 +102,7 @@ jobs:
             tests/js/app_template_hygiene.js
             tests/js/stats_quota_guard.js
             tests/js/count_key_uniqueness.js
+            tests/js/count_key_migration.js
             tests/js/cloud_stats.js
             tests/js/app_year_consistency.js
             tests/js/app_time_placeholder.js

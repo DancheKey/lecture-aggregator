@@ -103,8 +103,10 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   _flushUrlSync / _onPopState，105 → 109；行内函数见 app.core.js 尾部）
 // （2026-10-16：待开始计数 + 筛选 —— isNotStarted（口径乙判定，app.display.js）/
 //   toggleUpcoming（计数行数字/筛选片开关），109 → 111）
+// （2026-10-18：计数键过渡期迁移 —— migrateCountKeys（旧键→新键一次性展开，
+//   挂 dataStage watch；幂等），111 → 112）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 111) errs.push(`方法数 ${nMethods} != 111`);
+if (nMethods !== 112) errs.push(`方法数 ${nMethods} != 112`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');
