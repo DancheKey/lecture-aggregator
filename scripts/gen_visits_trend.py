@@ -35,7 +35,9 @@
     手绘内联 SVG 双轴组合图 —— 累计访问次数折线（左轴，按数据 min/max 自适应）
     + 每日新增访问柱（右轴）。缺失快照的日期保留在横轴上，不假装连续。
     范围切换与表格展开由前端 JS 完成。明细表仅 日期 / 累计访问次数 /
-    日新增访问 / 备注 四列，UV 相关列已删除。
+    日新增访问 三列（2026-10-18 应用户要求删「备注」列——该列内容是一次性
+    事件流水，对读者无决策价值；note 字段仍留在台账与 payload 里存档，
+    只是不再出片）。UV 相关列已删除。
 
 用法：
     python scripts/gen_visits_trend.py
@@ -114,10 +116,8 @@ table{width:100%;border-collapse:collapse;font-size:15px}
 th,td{padding:11px 15px;text-align:right;border-bottom:1px solid #F1F0EC;white-space:nowrap}
 th{position:sticky;top:0;background:#FAFAF8;font-weight:600;color:#5F5E5A;font-size:14px;z-index:1}
 td:first-child,th:first-child{text-align:left}
-td.l,th.l{text-align:left}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#FCFCFB}
-.note{color:#B45309;font-size:13.5px}
 .foot{margin-top:28px;color:#888780;font-size:13.5px;line-height:1.8}
 .foot b{color:#5F5E5A;font-weight:600}
 """
@@ -179,10 +179,9 @@ function niceTicks(lo, hi, seg) {
 }
 
 // 文本节点安全写入：2026-10-02 起不再用 innerHTML 拼接用户可控文本。
-// 本页唯一来自台账的自由文本是快照的 note 字段（其余全是数字与固定日期），
-// 它经 json.dumps 内嵌进页面脚本——若 note 里含 </script> 或 <img onerror=…>，
-// innerHTML 拼接即构成存储型 XSS（CI 抓来的数据进公网页面）。
-// 这里改用 createElement + textContent：文本一律按纯文本落地，不解释标记。
+// 快照的 note 字段（来自台账）仍随 payload 内嵌进页面数据，但 2026-10-18 起
+// 明细表已删「备注」列，note 不再进 DOM——保留 el() 的 textContent 语义与
+// json.dumps 的 </script> 转义，防未来重新展示 note 时直接踩存储型 XSS。
 // 数值字段走 fmt()（toLocaleString 产物）且统一经 _num() 归一，非字符串不可注入。
 function el(tag, text, cls) {
   var n = document.createElement(tag);
@@ -358,10 +357,6 @@ function renderTable() {
     tr.appendChild(el('td', s.date));
     tr.appendChild(el('td', fmt(s.site_pv)));
     tr.appendChild(el('td', fmt(s.pv_delta)));
-    // note 是本页唯一的自由文本（来自抓取脚本写入的台账），一律按纯文本落地。
-    var last = el('td', null, 'l');
-    if (s.note) last.appendChild(el('span', s.note, 'note'));
-    tr.appendChild(last);
     tb.appendChild(tr);
   });
   var btn = document.getElementById('toggleRows');
@@ -562,20 +557,13 @@ def main():
 <div class="tbl">
   <table>
     <thead><tr><th>日期</th><th>累计访问次数</th>
-    <th>日新增访问</th><th class="l">备注</th></tr></thead>
+    <th>日新增访问</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
 </div>
 
 <div class="foot">
-  <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。
-  本页只统计<b>页面访问次数</b>，不再统计独立访客数（UV）——UV 原依赖 busuanzi
-  服务端按 IP 去重，自建计数拿不到该信息，2026-10-18 起已从本页移除。<br>
-  2026-10-18 起计数源切换为自建 Supabase（种子 1730 = busuanzi 切换时刻实时值，
-  两段口径同为「页面打开次数」，无缝衔接）；「每日新增访问」= 本次快照 − 上一条记录，
-  负值一律记 0 并标注。<br>
-  横轴按<b>真实日期等距</b>绘制，缺失快照的日期不跳过、不补 0，避免把断档画成连续趋势；
-  左轴按数据范围自适应（累计值不从 0 起算，否则曲线会被压平贴顶）。
+  <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。 本页只统计<b>页面访问次数</b>。
 </div>
 
 <p id="load-err" class="empty" hidden></p>

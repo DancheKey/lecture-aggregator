@@ -55,9 +55,7 @@ table{width:100%;border-collapse:collapse;font-size:15px}
 th,td{padding:11px 15px;text-align:right;border-bottom:1px solid #F1F0EC;white-space:nowrap}
 th{position:sticky;top:0;background:#FAFAF8;font-weight:600;color:#5F5E5A;font-size:14px;z-index:1}
 td:first-child,th:first-child{text-align:left}
-td.l,th.l{text-align:left}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#FCFCFB}
-.note{color:#B45309;font-size:13.5px}
 .foot{margin-top:28px;color:#888780;font-size:13.5px;line-height:1.8}
 .foot b{color:#5F5E5A;font-weight:600}

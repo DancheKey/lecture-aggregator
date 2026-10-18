@@ -18,6 +18,8 @@ const html = fs.readFileSync(path.join(SITE, 'visits-trend.html'), 'utf-8');
 const errs = [];
 
 // ---------- ① 静态：不得再有 innerHTML 赋值 ----------
+// 2026-10-18 起明细表已删「备注」列，note 不再进 DOM；禁令保留防回潮——
+// 谁把 note 重新渲染出来，这条就是第一道闸（且 payload 里 note 仍在）。
 if (/\.innerHTML\s*=/.test(html)) {
   const at = html.search(/\.innerHTML\s*=/);
   const line = html.slice(0, at).split('\n').length;
@@ -101,6 +103,34 @@ for (const [label, src, bad] of [
   ['生成脚本模板', genSrc, /fmt\(s\.site_uv\)|fmt\(s\.uv_delta\)|<th>累计访客数/],
 ]) {
   if (bad.test(src)) errs.push(`${label} 仍在体现 UV（${bad}）——UV 已于 2026-10-18 下线`);
+}
+
+// ---------- ⑦b 明细表恰三列，「备注」列不得回潮（2026-10-18） ----------
+// 应用户要求删「备注」列（内容是一次性事件流水，无决策价值）；note 字段仍
+// 留在台账与 payload 存档。锁四处：产物表头列数、产物无备注字样、模板表头、
+// JS 渲染侧无备注单元格。放在此处是为了让 genSrc/js 已定义（避开 TDZ）。
+{
+  // ⚠ `<th(?:\s[^>]*)?>` 不能写 `<th[^>]*>`——后者会把 `<thead>` 也匹配上
+  // （th 是 thead 前缀，实测 3 列被数成 4 列；断言必须自带边界）。
+  const ths = [...html.matchAll(/<th(?:\s[^>]*)?>/g)].map(m => m[0]);
+  if (ths.length !== 3) {
+    errs.push(`明细表应恰 3 列（日期/累计访问次数/日新增访问），实得 ${ths.length}`
+              + '——「备注」列回潮了？');
+  }
+  if (/备注/.test(html)) errs.push('产物 HTML 仍含「备注」字样——该列 2026-10-18 已删');
+  if (/<th[^>]*>备注/.test(genSrc)) {
+    errs.push('scripts/gen_visits_trend.py 模板仍有「备注」表头——直接改产物会被 CI 覆盖');
+  }
+  if (/el\('td'[^)]*'l'\)|el\('span'[^)]*'note'\)/.test(js)) {
+    errs.push('visits-trend.js 仍在渲染备注单元格/span——删列应落到 JS 侧');
+  }
+  // 页脚说明只保留一行（用户 2026-10-18 明确要求），锁「无 <br> 堆叠」语义
+  const footM = html.match(/<div class="foot">([\s\S]*?)<\/div>/);
+  if (!footM) {
+    errs.push('页面缺 .foot 说明块');
+  } else if (/<br/i.test(footM[1])) {
+    errs.push('.foot 又变回多行长文——应只保留一行口径说明');
+  }
 }
 
 function mkNode(tag) {

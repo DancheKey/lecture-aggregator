@@ -53,10 +53,9 @@ function niceTicks(lo, hi, seg) {
 }
 
 // 文本节点安全写入：2026-10-02 起不再用 innerHTML 拼接用户可控文本。
-// 本页唯一来自台账的自由文本是快照的 note 字段（其余全是数字与固定日期），
-// 它经 json.dumps 内嵌进页面脚本——若 note 里含 </script> 或 <img onerror=…>，
-// innerHTML 拼接即构成存储型 XSS（CI 抓来的数据进公网页面）。
-// 这里改用 createElement + textContent：文本一律按纯文本落地，不解释标记。
+// 快照的 note 字段（来自台账）仍随 payload 内嵌进页面数据，但 2026-10-18 起
+// 明细表已删「备注」列，note 不再进 DOM——保留 el() 的 textContent 语义与
+// json.dumps 的 </script> 转义，防未来重新展示 note 时直接踩存储型 XSS。
 // 数值字段走 fmt()（toLocaleString 产物）且统一经 _num() 归一，非字符串不可注入。
 function el(tag, text, cls) {
   var n = document.createElement(tag);
@@ -232,10 +231,6 @@ function renderTable() {
     tr.appendChild(el('td', s.date));
     tr.appendChild(el('td', fmt(s.site_pv)));
     tr.appendChild(el('td', fmt(s.pv_delta)));
-    // note 是本页唯一的自由文本（来自抓取脚本写入的台账），一律按纯文本落地。
-    var last = el('td', null, 'l');
-    if (s.note) last.appendChild(el('span', s.note, 'note'));
-    tr.appendChild(last);
     tb.appendChild(tr);
   });
   var btn = document.getElementById('toggleRows');
