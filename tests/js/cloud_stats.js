@@ -10,7 +10,7 @@
 //   T5 REST 401（墙/无权限）→ fetchAll resolve null（软失败降级）
 //   T6 请求形态：URL /rest/v1/rpc/increment_<kind>、双 header、body {p_url,p_delta}
 //   T7 配置只加载一次（Promise 缓存，重复调用不发重复请求）
-//   T8 fetchAll 带 limit=5000（全表拉取兜底，2026-10-18 S1）
+//   T8 fetchAll 分页形态（order=url&limit=1000&offset=0，2026-10-18 路线二）
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
@@ -154,8 +154,9 @@ async function run() {
     console.log('T7 配置 Promise 缓存（只加载一次）  pass');
   }
 
-  // T8：fetchAll 必须带 limit（2026-10-18 审查报告 S1）——全表拉取无分页
-  // 上限，行数被灌爆（空键/超长键建行）时单次响应体会拖慢每页统计加载。
+  // T8：fetchAll 分页形态（2026-10-18 路线二）——单次 limit 再大也会被服务端
+  // Max Rows（默认 1000）静默截断，故每批恰取 1000 + offset 翻页 + order=url
+  // 保证稳定排序；行数触顶后部分讲座计数静默归零的问题由此根治。
   {
     let seenUrl = null;
     const { cloud } = loadCloud((url) => {
@@ -166,9 +167,10 @@ async function run() {
       return jsonResp([]);
     });
     await cloud.fetchAll();
-    assert.ok(seenUrl && seenUrl.includes('limit=5000'),
-              'T8 fetchAll 的请求须带 limit=5000 兜底，实得: ' + seenUrl);
-    console.log('T8 fetchAll 带 limit=5000（全表拉取兜底）  pass');
+    assert.ok(seenUrl && seenUrl.includes('order=url') && seenUrl.includes('limit=1000')
+              && seenUrl.includes('offset=0'),
+              'T8 fetchAll 首页须为 order=url&limit=1000&offset=0，实得: ' + seenUrl);
+    console.log('T8 fetchAll 分页形态（order/limit/offset）  pass');
   }
 
   console.log('cloud_stats: 8/8 pass');

@@ -36,31 +36,47 @@ const LectureCloud = (function () {
         // 拿配置（Promise<config|null>；null=云端禁用）。内部缓存，重复调用不发请求。
         config: loadConfig,
         // 批量读全表 → { url: { visits, likes, wants } }；任一环节失败返回 null。
-        // limit=5000（2026-10-18 审查报告 S1）：全表拉取无分页上限，行数被灌爆
-        // （空键/超长键建行）时单次响应体会拖慢每页统计加载。5000 远超真实量级
-        // （讲座 3835 条 + 保留行），是纯兜底，不影响正常读取。
+        // 分页循环（2026-10-18）：Supabase 服务端有 Max Rows 全局上限（默认 1000），
+        // 单次 limit 写多大都被静默截到该值——云端守卫上线前曾被灌出垃圾行，
+        // 且讲座计数行随访问持续增长，迟早触顶（触顶后部分讲座计数静默归零）。
+        // 改为每批 PAGE=1000（≤默认 Max Rows，任何配置下都不截断）+ offset 递增
+        // 翻到尾批不满即收工，从此不依赖 Dashboard 的 Max Rows 设置。
+        // order=url：url 是主键唯一，offset 翻页稳定（无重复无遗漏）。
+        // MAX_PAGES：服务端异常时永远返满页的死循环硬顶（5 万行，远超真实量级）。
+        // 任一批失败 → 整次返回 null，调用方照旧走 /api → 本机降级链；
+        // 不做部分采用——半套计数比没有计数更坏（数字会对不上）。
         fetchAll() {
             return loadConfig().then(cfg => {
                 if (!cfg) return null;
-                return fetch(cfg.url + '/rest/v1/lecture_stats?select=url,visits,likes,wants&limit=5000',
-                    { cache: 'no-store', headers: headers(cfg) })
-                    .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
-                    .then(rows => {
-                        const out = {};
-                        for (const row of (rows || [])) {
-                            // `__` 前缀是保留键（__site__=全站 PV、历史探测行），
-                            // 不是讲座 URL，过滤掉防止混入统计与讲座 map。
-                            if (row && row.url && !/^__/.test(row.url)) {
-                                out[row.url] = {
-                                    visits: +row.visits || 0,
-                                    likes: +row.likes || 0,
-                                    wants: +row.wants || 0,
-                                };
+                const PAGE = 1000;
+                const MAX_PAGES = 50;
+                const out = {};
+                const base = cfg.url + '/rest/v1/lecture_stats'
+                    + '?select=url,visits,likes,wants&order=url&limit=' + PAGE + '&offset=';
+                const onePage = (offset) =>
+                    fetch(base + offset, { cache: 'no-store', headers: headers(cfg) })
+                        .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
+                        .then(rows => {
+                            const list = rows || [];
+                            for (const row of list) {
+                                // `__` 前缀是保留键（__site__=全站 PV、历史探测行），
+                                // 不是讲座 URL，过滤掉防止混入统计与讲座 map。
+                                if (row && row.url && !/^__/.test(row.url)) {
+                                    out[row.url] = {
+                                        visits: +row.visits || 0,
+                                        likes: +row.likes || 0,
+                                        wants: +row.wants || 0,
+                                    };
+                                }
                             }
-                        }
-                        return out;
-                    })
-                    .catch(() => null);
+                            return list.length;
+                        });
+                // 满页（=PAGE）才可能有下一页；尾批不满即收工。
+                const loop = (offset, pages) =>
+                    onePage(offset).then(n => (n >= PAGE && pages < MAX_PAGES)
+                        ? loop(offset + PAGE, pages + 1)
+                        : out);
+                return loop(0, 1).catch(() => null);
             });
         },
         // 增量调用：kind ∈ like|want|visit，delta=+1/-1。

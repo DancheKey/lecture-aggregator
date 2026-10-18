@@ -247,6 +247,13 @@ jobs:
       - name: Run cloud stats frontend tests
         run: node tests/js/cloud_stats.js
 
+      # 云端计数分页循环门禁（2026-10-18 路线二）：fetchAll 每批 1000 + offset
+      # 翻页，根治服务端 Max Rows（默认 1000）静默截断——行数触顶后部分讲座
+      # 计数静默归零。锁满页续翻 / 尾批即停 / 整倍数空翻 / 多批合并 / 失败整体
+      # null（禁部分采用）/ 50 批死循环硬顶 / order=url 稳定排序。
+      - name: Run cloud pagination loop tests
+        run: node tests/js/cloud_pagination.js
+
       # 解析器自动产出 timeUnknown（2026-10-03，方案 A）。
       # 08:00/00:00 是占位约定（源页只给日期时填充），但确有讲座真在 8:00 开始。
       # 此前该区分全靠人工在 data/lectures.json 里标注，而爬虫不产出该字段 →
