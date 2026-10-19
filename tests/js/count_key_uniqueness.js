@@ -5,7 +5,7 @@
 // 含 3 场讲座（数据里 3 条记录共用同一 sourceUrl），云端只存 1 份 likes=1，
 // 而 stats.js 按讲座条目逐条累加 → 1+1+1=3；首页上 3 张卡片也会同时 +1。
 //
-// 修法：计数键下沉到讲座级（ck = sourceUrl#lectureIndex，单场则等于 sourceUrl），
+// 修法：计数键下沉到讲座级（ck = sourceUrl~lectureIndex，单场则等于 sourceUrl），
 // 由 scripts/generate_frontend_data.py::count_key 单点产出，前端只消费不拼装。
 //
 // 本门禁锁三件事：
@@ -57,7 +57,7 @@ for (const f of chunks) {
 }
 if (total === 0) errs.push('分片数据为空（扫到 0 条，门禁等价于没跑）');
 if (missing) errs.push(`${missing} 条讲座缺 ck 字段`);
-if (ruleBad) errs.push(`${ruleBad} 条讲座的 ck 与规则不符（单场须等于 sourceUrl，多场须为 sourceUrl#序号）`);
+if (ruleBad) errs.push(`${ruleBad} 条讲座的 ck 与规则不符（单场须等于 sourceUrl，多场须为 sourceUrl~序号）`);
 
 // ---------- ② 统计索引：k 与 ck 同规则且唯一 ----------
 const statsPath = path.join(chunkDir, 'stats.json');

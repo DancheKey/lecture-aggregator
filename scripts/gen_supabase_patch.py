@@ -45,18 +45,21 @@ HEADER = """-- ============================================================
 -- 幂等：create or replace / drop if exists / set default 均可重复执行，
 --   不会覆盖云端已产生的真实增量，可放心重跑。
 --
--- 2026-10-18 版包含（均有实测依据）：
+-- 2026-10-19 版包含（均有实测依据）：
 --   ① 列兜底：默认值 0 + not null（缺默认值的表插新 URL 会 23502）
 --   ② 值域 check 约束：visits<=100万 / likes<=1000 / wants<=1000
 --   ③ 三个增量 RPC：insert 与 on conflict 共用同一个钳过的 d，杜绝两路漂移；
---      visit 单次增量钳 100（原 100 万，一次 curl 即可刷爆页脚 PV）
+--      单次步长统一钳到 1（visit 原 100；like/want 此前误用累计上限 1000 当步长）。
+--      like/want 允许 -1：取消点赞必须真的减（原 greatest(p_delta,0) 把 -1 钳成 0，
+--      「取消」是空操作，且本地已删键 → 再点又 +1，可反复刷高）。
+--      已知取舍：匿名者可对他人计数 -1，彻底方案是设备级点赞表（独立迭代）。
 --   ④ p_url 双守卫：长度 1..300 + 前缀必须 http(s):// 或 __（保留键族）
 --      ——原零校验，anon 可建空键/超长键行，且只限长度挡不住批量造行
 --   ⑤ RLS：先 enable row level security 再建只读 policy
 --      ——原 SQL 只有 create policy，照它重建库会得到「RLS 关着 + anon 全表
 --         ALL 权限」，匿名可绕过 RPC 直写整表
 --
--- 跑完复测（4 条，预期见括号）：
+-- 跑完复测（5 条，预期见括号）：
 --   curl -s -X POST "$URL/rest/v1/rpc/increment_visit" -H "apikey: $KEY" \\
 --     -H "Content-Type: application/json" -d '{"p_url":"","p_delta":1}'   → 400（空键拒绝）
 --   curl -s -X POST "$URL/rest/v1/rpc/increment_visit" -H "apikey: $KEY" \\
@@ -65,6 +68,8 @@ HEADER = """-- ============================================================
 --     -H "Content-Type: application/json" -d '{"p_url":"abc","p_delta":1}' → 400（非法前缀拒绝）
 --   curl -s -X POST "$URL/rest/v1/rpc/increment_visit" -H "apikey: $KEY" \\
 --     -H "Content-Type: application/json" -d '{"p_url":"__site__","p_delta":1}'  → 200 且 visits +1（正常放行）
+--   curl -s -X POST "$URL/rest/v1/rpc/increment_like" -H "apikey: $KEY" \\
+--     -H "Content-Type: application/json" -d '{"p_url":"__site__","p_delta":-1}' → 200 且 likes -1（取消生效）
 -- ============================================================
 
 """

@@ -34,7 +34,21 @@ CAP_WANTS = 1_000
 # 只读、存量导入走 SQL 不经过 RPC——单次钳到 100 对真实用量零影响；而原值
 # 100 万意味着一次 curl 就能把页脚 PV（无 capDisplay）刷成门面事故。
 # 注意与 CAP_VISITS 的分工：本常量钳**单次 delta**，CAP_VISITS 钳**累计总量**。
-CAP_STEP_VISITS = 100
+#
+# 2026-10-19（B1/S1/S5 修复）：单次步长统一收敛到 1。
+#   S5：visit 100 → 1。前端每次只 +1，一次请求=一次真实访问，刷量成本回到真实量级。
+#   S1：like/want 此前**没有**独立步长，直接复用累计上限 1000 当单次上钳——
+#       一次 curl 即可把某条讲座顶到 1000。现补 CAP_STEP_LIKES/WANTS=1。
+#   B1：取消点赞必须能真正 -1。此前 greatest(p_delta, 0) 把 -1 钳成 0，
+#       「取消」是空操作（数字不降），且 likedUrls 已删键 → 再点又 +1，可反复刷高。
+#       现改为 greatest(p_delta, -1)：允许 -1，仍拒绝 -2 及更小的批量减。
+#       已知取舍：匿名者可对他人计数 -1（恶意清零）。相比「可无限刷高 + 取消无效」，
+#       这是止血阶段更可接受的一侧；彻底方案见 B1 设备级点赞表（独立迭代）。
+CAP_STEP_VISITS = 1
+CAP_STEP_LIKES = 1
+CAP_STEP_WANTS = 1
+# like/want 允许的最小单次增量：-1 = 取消。比 -1 更小的批量减一律钳成 -1。
+CAP_STEP_NEG = -1
 # p_url 校验规则（审查报告 S1，2026-10-18 复查加强）：增量 RPC 此前对 p_url
 # 零校验，anon 持 key 者实测可建空键行与 8000 字符行——既污染表（fetchAll 全表
 # 拉取被拖慢），也让表行数可被无限灌高。现入口两道校验，越界一律 400 拒绝：
@@ -89,6 +103,15 @@ alter table lecture_stats
 --       S2 visit 单次上钳 100 万→100：原值下一次 curl 就能把页脚 PV（无 capDisplay）
 --          刷成门面事故。d 变量统一承载「钳过的单次增量」，insert 与 on conflict
 --          两条路径共用同一个 d，杜绝两路上钳值漂移；累计总量仍由 {cap_v} 兜底。
+--    ⚠ 2026-10-19 修订（B1/S1/S5，三项缺陷同源）：
+--       B1 取消无效：like/want 原为 greatest(p_delta, 0)，前端取消传 -1 被钳成 0，
+--          「取消点赞」实际不减——界面 toast 报已取消、数字却被云端权威值弹回原值；
+--          且本地 likedUrls 已删键，再点一次又 +1，同一用户可反复刷高（上限 {cap_l}）。
+--          现改为 greatest(p_delta, {step_neg})：允许 -1，仍拒绝 -2 及更小的批量减。
+--          已知取舍：匿名者可对他人计数 -1；彻底方案是设备级点赞表（独立迭代）。
+--       S1 单次步长：like/want 此前直接用累计上限 {cap_l} 当单次上钳，一次 curl 即可
+--          顶满。现独立为 {step_l}/{step_w}，与累计上限 {cap_l}/{cap_w} 分离。
+--       S5 visit 步长 100 → {step_v}：一次请求 = 一次真实访问。
 create or replace function increment_like(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
 declare v lecture_stats; d int;
@@ -99,9 +122,11 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
-  d := least(greatest(p_delta, 0), {cap_l});
+  d := least(greatest(p_delta, {step_neg}), {step_l});
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, 0, d, 0)
+    -- greatest(d, 0)：取消一个云端还不存在的行（本地 likedUrls 有残留、云端被清过）
+    -- 时 d = -1，直接插会违反 check (likes >= 0) → 400；插 0 则是无害的幂等空操作。
+    values (p_url, 0, greatest(d, 0), 0)
   on conflict (url) do update set likes = least(greatest(lecture_stats.likes + d, 0), {cap_l})
   returning * into v;
   return to_jsonb(v) - 'url';
@@ -117,9 +142,9 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
-  d := least(greatest(p_delta, 0), {cap_w});
+  d := least(greatest(p_delta, {step_neg}), {step_w});
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, 0, 0, d)
+    values (p_url, 0, 0, greatest(d, 0))
   on conflict (url) do update set wants = least(greatest(lecture_stats.wants + d, 0), {cap_w})
   returning * into v;
   return to_jsonb(v) - 'url';
@@ -135,7 +160,7 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
-  d := least(greatest(p_delta, 0), {cap_step_v});
+  d := least(greatest(p_delta, 0), {step_v});
   insert into lecture_stats (url, visits, likes, wants)
     values (p_url, d, 0, 0)
   on conflict (url) do update set visits = least(greatest(lecture_stats.visits + d, 0), {cap_v})
@@ -171,7 +196,9 @@ def main():
     if with_existing and not os.path.exists(STATS_PATH):
         sys.exit('找不到 ' + STATS_PATH)
     print(HEADER.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS,
-                        cap_step_v=CAP_STEP_VISITS, max_len=MAX_URL_LEN))
+                        step_v=CAP_STEP_VISITS, step_l=CAP_STEP_LIKES,
+                        step_w=CAP_STEP_WANTS, step_neg=CAP_STEP_NEG,
+                        max_len=MAX_URL_LEN))
     if not with_existing:
         print('-- ⑤ 存量导入：未启用（默认）。如需导入本地历史计数，')
         print('--    运行 python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql')

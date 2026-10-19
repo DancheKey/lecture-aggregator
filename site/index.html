@@ -433,7 +433,8 @@
               <template v-for="u in g.items" :key="u.key">
               <!-- 论坛卡（2026-09-30 修订）：**同一天**场次 ≥3 才合并为一张卡，展开可看逐场清单；
                    跨天但每天仅 1~2 场的系列逐场单卡展示，不再整块折叠。
-                   点赞/想听按键为 sourceUrl 级（全体场次共享同一计数），点标题进源页看完整议程 -->
+                   点赞/想听按键为**页面级**计数（记在无后缀 sourceUrl 上，与展开后各场的
+                   讲座级 ck 互不干扰：点整页赞不会给某一场 +1，反之亦然），点标题进源页看完整议程 -->
               <article v-if="u.type === 'forum'" class="lecture-card bg-white border border-slate-200 rounded-xl p-4 mb-3 shadow-sm">
                 <div class="flex items-center gap-2 text-11pt mb-1.5">
                   <span class="hidden sm:inline font-medium text-slate-600 truncate min-w-0 max-w-college">{{ u.head.college }}</span>
@@ -676,8 +677,11 @@
 
           <div v-else class="text-center text-slate-400 py-16 text-12pt">没有匹配的讲座。</div>
 
-          <!-- 分页导航 -->
-          <nav v-if="units.length > pageSize" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-12pt">
+          <!-- 分页导航（2026-10-19 B5）：显示条件必须与分页实际使用的数组一致。
+               分页基于 foldedUnits（totalPages / pagedUnits 都取它），而远期折叠会把
+               N 个单元压成 1 个——用 units.length 判断时，折叠后只有 1 页仍会渲染出
+               一个孤零零的「1」。totalPages 已是 computed，直接判它。 -->
+          <nav v-if="totalPages > 1" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-12pt">
             <button @click="prevPage" :disabled="currentPage === 1"
               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
             <template v-for="p in pageNumbers" :key="p">
@@ -787,10 +791,10 @@
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=5e3372093c"></script>
   <script defer src="app.state.js?v=f2d1e1e82d"></script>
-  <script defer src="app.computed.js?v=44a9634403"></script>
+  <script defer src="app.computed.js?v=f6c92d9b65"></script>
   <script defer src="app.display.js?v=1520f114d4"></script>
   <script defer src="app.cloud.js?v=5d758201e3"></script>
-  <script defer src="app.social.js?v=7fe21dba74"></script>
+  <script defer src="app.social.js?v=fc1e54f3a8"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=2765a9ecc7"></script>

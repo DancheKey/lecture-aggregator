@@ -257,6 +257,9 @@ def build_stats(data, updated_at):
     year_totals = {}
     # 最小讲座索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
     lectures = []
+    # 页面级计数索引的原料（2026-10-19 B4）：u -> {split, plain, y, c, cs}。
+    # 见循环后「页面级虚拟索引」说明。
+    page_meta = {}
     # 学院 -> 校区（供统计页校区筛选）
     campus_map = {}
     # 学院 -> 实际举办校区集合（2026-10-14 P2-2）：校级等讲座按 location 推导的
@@ -335,16 +338,42 @@ def build_stats(data, updated_at):
         #   2026-10-08 改：早前取 sourceCount，在 sources 含重复 URL 时会虚高
         #   （iqm/180 曾 sources 两个同一 URL、sc=2）。此处与顶层 sourceNoticeCount
         #   同一口径——同一条内的重复 URL 只算一次。
+        _k = count_key(item)
         lectures.append({
             'u': primary_url,
             # 计数键（2026-10-18）：与分片数据的 ck 同一函数产出。统计页按 k 取
             # 云端计数；多场拆分后同一 u 会有多个不同 k，逐条累加不再重复计同一份。
-            'k': count_key(item),
+            'k': _k,
             'y': y or UNKNOWN_YEAR,
             'c': primary_college,
             'cs': units,
             's': len(unique_source_urls(item)),
         })
+        # 记录该页是否同时存在「讲座级」与「页面级」两种键（B4，见循环后处理）。
+        if primary_url:
+            meta = page_meta.get(primary_url)
+            if meta is None:
+                meta = {'split': False, 'plain': False,
+                        'y': y or UNKNOWN_YEAR, 'c': primary_college, 'cs': units}
+                page_meta[primary_url] = meta
+            if _k != primary_url:
+                meta['split'] = True
+            else:
+                meta['plain'] = True
+
+    # 页面级虚拟索引（2026-10-19 B4）：合并卡（同页同日 ≥3 场）的赞/想听/访问
+    # 记在**无后缀** sourceUrl 上（app.computed.js units() 的 forum 分支 ck: u），
+    # 而统计页只按 k 查 lectureStats，导致 30 组 / 225 场的页面级计数恒为 0。
+    # 这里为「只有拆分键、没有页面级键」的多场页补一条 k = u 的索引，按 u 去重
+    # （同一页 N 场只补 1 条，避免把一份页面级计数放大 N 倍）。归属单位/年份取
+    # 该页首条记录；p=1 标记非真实讲座（前端不读，仅便于排查）。
+    # 若该页本身就有 k == u 的记录（plain），原记录已能查到页面级键，不再补。
+    for _u, meta in page_meta.items():
+        if meta['split'] and not meta['plain']:
+            lectures.append({
+                'u': _u, 'k': _u, 'y': meta['y'], 'c': meta['c'],
+                'cs': meta['cs'], 's': 0, 'p': 1,
+            })
 
     # 年份排序：数字年份降序，"其他"放最后
     def year_key(y):
@@ -421,7 +450,7 @@ def with_unit(item, url_dates):
     # 计数键（2026-10-18）：讲座级唯一键，访问/点赞/想听的云端主键。
     #   - 单场讲座（无 lectureIndex）：= sourceUrl，与改造前的键逐字一致，
     #     故全站 90% 的存量云端计数无需任何迁移。
-    #   - 多场拆分（含 lectureIndex）：= sourceUrl#lectureIndex，
+    #   - 多场拆分（含 lectureIndex）：= sourceUrl~lectureIndex，
     #     同页的 N 场各自成键，修复「点一场 N 场同增」「统计页 1 次点赞累加 N 次」。
     #     该页整页级的计数（首页合并卡片单元）仍用无后缀的 sourceUrl，两者互不干扰。
     it['ck'] = count_key(item)

@@ -3,7 +3,7 @@
 // ⚠ 计数键约定（2026-10-18）：本文件所有 url 形参实际是**讲座级计数键**（数据里
 // 的 ck 字段，由 scripts/generate_frontend_data.py::count_key 产出），不是源页网址：
 //   单场讲座   ck = sourceUrl          （与改造前逐字一致，存量计数零迁移）
-//   多场拆分   ck = sourceUrl#场次序号  （同一通知页的 N 场各自独立计数）
+//   多场拆分   ck = sourceUrl~场次序号  （同一通知页的 N 场各自独立计数）
 // 历史 bug：此前直接用 sourceUrl 当键，导致同一页的 3 场共享一份计数——
 // 点一场 3 场同时 +1、统计页逐条累加把 1 次点赞显示成 3。改键规则只需动生成器。
 Object.assign(APP_METHODS, {
@@ -236,10 +236,8 @@ Object.assign(APP_METHODS, {
     },
 
     /* ---------- 讲座级访问/点赞/想听统计 ---------- */
-    loadLocalStats() {
-      try { this.lectureStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
-      catch (e) { this.lectureStats = {}; }
-    },
+    // loadLocalStats() 已于 2026-10-19 删除：全仓 0 处调用，loadLectureStats()
+    // 自己读 localStorage 并做键迁移/合并，保留一个无调用的同名方法只会误导排查。
     saveLocalStats() {
       try { localStorage.setItem(STAT_KEY, JSON.stringify(this.lectureStats)); } catch (e) { /* ignore */ }
     },

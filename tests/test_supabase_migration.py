@@ -116,26 +116,33 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             self.assertLess(guard_at, insert_at,
                             f'{n} 的 p_url 守卫在 insert 之后——空/超长键仍会先建行')
 
-    def test_06_visit单次上钳100(self):
-        """S2（2026-10-18）：visit 单次增量钳 100，累计总量钳 100 万不变。
+    def test_06_单次步长与取消(self):
+        """B1/S1/S5（2026-10-19）：单次步长统一钳 1，like/want 允许 -1 取消。
 
-        原单次上钳 = 总量上限 = 100 万，一次 curl 就能把页脚 PV（无 capDisplay）
-        刷成门面事故。分工：d := 行钳**单次 delta**（100），update 外层钳
-        **累计总量**（1000000）——两者不可互相替代。
+        S5：visit 单次 100 → 1（一次请求 = 一次真实访问）。
+        S1：like/want 此前没有独立步长，直接复用累计上限 1000 当单次上钳——
+            一次 curl 即可把某条讲座顶到 1000。
+        B1：取消必须真的减。greatest(p_delta, 0) 会把 -1 钳成 0 → 「取消」是
+            空操作（数字不降，toast 却报已取消），且本地已删键，再点又 +1，
+            同一用户可反复刷高。
+        分工不变：d 钳**单次 delta**，update 外层钳**累计总量**。
         """
         body = _func_body(self.sql, 'increment_visit')
-        # 尾部分号作边界：'100' 是 '1000000' 的前缀，无边界断言会把单次钳
-        # 被改回 100 万的破坏误判为通过（这正是 S2 修掉的原始形态）。
-        self.assertIn('d := least(greatest(p_delta, 0), 100);', body,
-                      'increment_visit 的单次增量未钳到 100')
+        # 尾部分号作边界：'1' 是 '1000000' 的前缀，无边界断言会把单次钳
+        # 被改回 100 万的破坏误判为通过。
+        self.assertIn('d := least(greatest(p_delta, 0), 1);', body,
+                      'increment_visit 的单次增量应钳到 1')
         self.assertIn(
             'set visits = least(greatest(lecture_stats.visits + d, 0), 1000000)',
             body, 'increment_visit 的累计总量上限应为 100 万（PV 量级，勿误改）')
-        # like/want 的单次钳保持 1000（与显示层 capDisplay 300+ 匹配）
-        for n in ('increment_like', 'increment_want'):
+        # like/want：单次 ±1（允许 -1 取消），累计上限仍 1000
+        for n, col in (('increment_like', 'likes'), ('increment_want', 'wants')):
             b = _func_body(self.sql, n)
-            self.assertIn('d := least(greatest(p_delta, 0), 1000);', b,
-                          f'{n} 的单次增量应钳 1000（本次只降 visit，勿顺手动它）')
+            self.assertIn('d := least(greatest(p_delta, -1), 1);', b,
+                          f'{n} 的单次步长应为 ±1 且允许 -1（取消必须真的减）')
+            self.assertIn(
+                f'set {col} = least(greatest(lecture_stats.{col} + d, 0), 1000)',
+                b, f'{n} 的累计上限应保持 1000')
 
     def test_07_rls必须显式开启(self):
         """P1-2（2026-10-18 复查）：SQL 要 enable row level security，不能只建 policy。

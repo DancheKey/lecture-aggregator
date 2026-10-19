@@ -656,6 +656,33 @@ class TestLocalOriginParity(unittest.TestCase):
             self.assertIn('跨站请求被拒绝', body,
                           f'{fn} 被拒时未返回统一文案')
 
+    def test_54b_SecFetchSite_cross_site被拒(self):
+        """S4（2026-10-19）：外站 `<img referrerpolicy="no-referrer">` 既不带
+        Origin 也不带 Referer，能穿过「缺失放行」的口子；而现代浏览器会为该请求
+        带上 `Sec-Fetch-Site: cross-site`，据此拒绝。无该头（curl / 老浏览器）
+        仍走原规则，不影响本机脚本与测试。"""
+        srv = _load_server()
+        H = srv.Handler
+
+        class _Stub:
+            pass
+
+        def _origin(headers):
+            h = _Stub()
+            h.headers = headers
+            return H._is_local_origin(h)
+
+        self.assertFalse(_origin({'Sec-Fetch-Site': 'cross-site'}),
+                         'cross-site 必须拒绝（外站图片借访客刷本机计数）')
+        self.assertTrue(_origin({'Sec-Fetch-Site': 'same-origin'}),
+                        'same-origin 应放行')
+        self.assertTrue(_origin({}),
+                        '无 Sec-Fetch-Site（curl / 老浏览器）应沿用原「缺失放行」')
+        self.assertFalse(
+            _origin({'Origin': 'http://evil.example.com',
+                     'Sec-Fetch-Site': 'same-origin'}),
+            '外站 Origin 仍须拒绝（Sec-Fetch-Site 不能放宽原有校验）')
+
     def test_55_全部GET数据接口都过一遍(self):
         """反向兜底：将来新增 GET /api/* 时，本用例逼人做一次抉择。
 
@@ -923,6 +950,102 @@ class TestSourcesUrlValidation(_SourcesRoundTripBase):
         self.assertEqual(set(self.srv.SOURCE_ALLOWED_DOMAINS),
                          set(scraper_mod.DEFAULT_ALLOWED_DOMAINS),
                          'server 与 scraper 的域名白名单不一致（改一处必须同步另一处）')
+
+
+class TestSourcesPutRequiredFields(_SourcesRoundTripBase):
+    """S3（2026-10-19）：PUT /api/sources/<i> 必须与 POST 一样拒绝空 name/base。
+
+    此前 PUT 只做类型校验，可把必填字段改成空串——下一次爬虫读 sources.yaml
+    的行为不可预期（_validate_source_urls 对空 base 是放行而非报错）。
+    """
+
+    class _Stub:
+        pass
+
+    def _put_handler(self, idx, body):
+        h = self._Stub()
+        self._bind(h, '_load_sources', '_save_sources', '_api_sources_put')
+        h.sent = []
+        h._send_json = lambda payload, code=200: h.sent.append((code, payload))
+        h._read_body_json = lambda: body
+        h.idx = idx
+        return h
+
+    def test_19_空name被拒且不落盘(self):
+        h = self._put_handler(0, {'name': '   '})
+        h._api_sources_put(0)
+        code, payload = h.sent[-1]
+        self.assertEqual(code, 400, f'PUT 空 name 须 400：{payload}')
+        self.assertFalse(payload.get('ok'))
+        self.assertEqual(self._read(), self.before_text, '被拒请求不应落盘')
+
+    def test_20_空base被拒且不落盘(self):
+        h = self._put_handler(0, {'base': ''})
+        h._api_sources_put(0)
+        code, payload = h.sent[-1]
+        self.assertEqual(code, 400, f'PUT 空 base 须 400：{payload}')
+        self.assertFalse(payload.get('ok'))
+        self.assertEqual(self._read(), self.before_text, '被拒请求不应落盘')
+
+    def test_21_非空字段仍可正常改(self):
+        """防过度收紧：只改 campus（name/base 不动）必须仍然成功。"""
+        # 源 0 的 campus 原本就是「石牌」，必须改成不同的值，否则文件内容不变，
+        # 「成功应落盘」的断言会因文本相同而误判失败。
+        h = self._put_handler(0, {'campus': '大学城'})
+        h._api_sources_put(0)
+        code, payload = h.sent[-1]
+        self.assertEqual(code, 200, f'PUT 改 campus 应成功：{payload}')
+        self.assertTrue(payload.get('ok'))
+        self.assertNotEqual(self._read(), self.before_text, '成功请求应落盘')
+
+
+class TestKnownLectureUrlsCountKey(unittest.TestCase):
+    """B2（2026-10-19）：讲座白名单必须同时收录讲座级计数键 ck。
+
+    前端自 888a686 起一律传 ck（多场拆分 = sourceUrl~lectureIndex），而
+    _known_lecture_urls() 此前只收 sourceUrl → 383 条记录 / 94 个源页在本地点赞、
+    想听、访问全部 400「未知讲座」，且前端收到 400 后仍把乐观值留在 localStorage，
+    表现为「本机有数字、别台与统计页都是 0」。
+    """
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp(prefix='test_known_urls_')
+        self.srv = _load_server()
+        self._orig_data_dir = self.srv.DATA_DIR
+        self._orig_cache = dict(self.srv._lecture_urls_cache)
+        self.srv.DATA_DIR = self.tmpdir
+        self.srv._lecture_urls_cache = {'mtime': 0.0, 'urls': frozenset()}
+
+    def tearDown(self):
+        self.srv.DATA_DIR = self._orig_data_dir
+        self.srv._lecture_urls_cache = self._orig_cache
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _write(self, rows):
+        with open(os.path.join(self.tmpdir, 'lectures.json'), 'w', encoding='utf-8') as f:
+            json.dump({'updatedAt': 'x', 'data': rows}, f, ensure_ascii=False)
+
+    def test_22_多场记录的ck在白名单内(self):
+        self._write([
+            {'sourceUrl': 'http://a.scnu.edu.cn/1.html', 'lectureIndex': 3},
+            {'sourceUrl': 'http://a.scnu.edu.cn/1.html', 'lectureIndex': 4},
+            {'sourceUrl': 'http://b.scnu.edu.cn/2.html', 'lectureIndex': None},
+        ])
+        urls = self.srv._known_lecture_urls()
+        self.assertIn('http://a.scnu.edu.cn/1.html', urls)
+        self.assertIn('http://a.scnu.edu.cn/1.html~3', urls)
+        self.assertIn('http://a.scnu.edu.cn/1.html~4', urls)
+        self.assertIn('http://b.scnu.edu.cn/2.html', urls)
+        # 单场不得产生 ~None 之类脏键（count_key 对 None 返回裸 URL）
+        self.assertNotIn('http://b.scnu.edu.cn/2.html~None', urls)
+
+    def test_23_尾斜杠源页与count_key同形(self):
+        """count_key 用原始 sourceUrl 拼 ~idx（不 rstrip）；白名单拼接后再整体
+        rstrip，保证 `url/~1` 这种带尾斜杠的源页也能命中前端传来的键。"""
+        self._write([{'sourceUrl': 'http://c.scnu.edu.cn/3.html/', 'lectureIndex': 1}])
+        urls = self.srv._known_lecture_urls()
+        self.assertIn('http://c.scnu.edu.cn/3.html/~1', urls)
+        self.assertIn('http://c.scnu.edu.cn/3.html/~1'.rstrip('/'), urls)
 
 
 if __name__ == '__main__':

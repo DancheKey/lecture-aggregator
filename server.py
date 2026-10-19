@@ -108,7 +108,13 @@ _recent_want_action = {}               # (ip, url) -> (时间戳, 'want'|'unwant
 VISIT_THROTTLE = 180                   # 同一 IP / 同一讲座 3 分钟内只计 1 次
 LIKE_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同点赞动作只接受一次（允许 like↔unlike 交替）
 WANT_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同想听动作只接受一次（允许 want↔unwant 交替）
-LIKE_CAP = 999                         # 单条讲座点赞数上限（防慢速刷高；unlike 仍可继续减）
+# 单条讲座点赞数上限（本地接口防慢速刷高；unlike 仍可继续减）。
+# 与云端 SQL 的累计上限 1000 对齐（此前 999，两处差 1 无实际意义却容易被误读成
+# 「两个不同的产品上限」）。三层上限分工：
+#   COUNT_CAP = 300  → 前端**显示**帽（超过显示 300+），纯展示，不拦写入；
+#   LIKE_CAP  = 1000 → 本地 /api 单条累计上限，到顶返回 capped 不再 +1；
+#   云端 SQL 1000    → lecture_stats.likes 的 check 约束 + RPC 累计钳位。
+LIKE_CAP = 1000
 MAX_BODY_BYTES = 1_000_000             # 请求体上限 1MB（本地 API 的 body 都是几十字节的小 JSON）
 MAX_SOURCES = 500                      # 信息源条数上限（当前 53 条。防POST 循环写入把yaml 撑成几万条，
                                         # 且每个源都会被 daily.yml 真实抓取——几百个源会让CI 跑一整天。
@@ -382,8 +388,17 @@ def _flush_stats_atexit():
 atexit.register(_flush_stats_atexit)
 
 
-# 讲座 sourceUrl 白名单（按 lectures.json mtime 缓存）：写统计接口仅接受已知讲座，
+# 讲座计数键白名单（按 lectures.json mtime 缓存）：写统计接口仅接受已知讲座，
 # 防止任意 url 撑大 _lecture_stats / 伪造访问与点赞。
+#
+# 2026-10-19（B2）：白名单此前只收 sourceUrl，而前端自 888a686 起一律传**讲座级
+# 计数键** ck（多场拆分页 = `sourceUrl~lectureIndex`），于是 383 条记录 / 94 个
+# 源页在本地点赞、想听、访问全部 400「未知讲座」；更糟的是前端收到 400 后仍
+# saveLocalStats()，本机 localStorage 留下「幽灵数字」（这台有、别台和统计页没有）。
+# 现同时收录 ck，规则与 scripts/generate_frontend_data.py::count_key 逐字一致：
+#   有 lectureIndex 且 sourceUrl 非空 → f'{sourceUrl}~{lectureIndex}'
+# 拼接用**原始** sourceUrl（count_key 不 rstrip），再对整串 rstrip('/')，避免
+# 源页地址带尾斜杠时 `url/~3` 与 `url~3` 对不上。
 _lecture_urls_cache = {'mtime': 0.0, 'urls': frozenset()}
 
 
@@ -402,7 +417,12 @@ def _known_lecture_urls():
             for r in rows:
                 u = r.get('sourceUrl')
                 if u:
-                    urls.add(str(u).rstrip('/'))
+                    src = str(u)
+                    urls.add(src.rstrip('/'))
+                    # 讲座级计数键（B2，2026-10-19）：与 count_key 同一规则。
+                    idx = r.get('lectureIndex')
+                    if idx is not None:
+                        urls.add(f'{src}~{idx}'.rstrip('/'))
         except Exception as e:
             _warn(f'讲座 URL 集合解析失败，「未知讲座」校验会降级：{type(e).__name__}: {e}')
         _lecture_urls_cache['mtime'] = mt
@@ -653,6 +673,13 @@ class Handler(SimpleHTTPRequestHandler):
             for k in ('name', 'campus', 'base', 'list_urls'):
                 if k in body:
                     src[k] = body[k]
+            # 2026-10-19（S3）：与 POST 对齐。PUT 此前只做类型校验，可把必填的
+            # name/base 改成空串——下一次爬虫读 sources.yaml 的行为不可预期
+            # （无 base 时 _validate_source_urls 是放行而非报错）。校验放在
+            # 重名校验之前，否则空名会先命中「名称已存在」而给出误导信息。
+            if not (src.get('name') or '').strip() or not (src.get('base') or '').strip():
+                self._send_json({'ok': False, 'message': 'name 和 base 为必填项'}, 400)
+                return
             # 重名校验（P2-4）：改名后不得与**其他**源重名
             _new_name = (src.get('name') or '').strip()
             if any((s.get('name') or '').strip() == _new_name
@@ -696,7 +723,16 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _is_local_origin(self):
         """写接口 CSRF 防护：Origin/Referer 缺失放行（curl/本机脚本）；
-        存在时必须指向 127.0.0.1/localhost/[::1]，拒绝跨站表单/fetch 触发本机写接口。"""
+        存在时必须指向 127.0.0.1/localhost/[::1]，拒绝跨站表单/fetch 触发本机写接口。
+
+        2026-10-19（S4）：补一道 Sec-Fetch-Site。外站 `<img referrerpolicy="no-referrer">`
+        既不带 Origin 也不带 Referer，能穿过上面「缺失放行」的口子；而现代浏览器
+        会为该请求带上 `Sec-Fetch-Site: cross-site`。故该头存在且为 cross-site 时
+        直接拒绝。无该头（curl / 老浏览器）仍走原规则，不影响本机脚本与测试。
+        """
+        sfs = (self.headers.get('Sec-Fetch-Site') or '').strip().lower()
+        if sfs == 'cross-site':
+            return False
         for h in ('Origin', 'Referer'):
             v = (self.headers.get(h) or '').strip()
             if not v:

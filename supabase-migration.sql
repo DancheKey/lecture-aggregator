@@ -43,6 +43,15 @@ alter table lecture_stats
 --       S2 visit 单次上钳 100 万→100：原值下一次 curl 就能把页脚 PV（无 capDisplay）
 --          刷成门面事故。d 变量统一承载「钳过的单次增量」，insert 与 on conflict
 --          两条路径共用同一个 d，杜绝两路上钳值漂移；累计总量仍由 1000000 兜底。
+--    ⚠ 2026-10-19 修订（B1/S1/S5，三项缺陷同源）：
+--       B1 取消无效：like/want 原为 greatest(p_delta, 0)，前端取消传 -1 被钳成 0，
+--          「取消点赞」实际不减——界面 toast 报已取消、数字却被云端权威值弹回原值；
+--          且本地 likedUrls 已删键，再点一次又 +1，同一用户可反复刷高（上限 1000）。
+--          现改为 greatest(p_delta, -1)：允许 -1，仍拒绝 -2 及更小的批量减。
+--          已知取舍：匿名者可对他人计数 -1；彻底方案是设备级点赞表（独立迭代）。
+--       S1 单次步长：like/want 此前直接用累计上限 1000 当单次上钳，一次 curl 即可
+--          顶满。现独立为 1/1，与累计上限 1000/1000 分离。
+--       S5 visit 步长 100 → 1：一次请求 = 一次真实访问。
 create or replace function increment_like(p_url text, p_delta int)
 returns json language plpgsql security definer as $$
 declare v lecture_stats; d int;
@@ -53,9 +62,11 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
-  d := least(greatest(p_delta, 0), 1000);
+  d := least(greatest(p_delta, -1), 1);
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, 0, d, 0)
+    -- greatest(d, 0)：取消一个云端还不存在的行（本地 likedUrls 有残留、云端被清过）
+    -- 时 d = -1，直接插会违反 check (likes >= 0) → 400；插 0 则是无害的幂等空操作。
+    values (p_url, 0, greatest(d, 0), 0)
   on conflict (url) do update set likes = least(greatest(lecture_stats.likes + d, 0), 1000)
   returning * into v;
   return to_jsonb(v) - 'url';
@@ -71,9 +82,9 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
-  d := least(greatest(p_delta, 0), 1000);
+  d := least(greatest(p_delta, -1), 1);
   insert into lecture_stats (url, visits, likes, wants)
-    values (p_url, 0, 0, d)
+    values (p_url, 0, 0, greatest(d, 0))
   on conflict (url) do update set wants = least(greatest(lecture_stats.wants + d, 0), 1000)
   returning * into v;
   return to_jsonb(v) - 'url';
@@ -89,7 +100,7 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
-  d := least(greatest(p_delta, 0), 100);
+  d := least(greatest(p_delta, 0), 1);
   insert into lecture_stats (url, visits, likes, wants)
     values (p_url, d, 0, 0)
   on conflict (url) do update set visits = least(greatest(lecture_stats.visits + d, 0), 1000000)

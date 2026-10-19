@@ -115,7 +115,12 @@ const APP_COMPUTED = {
       const nowMs = Date.now();
       const q = this.query.trim().toLowerCase();
       const list = this.all.filter(l => {
-        if (this.showLikedOnly && !this.hasLiked(l.sourceUrl)) return false;
+        // 只看已赞（2026-10-19 B3）：点赞写入的是计数键 ck（多场拆分 = url~N），
+        // 而合并卡的赞记在**页面级**无后缀 sourceUrl 上（app.computed.js units()
+        // 的 forum 分支 ck: u）。两者任一命中即算已赞，**不能**写成
+        // `hasLiked(l.ck || l.sourceUrl)` 二选一：多场记录的 ck 恒非空，
+        // 永远走不到回退分支，合并卡的赞就永远筛不出来（B4 那一半问题依旧）。
+        if (this.showLikedOnly && !(this.hasLiked(l.ck) || this.hasLiked(l.sourceUrl))) return false;
         // 线上讲座筛选（2026-10-13）：点卡片「# 线上」标签进入；isOnline 为派生
         // 字段（location 写的是参会方式而非实体地点），与校区筛选可叠加。
         if (this.onlineOnly && !l.isOnline) return false;
@@ -465,7 +470,9 @@ const APP_COMPUTED = {
           return {
             key: k,
             label: k,
-            count: fold.recs.length,
+            // 2026-10-19（B6）：文案是「N 场」，必须是**场次数**而非渲染单元数。
+            // 合并卡一张代表 total 场（同页同日 ≥3 场），按 recs.length 会把 5 场算成 1。
+            count: fold.recs.reduce((n, u) => n + (u.type === 'forum' ? (u.total || u.recs.length) : 1), 0),
             // 展开态：items 直接是被折的 units——模板的 forum/single 分支原样复用；
             // 折叠态：items 为空，只留提示条（fold 单元本身不渲染卡片）。
             items: this.farFutureOpen ? fold.recs : [],

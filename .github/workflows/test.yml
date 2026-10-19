@@ -369,6 +369,9 @@ jobs:
       #     规则/模板防回潮（多场页共用裸 URL 键会把一次点赞在统计页放大成 N 份）；
       #  ⑤ count_key_migration（2026-10-18）：ck 下沉过渡期的旧键→新键
       #     localStorage 迁移（幂等/写回）与缺 ck 时 single 单元键回退（B3）。
+      #  ⑥ liked_filter_keys（2026-10-19）：读取侧的键口径——「只看已赞」必须同时
+      #     命中场次级 ck 与合并卡的页面级 url（B3）、stats.json 必须覆盖多场页的
+      #     页面级键（B4）、折叠条 count 是场次数（B6）、分页用 totalPages 判定（B5）。
       - name: Run frontend data-flow behavior tests
         run: |
           node tests/js/app_ltkey_consistency.js
@@ -378,6 +381,7 @@ jobs:
           node tests/js/stats_quota_guard.js
           node tests/js/count_key_uniqueness.js
           node tests/js/count_key_migration.js
+          node tests/js/liked_filter_keys.js
           python tests/test_main_water_gate.py
 
       # 审计报告转义门禁（2026-10-02）：audit_fields.py 的 HTML 报告把抓来的

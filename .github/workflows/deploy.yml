@@ -104,6 +104,7 @@ jobs:
             tests/js/stats_quota_guard.js
             tests/js/count_key_uniqueness.js
             tests/js/count_key_migration.js
+            tests/js/liked_filter_keys.js
             tests/js/cloud_stats.js
             tests/js/cloud_pagination.js
             tests/js/cloud_local_shortcircuit.js

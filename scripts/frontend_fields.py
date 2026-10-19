@@ -63,7 +63,7 @@ FRONTEND_KEEP = frozenset({
     'isOnline',
     # 计数键（2026-10-18）：访问/点赞/想听的云端主键。讲座级唯一——
     # 单场讲座 = sourceUrl（与旧键逐字一致，存量计数零迁移）；
-    # 多场拆分的一页 = sourceUrl#lectureIndex，使同一页的 N 场各自独立计数，
+    # 多场拆分的一页 = sourceUrl~lectureIndex，使同一页的 N 场各自独立计数，
     # 不再「点一场、N 场同时 +1 / 统计页把 1 次点赞累加 N 次」。
     # 由 with_unit() 派生，前端 app.social.js / stats.js / app.computed.js 消费。
     'ck',
