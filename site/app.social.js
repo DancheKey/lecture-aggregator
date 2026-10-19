@@ -384,11 +384,23 @@ Object.assign(APP_METHODS, {
     // 2026-10-17 复核 P1-2：setCollege 补清 showLikedOnly，与 setCampus 对称——
     // 「只看已赞」与其他筛选互斥（口径源头是 toggleLikedFilter：清 campus/college
     // 不清 year）。setYear 刻意不清：反向入口与源头保持同一口径，勿"顺手修过头"。
-    setCampus(c) { this.campus = c; this.showLikedOnly = false; },
-    setCollege(c) { this.college = c; this.showLikedOnly = false; },
+    // 2026-10-19：想听通道与点赞完全对称，两个「已选」开关彼此也互斥（同时开只
+    // 会得到交集，用户几乎不可能想要；互斥比叠加更好理解），故两个入口互相关闭对方。
+    setCampus(c) { this.campus = c; this.showLikedOnly = false; this.showWantedOnly = false; },
+    setCollege(c) { this.college = c; this.showLikedOnly = false; this.showWantedOnly = false; },
     setYear(y) { this.year = y; },
-    toggleLikedFilter() { this.showLikedOnly = !this.showLikedOnly; this.campus = ''; this.college = ''; },
-    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.speaker = ''; this.onlineOnly = false; this.upcomingOnly = false; this.currentPage = 1; },
+    toggleLikedFilter() {
+      this.showLikedOnly = !this.showLikedOnly;
+      if (this.showLikedOnly) this.showWantedOnly = false;
+      this.campus = ''; this.college = '';
+    },
+    // 只看已想听（2026-10-19 用户要求）：与 toggleLikedFilter 逐字对称。
+    toggleWantedFilter() {
+      this.showWantedOnly = !this.showWantedOnly;
+      if (this.showWantedOnly) this.showLikedOnly = false;
+      this.campus = ''; this.college = '';
+    },
+    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.showWantedOnly = false; this.speaker = ''; this.onlineOnly = false; this.upcomingOnly = false; this.currentPage = 1; },
     /* ---------- 分页 ---------- */
     gotoPage(p) {
       if (p < 1 || p > this.totalPages) return;

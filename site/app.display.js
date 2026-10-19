@@ -312,8 +312,10 @@ Object.assign(APP_METHODS, {
       // （onlineOnly 线上筛选、farFutureOpen 远期折叠 items 从 [] 变全部），
       // 且都在第 1 页原位切换、不触发翻页 → 签名不变 → 测量被跳过 →
       // 新卡片无溢出记录 → 「展开摘要/展开简介」按钮静默缺失，零报错。与 B2 同根。
+      // 2026-10-19 补 showWantedOnly：与 showLikedOnly 同构——在第 1 页原位切换、
+      // 整体更换卡片 DOM 而不改页码，漏进签名就会跳过重测，「展开摘要/简介」按钮静默缺失。
       const sig = [this.currentPage, this.query, this.searchField, this.campus,
-        this.college, this.year, this.speaker, this.showLikedOnly,
+        this.college, this.year, this.speaker, this.showLikedOnly, this.showWantedOnly,
         this.all.length, this.dataStage, window.innerWidth,
         Object.keys(this._longText).length,
         JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio),

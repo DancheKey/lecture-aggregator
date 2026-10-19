@@ -236,6 +236,16 @@
               </svg>
               点赞
             </button>
+            <!-- 想听筛选片（2026-10-19 用户要求）：与「点赞」逐字对称，点开只看本机
+                 标记过想听的场次；激活态用蓝色系，与卡片上的想听按钮同一视觉语言
+                 （点赞是灰、想听是蓝），两者互斥——开一个会关掉另一个。 -->
+            <button @click="toggleWantedFilter()"
+              :class="['px-3 py-1.5 rounded-full text-12pt transition flex items-center gap-1', showWantedOnly ? 'text-blue-700 font-semibold bg-blue-50' : 'text-slate-500 hover:bg-slate-100']">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+              </svg>
+              想听
+            </button>
           </nav>
 
           <div ref="menuContainer" class="relative ml-auto">
@@ -278,6 +288,14 @@
               <path d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
             </svg>
             点赞
+          </button>
+          <!-- 想听筛选片（移动端）：与桌面同构，激活态蓝色系 -->
+          <button @click="toggleWantedFilter()"
+            :class="['px-3 py-1 rounded-full text-12pt whitespace-nowrap flex items-center gap-1', showWantedOnly ? 'text-blue-700 font-semibold bg-blue-50' : 'bg-slate-100 text-slate-500']">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+            </svg>
+            想听
           </button>
         </div>
       </div>
@@ -383,6 +401,18 @@
               <span v-if="speaker" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt min-w-0">
                 <span class="truncate">讲者：{{ speaker }}</span>
                 <button type="button" @click="clearSpeaker" aria-label="清除讲者筛选"
+                  class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+              </span>
+              <!-- 已选筛选片（2026-10-19）：点顶部「点赞 / 想听」开关进入后在此显示，
+                   × 或再点顶部开关取消。两者互斥，故最多同时出现一个。 -->
+              <span v-if="showLikedOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
+                <span>只看已赞</span>
+                <button type="button" @click="toggleLikedFilter()" aria-label="清除已赞筛选"
+                  class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+              </span>
+              <span v-if="showWantedOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
+                <span>想听</span>
+                <button type="button" @click="toggleWantedFilter()" aria-label="清除想听筛选"
                   class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
               </span>
               <!-- 线上讲座筛选片（2026-10-13）：点卡片「# 线上」标签后激活，× 或再点取消 -->
@@ -790,14 +820,14 @@
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=5e3372093c"></script>
-  <script defer src="app.state.js?v=f2d1e1e82d"></script>
-  <script defer src="app.computed.js?v=a1dd241f91"></script>
-  <script defer src="app.display.js?v=1520f114d4"></script>
+  <script defer src="app.state.js?v=ec1a701b95"></script>
+  <script defer src="app.computed.js?v=4ecf1eac9b"></script>
+  <script defer src="app.display.js?v=b61f721ed6"></script>
   <script defer src="app.cloud.js?v=5d758201e3"></script>
-  <script defer src="app.social.js?v=09b5fde1e5"></script>
+  <script defer src="app.social.js?v=b3ba6c9a3b"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
-  <script defer src="app.js?v=2765a9ecc7"></script>
+  <script defer src="app.js?v=3cdcecc6f3"></script>
   <!-- footer-counter.js：Supabase 云端计数 + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->

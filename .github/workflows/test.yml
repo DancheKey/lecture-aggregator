@@ -372,6 +372,9 @@ jobs:
       #  ⑥ liked_filter_keys（2026-10-19）：读取侧的键口径——「只看已赞」必须同时
       #     命中场次级 ck 与合并卡的页面级 url（B3）、stats.json 必须覆盖多场页的
       #     页面级键（B4）、折叠条 count 是场次数（B6）、分页用 totalPages 判定（B5）。
+      #  ⑦ stats_wants（2026-10-19）：统计页「想听数」——矩阵/年度合计/行合计三处
+      #     都要累加 wants（漏判会让「只想听」的记录被当空记录跳过），显示模式与
+      #     排序链路和 visits/likes 同构。
       - name: Run frontend data-flow behavior tests
         run: |
           node tests/js/app_ltkey_consistency.js
@@ -382,6 +385,7 @@ jobs:
           node tests/js/count_key_uniqueness.js
           node tests/js/count_key_migration.js
           node tests/js/liked_filter_keys.js
+          node tests/js/stats_wants.js
           python tests/test_main_water_gate.py
 
       # 审计报告转义门禁（2026-10-02）：audit_fields.py 的 HTML 报告把抓来的

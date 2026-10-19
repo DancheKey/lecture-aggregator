@@ -20,6 +20,7 @@
 //   test_06 远期折叠条 count 是场次数而非渲染单元数（B6）
 //   test_07 index.html 分页导航用 totalPages 判定（B5）
 //   test_08 非合并多场页的页面级键不得兜底命中（2026-10-19 用户实测：只赞 1 条筛出 3 条）
+//   test_09 想听通道与点赞逐字对称（2026-10-19 用户要求：顶部筛选片 + 互斥开关）
 //
 // 运行：node tests/js/liked_filter_keys.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -98,6 +99,8 @@ function makeCtx(allData, over) {
   for (const [name, fn] of [
     ['filtered', 'filtered'], ['units', 'units'], ['foldedUnits', 'foldedUnits'],
     ['pagedUnits', 'pagedUnits'], ['pagedGroups', 'pagedGroups'], ['totalPages', 'totalPages'],
+    // 「✕ 清除」按钮的显示条件：想听开关漏进判据会导致按钮不出现（test_09 锁）
+    ['hasActiveFilter', 'hasActiveFilter'],
   ]) {
     Object.defineProperty(cm, name, {
       get: () => computed[fn].call(cm), configurable: true });
@@ -183,6 +186,60 @@ const ALL = multi.concat([solo]);
     const cm = makeCtx(ALL, { showLikedOnly: true, likedUrls: new Set([P]) });
     ok(cm.filtered.length === 3,
        `test_08 合并页的页面级键仍须命中整组 3 场，实际 ${cm.filtered.length} 条`);
+  }
+}
+
+// ---------- test_09：想听通道与点赞逐字对称（2026-10-19 用户要求） ----------
+// 用户要求把「想听」做成跟点赞一样：顶部一个可选筛选片、点开只看已想听的场次。
+// 两条通道共用同一套键口径（场次级 ck 命中 / 页面级键仅在合并组内兜底），
+// 故这里逐条复验想听侧，避免只改一条腿。
+{
+  // A) 场次级想听键：命中 1 条
+  {
+    const cm = makeCtx(ALL, { showWantedOnly: true, wantedUrls: new Set([`${P}~2`]) });
+    const hit = cm.filtered;
+    ok(hit.length === 1 && hit[0].ck === `${P}~2`,
+       `test_09 场次级想听应命中 1 条，实际 ${hit.length}`);
+  }
+  // B) 非合并多场页的页面级想听键：不得兜底命中
+  {
+    const N = 'http://x.scnu.edu.cn/n/10265.html';
+    const days = ['2026-10-13', '2026-10-14', '2026-10-14'];
+    const nonMerged = [1, 2, 3].map((i, k) => rec({
+      sourceUrl: N, lectureIndex: i, ck: `${N}~${i}`,
+      lectureStart: `${days[k]} 14:00:00`, title: `第${i}期`,
+    }));
+    const cm = makeCtx(nonMerged, { showWantedOnly: true, wantedUrls: new Set([N]) });
+    ok(cm.filtered.length === 0,
+       `test_09 非合并页的页面级想听键不得兜底命中，实际筛出 ${cm.filtered.length} 条`);
+    // 只标记了第 3 期 → 恰好 1 条
+    const cm2 = makeCtx(nonMerged, { showWantedOnly: true, wantedUrls: new Set([`${N}~3`]) });
+    ok(cm2.filtered.length === 1,
+       `test_09 只标记第 3 期想听应命中 1 条，实际 ${cm2.filtered.length} 条`);
+  }
+  // C) 合并页的页面级想听键：仍命中整组
+  {
+    const cm = makeCtx(ALL, { showWantedOnly: true, wantedUrls: new Set([P]) });
+    ok(cm.filtered.length === 3,
+       `test_09 合并页的页面级想听键仍须命中整组 3 场，实际 ${cm.filtered.length} 条`);
+  }
+  // D) 两个「已选」开关互斥 + 清除按钮能清掉想听
+  {
+    const cm = makeCtx(ALL, {});
+    cm.showLikedOnly = true;
+    cm.toggleWantedFilter();
+    ok(cm.showWantedOnly === true && cm.showLikedOnly === false,
+       'test_09 打开「想听」应关闭「点赞」（两者互斥，叠加只会得到交集）');
+    cm.toggleLikedFilter();
+    ok(cm.showLikedOnly === true && cm.showWantedOnly === false,
+       'test_09 打开「点赞」应关闭「想听」');
+    cm.clearFilters();
+    ok(cm.showWantedOnly === false && cm.showLikedOnly === false,
+       'test_09 清除全部筛选应同时关掉两个开关');
+    ok(cm.hasActiveFilter === false, 'test_09 清除后 hasActiveFilter 应为 false');
+    cm.showWantedOnly = true;
+    ok(cm.hasActiveFilter === true,
+       'test_09 仅开想听时 hasActiveFilter 必须为 true，否则「✕ 清除」按钮不出现');
   }
 }
 
@@ -273,4 +330,4 @@ if (errs.length) {
   errs.forEach(e => console.log(' -', e));
   process.exit(1);
 }
-console.log('[PASS] 只看已赞：场次级 + 页面级双键命中；统计索引覆盖页面级键；折叠计数为场次数');
+console.log('[PASS] 只看已赞 / 只看已想听：场次级 + 页面级双键命中；统计索引覆盖页面级键；折叠计数为场次数');

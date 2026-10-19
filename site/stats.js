@@ -21,7 +21,7 @@
  * 以 lectures/stats.json 为唯一权威数据源，约 300KB（含预计算
  * matrix/yearTotals/campusMap 与最小讲座索引），避免加载 ~5.7MB 全量 lectures.json。
  * 数据一致性由 scripts/generate_frontend_data.py 保证。
- * 访问/点赞数仍通过 /api/lecture/stats 与本机 localStorage 动态合并后计算。
+ * 访问/点赞/想听数仍通过 /api/lecture/stats 与本机 localStorage 动态合并后计算。
  * 失败时直接提示错误，不再 fallback。
  */
 const { createApp } = Vue;
@@ -30,14 +30,17 @@ const SORT_KEY_TOTAL = 'total';
 const SORT_KEY_COLLEGE = 'college';
 const SORT_KEY_VISITS = 'visits';
 const SORT_KEY_LIKES = 'likes';
+// 想听数（2026-10-19 用户要求）：与访问/点赞同构的第三个互动指标。数据来自
+// lectureStats[k].wants（与首页卡片同一份计数），不需要 stats.json 额外字段。
+const SORT_KEY_WANTS = 'wants';
 const STAT_KEY = 'lecture_stats_v1';   // 与 app.js 一致的本机统计键
 const UNKNOWN_YEAR = '其他';             // 讲座时间缺失时归入此类
 // 校区筛选顺序（与 sources.yaml / 首页一致）；空串代表"全部"
 const CAMPUSES = ['', '石牌', '大学城', '佛山', '汕尾', '校级'];
 
 // 学院 / 年份 / 总计 统计页
-// 支持点击表头按任意列排序（学院名/各年份讲座数/总计/访问数/点赞数），多次点击切换升/降序；
-// 默认按学院名排序，仅显示学院、年份、总计列；点击访问数/点赞数后动态切换为仅显示对应指标；
+// 支持点击表头按任意列排序（学院名/各年份讲座数/总计/访问数/点赞数/想听数），多次点击切换升/降序；
+// 默认按学院名排序，仅显示学院、年份、总计列；点击访问数/点赞数/想听数后动态切换为仅显示对应指标；
 // 表格首列固定、表头固定，未来年份多、学院多时仍可一页内滚动查看。
 createApp({
   data() {
@@ -47,9 +50,9 @@ createApp({
       // 排序状态：key = 'college' | 'total' | 'visits' | 'likes' | 年份字符串(如 '2024')
       // order = 'asc' | 'desc'（多次点击切换）
       sortBy: { key: SORT_KEY_TOTAL, order: 'desc' },
-      // 显示模式：count | visits | likes —— 决定单元格与末列展示什么数值。
-      // 仅由顶部 4 个排序按钮设置；点击年份列只改变 sortBy.key，不改变显示模式，
-      // 这样在「访问数 / 点赞数」模式下点击年份，仍按该模式展示并按年份排序。
+      // 显示模式：count | visits | likes | wants —— 决定单元格与末列展示什么数值。
+      // 仅由顶部排序按钮设置；点击年份列只改变 sortBy.key，不改变显示模式，
+      // 这样在「访问数 / 点赞数 / 想听数」模式下点击年份，仍按该模式展示并按年份排序。
       displayMode: 'count',
       // 学院名过滤（未来学院数量多时便于定位）
       collegeFilter: '',
@@ -57,7 +60,7 @@ createApp({
       campusFilter: '',
       // 校区选项（来自 CAMPUSES 常量）
       campuses: CAMPUSES,
-      // 每条讲座的访问/点赞统计：url -> {visits, likes}（后端优先，无后端时回退本机）
+      // 每条讲座的访问/点赞/想听统计：url -> {visits, likes, wants}（后端优先，无后端时回退本机）
       lectureStats: {},
       // 是否正在加载数据（用于显示轻量提示）
       loading: true,
@@ -104,7 +107,7 @@ createApp({
       Object.entries(rawMatrix).forEach(([college, yearMap]) => {
         m[college] = {};
         Object.entries(yearMap).forEach(([year, count]) => {
-          m[college][year] = { count: count || 0, visits: 0, likes: 0 };
+          m[college][year] = { count: count || 0, visits: 0, likes: 0, wants: 0 };
         });
       });
       // 再叠加访问/点赞：按该讲座归属的每个单位（cs）展开累加，
@@ -120,8 +123,10 @@ createApp({
       lectures.forEach(l => {
         // 2026-10-18：索引键由 u（源页 URL）改为 k（讲座级计数键）——同一源页
         // 拆出的 N 场各有其键，逐条累加不再把一份计数放大 N 倍。
-        const st = this.lectureStats[l.k || l.u] || { visits: 0, likes: 0 };
-        if (!st.visits && !st.likes) return;
+        const st = this.lectureStats[l.k || l.u] || { visits: 0, likes: 0, wants: 0 };
+        // 三个指标全为 0 才跳过（2026-10-19：漏判 wants 会让「只想听、没访问没点赞」
+        // 的讲座整条被丢掉，想听数恒为 0）。
+        if (!st.visits && !st.likes && !st.wants) return;
         const y = l.y || UNKNOWN_YEAR;
         const cols = (l.cs && l.cs.length) ? l.cs : [l.c || '未分类'];
         if (cf) {
@@ -134,9 +139,10 @@ createApp({
           if (!hit) return;
         }
         cols.forEach(c => {
-          const cell = (m[c] && m[c][y]) || { count: 0, visits: 0, likes: 0 };
+          const cell = (m[c] && m[c][y]) || { count: 0, visits: 0, likes: 0, wants: 0 };
           cell.visits += (st.visits || 0);
           cell.likes += (st.likes || 0);
+          cell.wants += (st.wants || 0);
           if (!m[c]) m[c] = {};
           m[c][y] = cell;
         });
@@ -152,11 +158,12 @@ createApp({
       const key = this.sortBy.key;
       const order = this.sortBy.order;
       const list = Object.keys(this.matrix).map(college => {
-        const cells = this.years.map(y => this.matrix[college][y] || { count: 0, visits: 0, likes: 0 });
+        const cells = this.years.map(y => this.matrix[college][y] || { count: 0, visits: 0, likes: 0, wants: 0 });
         const total = cells.reduce((a, b) => a + b.count, 0);
         const visitsTotal = cells.reduce((a, b) => a + b.visits, 0);
         const likesTotal = cells.reduce((a, b) => a + b.likes, 0);
-        return { college, cells, total, visitsTotal, likesTotal };
+        const wantsTotal = cells.reduce((a, b) => a + (b.wants || 0), 0);
+        return { college, cells, total, visitsTotal, likesTotal, wantsTotal };
       }).filter(row => {
         if (!row) return false;
         if (!this.collegeFilter) return true;
@@ -173,12 +180,15 @@ createApp({
           cmp = a.visitsTotal - b.visitsTotal;
         } else if (key === SORT_KEY_LIKES) {
           cmp = a.likesTotal - b.likesTotal;
+        } else if (key === SORT_KEY_WANTS) {
+          cmp = a.wantsTotal - b.wantsTotal;
         } else {
           // 按具体年份列排序（当前模式下对应的数值）
           const idx = this.years.indexOf(key);
           if (idx >= 0) {
             if (this.displayMode === 'visits') cmp = (a.cells[idx].visits || 0) - (b.cells[idx].visits || 0);
             else if (this.displayMode === 'likes') cmp = (a.cells[idx].likes || 0) - (b.cells[idx].likes || 0);
+            else if (this.displayMode === 'wants') cmp = (a.cells[idx].wants || 0) - (b.cells[idx].wants || 0);
             else cmp = (a.cells[idx].count || 0) - (b.cells[idx].count || 0);
           }
         }
@@ -187,7 +197,7 @@ createApp({
       return list;
     },
 
-    // 每年合计：受校区筛选影响；count 来自矩阵累加，visits/likes 动态叠加。
+    // 每年合计：受校区筛选影响；count 来自矩阵累加，visits/likes/wants 动态叠加。
     // 矩阵在选中校区时已是该校区口径，无需再按学院集合过滤。
     yearTotals() {
       const counts = {};
@@ -195,7 +205,7 @@ createApp({
         Object.entries(yearMap).forEach(([y, c]) => { counts[y] = (counts[y] || 0) + (c.count || 0); });
       });
       const totals = {};
-      this.years.forEach(y => { totals[y] = { year: y, count: counts[y] || 0, visits: 0, likes: 0 }; });
+      this.years.forEach(y => { totals[y] = { year: y, count: counts[y] || 0, visits: 0, likes: 0, wants: 0 }; });
       const lectures = (this.summary && this.summary.lectures) || [];
       // 讲座级校区命中（与 matrix() 叠加段同口径）：任一归属单位的归口 ∪ 实际举办。
       const cmapAll = (this.summary && this.summary.campusMap) || {};
@@ -204,8 +214,10 @@ createApp({
       lectures.forEach(l => {
         // 2026-10-18：索引键由 u（源页 URL）改为 k（讲座级计数键）——同一源页
         // 拆出的 N 场各有其键，逐条累加不再把一份计数放大 N 倍。
-        const st = this.lectureStats[l.k || l.u] || { visits: 0, likes: 0 };
-        if (!st.visits && !st.likes) return;
+        const st = this.lectureStats[l.k || l.u] || { visits: 0, likes: 0, wants: 0 };
+        // 三个指标全为 0 才跳过（2026-10-19：漏判 wants 会让「只想听、没访问没点赞」
+        // 的讲座整条被丢掉，想听数恒为 0）。
+        if (!st.visits && !st.likes && !st.wants) return;
         const y = l.y || UNKNOWN_YEAR;
         // 与 matrix 同口径——按讲座归属的全部单位（cs）展开、逐单位过校区筛选。
         // 主学院不在当前校区、次学院在时，列里计入了、合计行却漏掉，
@@ -221,13 +233,14 @@ createApp({
           if (!hit) return;
         }
         cs.forEach(c => {
-          const t = totals[y] || { year: y, count: 0, visits: 0, likes: 0 };
+          const t = totals[y] || { year: y, count: 0, visits: 0, likes: 0, wants: 0 };
           t.visits += (st.visits || 0);
           t.likes += (st.likes || 0);
+          t.wants += (st.wants || 0);
           totals[y] = t;
         });
       });
-      return this.years.map(y => totals[y] || { year: y, count: 0, visits: 0, likes: 0 });
+      return this.years.map(y => totals[y] || { year: y, count: 0, visits: 0, likes: 0, wants: 0 });
     },
 
     // 当前筛选（校区 + 学院名）下的学院/部处（单位）数量
@@ -247,15 +260,19 @@ createApp({
     grandLikes() {
       return this.yearTotals.reduce((a, t) => a + t.likes, 0);
     },
+    // 全站想听数合计（2026-10-19）
+    grandWants() {
+      return this.yearTotals.reduce((a, t) => a + (t.wants || 0), 0);
+    },
   },
 
   methods: {
     // 切换排序：
-    //  - 点击年份列：仅改变排序键，保持当前显示模式（仍按访问数/点赞数展示并排序）
+    //  - 点击年份列：仅改变排序键，保持当前显示模式（仍按访问数/点赞数/想听数展示并排序）
     //  - 点击顶部排序按钮：同时设置显示模式与排序键
     toggleSort(key) {
       const isYearKey = key !== SORT_KEY_COLLEGE && key !== SORT_KEY_TOTAL
-        && key !== SORT_KEY_VISITS && key !== SORT_KEY_LIKES;
+        && key !== SORT_KEY_VISITS && key !== SORT_KEY_LIKES && key !== SORT_KEY_WANTS;
       if (isYearKey) {
         if (this.sortBy.key === key) {
           this.sortBy.order = this.sortBy.order === 'asc' ? 'desc' : 'asc';
@@ -265,7 +282,8 @@ createApp({
         return;
       }
       const newMode = key === SORT_KEY_VISITS ? 'visits'
-        : key === SORT_KEY_LIKES ? 'likes' : 'count';
+        : key === SORT_KEY_LIKES ? 'likes'
+          : key === SORT_KEY_WANTS ? 'wants' : 'count';
       if (this.sortBy.key === key) {
         this.sortBy.order = this.sortBy.order === 'asc' ? 'desc' : 'asc';
       } else {
@@ -285,7 +303,16 @@ createApp({
     cellValue(cell) {
       if (this.displayMode === 'visits') return cell.visits || 0;
       if (this.displayMode === 'likes') return cell.likes || 0;
+      if (this.displayMode === 'wants') return cell.wants || 0;
       return cell.count || 0;
+    },
+    // 合计行取值（与 cellValue 同口径，但入参是 yearTotals 的年度对象）。
+    // 早前模板里写的是三层三元表达式，加第四个模式后已不可读，故抽成方法。
+    totalValue(t) {
+      if (this.displayMode === 'visits') return t.visits || 0;
+      if (this.displayMode === 'likes') return t.likes || 0;
+      if (this.displayMode === 'wants') return t.wants || 0;
+      return t.count || 0;
     },
     // 单元格显示：0 显示为 —，非 0 显示数值
     cellDisplay(cell) {

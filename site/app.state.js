@@ -14,6 +14,9 @@ const APP_STATE = function () {
       query: '',
       searchField: '',  // 搜索维度：''=全部 | college=单位 | location=地点 | topic=题目 | abstract=摘要
       showLikedOnly: false,  // 仅显示已点赞讲座
+      // 仅显示已「想听」讲座（2026-10-19 用户要求：与点赞完全对称——顶部一个可点
+      // 筛选片，点开只留本机标记过想听的场次）。与 showLikedOnly 互斥。
+      showWantedOnly: false,
       onlineOnly: false,   // 仅显示线上讲座（点卡片「# 线上」标签进入，2026-10-13）
       upcomingOnly: false, // 仅显示待开始讲座（点计数行「待开始 N 场」进入，2026-10-16）
       scraping: false,

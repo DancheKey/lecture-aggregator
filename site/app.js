@@ -110,6 +110,8 @@ const app = createApp({
     onlineOnly() { this._scheduleUrlSync(true, 120); },
     upcomingOnly() { this._scheduleUrlSync(true, 120); },
     showLikedOnly() { this.currentPage = 1; },
+    // 想听筛选（2026-10-19）：与点赞同为「本机数据」，同样不进 URL（分享无意义），只回第一页。
+    showWantedOnly() { this.currentPage = 1; },
     // 页码越界钳位（2026-10-14 评审 P1-5）：URL 深链接可能带入超过总页数的
     // page（数据增减后旧链接失效），静态上界（MAX_URL_PAGE）拦不住这种「合法
     // 但越界」值。数据到达/筛选变化使 totalPages 变小时，把 currentPage 钳回
@@ -127,7 +129,7 @@ const app = createApp({
       this.migrateCountKeys();
       if (newVal === 'full') this.bumpCount();
       if (oldVal === 'partial' && newVal === 'full') {
-        if (!this.query && !this.campus && !this.college && !this.year && !this.showLikedOnly) {
+        if (!this.query && !this.campus && !this.college && !this.year && !this.showLikedOnly && !this.showWantedOnly) {
           // 无筛选时，full 数据已包含当前 50 条，保持页面不跳变
           return;
         }

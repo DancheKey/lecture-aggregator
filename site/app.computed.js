@@ -107,7 +107,7 @@ const APP_COMPUTED = {
 
     // 是否有任何筛选条件激活（控制"清除"按钮显示）
     hasActiveFilter() {
-      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.speaker || this.onlineOnly || this.upcomingOnly);
+      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.showWantedOnly || this.speaker || this.onlineOnly || this.upcomingOnly);
     },
 
     // 长文本（简介/摘要）不再阻塞搜索（2026-09-30 用户定）：
@@ -122,10 +122,11 @@ const APP_COMPUTED = {
       // 讲的「不依赖 tick / 不每秒空转」约束针对的就是它，待开始筛选同源复用。
       const nowMs = Date.now();
       const q = this.query.trim().toLowerCase();
-      // 只看已赞（2026-10-19 B3 + 同日二次修正）：点赞写入的是计数键 ck（多场拆分
-      // = url~N），而合并卡的赞记在**页面级**无后缀 sourceUrl 上（units() 的 forum
-      // 分支 ck: u）。两者任一命中即算已赞，**不能**写成 `hasLiked(l.ck || l.sourceUrl)`
-      // 二选一：多场记录的 ck 恒非空，永远走不到回退分支，合并卡的赞就永远筛不出来。
+      // 只看已赞 / 只看已想听（2026-10-19 B3 + 同日二次修正；想听通道同日补齐）：
+      // 点赞/想听写入的都是计数键 ck（多场拆分 = url~N），而合并卡的赞/想听记在
+      // **页面级**无后缀 sourceUrl 上（units() 的 forum 分支 ck: u）。两者任一命中
+      // 即算已选，**不能**写成 `hasLiked(l.ck || l.sourceUrl)` 二选一：多场记录的
+      // ck 恒非空，永远走不到回退分支，合并卡的赞就永远筛不出来。
       //
       // ⚠ 页面级兜底**必须限定在合并组内**：非合并的多场页（如研究生院勤勤论坛
       // 第 1/2/3 期分在 10-13、10-14 两天，同日最多 2 场）逐场是独立单卡，页面上
@@ -133,7 +134,8 @@ const APP_COMPUTED = {
       // 把整页 3 场全部筛出来——用户只赞了第 3 期，却看到 3 条（2026-10-19 实测）。
       // 判定口径与 units() 的 FORUM_MIN 同源。
       const likedOnly = this.showLikedOnly;
-      let mergedDays = null;   // Set(gk)：会渲染成合并卡的分组（惰性构建，只在已赞筛选时算）
+      const wantedOnly = this.showWantedOnly;
+      let mergedDays = null;   // Set(gk)：会渲染成合并卡的分组（惰性构建，只在两条已选筛选时算）
       const inMergedDay = l => {
         if (!mergedDays) {
           const cnt = new Map();
@@ -147,12 +149,14 @@ const APP_COMPUTED = {
         }
         return mergedDays.has(mergedDayKey(l));
       };
+      // 「已赞」「已想听」两条对称通道共用同一套键口径：场次级键命中即算；
+      // 页面级键只在合并组内兜底（理由见上方注释）。
+      const hasL = k => this.hasLiked(k);
+      const hasW = k => this.hasWanted(k);
+      const hitByKey = (has, l) => has(l.ck) || (has(l.sourceUrl) && inMergedDay(l));
       const list = this.all.filter(l => {
-        if (likedOnly) {
-          const byCk = this.hasLiked(l.ck);
-          const byPage = !byCk && this.hasLiked(l.sourceUrl) && inMergedDay(l);
-          if (!byCk && !byPage) return false;
-        }
+        if (likedOnly && !hitByKey(hasL, l)) return false;
+        if (wantedOnly && !hitByKey(hasW, l)) return false;
         // 线上讲座筛选（2026-10-13）：点卡片「# 线上」标签进入；isOnline 为派生
         // 字段（location 写的是参会方式而非实体地点），与校区筛选可叠加。
         if (this.onlineOnly && !l.isOnline) return false;
