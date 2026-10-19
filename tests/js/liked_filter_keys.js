@@ -19,6 +19,7 @@
 //          （B4；2026-10-19 收窄——早前给全部多场页都补，统计页与首页条数对不上）
 //   test_06 远期折叠条 count 是场次数而非渲染单元数（B6）
 //   test_07 index.html 分页导航用 totalPages 判定（B5）
+//   test_08 非合并多场页的页面级键不得兜底命中（2026-10-19 用户实测：只赞 1 条筛出 3 条）
 //
 // 运行：node tests/js/liked_filter_keys.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -150,6 +151,39 @@ const ALL = multi.concat([solo]);
   const hit = cm.filtered;
   ok(hit.length === 1 && hit[0].title === '单场',
      `test_04 单场赞应命中 1 条，实际 ${hit.length}`);
+}
+
+// ---------- test_08：非合并多场页的页面级键不得兜底命中（2026-10-19 用户实测） ----------
+// 现象：只赞了「勤勤论坛第 3 期」，筛选却出来 3 条（第 1/2 期不高亮、计数 0）。
+// 根因：页面级兜底按 sourceUrl 无条件匹配，而该页 3 场分在两天、同日最多 2 场，
+// 逐场是独立单卡，页面上根本没有「整页赞」入口——那条页面级键是历史遗留。
+// 修法：页面级兜底只在「该场属于合并组（同页同日 ≥3 场）」时生效。
+{
+  const N = 'http://x.scnu.edu.cn/n/10265.html';   // 非合并多场页：3 场分 3 天
+  const days = ['2026-10-13', '2026-10-14', '2026-10-14'];
+  const nonMerged = [1, 2, 3].map((i, k) => rec({
+    sourceUrl: N, lectureIndex: i, ck: `${N}~${i}`,
+    lectureStart: `${days[k]} 14:00:00`, title: `第${i}期`,
+  }));
+  // 情形 A：只存了历史页面级键（云端 likes 可能 >0）→ 一条都不该筛出
+  {
+    const cm = makeCtx(nonMerged, { showLikedOnly: true, likedUrls: new Set([N]) });
+    ok(cm.filtered.length === 0,
+       `test_08 非合并页的页面级键不得兜底命中任何场次，实际筛出 ${cm.filtered.length} 条`);
+  }
+  // 情形 B：只赞了第 3 期（场次级键）→ 恰好 1 条
+  {
+    const cm = makeCtx(nonMerged, { showLikedOnly: true, likedUrls: new Set([`${N}~3`]) });
+    const hit = cm.filtered;
+    ok(hit.length === 1 && hit[0].ck === `${N}~3`,
+       `test_08 只赞第 3 期应命中 1 条，实际 ${hit.length} 条`);
+  }
+  // 情形 C：合并页（同页同日 3 场）的页面级键仍须兜底命中整组——口径不能一刀切
+  {
+    const cm = makeCtx(ALL, { showLikedOnly: true, likedUrls: new Set([P]) });
+    ok(cm.filtered.length === 3,
+       `test_08 合并页的页面级键仍须命中整组 3 场，实际 ${cm.filtered.length} 条`);
+  }
 }
 
 // ---------- test_05：stats.json 只为「合并卡页」补页面级索引（B4，2026-10-19 收窄） ----------

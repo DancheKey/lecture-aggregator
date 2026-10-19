@@ -16,6 +16,14 @@ const FAR_FOLD_MIN = 3;
 // 远期折叠组在 pagedGroups 里的 key。真实日期组形如「2026-10-13 周二」，
 // 不会与此冲突；模板用它区分「折叠条」与「日期头」两种组头。
 const FAR_FOLD_KEY = '__far_future__';
+// 合并卡阈值（2026-09-30 用户定；2026-10-19 从 units() 里抽出为模块常量）：
+// **同一源页 + 同一天** ≥3 场才折成一张合并卡。抽出来的原因：「只看已赞」的
+// 页面级兜底匹配也必须用这个口径——只有合并卡才是「整页一个赞」，也只有它会把
+// 计数键写成无后缀的 sourceUrl（units() 的 forum 分支 ck: u）。两处若各写一份
+// 数字，就会出现「卡片不高亮、筛选却筛出来了」的分叉（2026-10-19 用户实测）。
+const FORUM_MIN = 3;
+// 合并/分组的键：源页 + 日期。units() 与 filtered() 共用，保证口径逐字一致。
+const mergedDayKey = l => (l.sourceUrl || '') + '|' + (l.lectureStart || '').slice(0, 10);
 
 const APP_COMPUTED = {
     totalCount() { return this.all.length; },
@@ -114,13 +122,37 @@ const APP_COMPUTED = {
       // 讲的「不依赖 tick / 不每秒空转」约束针对的就是它，待开始筛选同源复用。
       const nowMs = Date.now();
       const q = this.query.trim().toLowerCase();
+      // 只看已赞（2026-10-19 B3 + 同日二次修正）：点赞写入的是计数键 ck（多场拆分
+      // = url~N），而合并卡的赞记在**页面级**无后缀 sourceUrl 上（units() 的 forum
+      // 分支 ck: u）。两者任一命中即算已赞，**不能**写成 `hasLiked(l.ck || l.sourceUrl)`
+      // 二选一：多场记录的 ck 恒非空，永远走不到回退分支，合并卡的赞就永远筛不出来。
+      //
+      // ⚠ 页面级兜底**必须限定在合并组内**：非合并的多场页（如研究生院勤勤论坛
+      // 第 1/2/3 期分在 10-13、10-14 两天，同日最多 2 场）逐场是独立单卡，页面上
+      // 没有任何「整页赞」入口。若按 sourceUrl 无条件兜底，历史遗留的页面级键会
+      // 把整页 3 场全部筛出来——用户只赞了第 3 期，却看到 3 条（2026-10-19 实测）。
+      // 判定口径与 units() 的 FORUM_MIN 同源。
+      const likedOnly = this.showLikedOnly;
+      let mergedDays = null;   // Set(gk)：会渲染成合并卡的分组（惰性构建，只在已赞筛选时算）
+      const inMergedDay = l => {
+        if (!mergedDays) {
+          const cnt = new Map();
+          this.all.forEach(x => {
+            if (!x || !x.sourceUrl) return;
+            const k = mergedDayKey(x);
+            cnt.set(k, (cnt.get(k) || 0) + 1);
+          });
+          mergedDays = new Set();
+          cnt.forEach((n, k) => { if (n >= FORUM_MIN) mergedDays.add(k); });
+        }
+        return mergedDays.has(mergedDayKey(l));
+      };
       const list = this.all.filter(l => {
-        // 只看已赞（2026-10-19 B3）：点赞写入的是计数键 ck（多场拆分 = url~N），
-        // 而合并卡的赞记在**页面级**无后缀 sourceUrl 上（app.computed.js units()
-        // 的 forum 分支 ck: u）。两者任一命中即算已赞，**不能**写成
-        // `hasLiked(l.ck || l.sourceUrl)` 二选一：多场记录的 ck 恒非空，
-        // 永远走不到回退分支，合并卡的赞就永远筛不出来（B4 那一半问题依旧）。
-        if (this.showLikedOnly && !(this.hasLiked(l.ck) || this.hasLiked(l.sourceUrl))) return false;
+        if (likedOnly) {
+          const byCk = this.hasLiked(l.ck);
+          const byPage = !byCk && this.hasLiked(l.sourceUrl) && inMergedDay(l);
+          if (!byCk && !byPage) return false;
+        }
         // 线上讲座筛选（2026-10-13）：点卡片「# 线上」标签进入；isOnline 为派生
         // 字段（location 写的是参会方式而非实体地点），与校区筛选可叠加。
         if (this.onlineOnly && !l.isOnline) return false;
@@ -260,8 +292,8 @@ const APP_COMPUTED = {
     // 仅 1~2 场」的系列也整块折起（如美术学院 4 场分 3 天），反而藏掉了用户想看的逐场
     // 时间/地点。保持 filtered 的既有排序（论坛卡落在其所在天的位置）。
     units() {
-      const MIN = 3; // 同日折叠阈值：同一天 ≥3 场才折叠（1~2 场的日子逐场展示更有用）
-      const groupKey = l => (l.sourceUrl || '') + '|' + (l.lectureStart || '').slice(0, 10);
+      const MIN = FORUM_MIN; // 同日折叠阈值（模块常量，filtered 的已赞兜底同源）
+      const groupKey = mergedDayKey;
       // 2026-10-02 修复 B1：折叠组同时需要两个计数——修复前只有一个且取错了来源。
       //
       //   filteredCounts：filtered（已应用筛选/搜索）里的命中场次 → 决定是否折叠；
