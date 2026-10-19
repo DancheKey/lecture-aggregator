@@ -135,43 +135,102 @@ Object.assign(APP_METHODS, {
     },
 
     /* ---------- 计数键下沉过渡期迁移（2026-10-18 B1，一次性） ---------- */
-    // ck 改造前，多场拆分讲座的赞/想听记在**页面级**裸 URL 上（likedUrls/
-    // wantedUrls 里存的是无后缀键）；改造后展开场次查 sourceUrl~N 新键 →
-    // 老用户「已赞」状态丢失（图标不高亮），而云端计数还在，再点一次会 +1
-    // （用户以为自己没赞过）。全站 94 个多场源页受影响。
-    // 迁移规则：旧键 →「该页全部场次的新键」都标记（与改造前共享语义一致：
-    // 改造前点一个赞全页 N 场都高亮）。旧键本身**保留**——合并卡的 ck 仍是无
-    // 后缀 URL（页面级），保留才能让合并卡的已赞状态与计数继续自洽；单场页
-    // ck 逐字等于旧键，天然无需迁移。
-    // 幂等：只补缺失的新键，重复调用无副作用——故可挂在每个数据阶段变化处
-    // （partial 的 latest 50 条先迁一部分，full 到齐再补齐剩余）。
+    // ck 改造前，多场拆分讲座的赞/想听记在**页面级**裸 URL 上；改造后展开场次
+    // 查 sourceUrl~N 新键。两个过渡期问题：
+    //
+    // ① 老用户「已赞」状态丢失（图标不高亮，云端计数还在，再点一次 +1）。
+    // ② **反向问题（2026-10-19 用户实测）**：早前把旧键展开到「该页全部场次」，
+    //    但只有**合并卡**（同页同日 ≥3 场）才是「整页一个赞」的语义；普通多场页
+    //    每场是独立按钮，展开会把用户没点过的场次也标成已赞——图标高亮、数字 0，
+    //    「只看已赞」还会多筛出几条。全站 94 个多场源页里，只有 30 组会渲染成
+    //    合并卡，其余 60+ 页的展开都是伪造状态。
+    //
+    // 现规则（口径与 app.computed.js units() 的 MIN=3 完全一致）：
+    //   · 合并组 = 「同源页 + 同一天」场次 ≥3 的那一组，它渲染成一张合并卡，
+    //     卡片计数键 = 无后缀 sourceUrl（页面级）。
+    //   · expand：旧页面级键 → 只展开到**合并组内**的场次。非合并页不展开
+    //     （会造成虚假已赞）；混合页（同页既有合并组、又有零散场次）也不会
+    //     波及零散场次——那些场次是独立单卡，各自有自己的按钮。
+    //   · prune：把「不属于任何合并组的计数为 0 的键」清掉——它们只可能来自
+    //     历史展开，会让用户没点过的场次错误高亮。合并页的页面级裸键、合并组内
+    //     场次键一律保留；计数 > 0 的键也一律保留（可能是真实点赞但计数未落盘，
+    //     宁可留错也不误删）。
+    //   · prune 需要 lectureStats 已就绪，否则会把所有键当「计数 0」误删——
+    //     故加 statReady 守卫；loadLectureStats 完成后再调一次本函数补齐。
+    // 幂等：只补缺失的键、只删计数为 0 的伪造键，重复调用无副作用。
     migrateCountKeys() {
       const all = this.all || [];
       if (!all.length) return;   // 数据未就绪：等下次数据阶段变化时再跑
-      const multi = new Map();   // sourceUrl -> Set(lectureIndex)
+
+      // 该页全部场次：sourceUrl -> Set(lectureIndex)
+      const multi = new Map();
+      // 会渲染成合并卡的源页（存在任一同日 ≥3 场的组）
+      const mergedUrls = new Set();
+      // 属于合并组的场次：sourceUrl -> Set(lectureIndex)，expand/prune 的共同依据
+      const mergedIdx = new Map();
+      const dayIdx = new Map();   // sourceUrl|日期 -> lectureIndex[]
       all.forEach(l => {
-        if (l && l.sourceUrl && l.lectureIndex != null) {
-          let s = multi.get(l.sourceUrl);
-          if (!s) { s = new Set(); multi.set(l.sourceUrl, s); }
-          s.add(l.lectureIndex);
-        }
+        if (!l || !l.sourceUrl || l.lectureIndex == null) return;
+        let s = multi.get(l.sourceUrl);
+        if (!s) { s = new Set(); multi.set(l.sourceUrl, s); }
+        s.add(l.lectureIndex);
+        const gk = l.sourceUrl + '|' + (l.lectureStart || '').slice(0, 10);
+        let arr = dayIdx.get(gk);
+        if (!arr) { arr = []; dayIdx.set(gk, arr); }
+        arr.push(l.lectureIndex);
       });
       if (!multi.size) return;
-      // 先收集再统一 add：避免 Set.forEach 期间插入的新键被迭代到
-      // （虽含 ~ 会被跳过，但不依赖该巧合）。
+      dayIdx.forEach((idxs, gk) => {
+        if (idxs.length < 3) return;                  // 同日 <3 场：不折叠，逐场单卡
+        const u = gk.slice(0, gk.lastIndexOf('|'));
+        mergedUrls.add(u);
+        let ms = mergedIdx.get(u);
+        if (!ms) { ms = new Set(); mergedIdx.set(u, ms); }
+        idxs.forEach(i => ms.add(i));
+      });
+
+      let dirty = false;
+
+      // ① prune：不属于任何合并组、且计数为 0 的键 → 删除（历史展开的伪造状态）
+      const stats = this.lectureStats || {};
+      if (Object.keys(stats).length > 0) {
+        const prune = (set) => {
+          const del = [];
+          set.forEach(k => {
+            const i = k.lastIndexOf('~');
+            const u = i > 0 ? k.slice(0, i) : k;
+            if (!multi.has(u)) return;              // 单场页：键即 sourceUrl，合法
+            const idx = i > 0 ? k.slice(i + 1) : null;
+            if (idx === null) {
+              // 页面级裸键：只有合并页才有这个 UI 入口（合并卡的赞记在裸 URL 上）
+              if (mergedUrls.has(u)) return;
+            } else {
+              const ms = mergedIdx.get(u);
+              if (ms && ms.has(Number(idx))) return;   // 合并组内的场次键：合法
+            }
+            const st = stats[k];
+            if (!st || (!st.likes && !st.wants)) del.push(k);
+          });
+          del.forEach(k => set.delete(k));
+          return del.length > 0;
+        };
+        if (this.likedUrls && prune(this.likedUrls)) dirty = true;
+        if (this.wantedUrls && prune(this.wantedUrls)) dirty = true;
+      }
+
+      // ② expand：旧页面级键 → 合并组内的场次键（改造前「整页一个赞」= 整卡赞）
       const expand = (set) => {
         const add = [];
         set.forEach(old => {
-          if (old.indexOf('~') !== -1) return;    // 已是新键
-          const idxs = multi.get(old);
-          if (!idxs) return;                       // 单场页：ck 与旧键逐字一致
+          if (old.indexOf('~') !== -1) return;   // 已是新键
+          const idxs = mergedIdx.get(old);       // 非合并页没有这个表项 → 不展开
+          if (!idxs) return;
           idxs.forEach(i => add.push(old + '~' + i));
         });
         let touched = false;
         add.forEach(k => { if (!set.has(k)) { set.add(k); touched = true; } });
         return touched;
       };
-      let dirty = false;
       if (this.likedUrls && expand(this.likedUrls)) dirty = true;
       if (this.wantedUrls && expand(this.wantedUrls)) dirty = true;
       if (dirty) { this.saveLikes(); this.saveWants(); }
@@ -272,6 +331,14 @@ Object.assign(APP_METHODS, {
       let localStats = {};
       try { localStats = JSON.parse(localStorage.getItem(STAT_KEY) || '{}'); }
       catch (e) { localStats = {}; }
+      // 计数就绪后必须再跑一次键迁移（2026-10-19）：migrateCountKeys 的 prune 段
+      // 以「该键计数为 0」为判据，lectureStats 还没赋值时整个 prune 被守卫跳过；
+      // 而数据阶段的调用发生在 loadLectureStats 之前，于是伪造键永远清不掉
+      // （用户实测：只赞 1 条，「只看已赞」筛出 3 条）。这里在每次赋值后补一次。
+      const applyStats = (obj) => {
+        this.lectureStats = obj;
+        this.migrateCountKeys();
+      };
       // 2026-10-17 云端优先链：Supabase 批量读全表（一次请求拿全部讲座计数）；
       // 无配置/失败 → 本地 server /api → 本机。合并与写侧容错逻辑三条链共用。
       LectureCloud.fetchAll().then(cloudStats => {
@@ -280,7 +347,7 @@ Object.assign(APP_METHODS, {
           for (const [url, serverSt] of Object.entries(cloudStats)) {
             merged[url] = { ...(merged[url] || {}), ...serverSt };
           }
-          this.lectureStats = merged;
+          applyStats(merged);
           // 写侧单独容错（2026-10-14 评审 P1-6）：localStorage 配额满/
           // 隐私模式下 setItem 抛 QuotaExceededError，若不让它在此止住，
           // 会掉进下方 .catch 用本地旧值覆盖掉已合并的服务端权威数据。
@@ -297,13 +364,13 @@ Object.assign(APP_METHODS, {
               for (const [url, serverSt] of Object.entries(j.stats)) {
                 merged[url] = { ...(merged[url] || {}), ...serverSt };
               }
-              this.lectureStats = merged;
+              applyStats(merged);
               try { localStorage.setItem(STAT_KEY, JSON.stringify(merged)); } catch (e) { /* 保留内存态即可 */ }
             } else {
-              this.lectureStats = localStats;
+              applyStats(localStats);
             }
           })
-          .catch(() => { this.lectureStats = localStats; });
+          .catch(() => { applyStats(localStats); });
       });
     },
     showToast(msg, ms = 2000) {

@@ -61,9 +61,13 @@ function loadParts(ctx, parts) {
   }
 }
 
-// 造一个最小 this：loadLectureStats 只碰 this.lectureStats（+ 隐性 this.loadError 等）
+// 造一个最小 this：loadLectureStats 只碰 this.lectureStats（+ 隐性 this.loadError 等）。
+// 2026-10-19：loadLectureStats 赋值后会补跑 this.migrateCountKeys()（统计就绪后再
+// prune 一次伪造计数键，见 count_key_migration.js 的 B2e）——浏览器里 `this` 是
+// 挂了全部 APP_METHODS 的 Vue 实例，本套件的最小 this 不是，故补一个空桩。
+// 迁移逻辑本身由 count_key_migration.js 覆盖，这里只验证配额异常不回滚服务端值。
 function makeThis() {
-  return { lectureStats: null };
+  return { lectureStats: null, migrateCountKeys: () => {} };
 }
 
 // loadLectureStats 自身不返回 Promise（Vue 方法惯例），测试侧轮询等终态

@@ -257,7 +257,7 @@ def build_stats(data, updated_at):
     year_totals = {}
     # 最小讲座索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
     lectures = []
-    # 页面级计数索引的原料（2026-10-19 B4）：u -> {split, plain, y, c, cs}。
+    # 页面级计数索引的原料（2026-10-19 B4）：u -> {split, plain, days, y, c, cs}。
     # 见循环后「页面级虚拟索引」说明。
     page_meta = {}
     # 学院 -> 校区（供统计页校区筛选）
@@ -349,31 +349,42 @@ def build_stats(data, updated_at):
             'cs': units,
             's': len(unique_source_urls(item)),
         })
-        # 记录该页是否同时存在「讲座级」与「页面级」两种键（B4，见循环后处理）。
+        # 记录该页的键形态与「同日场次数」（B4，见循环后处理）。
         if primary_url:
             meta = page_meta.get(primary_url)
             if meta is None:
-                meta = {'split': False, 'plain': False,
+                meta = {'split': False, 'plain': False, 'days': {},
                         'y': y or UNKNOWN_YEAR, 'c': primary_college, 'cs': units}
                 page_meta[primary_url] = meta
             if _k != primary_url:
                 meta['split'] = True
             else:
                 meta['plain'] = True
+            _day = (item.get('lectureStart') or '')[:10]
+            meta['days'][_day] = meta['days'].get(_day, 0) + 1
 
     # 页面级虚拟索引（2026-10-19 B4）：合并卡（同页同日 ≥3 场）的赞/想听/访问
     # 记在**无后缀** sourceUrl 上（app.computed.js units() 的 forum 分支 ck: u），
     # 而统计页只按 k 查 lectureStats，导致 30 组 / 225 场的页面级计数恒为 0。
-    # 这里为「只有拆分键、没有页面级键」的多场页补一条 k = u 的索引，按 u 去重
-    # （同一页 N 场只补 1 条，避免把一份页面级计数放大 N 倍）。归属单位/年份取
-    # 该页首条记录；p=1 标记非真实讲座（前端不读，仅便于排查）。
-    # 若该页本身就有 k == u 的记录（plain），原记录已能查到页面级键，不再补。
+    # 这里为这些页补一条 k = u 的索引，按 u 去重（同页多天多张合并卡共用同一个
+    # 页面级键，只补 1 条，避免把一份页面级计数放大 N 倍）。归属单位/年份取该页
+    # 首条记录；p=1 标记非真实讲座（前端不读，仅便于排查）。
+    #
+    # ⚠ 2026-10-19 修正（用户实测）：早前对**全部**多场页（94 个）补虚拟记录，
+    # 但跨天拆分的页（如研究生院某页 3 场分 3 天）根本不渲染合并卡，页面上没有
+    # 任何「整页赞」的入口，页面级键恒为 0/历史脏值，统计页却把它当一条记录计入
+    # → 与首页「只看已赞」的条数对不上（用户：统计页 4 条 vs 首页筛出 1 条）。
+    # 判定依据必须与 units() 的 MIN=3 完全同口径：该页存在任意一天场次 ≥3。
+    # plain 页（本身 k == u）原记录已能查到页面级键，不再补。
     for _u, meta in page_meta.items():
-        if meta['split'] and not meta['plain']:
-            lectures.append({
-                'u': _u, 'k': _u, 'y': meta['y'], 'c': meta['c'],
-                'cs': meta['cs'], 's': 0, 'p': 1,
-            })
+        if not meta['split'] or meta['plain']:
+            continue
+        if max(meta['days'].values() or [0]) < 3:
+            continue
+        lectures.append({
+            'u': _u, 'k': _u, 'y': meta['y'], 'c': meta['c'],
+            'cs': meta['cs'], 's': 0, 'p': 1,
+        })
 
     # 年份排序：数字年份降序，"其他"放最后
     def year_key(y):

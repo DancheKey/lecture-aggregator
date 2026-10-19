@@ -15,7 +15,8 @@
 //   test_02 页面级赞（无后缀 url，合并卡）能筛出整组，且仍渲染为 1 张合并卡
 //   test_03 未赞的场次不被筛出
 //   test_04 单场记录（ck === sourceUrl）照常筛出
-//   test_05 stats.json：每个多场页的页面级 u 都有 k=u 的索引（B4 不回流）
+//   test_05 stats.json：只有「合并卡页」（同页同日 ≥3 场）才有 k=u 的页面级索引
+//          （B4；2026-10-19 收窄——早前给全部多场页都补，统计页与首页条数对不上）
 //   test_06 远期折叠条 count 是场次数而非渲染单元数（B6）
 //   test_07 index.html 分页导航用 totalPages 判定（B5）
 //
@@ -151,33 +152,50 @@ const ALL = multi.concat([solo]);
      `test_04 单场赞应命中 1 条，实际 ${hit.length}`);
 }
 
-// ---------- test_05：stats.json 覆盖多场页的页面级键（B4） ----------
+// ---------- test_05：stats.json 只为「合并卡页」补页面级索引（B4，2026-10-19 收窄） ----------
+// 判定口径必须与 app.computed.js units() 的 MIN=3 完全一致：同源页 + 同一天 ≥3 场
+// 才渲染成合并卡，才有「整页一个赞」的入口，页面级键（无后缀 url）才会被写入。
+// 早前对**全部** 94 个多场页都补了 k=u 虚拟记录，跨天拆分的页根本没有这个入口，
+// 统计页却把页面级键（历史脏值）当一条记录计入 → 与首页「只看已赞」条数对不上。
 {
   const statsPath = path.join(SITE, 'lectures', 'stats.json');
+  const dataPath = path.join(SITE, 'lectures.json');
   if (!fs.existsSync(statsPath)) {
     errs.push('test_05 site/lectures/stats.json 不存在');
   } else {
     const st = JSON.parse(fs.readFileSync(statsPath, 'utf-8'));
     const L = st.lectures || [];
-    const ks = new Set(L.map(x => x.k));
-    // 多场页 = 同一 u 下存在 k != u 的记录；这些页的页面级计数记在 u 上，
-    // 统计页按 k 查 → 必须有 k = u 的索引记录（p=1 虚拟记录或真实单场记录）。
-    const pageSplit = new Map();   // u -> {split, plain}
-    L.forEach(x => {
-      const m = pageSplit.get(x.u) || { split: false, plain: false };
-      if (x.k !== x.u) m.split = true; else m.plain = true;
-      pageSplit.set(x.u, m);
-    });
-    const missing = [];
-    pageSplit.forEach((m, u) => {
-      if (m.split && !m.plain && !ks.has(u)) missing.push(u);
-    });
-    ok(missing.length === 0,
-       `test_05 ${missing.length} 个多场页缺页面级索引（k=u），统计页会漏计：`
-       + missing.slice(0, 3).join(', '));
-    // 页面级索引必须唯一：同一页 N 场只能补 1 条，否则一份计数被放大 N 倍
+    // k 必须唯一：同一页 N 场只能补 1 条，否则一份计数被放大 N 倍
     const dup = L.length - new Set(L.map(x => x.k)).size;
     ok(dup === 0, `test_05 stats.json 的 k 不唯一（重复 ${dup} 条），统计页会重复累加`);
+
+    // 用全量数据算出「会渲染成合并卡的源页」集合（同源页同日 ≥3 场）
+    if (!fs.existsSync(dataPath)) {
+      errs.push('test_05 site/lectures.json 不存在，无法校验合并页口径');
+    } else {
+      const raw = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+      const recs = raw.data || [];
+      const dayCount = new Map();
+      recs.forEach(r => {
+        const u = r.sourceUrl || '';
+        if (!u) return;
+        const gk = u + '|' + String(r.lectureStart || '').slice(0, 10);
+        dayCount.set(gk, (dayCount.get(gk) || 0) + 1);
+      });
+      const mergedPages = new Set();
+      dayCount.forEach((n, gk) => {
+        if (n >= 3) mergedPages.add(gk.slice(0, gk.lastIndexOf('|')));
+      });
+      const virtualPages = new Set(L.filter(x => x.p === 1).map(x => x.u));
+      const extra = [...virtualPages].filter(u => !mergedPages.has(u));
+      const miss = [...mergedPages].filter(u => !virtualPages.has(u));
+      ok(extra.length === 0,
+         `test_05 ${extra.length} 个「非合并页」被补了页面级索引（k=u），统计页会多算一条：`
+         + extra.slice(0, 3).join(', '));
+      ok(miss.length === 0,
+         `test_05 ${miss.length} 个合并卡页缺页面级索引（k=u），统计页会漏计：`
+         + miss.slice(0, 3).join(', '));
+    }
   }
 }
 
