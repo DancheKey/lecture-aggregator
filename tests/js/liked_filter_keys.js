@@ -10,6 +10,11 @@
 //   B5 分页导航用 units.length 判定，而分页实际基于 foldedUnits。
 //   B6 远期折叠条文案是「N 场」，却用渲染单元数（一张合并卡 5 场算成 1）。
 //
+// ⚠ 2026-10-19 晚语义变更（用户澄清本意）：筛选的数据源 = **全站口径**——
+//   「有点赞/有想听」按 lectureStats（云端全表合并）的 likes/wants > 0 判定，
+//   不再读本机 likedUrls/wantedUrls（那只是卡片按钮高亮的依据）。
+//   键口径（场次级 ck / 页面级仅合并组内兜底）不变。
+//
 // 本门禁锁：
 //   test_01 场次级赞（url~N）能被「只看已赞」筛出
 //   test_02 页面级赞（无后缀 url，合并卡）能筛出整组，且仍渲染为 1 张合并卡
@@ -93,7 +98,8 @@ function rec(over) {
 function makeCtx(allData, over) {
   const cm = Object.assign(vm.runInContext('APP_STATE()', ctx), methods, {
     all: allData, campus: '', college: '', year: '', query: '', searchField: '',
-    speaker: '', showLikedOnly: false, likedUrls: new Set(),
+    speaker: '', showLikedOnly: false, likedUrls: new Set(), wantedUrls: new Set(),
+    lectureStats: {},
     pageSize: 25, currentPage: 1,
   }, over || {});
   for (const [name, fn] of [
@@ -119,7 +125,7 @@ const ALL = multi.concat([solo]);
 
 // ---------- test_01：场次级赞能被筛出 ----------
 {
-  const cm = makeCtx(ALL, { showLikedOnly: true, likedUrls: new Set([`${P}~2`]) });
+  const cm = makeCtx(ALL, { showLikedOnly: true, lectureStats: { [`${P}~2`]: { likes: 1, wants: 0, visits: 0 } } });
   const hit = cm.filtered;
   ok(hit.length === 1, `test_01 只看已赞应命中 1 条（场次级 ck），实际 ${hit.length}`);
   ok(hit[0] && hit[0].ck === `${P}~2`, `test_01 命中的应是 url~2，实际 ${hit[0] && hit[0].ck}`);
@@ -130,7 +136,7 @@ const ALL = multi.concat([solo]);
 
 // ---------- test_02：页面级赞（合并卡）能筛出整组 ----------
 {
-  const cm = makeCtx(ALL, { showLikedOnly: true, likedUrls: new Set([P]) });
+  const cm = makeCtx(ALL, { showLikedOnly: true, lectureStats: { [P]: { likes: 2, wants: 0, visits: 0 } } });
   const hit = cm.filtered;
   // 过滤是逐条记录：同页 3 场的 sourceUrl 都命中页面级键 → 整组保留，
   // 从而仍满足 MIN=3 的合并条件（形态不退化成单卡）。
@@ -144,13 +150,13 @@ const ALL = multi.concat([solo]);
 
 // ---------- test_03：未赞的不被筛出 ----------
 {
-  const cm = makeCtx(ALL, { showLikedOnly: true, likedUrls: new Set() });
+  const cm = makeCtx(ALL, { showLikedOnly: true, lectureStats: {} });
   ok(cm.filtered.length === 0, `test_03 无任何已赞时应为 0 条，实际 ${cm.filtered.length}`);
 }
 
 // ---------- test_04：单场（ck === sourceUrl）照常筛出 ----------
 {
-  const cm = makeCtx(ALL, { showLikedOnly: true, likedUrls: new Set([S]) });
+  const cm = makeCtx(ALL, { showLikedOnly: true, lectureStats: { [S]: { likes: 1, wants: 0, visits: 0 } } });
   const hit = cm.filtered;
   ok(hit.length === 1 && hit[0].title === '单场',
      `test_04 单场赞应命中 1 条，实际 ${hit.length}`);
@@ -170,20 +176,20 @@ const ALL = multi.concat([solo]);
   }));
   // 情形 A：只存了历史页面级键（云端 likes 可能 >0）→ 一条都不该筛出
   {
-    const cm = makeCtx(nonMerged, { showLikedOnly: true, likedUrls: new Set([N]) });
+    const cm = makeCtx(nonMerged, { showLikedOnly: true, lectureStats: { [N]: { likes: 2, wants: 0, visits: 0 } } });
     ok(cm.filtered.length === 0,
        `test_08 非合并页的页面级键不得兜底命中任何场次，实际筛出 ${cm.filtered.length} 条`);
   }
   // 情形 B：只赞了第 3 期（场次级键）→ 恰好 1 条
   {
-    const cm = makeCtx(nonMerged, { showLikedOnly: true, likedUrls: new Set([`${N}~3`]) });
+    const cm = makeCtx(nonMerged, { showLikedOnly: true, lectureStats: { [`${N}~3`]: { likes: 1, wants: 0, visits: 0 } } });
     const hit = cm.filtered;
     ok(hit.length === 1 && hit[0].ck === `${N}~3`,
        `test_08 只赞第 3 期应命中 1 条，实际 ${hit.length} 条`);
   }
   // 情形 C：合并页（同页同日 3 场）的页面级键仍须兜底命中整组——口径不能一刀切
   {
-    const cm = makeCtx(ALL, { showLikedOnly: true, likedUrls: new Set([P]) });
+    const cm = makeCtx(ALL, { showLikedOnly: true, lectureStats: { [P]: { likes: 2, wants: 0, visits: 0 } } });
     ok(cm.filtered.length === 3,
        `test_08 合并页的页面级键仍须命中整组 3 场，实际 ${cm.filtered.length} 条`);
   }
@@ -196,7 +202,7 @@ const ALL = multi.concat([solo]);
 {
   // A) 场次级想听键：命中 1 条
   {
-    const cm = makeCtx(ALL, { showWantedOnly: true, wantedUrls: new Set([`${P}~2`]) });
+    const cm = makeCtx(ALL, { showWantedOnly: true, lectureStats: { [`${P}~2`]: { likes: 0, wants: 1, visits: 0 } } });
     const hit = cm.filtered;
     ok(hit.length === 1 && hit[0].ck === `${P}~2`,
        `test_09 场次级想听应命中 1 条，实际 ${hit.length}`);
@@ -209,17 +215,17 @@ const ALL = multi.concat([solo]);
       sourceUrl: N, lectureIndex: i, ck: `${N}~${i}`,
       lectureStart: `${days[k]} 14:00:00`, title: `第${i}期`,
     }));
-    const cm = makeCtx(nonMerged, { showWantedOnly: true, wantedUrls: new Set([N]) });
+    const cm = makeCtx(nonMerged, { showWantedOnly: true, lectureStats: { [N]: { likes: 0, wants: 2, visits: 0 } } });
     ok(cm.filtered.length === 0,
        `test_09 非合并页的页面级想听键不得兜底命中，实际筛出 ${cm.filtered.length} 条`);
     // 只标记了第 3 期 → 恰好 1 条
-    const cm2 = makeCtx(nonMerged, { showWantedOnly: true, wantedUrls: new Set([`${N}~3`]) });
+    const cm2 = makeCtx(nonMerged, { showWantedOnly: true, lectureStats: { [`${N}~3`]: { likes: 0, wants: 1, visits: 0 } } });
     ok(cm2.filtered.length === 1,
        `test_09 只标记第 3 期想听应命中 1 条，实际 ${cm2.filtered.length} 条`);
   }
   // C) 合并页的页面级想听键：仍命中整组
   {
-    const cm = makeCtx(ALL, { showWantedOnly: true, wantedUrls: new Set([P]) });
+    const cm = makeCtx(ALL, { showWantedOnly: true, lectureStats: { [P]: { likes: 0, wants: 2, visits: 0 } } });
     ok(cm.filtered.length === 3,
        `test_09 合并页的页面级想听键仍须命中整组 3 场，实际 ${cm.filtered.length} 条`);
   }
@@ -241,6 +247,35 @@ const ALL = multi.concat([solo]);
     ok(cm.hasActiveFilter === true,
        'test_09 仅开想听时 hasActiveFilter 必须为 true，否则「✕ 清除」按钮不出现');
   }
+}
+
+// ---------- test_10：数据源彻底切换——本机 Set 不再驱动筛选（2026-10-19 晚） ----------
+// 用户澄清：筛选语义是「全站所有访客标记过」，不是个人标记。锁定：
+// 即使本机 likedUrls/wantedUrls 有键，lectureStats 无数据时也不得命中
+// （防止有人把数据源改回去/两个来源混用）。
+{
+  const cm = makeCtx(ALL, {
+    showLikedOnly: true,
+    likedUrls: new Set([`${P}~2`, S, P]),      // 本机标记了 3 个键
+    lectureStats: {},                           // 但全站数据为空（加载中/云端失败且无降级值）
+  });
+  ok(cm.filtered.length === 0,
+     `test_10 本机 Set 有键但 lectureStats 为空时不得命中（筛选只认全站口径），实际 ${cm.filtered.length} 条`);
+  const cm2 = makeCtx(ALL, {
+    showWantedOnly: true,
+    wantedUrls: new Set([`${P}~2`]),
+    lectureStats: {},
+  });
+  ok(cm2.filtered.length === 0,
+     `test_10 想听通道同口径：本机标记不驱动筛选，实际 ${cm2.filtered.length} 条`);
+  // 反向：本机 Set 为空但全站有数据 → 仍命中（数据源确实是 lectureStats）
+  const cm3 = makeCtx(ALL, {
+    showLikedOnly: true,
+    likedUrls: new Set(),
+    lectureStats: { [`${P}~2`]: { likes: 1, wants: 0, visits: 0 } },
+  });
+  ok(cm3.filtered.length === 1 && cm3.filtered[0].ck === `${P}~2`,
+     `test_10 全站有数据而本机未标记时仍应命中，实际 ${cm3.filtered.length} 条`);
 }
 
 // ---------- test_05：stats.json 只为「合并卡页」补页面级索引（B4，2026-10-19 收窄） ----------
@@ -330,4 +365,4 @@ if (errs.length) {
   errs.forEach(e => console.log(' -', e));
   process.exit(1);
 }
-console.log('[PASS] 只看已赞 / 只看已想听：场次级 + 页面级双键命中；统计索引覆盖页面级键；折叠计数为场次数');
+console.log('[PASS] 有点赞/有想听筛选（全站口径）：场次级 + 页面级双键命中；数据源为 lectureStats 而非本机标记；统计索引覆盖页面级键；折叠计数为场次数');

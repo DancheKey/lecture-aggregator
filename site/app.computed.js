@@ -122,7 +122,7 @@ const APP_COMPUTED = {
       // 讲的「不依赖 tick / 不每秒空转」约束针对的就是它，待开始筛选同源复用。
       const nowMs = Date.now();
       const q = this.query.trim().toLowerCase();
-      // 只看已赞 / 只看已想听（2026-10-19 B3 + 同日二次修正；想听通道同日补齐）：
+      // 只看有点赞 / 只看有想听（2026-10-19 B3 + 同日二次修正；2026-10-19 晚改全站口径）：
       // 点赞/想听写入的都是计数键 ck（多场拆分 = url~N），而合并卡的赞/想听记在
       // **页面级**无后缀 sourceUrl 上（units() 的 forum 分支 ck: u）。两者任一命中
       // 即算已选，**不能**写成 `hasLiked(l.ck || l.sourceUrl)` 二选一：多场记录的
@@ -133,6 +133,12 @@ const APP_COMPUTED = {
       // 没有任何「整页赞」入口。若按 sourceUrl 无条件兜底，历史遗留的页面级键会
       // 把整页 3 场全部筛出来——用户只赞了第 3 期，却看到 3 条（2026-10-19 实测）。
       // 判定口径与 units() 的 FORUM_MIN 同源。
+      //
+      // ⚠ 数据源 = **全站口径**（2026-10-19 用户澄清本意）：筛选显示「全站所有
+      // 访客标记过」的场次，而非本机标记——数据来自 LectureCloud.fetchAll()
+      // 合并进 lectureStats 的全表（无云端时降级 /api 与本机记录，链路见
+      // app.social.js loadLectureStats）。键口径与上面完全一致，只换数据源。
+      // 卡片按钮的高亮仍读本机 Set（likedUrls/wantedUrls），两者语义分工。
       const likedOnly = this.showLikedOnly;
       const wantedOnly = this.showWantedOnly;
       let mergedDays = null;   // Set(gk)：会渲染成合并卡的分组（惰性构建，只在两条已选筛选时算）
@@ -151,8 +157,8 @@ const APP_COMPUTED = {
       };
       // 「已赞」「已想听」两条对称通道共用同一套键口径：场次级键命中即算；
       // 页面级键只在合并组内兜底（理由见上方注释）。
-      const hasL = k => this.hasLiked(k);
-      const hasW = k => this.hasWanted(k);
+      const hasL = k => ((this.lectureStats[k] || {}).likes || 0) > 0;
+      const hasW = k => ((this.lectureStats[k] || {}).wants || 0) > 0;
       const hitByKey = (has, l) => has(l.ck) || (has(l.sourceUrl) && inMergedDay(l));
       const list = this.all.filter(l => {
         if (likedOnly && !hitByKey(hasL, l)) return false;

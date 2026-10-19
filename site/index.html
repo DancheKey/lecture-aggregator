@@ -236,8 +236,9 @@
               </svg>
               点赞
             </button>
-            <!-- 想听筛选片（2026-10-19 用户要求）：与「点赞」逐字对称，点开只看本机
-                 标记过想听的场次；激活态用蓝色系，与卡片上的想听按钮同一视觉语言
+            <!-- 想听筛选片（2026-10-19 用户要求）：与「点赞」逐字对称，点开只看全站访客
+                 标记过想听的场次（数据源 lectureStats 全表，2026-10-19 晚改全站口径）；
+                 激活态用蓝色系，与卡片上的想听按钮同一视觉语言
                  （点赞是灰、想听是蓝），两者互斥——开一个会关掉另一个。 -->
             <button @click="toggleWantedFilter()"
               :class="['px-3 py-1.5 rounded-full text-12pt transition flex items-center gap-1', showWantedOnly ? 'text-blue-700 font-semibold bg-blue-50' : 'text-slate-500 hover:bg-slate-100']">
@@ -406,7 +407,7 @@
               <!-- 已选筛选片（2026-10-19）：点顶部「点赞 / 想听」开关进入后在此显示，
                    × 或再点顶部开关取消。两者互斥，故最多同时出现一个。 -->
               <span v-if="showLikedOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
-                <span>只看已赞</span>
+                <span>点赞</span>
                 <button type="button" @click="toggleLikedFilter()" aria-label="清除已赞筛选"
                   class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
               </span>
@@ -820,8 +821,8 @@
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=5e3372093c"></script>
-  <script defer src="app.state.js?v=ec1a701b95"></script>
-  <script defer src="app.computed.js?v=4ecf1eac9b"></script>
+  <script defer src="app.state.js?v=53fe7b787c"></script>
+  <script defer src="app.computed.js?v=56ab6fe9bc"></script>
   <script defer src="app.display.js?v=b61f721ed6"></script>
   <script defer src="app.cloud.js?v=5d758201e3"></script>
   <script defer src="app.social.js?v=b3ba6c9a3b"></script>
