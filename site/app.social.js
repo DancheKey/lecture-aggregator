@@ -134,6 +134,25 @@ Object.assign(APP_METHODS, {
       } catch (e) { /* ignore quota/storage errors */ }
     },
 
+    /* ---------- 本地「已加日历」高亮态（同一浏览器，2026-10-20） ----------
+     * 纯本机高亮标记（localStorage Set），与想听/点赞的 likedUrls/wantedUrls 同模式。
+     * 计数是另一回事（全局云端 lectureStats.cal_downloads），这里只管「我加过没有」。 */
+    loadCalAdded() {
+      try {
+        this.calAddedUrls = new Set(JSON.parse(localStorage.getItem(CAL_ADDED_KEY) || '[]'));
+      } catch (e) {
+        this.calAddedUrls = new Set();
+      }
+    },
+    saveCalAdded() {
+      try {
+        localStorage.setItem(CAL_ADDED_KEY, JSON.stringify(Array.from(this.calAddedUrls)));
+      } catch (e) { /* ignore quota/storage errors */ }
+    },
+    hasCalAdded(url) {
+      return this.calAddedUrls.has(url);
+    },
+
     /* ---------- 计数键下沉过渡期迁移（2026-10-18 B1，一次性） ---------- */
     // ck 改造前，多场拆分讲座的赞/想听记在**页面级**裸 URL 上；改造后展开场次
     // 查 sourceUrl~N 新键。两个过渡期问题：

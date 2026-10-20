@@ -210,9 +210,15 @@ Object.assign(APP_METHODS, {
     const p = n => String(n).padStart(2, '0');
     const name = `muduojinsheng-single-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}.ics`;
     this._calWeChatHint();
-    // 计数 +1（2026-10-20 三按钮统一）：仅在下载真正触发成功时计——下载都失败了
-    // 还 +1 会虚高。键用 ck，与想听/点赞同一套讲座级计数键（见 count_key 门禁）。
-    if (this._calDownload(name, text)) this.bumpCal(l.ck || l.sourceUrl);
+    // 计数 +1 与本机高亮（2026-10-20 三按钮统一）：仅在下载真正触发成功时计——
+    // 下载都失败了还 +1 会虚高。键用 ck，与想听/点赞同一套讲座级计数键（见 count_key 门禁）。
+    // calAddedUrls 是本机高亮态（localStorage，同 likedUrls/wantedUrls），加过即高亮；
+    // bumpCal 是全局云端计数。两者独立。
+    if (this._calDownload(name, text)) {
+      const key = l.ck || l.sourceUrl;
+      if (key && this.calAddedUrls) { this.calAddedUrls.add(key); this.saveCalAdded(); }
+      this.bumpCal(key);
+    }
   },
 
   // 整组入口的显示条件（2026-10-20 二修）：组内至少一场「还没结束」。否则按钮是死的——

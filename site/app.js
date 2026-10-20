@@ -25,6 +25,7 @@ const app = createApp({
     this.syncCountDisplay();
     this.loadLikes();
     this.loadWants();
+    this.loadCalAdded();   // 已加日历高亮态（localStorage 恢复，2026-10-20）
     this.loadLectureStats();
     this.loadFarFuture();   // 远期折叠条展开态（localStorage 恢复，2026-10-13 方案 B）
     // 启动秒级心跳：驱动「即将开始」徽章的倒计时（statusInfo 内读取 this.tick 触发响应式）

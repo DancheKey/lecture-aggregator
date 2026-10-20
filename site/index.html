@@ -734,8 +734,8 @@
                        没有时间的讲座塞进日历只会是个错误提醒；二修再挡已结束的场次
                        （与整组入口同判据 _calLive，此前只有整组入口过滤过期）。 -->
                   <button v-if="canAddCal(l)" @click="addToCalendar(l)"
-                    class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
-                    title="把当前讲座加进日历，双击 .ics 文件导入">
+                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border', hasCalAdded(l.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
+                    :title="hasCalAdded(l.ck) ? '已加入日历（本机标记）' : '把当前讲座加进日历，双击 .ics 文件导入'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
@@ -910,16 +910,16 @@
 
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
-  <script defer src="app.core.js?v=5e3372093c"></script>
-  <script defer src="app.state.js?v=53fe7b787c"></script>
+  <script defer src="app.core.js?v=43554137cc"></script>
+  <script defer src="app.state.js?v=96bb8747d0"></script>
   <script defer src="app.computed.js?v=3c7112525b"></script>
   <script defer src="app.display.js?v=9a9d17612f"></script>
   <script defer src="app.cloud.js?v=48b48189e4"></script>
-  <script defer src="app.social.js?v=542796ce38"></script>
-  <script defer src="app.calendar.js?v=a6a0500a83"></script>
+  <script defer src="app.social.js?v=53c95b667e"></script>
+  <script defer src="app.calendar.js?v=989b267746"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
-  <script defer src="app.js?v=3cdcecc6f3"></script>
+  <script defer src="app.js?v=00516d2e4d"></script>
   <!-- footer-counter.js：Supabase 云端计数 + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->

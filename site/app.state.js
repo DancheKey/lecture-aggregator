@@ -28,6 +28,7 @@ const APP_STATE = function () {
       reportSending: false,  // 报告提交中（防重复点击 + 按钮态）
       likedUrls: new Set(), // 当前浏览器已点赞的 url 集合（计数见 lectureStats）
       wantedUrls: new Set(), // 当前浏览器已标记想听的 url 集合
+      calAddedUrls: new Set(), // 当前浏览器已加进日历的 url 集合（高亮态；计数另见 lectureStats.cal_downloads）
       loading: true,       // 首屏数据加载中（避免闪现空列表）
       dataStage: 'loading', // 'loading' | 'partial' | 'partial-error' | 'full'：渐进加载阶段
     lectureStats: {},    // url -> {visits, likes}（后端优先，无后端时回退本机 localStorage）
