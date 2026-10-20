@@ -112,6 +112,11 @@ jobs:
       # 三条都无运行时报错、无 UI 提示，只能靠本套件锁住。
       - name: Run calendar export test
         run: node tests/js/calendar_ics.js
+      # 2026-10-20 纳入：多主讲显示规则。多讲者只显示第一位 + 「等」（无单位时补空格，
+      # 防「王红军等」被误读成更长名字）；只在解析器已识别出多讲者时生效。
+      # 显示逻辑错了不会报错、只是页面上名字呈现不对，纯 node、无浏览器无网络。
+      - name: Run speaker display test
+        run: node tests/js/speaker_display.js
       # 2026-09-30 纳入 3 套此前**未被任何 workflow 引用**的测试（CI 审计发现）。
       # 三者都覆盖「静默漏抓/静默重复抓取」这条最贵的失败模式，恰恰是规则改动最密集处：
       #   test_ledger     —— 被拒 URL 台账（gy/zhx/ibrr 等源曾单轮白抓 586 页、净新增 0）

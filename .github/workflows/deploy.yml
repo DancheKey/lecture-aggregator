@@ -113,6 +113,7 @@ jobs:
             tests/js/cloud_local_shortcircuit.js
             tests/js/app_year_consistency.js
             tests/js/app_time_placeholder.js
+            tests/js/speaker_display.js
             tests/test_main_water_gate.py
             tests/test_module_compile.py
             tests/test_time_unknown_autotag.py
