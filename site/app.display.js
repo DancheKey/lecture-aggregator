@@ -45,6 +45,39 @@ Object.assign(APP_METHODS, {
       this.speaker = '';
       this.currentPage = 1;
     },
+    /* ---------- 多主讲显示（2026-10-20 用户规则） ----------
+     * 多主讲时只显示第一位讲者 + 单位 + 「等」，不罗列其他人姓名
+     * （如「王红军（广州市花都区教师发展中心）等」）。
+     * 「等」前的空格规则：有单位时靠「）」天然分隔、直接接「等」；**无单位时**
+     *   名字与「等」之间补一个空格（「王红军 等」），否则「王红军等」会被误读成
+     *   一个更长的名字。空格在模板内联三元处理（因论坛场次清单不显示单位、
+     *   恒需空格，与主讲主行「有单位不加空格」不同，无法收敛成单一方法）。
+     * ⚠ 本规则只在**解析器已识别出多讲者**时生效（speakerKeys 长度>1，
+     *   或 speaker 串含 、/, 等分隔符）。识别不出第二人的海报（如
+     *   mks 20261020/19 只从乱码 OCR 抠出王红军一人）不会触发「等」——
+     *   那是抽取环节的问题，非本显示规则可解（抽取改进另议）。 */
+    // 把 speaker 串按常见多讲者分隔符切段（顿号/逗号/分号/斜杠），供下面两个判据共用。
+    _speakerSegs(l) {
+      const sp = l && l.speaker ? String(l.speaker) : '';
+      if (!sp) return [];
+      return sp.split(/[、,，;；/]/).map(s => s.trim()).filter(Boolean);
+    },
+    // 主讲显示名：取第一位。优先从 speaker 串切（保留原始大小写，适合英文名）；
+    // 串粘连无分隔但 speakerKeys 识别出多人时，回退用 speakerKeys[0]。
+    speakerDisplayName(l) {
+      if (!l) return '';
+      const segs = this._speakerSegs(l);
+      if (segs.length > 1) return segs[0];
+      const keys = l.speakerKeys;
+      if (Array.isArray(keys) && keys.length > 1) return keys[0];
+      return segs.length ? segs[0] : '';
+    },
+    // 是否多主讲：speakerKeys（结构化归一键）长度>1，或 speaker 串切出多段。
+    isMultiSpeaker(l) {
+      const keys = l && l.speakerKeys;
+      if (Array.isArray(keys) && keys.length > 1) return true;
+      return this._speakerSegs(l).length > 1;
+    },
     /* ---------- 工具 ---------- */
     yearOf(l) {
       if (!l) return '';

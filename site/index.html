@@ -555,7 +555,7 @@
                   <div v-for="r in forumRecsSorted(u)" :key="r.lectureIndex ?? (r.topic || '').slice(0, 16)" class="flex items-baseline gap-2 text-11pt min-w-0">
                     <span class="shrink-0 text-slate-400 tabular-nums w-[86px]">{{ (r.lectureStart || '').slice(5, 16) }}</span>
                     <span class="min-w-0 text-slate-700 truncate" :title="r.topic">{{ r.topic || r.title }}</span>
-                    <span class="shrink-0 text-slate-500">{{ r.speaker }}</span>
+                    <span class="shrink-0 text-slate-500">{{ speakerDisplayName(r) }}{{ isMultiSpeaker(r) ? ' 等' : '' }}</span>
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 items-center mt-2">
@@ -652,7 +652,7 @@
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold">主讲</span>
                     <span class="text-slate-700 min-w-0"><span class="cursor-pointer underline decoration-slate-300 underline-offset-2 hover:decoration-slate-500"
-                      :title="'查看 ' + l.speaker + ' 的所有讲座'" @click="pickSpeaker(l)">{{ l.speaker }}</span><span v-if="l.speakerAffiliation" class="text-slate-500">（{{ l.speakerAffiliation }}）</span></span>
+                      :title="'查看 ' + speakerDisplayName(l) + ' 的所有讲座'" @click="pickSpeaker(l)">{{ speakerDisplayName(l) }}</span><span v-if="l.speakerAffiliation" class="text-slate-500">（{{ l.speakerAffiliation }}）</span><span v-if="isMultiSpeaker(l)" class="text-slate-500">{{ l.speakerAffiliation ? '等' : ' 等' }}</span></span>
                   </div>
                   <div v-if="l.host" class="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -913,7 +913,7 @@
   <script defer src="app.core.js?v=5e3372093c"></script>
   <script defer src="app.state.js?v=53fe7b787c"></script>
   <script defer src="app.computed.js?v=3c7112525b"></script>
-  <script defer src="app.display.js?v=b61f721ed6"></script>
+  <script defer src="app.display.js?v=9a9d17612f"></script>
   <script defer src="app.cloud.js?v=48b48189e4"></script>
   <script defer src="app.social.js?v=542796ce38"></script>
   <script defer src="app.calendar.js?v=a6a0500a83"></script>

@@ -115,8 +115,10 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   addToCalendar / addGroupToCalendar，112 → 124）
 // （2026-10-20：日历云端计数 + 直播判定 —— calCount / bumpCal（三按钮统一，
 //   日历加入次数云端共享）/ _calLive / hasLiveRecs（直播中场次判定），124 → 128）
+// （2026-10-20：多主讲显示 —— _speakerSegs / speakerDisplayName / isMultiSpeaker
+//   （多主讲只显示第一位+等），128 → 131）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 128) errs.push(`方法数 ${nMethods} != 128`);
+if (nMethods !== 131) errs.push(`方法数 ${nMethods} != 131`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');
