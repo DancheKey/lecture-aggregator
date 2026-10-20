@@ -391,6 +391,36 @@ class TestFeeds(unittest.TestCase):
         self.assertEqual(len(re.findall(r'DTEND:\S+', raw)), len(starts),
                          '每个 VEVENT 都必须有 DTEND（缺结束时间会让部分客户端把日程画成 0 分钟）')
 
+    def test_标题不与题目重复(self):
+        """title 已内嵌题目时不能再追加 topic。
+
+        全库 483 条（12.6%）的 title 本身就包含 topic（「学术讲座：早期胚胎发育…」
+        「黄中杰——Spinning Mellin Bootstrap」），旧逻辑只判 `topic != title`
+        会拼成「…题目｜题目」——RSS 阅读器和日历里都是明显的重复，
+        且随每日新增持续出现。这里锁住三条分支：已包含→不拼、真不同→拼、空值→兜底。
+        """
+        import importlib.util
+        path = os.path.join(_ROOT, 'scripts', 'generate_frontend_data.py')
+        spec = importlib.util.spec_from_file_location('_gfd_for_test', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        cases = [
+            ({'title': '学术讲座：早期胚胎发育和体轴建立',
+              'topic': '早期胚胎发育和体轴建立'},
+             '学术讲座：早期胚胎发育和体轴建立'),
+            ({'title': '黄中杰——Spinning Mellin Bootstrap',
+              'topic': 'Spinning Mellin Bootstrap'},
+             '黄中杰——Spinning Mellin Bootstrap'),
+            ({'title': '系列讲座第3讲', 'topic': '人工智能前沿'},
+             '系列讲座第3讲｜人工智能前沿'),
+            ({'title': '完全相同的标题', 'topic': '完全相同的标题'}, '完全相同的标题'),
+            ({'title': '', 'topic': '只有题目'}, '只有题目'),
+            ({}, '学术讲座'),
+        ]
+        for rec, want in cases:
+            self.assertEqual(mod._feed_title(rec), want,
+                             f'_feed_title({rec}) 应为 {want!r}')
+
     def test_订阅源由生成器产出(self):
         with open(os.path.join(_ROOT, 'scripts', 'generate_frontend_data.py'),
                   encoding='utf-8') as f:

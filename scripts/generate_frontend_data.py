@@ -736,10 +736,21 @@ def feed_records(data):
 
 
 def _feed_title(rec):
-    t, topic = rec.get('title') or '', rec.get('topic') or ''
-    if topic and topic != t:
-        return f'{t}｜{topic}' if t else topic
-    return t or '学术讲座'
+    """RSS/日历条目的标题。
+
+    ⚠ 不能只判 `topic != title`：数据里 title 经常已经内嵌了题目，例如
+      「学术讲座：早期胚胎发育和体轴建立」「黄中杰——Spinning Mellin Bootstrap」。
+    全库 483 条（12.6%）属此类，按旧逻辑会拼成「…题目｜题目」——
+    在 RSS 阅读器和日历里都是明显的重复，且会随每日新增持续出现。
+    故先判 `topic in title`（已包含则不再补），只有真正不同的题目才追加。
+    """
+    t = (rec.get('title') or '').strip()
+    topic = (rec.get('topic') or '').strip()
+    if not t:
+        return topic or '学术讲座'
+    if not topic or topic == t or topic in t:
+        return t
+    return f'{t}｜{topic}'
 
 
 def _feed_desc(rec):
