@@ -19,6 +19,15 @@
 # 前端静态资源：强制 LF，且**不做** CRLF 转换（Pages 直接下发仓库内容）
 site/** text eol=lf
 
+# ⚠ iCalendar 必须例外（2026-10-20 批次 B）：
+# RFC 5545 §3.1 明确规定内容行以 CRLF 分隔，且折行以「CRLF + 单个空格」续行。
+# 上面那条 `site/** text eol=lf` 会把 feed.ics 的 CRLF 归一成 LF，导致：
+#   ① 仓库里存的是 LF → GitHub Pages 下发 LF → 我的 test_site_assets 断言失败；
+#   ② 更糟的是若某客户端宽容、某客户端严格，会出现「本地能导入、线上不能」。
+# 用 -text 把它当二进制原样存储，工作区 / 仓库 / Pages 三方字节完全一致。
+# 代价是 git diff 显示为 binary——可接受：它是每日重生成的产物，不需要逐行审阅。
+site/feed.ics -text
+
 # 明确排除二进制
 *.png binary
 *.jpg binary

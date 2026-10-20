@@ -92,6 +92,7 @@ jobs:
             tests/js/app_longtext_flow.js
             tests/js/app_clamp_consistency.js
             tests/js/app_count_animation.js
+            tests/js/calendar_ics.js
             tests/js/app_forum_and_clamp.js
             tests/js/app_far_future_fold.js
             tests/js/app_campus_filter.js

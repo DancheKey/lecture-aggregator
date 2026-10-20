@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 
 # 确保 scripts/ 下的共享模块（如 excluded_urls）可被 import
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -643,6 +644,188 @@ def write_sitemap(updated_at):
     print(f'[done] sitemap.xml: {len(urls)} 条')
 
 
+# ---------- 订阅源：RSS + iCalendar（2026-10-20 批次 B） ----------
+# 两个 feed 解决的是不同问题，别混为一谈：
+#   · feed.xml（RSS）  —— 「有新讲座了」：阅读器里看，不提醒
+#   · feed.ics（日历） —— 「今天下午三点该去了」：进日程，到点提醒，改期自动同步
+# 都只收「有时间、未标记时间未知、还没结束」的讲座，按开始时间升序取前 100 场。
+# 理由：订阅者关心的是「接下来有什么」，不是「历史上都有什么」；100 条足够，
+# 再多阅读器和日历都会嫌吵。
+CST = timezone(timedelta(hours=8))
+FEED_MAX = 100
+_DAY_ABBR = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
+_MON_ABBR = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+
+
+def _parse_cst(s):
+    """'2026-10-31 14:00:00'（北京时间字面量）→ aware datetime；非法 → None。"""
+    try:
+        return datetime.strptime(str(s or '')[:19], '%Y-%m-%d %H:%M:%S').replace(tzinfo=CST)
+    except ValueError:
+        return None
+
+
+def _rfc822(dt):
+    """RFC 822 日期（RSS 的 pubDate）。
+
+    ⚠ **不能**用 `strftime('%a, %d %b %Y')`：`%a`/`%b` 是 locale 相关的，
+    中文 locale 下会输出「星期六」「十月」，RSS 解析器直接判为非法日期。
+    这里用写死的英文缩写表，与运行环境无关。
+    """
+    return (f'{_DAY_ABBR[dt.weekday()]}, {dt.day:02d} {_MON_ABBR[dt.month - 1]} '
+            f'{dt.year} {dt:%H:%M:%S} +0800')
+
+
+def _ics_stamp(dt):
+    """iCalendar 的 UTC 时间戳。统一用 UTC（Z 结尾），任何时区的日历打开都是同一瞬间。"""
+    return dt.astimezone(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+
+
+def _ics_esc(s):
+    """RFC 5545 转义：反斜杠、分号、逗号，换行写成字面量 \\n。"""
+    return (str(s if s is not None else '')
+            .replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,')
+            .replace('\r\n', '\\n').replace('\n', '\\n').replace('\r', '\\n'))
+
+
+def _ics_fold(line):
+    """按 UTF-8 **字节**折行（≤75 字节），续行以单个空格开头。
+
+    必须按字节折：中文一个字 3 字节，按字符折会写出超长行，按字节但切在
+    汉字中间则得到乱码。这里逐字符累加字节数，永远切在字符边界上。
+    """
+    if len(line.encode('utf-8')) <= 75:
+        return line
+    out, cur, n = [], '', 0
+    for ch in line:
+        b = len(ch.encode('utf-8'))
+        if n + b > 74:
+            out.append(cur)
+            cur, n = ' ', 1
+        cur += ch
+        n += b
+    out.append(cur)
+    return '\r\n'.join(out)
+
+
+def _xml_esc(s):
+    return (str(s if s is not None else '')
+            .replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            .replace('"', '&quot;').replace("'", '&apos;'))
+
+
+def feed_records(data):
+    """挑出可订阅的讲座：(start, end, rec) 列表，按开始时间升序，最多 FEED_MAX 条。"""
+    now = datetime.now(CST)
+    rows = []
+    for r in data:
+        if str(r.get('timeUnknown')) == 'True':
+            continue
+        start = _parse_cst(r.get('lectureStart'))
+        if not start:
+            continue
+        end = _parse_cst(r.get('lectureEnd'))
+        if not end or end <= start:
+            end = start + timedelta(hours=1)   # lectureEnd 只覆盖 49.7%，缺省 +1h
+        if end < now:
+            continue                            # 已结束的进订阅源没有意义
+        rows.append((start, end, r))
+    rows.sort(key=lambda x: x[0])
+    return rows[:FEED_MAX]
+
+
+def _feed_title(rec):
+    t, topic = rec.get('title') or '', rec.get('topic') or ''
+    if topic and topic != t:
+        return f'{t}｜{topic}' if t else topic
+    return t or '学术讲座'
+
+
+def _feed_desc(rec):
+    bits = []
+    if rec.get('topic'):
+        bits.append(f'题目：{rec["topic"]}')
+    who = rec.get('speaker') or ''
+    if who and rec.get('speakerAffiliation'):
+        who = f'{who}（{rec["speakerAffiliation"]}）'
+    if who:
+        bits.append(f'主讲：{who}')
+    if rec.get('location'):
+        bits.append(f'地点：{rec["location"]}')
+    if rec.get('college') or rec.get('organizer'):
+        bits.append(f'主办：{rec.get("college") or rec.get("organizer")}')
+    return '\n'.join(bits)
+
+
+def write_feeds(data, updated_at):
+    """生成 site/feed.xml（RSS 2.0）与 site/feed.ics（日历订阅）。"""
+    rows = feed_records(data)
+    if not rows:
+        print('[warn] 没有可订阅的讲座，跳过 feed 生成')
+        return
+    built = _parse_cst(updated_at.replace('T', ' ')) or datetime.now(CST)
+    base = SITE_BASE_URL
+    title_site = '木铎金声 · 华师讲座聚合'
+    desc_site = '汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。'
+
+    # ---- RSS 2.0 ----
+    items = []
+    for start, _end, rec in rows:
+        link = rec.get('sourceUrl') or base
+        guid = rec.get('ck') or link
+        items.append('\n'.join([
+            '    <item>',
+            f'      <title>{_xml_esc(_feed_title(rec))}</title>',
+            f'      <link>{_xml_esc(link)}</link>',
+            f'      <guid isPermaLink="false">{_xml_esc(guid)}</guid>',
+            f'      <pubDate>{_rfc822(start)}</pubDate>',
+            f'      <category>{_xml_esc(rec.get("college") or "")}</category>',
+            f'      <description>{_xml_esc(_feed_desc(rec))}</description>',
+            '    </item>',
+        ]))
+    rss = '\n'.join([
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
+        '  <channel>',
+        f'    <title>{_xml_esc(title_site)}</title>',
+        f'    <link>{base}</link>',
+        f'    <description>{_xml_esc(desc_site)}</description>',
+        '    <language>zh-CN</language>',
+        f'    <lastBuildDate>{_rfc822(built)}</lastBuildDate>',
+        f'    <atom:link href="{base}feed.xml" rel="self" type="application/rss+xml"/>',
+        *items,
+        '  </channel>',
+        '</rss>',
+    ]) + '\n'
+    atomic_write_text(os.path.join(ROOT, 'site', 'feed.xml'), rss)
+
+    # ---- iCalendar ----
+    lines = ['BEGIN:VCALENDAR', 'VERSION:2.0',
+             'PRODID:-//Muduo Jinsheng//Lecture Aggregator//CN',
+             'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+             'X-WR-CALNAME:木铎金声 · 华师讲座', 'X-WR-TIMEZONE:Asia/Shanghai',
+             'X-WR-CALDESC:' + _ics_esc(desc_site)]
+    stamp = _ics_stamp(datetime.now(timezone.utc))
+    for start, end, rec in rows:
+        uid = (rec.get('ck') or rec.get('sourceUrl') or _feed_title(rec)) + '@danchekey.github.io'
+        lines += ['BEGIN:VEVENT', 'UID:' + _ics_esc(uid), 'DTSTAMP:' + stamp,
+                  'DTSTART:' + _ics_stamp(start), 'DTEND:' + _ics_stamp(end),
+                  'SUMMARY:' + _ics_esc(_feed_title(rec))]
+        if rec.get('location'):
+            lines.append('LOCATION:' + _ics_esc(rec['location']))
+        lines.append('DESCRIPTION:' + _ics_esc(_feed_desc(rec)))
+        if rec.get('sourceUrl'):
+            lines.append('URL:' + _ics_esc(rec['sourceUrl']))
+        lines += ['BEGIN:VALARM', 'TRIGGER:-PT30M', 'ACTION:DISPLAY',
+                  'DESCRIPTION:讲座即将开始', 'END:VALARM', 'END:VEVENT']
+    lines.append('END:VCALENDAR')
+    ics = '\r\n'.join(_ics_fold(x) for x in lines) + '\r\n'
+    atomic_write_text(os.path.join(ROOT, 'site', 'feed.ics'), ics)
+
+    print(f'[done] feed.xml / feed.ics: {len(rows)} 场（未来讲座，按时间升序）')
+
+
 def main():
     warn_uncommitted_scripts()
     warn_stale_stamp_inputs()
@@ -711,7 +894,8 @@ def main():
     # 顺序与 index.html 中的加载顺序一致（app.js 组装文件放在最后）。
     # app.cloud.js：云端共享计数层，须先于 app.social.js 执行（const 声明，防 TDZ）。
     for _part in ('app.core.js', 'app.state.js', 'app.computed.js', 'app.display.js',
-                  'app.cloud.js', 'app.social.js', 'app.data.js', 'app.admin.js'):
+                  'app.cloud.js', 'app.social.js', 'app.calendar.js',
+                  'app.data.js', 'app.admin.js'):
         stamp_script_version('index.html', _part)
     stamp_script_version('index.html', 'app.js')
     stamp_script_version('index.html', 'footer-counter.js')
@@ -726,9 +910,10 @@ def main():
     stamp_script_version('visits-trend.html', 'visits-trend.js')
     stamp_script_version('visits-trend.html', 'visits-trend.css')
 
-    # sitemap 只依赖数据更新时间，放在最后：所有前端产物落盘后再写，即使这里出错
-    # 也不影响首页/统计页可用（sitemap 是 SEO 附属物，不是功能件）。
+    # sitemap 与订阅源只依赖数据本身，放在最后：所有前端产物落盘后再写，即使这里
+    # 出错也不影响首页/统计页可用（SEO 与订阅是附属物，不是功能件）。
     write_sitemap(updated_at)
+    write_feeds(data, updated_at)
 
 
 if __name__ == '__main__':

@@ -561,6 +561,16 @@
                   <button v-if="u.head.isOnline" @click="toggleOnline()"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># 线上</button>
                   <div class="card-actions flex items-center gap-2 shrink-0">
+                    <!-- 整组加入日历（2026-10-20 批次 B）：合并卡代表「同页同日 ≥3 场」，
+                         逐场按钮会挤爆卡片，所以整组生成一个含多条 VEVENT 的 .ics。
+                         只收「还没结束」的场次（见 addGroupToCalendar）。 -->
+                    <button v-if="u.recs && u.recs.length" @click="addGroupToCalendar(u)"
+                      class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
+                      title="整组加入日历（.ics）">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                      </svg>
+                    </button>
                     <button @click="toggleWant(u.ck, $event)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
                       title="想听就点^_^">
@@ -706,6 +716,16 @@
                        点赞被迫换行到下一行左端」的割裂。移动端整组随标签流式排列（放不下则整组换行，
                        两按钮仍相邻同行）；桌面端由 .card-actions 的媒体查询恢复右推。 -->
                   <div class="card-actions flex items-center gap-2 shrink-0">
+                  <!-- 加入日历（2026-10-20 批次 B）：生成单场 .ics，点开即加到系统日历。
+                       canAddCal 挡掉「时间未知」的 50 条和缺开始时间的 1 条——
+                       没有时间的讲座塞进日历只会是个错误提醒。 -->
+                  <button v-if="canAddCal(l)" @click="addToCalendar(l)"
+                    class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
+                    title="加入日历（.ics）">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                    </svg>
+                  </button>
                   <button @click="toggleWant(l.ck, $event)"
                     :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(l.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300']"
                     title="想听就点^_^">
@@ -770,6 +790,19 @@
       数据来源于华南师范大学各学院/部处公开站点，仅供师生参考，请以官方原文为准。
       <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
         · 本站总访问量 <span id="site_pv_value">—</span> 次
+      </span>
+      <!-- 订阅入口（2026-10-20 批次 B）：RSS 给阅读器看「有新讲座了」，
+           .ics 给系统日历看「今天下午三点该去了」。两个都是纯静态文件，无账号、无后端。
+           ⚠ 措辞必须区分两种用法，否则用户会以为「下载一次就自动跟着改期」：
+             ① 双击下载的 .ics = **一次性导入**，当天有哪些场次就定格哪些，之后不会变；
+             ② 在日历里选「订阅日历 / 添加日历订阅」并填本站 feed.ics 的地址 = 真正的订阅，
+                客户端会定期回拉，改期/新增会自动同步。
+           文案里只承诺 ①，② 作为「进阶用法」写在 title 里，不夸大。 -->
+      <span class="block mt-2">
+        · 订阅：
+        <a href="feed.xml" class="hover:text-slate-600 underline decoration-dotted" title="用 RSS 阅读器（Feedly / Inoreader / 一读等）订阅，有新讲座时推送">RSS</a>
+        <span class="mx-1 text-slate-300">|</span>
+        <a href="feed.ics" class="hover:text-slate-600 underline decoration-dotted" title="下载后双击导入系统日历（一次性）；若想改期自动同步，在日历里用「订阅日历」填 https://danchekey.github.io/lecture-aggregator/feed.ics">日历 .ics</a>
       </span>
     </footer>
 
@@ -859,6 +892,7 @@
   <script defer src="app.display.js?v=b61f721ed6"></script>
   <script defer src="app.cloud.js?v=5d758201e3"></script>
   <script defer src="app.social.js?v=b3ba6c9a3b"></script>
+  <script defer src="app.calendar.js?v=c5340b3dce"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=3cdcecc6f3"></script>

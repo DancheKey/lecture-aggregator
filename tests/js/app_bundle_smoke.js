@@ -109,8 +109,12 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   读 localStorage），112 → 111）
 // （2026-10-19：想听筛选与点赞对称 —— toggleWantedFilter（顶部「想听」片开关，
 //   与 toggleLikedFilter 互斥），111 → 112）
+// （2026-10-20：批次 B 日历导出 —— app.calendar.js 新增 12 个方法
+//   _calUtcMs / _calStamp / _calSpan / _calEsc / _calFold / _calEvent /
+//   calIcsFor / canAddCal / _calDownload / _calWeChatHint /
+//   addToCalendar / addGroupToCalendar，112 → 124）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 112) errs.push(`方法数 ${nMethods} != 112`);
+if (nMethods !== 124) errs.push(`方法数 ${nMethods} != 124`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');

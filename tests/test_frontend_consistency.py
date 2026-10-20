@@ -438,6 +438,7 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
             'site/app.computed.js', 'site/app.display.js', 'site/app.social.js',
             'site/app.data.js', 'site/app.admin.js',
             'site/app.cloud.js',                       # 云端共享计数层（2026-10-17）
+            'site/app.calendar.js',                    # 日历导出 .ics（2026-10-20 批次 B）
             'site/supabase-config.json',               # 云端配置（2026-10-18 起入库随部署）
             'site/supabase-config.example.json',       # 配置模板
             # 分享与可发现性资产（2026-10-20 批次 A）。全部是**手写静态文件**，

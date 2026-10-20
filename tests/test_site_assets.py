@@ -291,5 +291,128 @@ class TestDiscoveryFiles(unittest.TestCase):
         self.assertIn('noindex', html, '404 页应标 noindex，避免被搜索引擎收录')
 
 
+class TestFeeds(unittest.TestCase):
+    """订阅源（2026-10-20 批次 B）：feed.xml（RSS 2.0）+ feed.ics（iCalendar）。
+
+    两个文件都是每日重生成的产物，格式错一次就整站订阅失效，而浏览器里
+    看不出任何异常——RSS 阅读器只会显示「无条目」，日历客户端只会拒绝导入。
+    """
+
+    # RFC 822 的星期/月份必须是固定的英文三字母缩写。用 strftime('%a %b') 取的是
+    # **进程 locale**，在中文 locale 下会输出「二 10月」这种非法值——多数阅读器
+    # 会直接丢弃整条 pubDate，条目按「无日期」排到最后。
+    _DAY = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
+    _MON = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+
+    def _read(self, name):
+        path = os.path.join(_SITE, name)
+        self.assertTrue(os.path.exists(path), f'site/{name} 不存在')
+        with open(path, encoding='utf-8', newline='') as f:
+            return f.read()
+
+    # ---------------------------------------------------------------- RSS
+    def test_rss可被解析且条目结构完整(self):
+        import xml.etree.ElementTree as ET
+        xml = self._read('feed.xml')
+        root = ET.fromstring(xml)           # 解析失败会直接抛异常 → 门禁变红
+        self.assertEqual(root.tag, 'rss')
+        self.assertEqual(root.get('version'), '2.0')
+        chan = root.find('channel')
+        self.assertIsNotNone(chan, 'feed.xml 缺 channel')
+        for key in ('title', 'link', 'description'):
+            node = chan.find(key)
+            self.assertIsNotNone(node, f'channel 缺 {key}')
+            self.assertTrue((node.text or '').strip(), f'channel/{key} 为空')
+        items = chan.findall('item')
+        self.assertGreater(len(items), 0, 'feed.xml 没有任何 item')
+        base = _site_base_url()
+        for it in items:
+            for key in ('title', 'link', 'guid', 'pubDate'):
+                node = it.find(key)
+                self.assertIsNotNone(node, f'item 缺 {key}')
+                self.assertTrue((node.text or '').strip(), f'item/{key} 为空')
+            # link 有意指向**原始来源页**而非本站：订阅者点开一条讲座，想看的是
+            # 学院原公告（含海报、报名方式、可能改期后的最新说明），本站只是索引。
+            # 因此这里不能断言等于站点 base，但必须断言是绝对 URL——RSS 阅读器
+            # 不解析相对路径，相对 link 会让整条显示为不可点击。
+            link = it.find('link').text
+            self.assertTrue(link.startswith(('http://', 'https://')),
+                            f'item link 必须是绝对 URL（RSS 阅读器不解析相对路径），实际 {link}')
+        # channel/link 才是本站入口，必须是站点绝对地址
+        self.assertEqual(chan.find('link').text, base,
+                         'channel/link 应指向站点首页')
+        # 自引用 atom:link 让阅读器/聚合服务知道 feed 的真实地址
+        atom = chan.find('{http://www.w3.org/2005/Atom}link')
+        self.assertIsNotNone(atom, 'channel 缺 atom:link 自引用（订阅器靠它发现更新）')
+        self.assertEqual(atom.get('href'), base + 'feed.xml')
+
+    def test_rss日期用英文缩写而非本地化名称(self):
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(self._read('feed.xml'))
+        stamps = [it.find('pubDate').text for it in root.find('channel').findall('item')]
+        self.assertGreater(len(stamps), 0, '没有可校验的 pubDate')
+        pat = re.compile(r'^(%s), (\d{2}) (%s) (\d{4}) (\d{2}):(\d{2}):(\d{2}) ([+-]\d{4})$'
+                         % ('|'.join(self._DAY), '|'.join(self._MON)))
+        for s in stamps:
+            m = pat.match(s)
+            self.assertIsNotNone(m, f'pubDate 不是合法 RFC 822（疑似用了本地化 strftime）：{s}')
+            self.assertIn(m.group(8), ('+0800', '+0000'),
+                          f'pubDate 时区必须是 +0800 或 +0000，实际 {s}')
+
+    # ---------------------------------------------------------------- ICS
+    def test_ics结构完整且行宽不超过75字节(self):
+        raw = self._read('feed.ics')
+        # RFC 5545 §3.1：内容行必须以 CRLF 分隔
+        self.assertIn('\r\n', raw, 'feed.ics 必须用 CRLF 换行（RFC 5545）')
+        bare_lf = raw.replace('\r\n', '').count('\n')
+        self.assertEqual(bare_lf, 0, 'feed.ics 混入了裸 LF 换行')
+        self.assertTrue(raw.startswith('BEGIN:VCALENDAR\r\n'), 'feed.ics 必须以 BEGIN:VCALENDAR 开头')
+        self.assertTrue(raw.rstrip('\r\n').endswith('END:VCALENDAR'), 'feed.ics 必须以 END:VCALENDAR 结尾')
+        # 75 字节是**字节**不是字符：中文标题按字符折行会超限，
+        # Outlook/Apple 日历会判文件损坏而整份拒绝导入。
+        for i, line in enumerate(raw.split('\r\n'), 1):
+            self.assertLessEqual(len(line.encode('utf-8')), 75,
+                                 f'feed.ics 第 {i} 行 {len(line.encode("utf-8"))} 字节，超过 RFC 5545 的 75 字节上限')
+        n_begin = raw.count('BEGIN:VEVENT')
+        n_end = raw.count('END:VEVENT')
+        self.assertEqual(n_begin, n_end, f'VEVENT 未配平：BEGIN={n_begin} END={n_end}')
+        self.assertGreater(n_begin, 0, 'feed.ics 没有任何 VEVENT')
+
+    def test_ics时间是UTC且带结束时间(self):
+        raw = self._read('feed.ics')
+        # DTSTART 必须带 Z 后缀（UTC）。不带 Z 会被按「本地时间」解释，
+        # 而记录里是北京时间字面量 → 境外用户导入后整体偏移数小时。
+        starts = re.findall(r'DTSTART:(\S+)', raw)
+        self.assertGreater(len(starts), 0, 'feed.ics 没有 DTSTART')
+        pat = re.compile(r'^\d{8}T\d{6}Z$')
+        for s in starts:
+            self.assertIsNotNone(pat.match(s), f'DTSTART 必须是 UTC 形式 YYYYMMDDTHHMMSSZ，实际 {s}')
+        self.assertEqual(len(re.findall(r'DTEND:\S+', raw)), len(starts),
+                         '每个 VEVENT 都必须有 DTEND（缺结束时间会让部分客户端把日程画成 0 分钟）')
+
+    def test_订阅源由生成器产出(self):
+        with open(os.path.join(_ROOT, 'scripts', 'generate_frontend_data.py'),
+                  encoding='utf-8') as f:
+            src = f.read()
+        self.assertIn('def write_feeds(', src, 'generate_frontend_data.py 缺 write_feeds')
+        self.assertIn('write_feeds(data, updated_at)', src, 'main() 里没有调用 write_feeds')
+
+    def test_ics在gitattributes里豁免换行归一(self):
+        """`.gitattributes` 的 `site/** text eol=lf` 会把 feed.ics 的 CRLF 洗成 LF。
+
+        RFC 5545 强制 CRLF，且这个转换**只在入库/检出时发生**——本地文件看着
+        好好的（CRLF），CI checkout 出来是 LF，上面那条行宽/换行断言才会突然变红，
+        而本地复现不出来。必须在 .gitattributes 里显式 `-text` 豁免。
+        """
+        with open(os.path.join(_ROOT, '.gitattributes'), encoding='utf-8') as f:
+            lines = [ln.strip() for ln in f]
+        hit = [ln for ln in lines
+               if ln and not ln.startswith('#') and ln.split()[:2] == ['site/feed.ics', '-text']]
+        self.assertTrue(hit,
+                        '.gitattributes 缺少 `site/feed.ics -text`：CRLF 会被 '
+                        '`site/** text eol=lf` 归一成 LF，违反 RFC 5545')
+
+
 if __name__ == '__main__':
     unittest.main()

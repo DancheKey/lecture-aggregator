@@ -101,6 +101,17 @@ jobs:
       # 锁住「逐帧单调不减」「终值收敛到真实总数」「不许退回固定时长」三条不变量。
       - name: Run header count animation test
         run: node tests/js/app_count_animation.js
+      # 2026-10-20 纳入：日历导出 .ics（批次 B）。这段逻辑的三处失败都是**静默且不可逆**的：
+      #   ① lectureStart 是无时区的北京时间字面量 '2026-10-31 14:00:00'，
+      #      new Date(str) 会按浏览器本地时区解析——境外用户导出的日程会整体偏移数小时，
+      #      而 .ics 一旦导入日历就不会再被网站纠正；
+      #   ② RFC 5545 要求 75 字节折行（不是字符），中文长标题按字符折会超限，
+      #      部分日历客户端（Outlook/Apple）会直接判定文件损坏而拒绝导入；
+      #   ③ timeUnknown 是字符串 'True' 而非布尔，`if (l.timeUnknown)` 恒为真——
+      #      时间未定的讲座会以 00:00 导出，用户白跑一趟。
+      # 三条都无运行时报错、无 UI 提示，只能靠本套件锁住。
+      - name: Run calendar export test
+        run: node tests/js/calendar_ics.js
       # 2026-09-30 纳入 3 套此前**未被任何 workflow 引用**的测试（CI 审计发现）。
       # 三者都覆盖「静默漏抓/静默重复抓取」这条最贵的失败模式，恰恰是规则改动最密集处：
       #   test_ledger     —— 被拒 URL 台账（gy/zhx/ibrr 等源曾单轮白抓 586 页、净新增 0）
