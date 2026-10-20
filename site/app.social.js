@@ -293,6 +293,13 @@ Object.assign(APP_METHODS, {
     capDisplay(n) {
       return n > COUNT_CAP ? COUNT_CAP + '+' : String(n);
     },
+    // 徽标文案（2026-10-20）：计数为 0（没人点过）时不显示数字，点击后数字才出现。
+    // 0 → 空串时按钮只剩图标；模板里数字 span 保留 min-w-badge 的 1.25rem 占位，
+    // 数字出现/消失不会引起按钮宽度跳动。取消点赞/想听回到 0 会重新隐藏，
+    // 与「没人点就不显示」语义一致。
+    countBadge(n) {
+      return n > 0 ? this.capDisplay(n) : '';
+    },
 
     /* ---------- 讲座级访问/点赞/想听统计 ---------- */
     // loadLocalStats() 已于 2026-10-19 删除：全仓 0 处调用，loadLectureStats()
