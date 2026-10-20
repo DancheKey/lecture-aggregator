@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-19T12:45:45+08:00",
+  "updatedAt": "2026-10-20T12:56:21+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8857.html",
@@ -63,6 +63,52 @@
       "listTitle": "勷勤数学•专家报告-蒋枭"
     },
     {
+      "sourceUrl": "http://mks.scnu.edu.cn/a/20261020/20.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/mks/2026/1020/1792466877886204.jpg"
+      ],
+      "college": "马克思主义学院",
+      "campus": "石牌",
+      "title": "第十九届“勷勤论坛”主论坛名校长讲座板块之周建国校长...",
+      "topic": "第十九届“勷勤论坛”主论坛名校长讲座板块之周建国校长...",
+      "lectureStart": "2026-10-28 18:30:00",
+      "lectureEnd": null,
+      "location": "桃李园三楼高明厅",
+      "speaker": "周建国",
+      "speakerTitle": "校长",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "广东省骨干教师,广州市 优秀教师,华南师范大学外聘 硕士生导师、广州大学思想 政治教育硕士研究生指导教师,广州大学优秀党员,广大附中名教师,广大附中优 秀班主任,广大附中美林湖 学校校长。",
+      "organizer": "马克思主义学院",
+      "publishTime": "2026-10-20 11:27:00",
+      "publishTimeSource": "label",
+      "imageParseMethod": "ocr",
+      "hasPosterImage": true,
+      "speakerSource": "isolated-word",
+      "abstract": "1青马职桥 馬克烈主义蛋院 華南師大学 SOUTH CHINA NORMAL UNIVERSITY SCHOOLOFMARXISM 第十九届\"勤论坛\"主论坛 名校长讲座板块之 周建国校长专场讲座 周建国 广东省骨干教师,广州市 优秀教师,华南师范大学外聘 硕士生导师、广州大学思想 政治教育硕士研究生指导教师,广州大学优秀党员,广大附中名教师,广大附中优 秀班主任,广大附中美林湖 学校校长。",
+      "llmTextEnhanced": true,
+      "llmVerdict": "rule",
+      "llmSpeakerSource": "isolated-word",
+      "llmSelfExtract": {
+        "speaker": null,
+        "speakerTitle": null,
+        "affiliation": null,
+        "lectureStart": null,
+        "lectureEnd": null,
+        "location": "桃李园三楼高明厅",
+        "topic": "第十九届“勷勤论坛”主论坛名校长讲座板块之周建国校长...",
+        "title": null
+      },
+      "llmRejected": "speakerAffiliation",
+      "llmRejectReason": "speakerAffiliation@invalid:广大附中",
+      "llmAdopted": "speakerTitle",
+      "needsHumanReview": "location|topic",
+      "qaGate": "abstract",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "第十九届“勷勤论坛”主论坛名校长讲座板块之周建国校长..."
+    },
+    {
       "sourceUrl": "http://life.scnu.edu.cn/a/20261019/6830.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/life/2026/1019/1792377529437422.png"
@@ -91,6 +137,48 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "2026年10月23日学术讲座：早期胚胎发育和体轴建立"
+    },
+    {
+      "sourceUrl": "http://mks.scnu.edu.cn/a/20261020/19.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/mks/2026/1020/1792466751704503.png"
+      ],
+      "college": "马克思主义学院",
+      "campus": "石牌",
+      "title": "第十九届“勷勤论坛”主论坛之第十四届“明日之师”研究...",
+      "topic": "第十九届“勷勤论坛”主论坛之第十四届“明日之师”研究...",
+      "lectureStart": "2026-10-22 19:00:00",
+      "lectureEnd": null,
+      "location": "桃李园顺德厅(石牌校园)",
+      "speaker": "王红军",
+      "speakerTitle": "中学政治正高级教师",
+      "speakerAffiliation": "广州市花都区教师发展中心",
+      "inviter": "",
+      "speakerBio": "广州市花都区教师发展中心思政教研员,中学 政治正高级教师,广东省特级教师,北京师范大学 (珠海)教育博士。华南师范大学、华中师范大学、广东第二师范学院马克思主义学院校外硕士生 导师,广州大学马克思主义学院兼职教师。先后荣 获南粤优秀教师、广州市优秀教师、广州市基础教育\"百千万工程\"首批名教师和第四批教育专家培 养对象、广州市骨干教师、广州市名教师工作室主持人、广州市优秀学校思政理论课教师、广州市十 佳思政理论课宣讲教师、广州市\"思政教研先锋\" 等称号。2010年10月,曾作为广东省唯一代表赴 福建省厦门市参加全国高中思想政治\"同课异构\" 大赛荣获特等奖。",
+      "organizer": "马克思主义学院",
+      "publishTime": "2026-10-20 11:25:00",
+      "publishTimeSource": "label",
+      "imageParseMethod": "ocr",
+      "hasPosterImage": true,
+      "abstract": "青马职桥1 华南轩航大学 禹克然主义蛋院 SCHOOL OF MARXISM 第十九届\"勤论坛\"主论坛之 第十四届\"明日之师\"研究生授课技能 大赛赛前指导讲座",
+      "llmTextEnhanced": true,
+      "llmVerdict": "llm",
+      "llmSpeakerSource": null,
+      "llmSelfExtract": {
+        "speaker": null,
+        "speakerTitle": null,
+        "affiliation": null,
+        "lectureStart": null,
+        "lectureEnd": null,
+        "location": null,
+        "topic": null,
+        "title": null
+      },
+      "llmAdopted": "speaker|speakerTitle|speakerAffiliation|location|speakerBio",
+      "speakerSource": "llm",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "第十九届“勷勤论坛”主论坛之第十四届“明日之师”研究..."
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20261022/11210.html",

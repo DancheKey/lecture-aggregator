@@ -5,7 +5,7 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 19 Oct 2026 12:45:45 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 20 Oct 2026 12:56:21 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
       <title>勷勤数学•专家报告-周勇｜不可压缩Navier-Stokes方程光滑解的全局存在性</title>
@@ -30,6 +30,17 @@
 主办：经济与管理学院</description>
     </item>
     <item>
+      <title>第十九届“勷勤论坛”主论坛之第十四届“明日之师”研究...</title>
+      <link>http://mks.scnu.edu.cn/a/20261020/19.html</link>
+      <guid isPermaLink="false">http://mks.scnu.edu.cn/a/20261020/19.html</guid>
+      <pubDate>Thu, 22 Oct 2026 19:00:00 +0800</pubDate>
+      <category>马克思主义学院</category>
+      <description>题目：第十九届“勷勤论坛”主论坛之第十四届“明日之师”研究...
+主讲：王红军（广州市花都区教师发展中心）
+地点：桃李园顺德厅(石牌校园)
+主办：马克思主义学院</description>
+    </item>
+    <item>
       <title>学术讲座：早期胚胎发育和体轴建立</title>
       <link>http://life.scnu.edu.cn/a/20261019/6830.html</link>
       <guid isPermaLink="false">http://life.scnu.edu.cn/a/20261019/6830.html</guid>
@@ -39,6 +50,17 @@
 主讲：陈静（四川大学）
 地点：生命科学学院102会议室
 主办：生命科学学院</description>
+    </item>
+    <item>
+      <title>第十九届“勷勤论坛”主论坛名校长讲座板块之周建国校长...</title>
+      <link>http://mks.scnu.edu.cn/a/20261020/20.html</link>
+      <guid isPermaLink="false">http://mks.scnu.edu.cn/a/20261020/20.html</guid>
+      <pubDate>Wed, 28 Oct 2026 18:30:00 +0800</pubDate>
+      <category>马克思主义学院</category>
+      <description>题目：第十九届“勷勤论坛”主论坛名校长讲座板块之周建国校长...
+主讲：周建国
+地点：桃李园三楼高明厅
+主办：马克思主义学院</description>
     </item>
     <item>
       <title>勷勤数学•专家报告-蒋枭｜两类局部零和问题</title>
