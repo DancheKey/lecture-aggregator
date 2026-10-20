@@ -9,21 +9,25 @@
        两条硬约束：
        ① og:image / og:url 必须绝对 URL。爬虫不解析相对路径，写 "og-cover.jpg"
           会抓不到图。
-       ② 图必须近方形。微信缩略图是方形取景框，1920×480 的 site-title.png 会被
-          裁成中间一条（只剩「铎金」两字）。og-cover.jpg 是 800×800 / 48KB。
+       ② 图必须近方形，且**小于 32KB**。微信分享缩略图有 32KB 上限（JS-SDK 文档
+          明写 imgUrl 不超过 32kb，抓取器沿用同一套限制），超了的表现是「有标题、
+          没图」——正是 2026-10-20 实测踩到的坑（当时是 800×800 / 48KB）。
+          1920×480 的 site-title.png 还会被方形取景框裁成中间一条。
+          故用 og-cover-2.jpg：600×600 / 24.5KB / **基线 JPEG**
+          （渐进式格式微信不一定吃，这里用最保守的编码）。
        换图后微信有缓存，旧链接仍显示旧卡；测新卡请在 URL 后加没发过的参数。 -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="木铎金声">
   <meta property="og:title" content="木铎金声 · 华师讲座聚合">
   <meta property="og:description" content="汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，可按校区、学院、讲者、时间筛选，每天更新。">
   <meta property="og:url" content="https://danchekey.github.io/lecture-aggregator/">
-  <meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
-  <meta property="og:image:width" content="800">
-  <meta property="og:image:height" content="800">
+  <meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover-2.jpg">
+  <meta property="og:image:width" content="600">
+  <meta property="og:image:height" content="600">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="木铎金声 · 华师讲座聚合">
   <meta name="twitter:description" content="汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，可按校区、学院、讲者、时间筛选，每天更新。">
-  <meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
+  <meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover-2.jpg">
   <!-- CSP 说明：
        - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
          站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。

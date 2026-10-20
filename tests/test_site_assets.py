@@ -37,6 +37,12 @@ PAGE_PATH = {
     'visits-trend.html': 'visits-trend.html',
 }
 
+# 分享封面文件名。带 -2 后缀是有意的：换图时**必须换文件名**，否则微信/CDN
+# 按旧 URL 返回缓存图（GitHub Pages 的 Cache-Control 是 600s，微信缓存更久）。
+COVER_NAME = 'og-cover-2.jpg'
+# 微信分享缩略图上限（JS-SDK 文档：imgUrl 不超过 32kb，抓取器沿用同一套限制）。
+COVER_MAX_KB = 32
+
 
 def _read(rel):
     with open(os.path.join(_SITE, rel), encoding='utf-8') as f:
@@ -76,6 +82,33 @@ def _jpeg_size(path):
         if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
             h, w = struct.unpack('>HH', data[i + 5:i + 9])
             return w, h
+        i += 2 + seg_len
+    raise AssertionError(f'{path} 找不到 SOF 段')
+
+
+def _jpeg_sof_marker(path):
+    """返回首个 SOF 段标记：0xC0 = 基线，0xC2 = 渐进。
+
+    不依赖图像库——CI 上只有标准库，装 Pillow 会让门禁多一层环境依赖。
+    """
+    with open(path, 'rb') as f:
+        data = f.read()
+    if data[:2] != b'\xff\xd8':
+        raise AssertionError(f'{path} 不是 JPEG')
+    i = 2
+    while i < len(data) - 9:
+        if data[i] != 0xFF:
+            i += 1
+            continue
+        marker = data[i + 1]
+        if marker == 0xFF or marker == 0x01 or 0xD0 <= marker <= 0xD7 or marker == 0xD8:
+            i += 1 if marker == 0xFF else 2
+            continue
+        if marker == 0xDA:
+            break
+        seg_len = struct.unpack('>H', data[i + 2:i + 4])[0]
+        if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+            return marker
         i += 2 + seg_len
     raise AssertionError(f'{path} 找不到 SOF 段')
 
@@ -151,7 +184,7 @@ class TestSocialCard(unittest.TestCase):
             img = _meta(_read(page), 'og:image')
             self.assertTrue(img.startswith('https://'),
                             f'{page} 的 og:image 不是绝对 URL：{img}（爬虫抓不到相对路径）')
-            self.assertEqual(img, base + 'og-cover.jpg',
+            self.assertEqual(img, base + COVER_NAME,
                             f'{page} 的 og:image 与 SITE_BASE_URL 不一致：{img}')
             tw = _meta(_read(page), 'twitter:image', attr='name')
             self.assertEqual(tw, img, f'{page} 的 twitter:image 应与 og:image 相同')
@@ -187,15 +220,26 @@ class TestSocialCard(unittest.TestCase):
             self.assertEqual(url, base + PAGE_PATH[page],
                              f'{page} 的 og:url 应指向本页：{base}{PAGE_PATH[page]}')
 
-    def test_封面图存在且为方形(self):
-        path = os.path.join(_SITE, 'og-cover.jpg')
-        self.assertTrue(os.path.exists(path), 'site/og-cover.jpg 不存在')
+    def test_封面图是方形基线JPEG且小于32KB(self):
+        """三条硬约束，每条都对应一次实测踩坑。
+
+        ① **方形**：微信缩略图是方形取景框，4:1 横幅会被裁成中间一条。
+        ② **< 32KB**：微信 JS-SDK 文档明写 imgUrl 不超过 32kb，抓取器沿用同一套
+           限制。2026-10-20 实测 800×800 / 48KB 的表现是「有标题、没图」——
+           标题来自客户端本地 DOM，图片要服务端下载，超限就被丢掉。
+        ③ **基线 JPEG**：progressive JPEG 的 SOF 是 0xC2，部分老解码器不支持；
+           基线是 0xC0。用段标记判断，不依赖图像库（CI 上没装 Pillow）。
+        """
+        path = os.path.join(_SITE, COVER_NAME)
+        self.assertTrue(os.path.exists(path), f'site/{COVER_NAME} 不存在')
         w, h = _jpeg_size(path)
-        self.assertEqual(w, h, f'og-cover 应为方形（微信缩略图是方形取景框），实测 {w}x{h}')
-        self.assertGreaterEqual(w, 600, f'og-cover 边长至少 600px，实测 {w}')
-        # 微信/QQ 抓图有超时，体积过大容易抓取失败
+        self.assertEqual(w, h, f'封面应为方形（微信缩略图是方形取景框），实测 {w}x{h}')
+        self.assertGreaterEqual(w, 600, f'封面边长至少 600px，实测 {w}')
         size_kb = os.path.getsize(path) / 1024
-        self.assertLess(size_kb, 300, f'og-cover 应小于 300KB，实测 {size_kb:.0f}KB')
+        self.assertLess(size_kb, COVER_MAX_KB,
+                        f'封面必须小于 {COVER_MAX_KB}KB（微信上限），实测 {size_kb:.1f}KB')
+        self.assertEqual(_jpeg_sof_marker(path), 0xC0,
+                         '封面必须是基线 JPEG（SOF0）；渐进式（SOF2）微信不一定支持')
         # 尺寸声明必须与真实文件一致，否则部分平台按声明裁剪
         for page in PAGES:
             html = _read(page)

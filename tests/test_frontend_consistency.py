@@ -445,7 +445,7 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
             # sitemap.xml 例外——它是每日重生成的产物，已进 SITE_PATHS。
             'site/404.html',                           # GitHub Pages 项目页 404
             'site/robots.txt',                         # 项目页下不被读取，为迁移预留
-            'site/og-cover.jpg',                       # 分享卡片 800×800
+            'site/og-cover-2.jpg',                     # 分享卡片 600×600 / 24.5KB（微信 32KB 上限）
             'site/favicon-32.png', 'site/favicon-16.png',
             'site/apple-touch-icon.png',
         }

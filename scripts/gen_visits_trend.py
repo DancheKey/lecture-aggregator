@@ -504,11 +504,11 @@ def main():
 <meta property="og:title" content="站点访问量趋势 · 木铎金声">
 <meta property="og:description" content="木铎金声站点每日访问量与累计访问次数趋势。">
 <meta property="og:url" content="https://danchekey.github.io/lecture-aggregator/visits-trend.html">
-<meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
-<meta property="og:image:width" content="800">
-<meta property="og:image:height" content="800">
+<meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover-2.jpg">
+<meta property="og:image:width" content="600">
+<meta property="og:image:height" content="600">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
+<meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover-2.jpg">
 <!-- CSP（2026-10-02）：本报告页此前是全站唯一无 CSP 的页面（2026-09-30 评审 P5），
      补 CSP 时因脚本与数据整体内联而被迫放行 script-src 'unsafe-inline'。
      同日两项改动使其可以完全收紧：
