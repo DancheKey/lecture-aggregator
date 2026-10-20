@@ -210,7 +210,9 @@ Object.assign(APP_METHODS, {
     const p = n => String(n).padStart(2, '0');
     const name = `muduojinsheng-single-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}.ics`;
     this._calWeChatHint();
-    this._calDownload(name, text);
+    // 计数 +1（2026-10-20 三按钮统一）：仅在下载真正触发成功时计——下载都失败了
+    // 还 +1 会虚高。键用 ck，与想听/点赞同一套讲座级计数键（见 count_key 门禁）。
+    if (this._calDownload(name, text)) this.bumpCal(l.ck || l.sourceUrl);
   },
 
   // 整组入口的显示条件（2026-10-20 二修）：组内至少一场「还没结束」。否则按钮是死的——

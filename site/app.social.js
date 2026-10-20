@@ -293,12 +293,30 @@ Object.assign(APP_METHODS, {
     capDisplay(n) {
       return n > COUNT_CAP ? COUNT_CAP + '+' : String(n);
     },
-    // 徽标文案（2026-10-20）：计数为 0（没人点过）时不显示数字，点击后数字才出现。
-    // 0 → 空串时按钮只剩图标；模板里数字 span 保留 min-w-badge 的 1.25rem 占位，
-    // 数字出现/消失不会引起按钮宽度跳动。取消点赞/想听回到 0 会重新隐藏，
-    // 与「没人点就不显示」语义一致。
-    countBadge(n) {
-      return n > 0 ? this.capDisplay(n) : '';
+    // 日历「加入次数」读数（2026-10-20 三按钮统一）：与 likeCount/wantCount 同模式，
+    // 以 lectureStats 为唯一来源，缺字段/缺行一律 0（模板用 v-if 在 0 时不渲染数字，
+    // 让按钮塌成与日历一致的图标宽，点了才展开——见 index.html 三按钮徽标）。
+    calCount(url) {
+      const s = this.lectureStats[url];
+      if (s && typeof s.cal_downloads === 'number') return s.cal_downloads;
+      return 0;
+    },
+    // 日历「加入次数」+1（单向、无取消）。云端（Supabase increment_cal）优先；
+    // 无配置/失败时退回本机 lectureStats 累加——本机只累加不回传，语义退化成
+    // 「我下载了几次」而非「全站多少人加了日历」（本地预览可接受，与 like/want
+    // 走 /api 的三级链不同：日历计数是 2026-10-20 新增的云端维度，本地 server
+    // 尚无对应端点，故省去一次注定 404 的请求）。
+    bumpCal(url) {
+      if (!url) return;
+      LectureCloud.bump('cal', url, 1).then(cloud => {
+        if (!this.lectureStats[url]) this.lectureStats[url] = { visits: 0, likes: 0, wants: 0, cal_downloads: 0 };
+        if (cloud && typeof cloud.cal_downloads === 'number') {
+          this.lectureStats[url].cal_downloads = cloud.cal_downloads;   // 云端权威值覆盖
+        } else {
+          this.lectureStats[url].cal_downloads = (this.lectureStats[url].cal_downloads || 0) + 1;
+        }
+        this.saveLocalStats();
+      });
     },
 
     /* ---------- 讲座级访问/点赞/想听统计 ---------- */

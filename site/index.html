@@ -86,8 +86,9 @@
     .text-12pt { font-size: 12pt; }
     .text-15pt { font-size: 15pt; }
     /* 原任意值宽度类的等效定义（同样未包含在预编译产物中）：
-       min-w-badge=点赞/想听数字防挤压，min-w-page=分页页码按钮，max-w-college=元信息行学院名截断 */
-    .min-w-badge { min-width: 1.25rem; }
+       min-w-page=分页页码按钮，max-w-college=元信息行学院名截断。
+       （2026-10-20 三按钮统一：移除 min-w-badge 固定占宽，计数徽标改用 v-if——
+         数字为 0 时不渲染 span，按钮塌成与日历一致的图标宽，点击后才展开。） */
     .min-w-page { min-width: 36px; }
     .max-w-college { max-width: 45%; }
     /* 卡片底部「想听 + 点赞」操作组：移动端随标签流式排列（两按钮始终相邻同行，
@@ -576,12 +577,12 @@
                     <button @click="toggleWant(u.ck, $event)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300']"
                       title="想听就点^_^">
-                      <span class="min-w-badge text-center">{{ countBadge(wantCount(u.ck)) }}</span>
+                      <span v-if="wantCount(u.ck) > 0" class="text-center">{{ capDisplay(wantCount(u.ck)) }}</span>
                     </button>
                     <button @click="toggleLike(u.ck, $event)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(u.ck) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-500 hover:text-slate-600 hover:border-slate-400']"
                       title="喜欢就赞^_^">
-                      <span class="min-w-badge text-center">{{ countBadge(likeCount(u.ck)) }}</span>
+                      <span v-if="likeCount(u.ck) > 0" class="text-center">{{ capDisplay(likeCount(u.ck)) }}</span>
                     </button>
                   </div>
                 </div>
@@ -728,6 +729,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
+                    <span v-if="calCount(l.ck) > 0" class="text-center">{{ capDisplay(calCount(l.ck)) }}</span>
                   </button>
                   <button @click="toggleWant(l.ck, $event)"
                     :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(l.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300']"
@@ -735,7 +737,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" :fill="hasWanted(l.ck) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                     </svg>
-                    <span class="min-w-badge text-center">{{ countBadge(wantCount(l.ck)) }}</span>
+                    <span v-if="wantCount(l.ck) > 0" class="text-center">{{ capDisplay(wantCount(l.ck)) }}</span>
                   </button>
                   <button @click="toggleLike(l.ck, $event)"
                     :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(l.ck) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-500 hover:text-slate-600 hover:border-slate-400']"
@@ -743,7 +745,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.ck) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linejoin="round" d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
                     </svg>
-                    <span class="min-w-badge text-center">{{ countBadge(likeCount(l.ck)) }}</span>
+                    <span v-if="likeCount(l.ck) > 0" class="text-center">{{ capDisplay(likeCount(l.ck)) }}</span>
                   </button>
                   </div>
                 </div>
@@ -902,9 +904,9 @@
   <script defer src="app.state.js?v=53fe7b787c"></script>
   <script defer src="app.computed.js?v=56ab6fe9bc"></script>
   <script defer src="app.display.js?v=b61f721ed6"></script>
-  <script defer src="app.cloud.js?v=5d758201e3"></script>
-  <script defer src="app.social.js?v=ffbde947c2"></script>
-  <script defer src="app.calendar.js?v=a0a00a2024"></script>
+  <script defer src="app.cloud.js?v=48b48189e4"></script>
+  <script defer src="app.social.js?v=542796ce38"></script>
+  <script defer src="app.calendar.js?v=a6a0500a83"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=3cdcecc6f3"></script>

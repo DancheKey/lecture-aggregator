@@ -52,7 +52,7 @@ const LectureCloud = (function () {
     return {
         // 拿配置（Promise<config|null>；null=云端禁用）。内部缓存，重复调用不发请求。
         config: loadConfig,
-        // 批量读全表 → { url: { visits, likes, wants } }；任一环节失败返回 null。
+        // 批量读全表 → { url: { visits, likes, wants, cal_downloads } }；任一环节失败返回 null。
         // 分页循环（2026-10-18）：Supabase 服务端有 Max Rows 全局上限（默认 1000），
         // 单次 limit 写多大都被静默截到该值——云端守卫上线前曾被灌出垃圾行，
         // 且讲座计数行随访问持续增长，迟早触顶（触顶后部分讲座计数静默归零）。
@@ -69,7 +69,7 @@ const LectureCloud = (function () {
                 const MAX_PAGES = 50;
                 const out = {};
                 const base = cfg.url + '/rest/v1/lecture_stats'
-                    + '?select=url,visits,likes,wants&order=url&limit=' + PAGE + '&offset=';
+                    + '?select=url,visits,likes,wants,cal_downloads&order=url&limit=' + PAGE + '&offset=';
                 const onePage = (offset) =>
                     fetch(base + offset, { cache: 'no-store', headers: headers(cfg) })
                         .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
@@ -83,6 +83,7 @@ const LectureCloud = (function () {
                                         visits: +row.visits || 0,
                                         likes: +row.likes || 0,
                                         wants: +row.wants || 0,
+                                        cal_downloads: +row.cal_downloads || 0,
                                     };
                                 }
                             }
@@ -96,8 +97,8 @@ const LectureCloud = (function () {
                 return loop(0, 1).catch(() => null);
             });
         },
-        // 增量调用：kind ∈ like|want|visit，delta=+1/-1。
-        // 成功返回数据库权威行 { visits, likes, wants }；失败/禁用返回 null。
+        // 增量调用：kind ∈ like|want|visit|cal，delta=+1/-1（cal 为单向，负值被数据库钳成 0）。
+        // 成功返回数据库权威行 { visits, likes, wants, cal_downloads }；失败/禁用返回 null。
         bump(kind, url, delta) {
             return loadConfig().then(cfg => {
                 if (!cfg) return null;

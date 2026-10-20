@@ -30,6 +30,9 @@ CAP_VISITS = 1_000_000
 # 校园讲座真实量级，又与显示层 300+ 封顶留足余量，刷的成本收益比骤降。
 CAP_LIKES = 1_000
 CAP_WANTS = 1_000
+# 2026-10-20（三按钮统一）：日历「加入次数」累计上限，与点赞/想听同量级。
+# 语义是「多少人把这条讲座加进了日历」——比点赞更强的兴趣信号，故量级一致。
+CAP_CALS = 1_000
 # 2026-10-18 修复（审查报告 S2）：visit 的单次增量上钳。前端每次只 +1、CI 快照
 # 只读、存量导入走 SQL 不经过 RPC——单次钳到 100 对真实用量零影响；而原值
 # 100 万意味着一次 curl 就能把页脚 PV（无 capDisplay）刷成门面事故。
@@ -47,6 +50,8 @@ CAP_WANTS = 1_000
 CAP_STEP_VISITS = 1
 CAP_STEP_LIKES = 1
 CAP_STEP_WANTS = 1
+# 日历加入是单向动作（下载了就不存在「取消下载」），单次只允许 +1，负增量钳成 0。
+CAP_STEP_CALS = 1
 # like/want 允许的最小单次增量：-1 = 取消。比 -1 更小的批量减一律钳成 -1。
 CAP_STEP_NEG = -1
 # p_url 校验规则（审查报告 S1，2026-10-18 复查加强）：增量 RPC 此前对 p_url
@@ -70,26 +75,33 @@ HEADER = """-- ============================================================
 update lecture_stats set visits = 0 where visits is null;
 update lecture_stats set likes = 0 where likes is null;
 update lecture_stats set wants = 0 where wants is null;
+-- cal_downloads（2026-10-20 新增：日历「加入次数」）：新列先幂等建列，再兜底默认值/非空。
+alter table lecture_stats add column if not exists cal_downloads int8;
+update lecture_stats set cal_downloads = 0 where cal_downloads is null;
 alter table lecture_stats
   alter column visits set default 0,
   alter column likes set default 0,
   alter column wants set default 0,
+  alter column cal_downloads set default 0,
   alter column visits set not null,
   alter column likes set not null,
-  alter column wants set not null;
+  alter column wants set not null,
+  alter column cal_downloads set not null;
 
 -- ② 值域约束（粗粒度防刷兜底，脚本最多刷到这里就被数据库拦住）
 alter table lecture_stats drop constraint if exists lecture_stats_visits_range;
 alter table lecture_stats drop constraint if exists lecture_stats_likes_range;
 alter table lecture_stats drop constraint if exists lecture_stats_wants_range;
+alter table lecture_stats drop constraint if exists lecture_stats_cals_range;
 alter table lecture_stats
   add constraint lecture_stats_visits_range check (visits between 0 and {cap_v}),
   add constraint lecture_stats_likes_range check (likes between 0 and {cap_l}),
-  add constraint lecture_stats_wants_range check (wants between 0 and {cap_w});
+  add constraint lecture_stats_wants_range check (wants between 0 and {cap_w}),
+  add constraint lecture_stats_cals_range check (cal_downloads between 0 and {cap_c});
 
 -- ③ RPC 增量函数：前端只能 +/-1，写不了任意值（security definer = 以所有者权限跑，
 --    anon 无需表级 INSERT/UPDATE 权限；表级写权限保持关闭，只走函数这一道闸门）。
---    insert 必须显式写全三列——只填目标列会依赖列默认值，缺默认值的表直接 23502。
+--    insert 必须显式写全相关列——只填目标列会依赖列默认值，缺默认值的表直接 23502。
 --    ⚠ 2026-10-17 深夜修复：update 与 insert 两条路径都必须 least 上钳——此前
 --    like/want 只有 greatest(...,0) 下钳，实测灌 p_delta=99999 可直接刷爆计数。
 --    ⚠ 2026-10-18 修订（两项，均有实测依据）：
@@ -168,6 +180,27 @@ begin
   return to_jsonb(v) - 'url';
 end $$;
 
+-- 日历「加入次数」增量（2026-10-20 三按钮统一）：把讲座导出成 .ics 加进日历。
+-- 与 like/want 的唯一区别是**单向**：greatest(p_delta, 0) 把取消（-1）钳成 0，
+-- 「下载日历」不存在取消语义，故不允许 -1（不像点赞取消需要真的减）。
+create or replace function increment_cal(p_url text, p_delta int)
+returns json language plpgsql security definer as $$
+declare v lecture_stats; d int;
+begin
+  if p_url is null or length(p_url) = 0 or length(p_url) > {max_len} then
+    raise exception 'p_url must be 1..{max_len} chars' using errcode = 22023;
+  end if;
+  if p_url !~* '^(https?://|__)' then
+    raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
+  end if;
+  d := least(greatest(p_delta, 0), {step_c});
+  insert into lecture_stats (url, visits, likes, wants, cal_downloads)
+    values (p_url, 0, 0, 0, greatest(d, 0))
+  on conflict (url) do update set cal_downloads = least(greatest(lecture_stats.cal_downloads + d, 0), {cap_c})
+  returning * into v;
+  return to_jsonb(v) - 'url';
+end $$;
+
 -- ④ RLS：先确保行级安全真的开着——policy 存在但 RLS 关闭 = 完全裸奔。
 --    ⚠ 2026-10-18 复查补：原 SQL 只有 create policy，漏了 enable。Supabase 对
 --    新表默认给 anon 全表 ALL 权限，RLS 未开启时 policy 形同虚设，匿名可绕过
@@ -179,6 +212,7 @@ create policy "anon read" on lecture_stats for select using (true);
 grant execute on function increment_like(text, int) to anon;
 grant execute on function increment_want(text, int) to anon;
 grant execute on function increment_visit(text, int) to anon;
+grant execute on function increment_cal(text, int) to anon;
 
 -- ⑤ 存量导入：默认不生成（2026-10-17 决策：云端从零积累）。
 --   启用方式：python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql
@@ -196,8 +230,10 @@ def main():
     if with_existing and not os.path.exists(STATS_PATH):
         sys.exit('找不到 ' + STATS_PATH)
     print(HEADER.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS,
+                        cap_c=CAP_CALS,
                         step_v=CAP_STEP_VISITS, step_l=CAP_STEP_LIKES,
-                        step_w=CAP_STEP_WANTS, step_neg=CAP_STEP_NEG,
+                        step_w=CAP_STEP_WANTS, step_c=CAP_STEP_CALS,
+                        step_neg=CAP_STEP_NEG,
                         max_len=MAX_URL_LEN))
     if not with_existing:
         print('-- ⑤ 存量导入：未启用（默认）。如需导入本地历史计数，')

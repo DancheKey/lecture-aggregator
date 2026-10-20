@@ -43,7 +43,7 @@ PATCH_PATH = os.path.join(ROOT, 'supabase-patch-current.sql')
 PATCH_GEN = os.path.join(ROOT, 'scripts', 'gen_supabase_patch.py')
 LECTURES_JSON = os.path.join(ROOT, 'site', 'lectures.json')
 
-FUNCS = ('increment_like', 'increment_want', 'increment_visit')
+FUNCS = ('increment_like', 'increment_want', 'increment_visit', 'increment_cal')
 
 
 def _func_body(sql, name):
@@ -143,6 +143,14 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             self.assertIn(
                 f'set {col} = least(greatest(lecture_stats.{col} + d, 0), 1000)',
                 b, f'{n} 的累计上限应保持 1000')
+        # cal（2026-10-20 三按钮统一）：单向 +1，负增量钳成 0——日历下载无「取消」语义
+        bc = _func_body(self.sql, 'increment_cal')
+        self.assertIn('d := least(greatest(p_delta, 0), 1);', bc,
+                      'increment_cal 应单向：负增量钳成 0（日历下载无取消语义，'
+                      '与 like/want 允许 -1 不同）')
+        self.assertIn(
+            'set cal_downloads = least(greatest(lecture_stats.cal_downloads + d, 0), 1000)',
+            bc, 'increment_cal 的累计上限应为 1000')
 
     def test_07_rls必须显式开启(self):
         """P1-2（2026-10-18 复查）：SQL 要 enable row level security，不能只建 policy。
@@ -227,16 +235,18 @@ class TestSupabaseMigrationSql(unittest.TestCase):
 
     def test_02_check约束存在且上限合理(self):
         caps = dict(re.findall(r'check \((\w+) between 0 and (\d+)\)', self.sql))
-        for col in ('visits', 'likes', 'wants'):
+        for col in ('visits', 'likes', 'wants', 'cal_downloads'):
             self.assertIn(col, caps, f'缺 {col} 的 check 值域约束')
         self.assertLessEqual(int(caps['likes']), 10000, 'likes 上限过松（防刷量级应 <= 10000）')
         self.assertLessEqual(int(caps['wants']), 10000, 'wants 上限过松（防刷量级应 <= 10000）')
+        self.assertLessEqual(int(caps['cal_downloads']), 10000,
+                             'cal_downloads 上限过松（防刷量级应 <= 10000）')
         self.assertGreater(int(caps['visits']), int(caps['likes']),
                            'visits 上限应远大于 likes（PV 量级与点赞不同）')
 
     def test_03_列兜底与安全授权(self):
         # 列兜底：默认值 0 + not null（缺默认值的表插新 URL 会 23502）
-        for col in ('visits', 'likes', 'wants'):
+        for col in ('visits', 'likes', 'wants', 'cal_downloads'):
             self.assertIn(f'alter column {col} set default 0', self.sql)
             self.assertIn(f'alter column {col} set not null', self.sql)
         # RLS 只读 + 函数授权；表级写权限一律不授（写入只走 RPC）

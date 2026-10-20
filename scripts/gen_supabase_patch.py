@@ -45,10 +45,11 @@ HEADER = """-- ============================================================
 -- 幂等：create or replace / drop if exists / set default 均可重复执行，
 --   不会覆盖云端已产生的真实增量，可放心重跑。
 --
--- 2026-10-19 版包含（均有实测依据）：
+-- 2026-10-20 版包含（均有实测依据）：
 --   ① 列兜底：默认值 0 + not null（缺默认值的表插新 URL 会 23502）
---   ② 值域 check 约束：visits<=100万 / likes<=1000 / wants<=1000
---   ③ 三个增量 RPC：insert 与 on conflict 共用同一个钳过的 d，杜绝两路漂移；
+--      含新增列 cal_downloads（日历「加入次数」，三按钮统一计数）
+--   ② 值域 check 约束：visits<=100万 / likes<=1000 / wants<=1000 / cal_downloads<=1000
+--   ③ 四个增量 RPC（新增 increment_cal）：insert 与 on conflict 共用同一个钳过的 d，杜绝两路漂移；
 --      单次步长统一钳到 1（visit 原 100；like/want 此前误用累计上限 1000 当步长）。
 --      like/want 允许 -1：取消点赞必须真的减（原 greatest(p_delta,0) 把 -1 钳成 0，
 --      「取消」是空操作，且本地已删键 → 再点又 +1，可反复刷高）。
