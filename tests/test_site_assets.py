@@ -22,6 +22,7 @@ import os
 import re
 import struct
 import unittest
+from datetime import datetime, timezone
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SITE = os.path.join(_ROOT, 'site')
@@ -420,6 +421,33 @@ class TestFeeds(unittest.TestCase):
         for rec, want in cases:
             self.assertEqual(mod._feed_title(rec), want,
                              f'_feed_title({rec}) 应为 {want!r}')
+
+    def test_ics的DTSTAMP取自数据更新时间而非生成时刻(self):
+        """DTSTAMP 若用 datetime.now()，每次生成都会改动 feed.ics 的字节。
+
+        后果有两层：订阅端据此认为事件被修改（部分客户端会触发不必要的刷新），
+        以及每次生成（每日 CI + 任何手动重跑）都产生无意义的 git diff。
+        这里用「DTSTAMP 必须等于 RSS 的 lastBuildDate」来锁——两者都取自
+        data/lectures.json 的 updatedAt，一旦有人改回 now()，这条立刻变红。
+        """
+        import xml.etree.ElementTree as ET
+        from email.utils import parsedate_to_datetime
+
+        ics = self._read('feed.ics')
+        m = re.search(r'DTSTAMP:(\d{8}T\d{6}Z)', ics)
+        self.assertIsNotNone(m, 'feed.ics 缺 DTSTAMP')
+        dt_stamp = datetime.strptime(m.group(1), '%Y%m%dT%H%M%SZ').replace(
+            tzinfo=timezone.utc)
+
+        root = ET.fromstring(self._read('feed.xml'))
+        lbd = root.find('channel').find('lastBuildDate').text
+        dt_build = parsedate_to_datetime(lbd).astimezone(timezone.utc)
+
+        self.assertEqual(
+            dt_stamp, dt_build,
+            'DTSTAMP 应等于 RSS 的 lastBuildDate（两者都取自 updatedAt）；'
+            f'实际 DTSTAMP={dt_stamp} / lastBuildDate={dt_build}，'
+            '不等说明有一方用了生成时刻 now()')
 
     def test_订阅源由生成器产出(self):
         with open(os.path.join(_ROOT, 'scripts', 'generate_frontend_data.py'),

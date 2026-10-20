@@ -817,7 +817,12 @@ def write_feeds(data, updated_at):
              'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
              'X-WR-CALNAME:木铎金声 · 华师讲座', 'X-WR-TIMEZONE:Asia/Shanghai',
              'X-WR-CALDESC:' + _ics_esc(desc_site)]
-    stamp = _ics_stamp(datetime.now(timezone.utc))
+    # DTSTAMP 用「数据更新时间」而非「本次生成时刻」（2026-10-20 修）。
+    # 原用 datetime.now() 的后果：每天 CI 重生成、以及任何一次手动重跑，都会让
+    # feed.ics 的每一个 VEVENT 字节变化 → 订阅端据此认为事件被修改，可能触发
+    # 不必要的刷新；同时也让每次生成都产生无意义的 git diff。
+    # 数据没变时，产物就应当字节完全一致——updated_at 正好满足这个语义。
+    stamp = _ics_stamp(built)
     for start, end, rec in rows:
         uid = (rec.get('ck') or rec.get('sourceUrl') or _feed_title(rec)) + '@danchekey.github.io'
         lines += ['BEGIN:VEVENT', 'UID:' + _ics_esc(uid), 'DTSTAMP:' + stamp,
