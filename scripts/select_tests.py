@@ -59,17 +59,22 @@ GROUPS = [
                                'scripts/gen_supabase_patch.py', 'scripts/fetch_visits_snapshot.py',
                                'supabase-migration.sql', 'supabase-patch-current.sql'],
      'tests': ['tests/test_supabase_migration.py']},
-    # 趋势页（仅 node 门禁 visits_trend_render.js）
+    # 趋势页（node 门禁 visits_trend_render.js + 资产门禁 test_site_assets：
+    # 本页的 icon/og meta 在 gen_visits_trend.py 的模板里，产物会被次日 CI 覆盖，
+    # 只改产物不改模板等于没改——故模板一改就连资产守卫一起跑）
     {'name': 'trend', 'pats': ['scripts/gen_visits_trend.py', 'site/visits-trend.html',
                                'site/visits-trend.js', 'site/visits-trend.css',
                                'site/visits-trend-data.json'],
-     'tests': []},
+     'tests': ['tests/test_site_assets.py']},
     # 前端站点产物 / 版本戳（test_server 独占 29s，不在此组——见 server 组）
+    # test_site_assets（2026-10-20）：图标/og 卡片/sitemap/404 的静态资产守卫，
+    # 与 site/ 产物同组——改任何一个页面或生成器都要连它一起跑。
     {'name': 'frontend', 'pats': ['site/', 'scripts/generate_frontend_data.py',
                                   'scripts/frontend_fields.py', 'scripts/tailwind-input.css',
                                   'scripts/tailwind.config.js'],
      'tests': ['tests/test_frontend_schema.py', 'tests/test_frontend_consistency.py',
-               'tests/test_module_compile.py', 'tests/test_env_flags.py']},
+               'tests/test_module_compile.py', 'tests/test_env_flags.py',
+               'tests/test_site_assets.py']},
     # server.py（含它镜像的前端派生逻辑；socket 超时用例使其偏重）
     {'name': 'server', 'pats': ['server.py'],
      'tests': ['tests/test_server.py', 'tests/test_frontend_consistency.py',

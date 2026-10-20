@@ -65,6 +65,7 @@ jobs:
             tests/test_bio_stop_words.py
             tests/test_location_prefix.py
             tests/test_frontend_schema.py
+            tests/test_site_assets.py
             tests/test_parser_snapshot.py
             tests/test_stage_var_leak.py
             tests/test_ledger.py

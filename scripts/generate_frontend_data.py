@@ -30,6 +30,9 @@ import field_vocab as _fv  # noqa: E402
 DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
 SITE_LECTURES_PATH = os.path.join(ROOT, 'site', 'lectures.json')
 SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
+# 站点绝对地址前缀（2026-10-20）：sitemap 与分享卡片（og:url / og:image）都要用
+# 绝对 URL，爬虫不解析相对路径。GitHub Pages 项目页挂在子路径下，结尾必须有 `/`。
+SITE_BASE_URL = 'https://danchekey.github.io/lecture-aggregator/'
 LATEST_SIZE = 50
 CHUNK_SIZE = 100        # 公网分片加载：每片 100 条（2026-10-14 用户定，原 500）。
 # 背景：阶梯跳变形态下数字只在分片到达时更新（bumpCount 恒等于已加载真实条数，
@@ -606,6 +609,40 @@ def write_visits_snapshot():
           f"累计 pv={payload['site_pv']}")
 
 
+def write_sitemap(updated_at):
+    """生成 site/sitemap.xml（2026-10-20 批次 A：分享与可发现性）。
+
+    只有 3 个真实页面——讲座列表与筛选都是 SPA 内部状态、没有独立 URL，详情也不
+    单独成页。所以 sitemap 恒为 3 条，**别指望它带来收录量**：本站内容全在 JSON
+    里，百度不执行 JS，抓到的就是一个空壳 HTML（Google 能渲染 JS，但也要排队）。
+    它的实际作用只有两个：给搜索引擎一个「更新频率」信号；满足 Search Console /
+    Bing Webmaster 的 sitemap 提交入口。
+
+    ⚠ 必须写**绝对 URL 且带 /lecture-aggregator/ 子路径**：GitHub Pages 项目页挂
+    在域名子路径下，写相对路径或漏掉子路径会被判为无效条目。
+    lastmod 直接复用数据更新时间（W3C datetime，与 lectures.json 的 updatedAt
+    同源），保证「sitemap 声称的更新」与「数据真的更新」永远一致，不会出现
+    手工维护导致的日期漂移。
+    """
+    urls = [
+        ('', '1.0', 'daily'),
+        ('stats.html', '0.8', 'daily'),
+        ('visits-trend.html', '0.3', 'weekly'),
+    ]
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
+             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for path, prio, freq in urls:
+        lines += ['  <url>',
+                  f'    <loc>{SITE_BASE_URL}{path}</loc>',
+                  f'    <lastmod>{updated_at}</lastmod>',
+                  f'    <changefreq>{freq}</changefreq>',
+                  f'    <priority>{prio}</priority>',
+                  '  </url>']
+    lines.append('</urlset>')
+    atomic_write_text(os.path.join(ROOT, 'site', 'sitemap.xml'), '\n'.join(lines) + '\n')
+    print(f'[done] sitemap.xml: {len(urls)} 条')
+
+
 def main():
     warn_uncommitted_scripts()
     warn_stale_stamp_inputs()
@@ -688,6 +725,10 @@ def main():
     #   导航改落生成脚本模板——都是「清单漏一处、零告警」。）
     stamp_script_version('visits-trend.html', 'visits-trend.js')
     stamp_script_version('visits-trend.html', 'visits-trend.css')
+
+    # sitemap 只依赖数据更新时间，放在最后：所有前端产物落盘后再写，即使这里出错
+    # 也不影响首页/统计页可用（sitemap 是 SEO 附属物，不是功能件）。
+    write_sitemap(updated_at)
 
 
 if __name__ == '__main__':

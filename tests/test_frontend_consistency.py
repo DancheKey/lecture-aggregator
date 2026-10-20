@@ -440,6 +440,14 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
             'site/app.cloud.js',                       # 云端共享计数层（2026-10-17）
             'site/supabase-config.json',               # 云端配置（2026-10-18 起入库随部署）
             'site/supabase-config.example.json',       # 配置模板
+            # 分享与可发现性资产（2026-10-20 批次 A）。全部是**手写静态文件**，
+            # 不由生成器产出，故不进 SITE_PATHS（那里只放产物）；改动走正常 git 提交。
+            # sitemap.xml 例外——它是每日重生成的产物，已进 SITE_PATHS。
+            'site/404.html',                           # GitHub Pages 项目页 404
+            'site/robots.txt',                         # 项目页下不被读取，为迁移预留
+            'site/og-cover.jpg',                       # 分享卡片 800×800
+            'site/favicon-32.png', 'site/favicon-16.png',
+            'site/apple-touch-icon.png',
         }
         missing = [u for u in uncovered if u not in known_static]
         self.assertEqual(missing, [],

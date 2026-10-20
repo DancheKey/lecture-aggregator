@@ -1,0 +1,14 @@
+# 木铎金声 · 华师讲座聚合
+#
+# ⚠ 2026-10-20：本站是 GitHub Pages **项目页**（挂在 /lecture-aggregator/ 子路径下），
+# 而爬虫只会去域名根读 robots.txt（即 danchekey.github.io/robots.txt），
+# 不会读 /lecture-aggregator/robots.txt。所以**这个文件实际上不会被读取**。
+# 保留它的唯一理由是：将来若迁到自定义域名或改成用户主页（user site），
+# 它会立刻生效，不必临时补。
+#
+# 真正有效的是 sitemap：需要在 Google Search Console / Bing Webmaster 里
+# **手动提交** https://danchekey.github.io/lecture-aggregator/sitemap.xml 才会被消费。
+User-agent: *
+Allow: /
+
+Sitemap: https://danchekey.github.io/lecture-aggregator/sitemap.xml

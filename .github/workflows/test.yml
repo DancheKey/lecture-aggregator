@@ -58,6 +58,13 @@ jobs:
         run: python tests/test_location_prefix.py
       - name: Run frontend schema guard tests
         run: python tests/test_frontend_schema.py
+      # 2026-10-20 纳入（批次 A：分享与可发现性）：站点静态资产守卫。
+      # 锁四类「坏了也看不出来」的缺陷——图标三件套缺失（Safari 空白）、
+      # og:image 写成相对路径（微信分享退化成裸链接）、og:url 复制后忘改
+      # （所有页面转发都指回首页）、sitemap 的 loc 漏了 /lecture-aggregator/
+      # 子路径（整份 sitemap 判为无效）。这些在本地打开完全正常，只有转发时暴露。
+      - name: Run site assets guard tests
+        run: python tests/test_site_assets.py
       # 2026-09-29 纳入：全字段行为快照（渐进重构第 2 步）。
       # golden 是抽查（每页仅 4~6 项断言），location/lectureStart/abstract 等 20+ 字段
       # 全未锁定；本套件按记录全字段比对基线 parser_snapshot.json，锁「纯规则基线」

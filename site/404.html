@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 404 页（2026-10-20 批次 A）。GitHub Pages 项目页支持 /lecture-aggregator/404.html，
+     该路径下的任何未命中 URL 都会渲染本页。刻意做成零脚本、零外部样式表：
+     用户走到这里往往已经是一次失败请求，再拉 100KB+ 的 tailwind 只会更慢。
+     故样式全部内联，CSP 相应放行 style-src 'unsafe-inline'（无脚本，风险为零）。 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; object-src 'none'; base-uri 'self'">
+<title>页面不存在 · 木铎金声</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="scnu-emblem.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #f7f8fa; color: #1e293b; padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  .box { max-width: 420px; text-align: center; }
+  .brand { width: 190px; max-width: 70%; height: auto; opacity: .9; margin-bottom: 28px; }
+  .code { font-size: 64px; font-weight: 800; line-height: 1; color: #cbd5e1; letter-spacing: 2px; }
+  h1 { font-size: 20px; margin: 14px 0 10px; }
+  p { font-size: 14px; line-height: 1.7; color: #64748b; margin: 0 0 26px; }
+  .links { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  a.btn {
+    display: inline-block; padding: 10px 20px; border-radius: 10px; font-size: 14px;
+    text-decoration: none; transition: background .15s, border-color .15s;
+  }
+  a.primary { background: #1e293b; color: #fff; }
+  a.primary:hover { background: #0f172a; }
+  a.ghost { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+  a.ghost:hover { border-color: #94a3b8; }
+  .hint { margin-top: 30px; font-size: 12px; color: #94a3b8; line-height: 1.7; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <img class="brand" src="site-title.png" alt="木铎金声">
+    <div class="code">404</div>
+    <h1>这一页不存在</h1>
+    <p>链接可能已经失效，或者这条讲座信息后来被合并到了别的页面。</p>
+    <div class="links">
+      <a class="btn primary" href="./">返回讲座列表</a>
+      <a class="btn ghost" href="stats.html">看看统计</a>
+    </div>
+    <p class="hint">如果你是从别人分享的链接过来的，可以直接在首页按学院或讲者搜一下。</p>
+  </div>
+</body>
+</html>

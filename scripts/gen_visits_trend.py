@@ -507,7 +507,24 @@ def main():
      遗留代价：页面不再支持 file:// 直接打开（fetch 受同源限制），
      本地预览请用 start_local.bat 起本地 server。 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
-<title>站点访问量趋势</title>
+<title>站点访问量趋势 · 木铎金声</title>
+<!-- 图标与分享卡片（2026-10-20）：与 index.html 同一套。本页是模板，改动会随
+     每次 CI 重新生成进 site/visits-trend.html；直接改产物次日会被覆盖。 -->
+<link rel="icon" href="scnu-emblem.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="description" content="木铎金声站点每日访问量与累计访问次数趋势（数据来自自建计数快照）。">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="木铎金声">
+<meta property="og:title" content="站点访问量趋势 · 木铎金声">
+<meta property="og:description" content="木铎金声站点每日访问量与累计访问次数趋势。">
+<meta property="og:url" content="https://danchekey.github.io/lecture-aggregator/visits-trend.html">
+<meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
+<meta property="og:image:width" content="800">
+<meta property="og:image:height" content="800">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
 <link rel="stylesheet" href="visits-trend.css">
 </head>
 <body><div class="wrap">
