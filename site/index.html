@@ -563,8 +563,10 @@
                   <div class="card-actions flex items-center gap-2 shrink-0">
                     <!-- 整组加入日历（2026-10-20 批次 B）：合并卡代表「同页同日 ≥3 场」，
                          逐场按钮会挤爆卡片，所以整组生成一个含多条 VEVENT 的 .ics。
-                         只收「还没结束」的场次（见 addGroupToCalendar）。 -->
-                    <button v-if="u.recs && u.recs.length" @click="addGroupToCalendar(u)"
+                         只在组内还有「还没结束」场次时显示（hasLiveRecs，二修：与
+                         addGroupToCalendar 的过滤同判据 _calLive——否则全组过期时
+                         按钮点了静默无反应）。 -->
+                    <button v-if="hasLiveRecs(u)" @click="addGroupToCalendar(u)"
                       class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
                       title="整组加入日历：把这一组里还没结束的场次一次性导出（.ics）">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -718,7 +720,8 @@
                   <div class="card-actions flex items-center gap-2 shrink-0">
                   <!-- 加入日历（2026-10-20 批次 B）：生成单场 .ics，点开即加到系统日历。
                        canAddCal 挡掉「时间未知」的 50 条和缺开始时间的 1 条——
-                       没有时间的讲座塞进日历只会是个错误提醒。 -->
+                       没有时间的讲座塞进日历只会是个错误提醒；二修再挡已结束的场次
+                       （与整组入口同判据 _calLive，此前只有整组入口过滤过期）。 -->
                   <button v-if="canAddCal(l)" @click="addToCalendar(l)"
                     class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
                     title="只把这一场加进日历（.ics）">
@@ -901,7 +904,7 @@
   <script defer src="app.display.js?v=b61f721ed6"></script>
   <script defer src="app.cloud.js?v=5d758201e3"></script>
   <script defer src="app.social.js?v=ffbde947c2"></script>
-  <script defer src="app.calendar.js?v=caa00580e9"></script>
+  <script defer src="app.calendar.js?v=a0a00a2024"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=3cdcecc6f3"></script>

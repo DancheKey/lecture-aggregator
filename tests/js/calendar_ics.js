@@ -147,6 +147,72 @@ const cal = loadCal();
   ok(cal.calIcsFor([{ title: '无时间' }]) === '', 'test_09b 无时间的记录应被跳过');
 }
 
+// ---------- test_10：过期判定（2026-10-20 二修：单场/整组入口同判据 _calLive） ----------
+{
+  ok(cal.canAddCal({ lectureStart: '2020-01-01 14:00:00' }) === false,
+    'test_10 已结束的讲座不得再显示「加入日历」（此前只有整组入口过滤过期）');
+  // 进行中（已开始、缺结束时间按 +1 小时兜底）仍可加：讲座正进行时按钮不该消失
+  const recent = new Date(Date.now() - 20 * 60 * 1000 + 8 * 3600 * 1000); // now-20min 的北京字面量
+  const p2 = n => String(n).padStart(2, '0');
+  const bj = `${recent.getUTCFullYear()}-${p2(recent.getUTCMonth() + 1)}-${p2(recent.getUTCDate())}`
+    + ` ${p2(recent.getUTCHours())}:${p2(recent.getUTCMinutes())}:00`;
+  ok(cal.canAddCal({ lectureStart: bj }) === true,
+    'test_10b 刚开始 20 分钟且未标结束时间的讲座应仍可加（进行中）');
+  ok(cal.hasLiveRecs({ recs: [{ lectureStart: '2020-01-01 14:00:00' }] }) === false,
+    'test_10c 整组全部过期时不得显示整组入口（否则点击静默无反应）');
+  ok(cal.hasLiveRecs({ recs: [
+    { lectureStart: '2020-01-01 14:00:00' },
+    { lectureStart: '2099-01-01 14:00:00' },
+  ] }) === true, 'test_10d 组内有一场未结束即应显示整组入口');
+  // timeUnknown 的组内场次必须被整组过滤剔除（_calLive 同时管两个入口）
+  ok(cal.hasLiveRecs({ recs: [
+    { lectureStart: '2099-01-01 14:00:00', timeUnknown: 'True' },
+  ] }) === false, 'test_10e 组内仅剩 timeUnknown 场次时同样不得显示整组入口');
+}
+
+// ---------- test_11：标题去重（与 Python _feed_title 同判据，修「题目｜题目」） ----------
+{
+  // title 已内嵌 topic（全库 12.6%）：旧前端只判 !== 会重复，而 feed.xml/feed.ics 不会
+  const ics1 = cal.calIcsFor([{
+    title: '学术讲座：早期胚胎发育和体轴建立',
+    topic: '早期胚胎发育和体轴建立',
+    lectureStart: '2026-10-31 14:00:00', ck: 'dedup',
+  }]);
+  ok(ics1.includes('SUMMARY:学术讲座：早期胚胎发育和体轴建立'),
+    'test_11 topic 已内嵌于 title 时 SUMMARY 应仅为 title');
+  ok(!ics1.includes('｜'), 'test_11b topic 已内嵌于 title 时不得追加「｜题目」');
+  // 真正不同的题目才追加（SUMMARY 可能超 75 字节被折行，只断言连接符存在）
+  const ics2 = cal.calIcsFor([{
+    title: '勷勤数学•专家报告-陈天翔', topic: '从医学视觉到多模态大模型',
+    lectureStart: '2026-10-31 14:00:00', ck: 'differ',
+  }]);
+  ok(ics2.includes('｜'), 'test_11c topic 与 title 不同时才追加「｜题目」');
+}
+
+// ---------- test_12：主讲行拼装（与 Python _feed_desc 对齐，修残缺括号） ----------
+{
+  // 只有单位没姓名：旧写法输出成「华南师范大学）」（缺左括号）
+  const ics1 = cal.calIcsFor([{
+    title: 'T', lectureStart: '2026-10-31 14:00:00', ck: 'aff1',
+    speaker: '', speakerAffiliation: '华南师范大学',
+  }]);
+  ok(!ics1.includes('主讲'),
+    'test_12 无姓名时不得输出残缺主讲行（_feed_desc 口径：整行不输出）');
+  const ics2 = cal.calIcsFor([{
+    title: 'T', lectureStart: '2026-10-31 14:00:00', ck: 'aff2',
+    speaker: '张三', speakerAffiliation: '华南师范大学',
+  }]);
+  ok(ics2.includes('主讲：张三（华南师范大学）'),
+    'test_12b 姓名+单位应输出「姓名（单位）」');
+  // 有姓名没单位：不得留下孤立左括号
+  const ics3 = cal.calIcsFor([{
+    title: 'T', lectureStart: '2026-10-31 14:00:00', ck: 'aff3',
+    speaker: '张三', speakerAffiliation: '',
+  }]);
+  ok(ics3.includes('主讲：张三') && !ics3.includes('（'),
+    'test_12c 无单位时不得输出孤立括号');
+}
+
 if (errs.length) {
   errs.forEach(e => console.error('  ✗ ' + e));
   console.error(`calendar_ics: ${errs.length} 项失败`);

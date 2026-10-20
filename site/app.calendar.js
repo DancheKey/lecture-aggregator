@@ -82,8 +82,22 @@ Object.assign(APP_METHODS, {
   _calEvent(l, dtstamp) {
     const span = this._calSpan(l);
     if (!span) return null;
-    const title = l.topic && l.topic !== l.title ? `${l.title}｜${l.topic}` : (l.title || '学术讲座');
-    const who = [l.speaker, l.speakerAffiliation].filter(Boolean).join('（') + (l.speakerAffiliation ? '）' : '');
+    // 标题去重（2026-10-20 与 Python 端 _feed_title 对齐，修「题目｜题目」重复）：
+    // title 常已内嵌 topic（全库 483 条 / 12.6%，如「学术讲座：早期胚胎发育和体轴建立」），
+    // 只判 !== 会拼成「…题目｜题目」，而 feed.xml/feed.ics 不会——两处导出行为分叉。
+    // 判据与 generate_frontend_data.py::_feed_title 逐条一致：
+    // topic 为空 / 相等 / 已包含于 title 时都不追加。
+    const t = String(l.title || '').trim();
+    const topic = String(l.topic || '').trim();
+    const title = t
+      ? ((topic && topic !== t && !t.includes(topic)) ? `${t}｜${topic}` : t)
+      : (topic || '学术讲座');
+    // 主讲行（与 Python 端 _feed_desc 对齐）：只有姓名非空才输出，单位有姓名时才加括号。
+    // 旧写法 [speaker, aff].filter(Boolean).join('（')+'）' 在「只有单位没姓名」时
+    // 输出成「华南师范大学）」（缺左括号）；_feed_desc 的口径是无姓名则整行不输出。
+    const who = l.speaker
+      ? (l.speakerAffiliation ? `${l.speaker}（${l.speakerAffiliation}）` : String(l.speaker))
+      : '';
     const desc = [
       l.topic ? `题目：${l.topic}` : '',
       who ? `主讲：${who}` : '',
@@ -137,12 +151,21 @@ Object.assign(APP_METHODS, {
 
   /* ---------- 交互 ---------- */
 
-  // 这条记录能不能加日历：有可解析的开始时间，且解析器没有标「时间未知」。
-  // timeUnknown 在数据里是字符串 'True'/'False'（不是布尔），必须按字符串比。
+  // 「还没结束且时间可用」的统一口径——单场按钮（canAddCal）、整组按钮
+  // （hasLiveRecs）、整组导出（addGroupToCalendar 的过滤）三处共用，勿再各写一份。
+  // timeUnknown 在数据里是字符串 'True'/'False'（不是布尔），必须按字符串比；
+  // 缺结束时间按 _calSpan 的 +1 小时兜底——进行中的讲座（已开始未结束）视为「还没结束」。
+  _calLive(l, now) {
+    if (!l || String(l.timeUnknown) === 'True') return false;
+    const span = this._calSpan(l);
+    return !!span && span.end > now;
+  },
+
+  // 这条记录能不能加日历：时间可用、非「时间未知」，且（2026-10-20 二修）**还没结束**。
+  // 此前单场入口不查过期、整组入口查——已结束的讲座仍显示单场按钮，两处口径不一致，
+  // 把过期讲座加进日历没有意义。过期判定收敛到 _calLive 单点。
   canAddCal(l) {
-    if (!l) return false;
-    if (String(l.timeUnknown) === 'True') return false;
-    return this._calUtcMs(l.lectureStart) !== null;
+    return this._calLive(l, Date.now());
   },
 
   // 触发下载。filename 用纯 ASCII：中文文件名在部分安卓机型上会变成乱码或 .bin
@@ -190,15 +213,20 @@ Object.assign(APP_METHODS, {
     this._calDownload(name, text);
   },
 
+  // 整组入口的显示条件（2026-10-20 二修）：组内至少一场「还没结束」。否则按钮是死的——
+  // addGroupToCalendar 过滤后为空 → calIcsFor 返回 '' → 不触发下载、无任何反馈。
+  // 与单场入口（canAddCal）同一判据 _calLive。
+  hasLiveRecs(u) {
+    const now = Date.now();
+    return ((u && u.recs) || []).some(l => this._calLive(l, now));
+  },
+
   // 论坛卡（同页同日 ≥3 场折叠成一张卡）：整组一起加。
-  // 只取「还没结束」的场次——把上周的讲座塞进日历没有意义。
+  // 只取「还没结束」的场次——把上周的讲座塞进日历没有意义（判据见 _calLive）。
   addGroupToCalendar(u) {
     const recs = (u && u.recs) || [];
     const now = Date.now();
-    const live = recs.filter(l => {
-      const span = this._calSpan(l);
-      return span && span.end > now && String(l.timeUnknown) !== 'True';
-    });
+    const live = recs.filter(l => this._calLive(l, now));
     const text = this.calIcsFor(live);
     if (!text) return;
     const first = this._calSpan(live[0]);
