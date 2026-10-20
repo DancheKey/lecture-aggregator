@@ -156,6 +156,30 @@ class TestSocialCard(unittest.TestCase):
             tw = _meta(_read(page), 'twitter:image', attr='name')
             self.assertEqual(tw, img, f'{page} 的 twitter:image 应与 og:image 相同')
 
+    def test_og标签必须在前2KB内(self):
+        """抓取器可能只读响应体前 4KB——og 标签被注释/CSP 推到后面 = 静默失效。
+
+        2026-10-20 用户实测：标签齐全（用微信 UA 抓过，逐条都在），但微信里
+        仍是裸链接。当时的 og 块位于 2.8~3.5KB 处，前面压着两段长注释——
+        这是「写得越认真越容易踩」的坑：注释越详细，标签推得越后。
+        修法是把 og 块前置到 head 最前，本条把它固化成断言：将来谁在 head
+        里加长注释，这里立刻变红。
+
+        ⚠ 定位必须带 `<meta property="` 前缀：注释里也写着 "og:image" 三个字，
+        直接 find(b'og:image') 会命中注释（本机实测偏移量对不上就是这么来的）。
+        """
+        LIMIT = 2048
+        for page in PAGES:
+            with open(os.path.join(_SITE, page), 'rb') as f:
+                raw = f.read()
+            for key in (b'og:title', b'og:image', b'og:url'):
+                needle = b'<meta property="' + key + b'"'
+                i = raw.find(needle)
+                self.assertNotEqual(i, -1, f'{page} 找不到 {needle.decode()}')
+                self.assertLess(i, LIMIT,
+                                f'{page} 的 {key.decode()} 在第 {i} 字节（上限 {LIMIT}），'
+                                f'抓取器可能读不到——把它往前挪，别在 head 顶部堆长注释')
+
     def test_og_url每页指向自己(self):
         base = _site_base_url()
         for page in PAGES:

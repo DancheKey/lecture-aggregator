@@ -1,38 +1,38 @@
 <!DOCTYPE html>
 <html lang="zh-CN" class="pre-hidden">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 分享卡片：与 index.html 同一套，刻意前置（抓取器可能只读前 4KB）。
+       og:url 必须是本页绝对地址，否则从统计页转发出去会指回首页。 -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="木铎金声">
+  <meta property="og:title" content="各学院讲座统计 · 木铎金声">
+  <meta property="og:description" content="按学院与年份统计华南师范大学学术讲座数量，并汇总访问量、点赞数与想听数。">
+  <meta property="og:url" content="https://danchekey.github.io/lecture-aggregator/stats.html">
+  <meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
+  <meta property="og:image:width" content="800">
+  <meta property="og:image:height" content="800">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="各学院讲座统计 · 木铎金声">
+  <meta name="twitter:description" content="按学院与年份统计华南师范大学学术讲座数量，并汇总访问量、点赞数与想听数。">
+  <meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
   <!-- CSP 说明：
        - 'unsafe-eval' 因本站使用 Vue 3 运行时模板编译（零构建静态站点，模板在浏览器内编译）所必需；
          站点纯静态、无任何用户可控输入，故实际 XSS 风险极低。若日后改为预编译构建，可移除该指令。
        - 访问量计数（2026-10-18 起）走自建 Supabase（含全站 PV 专用行与讲座计数），
          connect-src 放行 *.supabase.co，不再依赖 busuanzi 第三方；
          localStorage 5 分钟缓存防重复计数。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
   <!-- footer-counter.js 走 Supabase 云端计数（app.cloud.js 已先加载），5 分钟内不重复计数 -->
-  <meta name="referrer" content="no-referrer" />
+  <meta name="referrer" content="no-referrer">
   <title>各学院讲座统计 · 木铎金声</title>
-  <meta name="description" content="按学院与年份统计华南师范大学学术讲座数量，并汇总访问量、点赞数与想听数。" />
-  <!-- 图标与分享卡片（2026-10-20）：与 index.html 同一套，详见该文件注释。
-       og:url 必须是本页绝对地址，否则从统计页转发出去会指回首页。 -->
-  <link rel="icon" href="scnu-emblem.svg" type="image/svg+xml" />
-  <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
-  <link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="木铎金声" />
-  <meta property="og:title" content="各学院讲座统计 · 木铎金声" />
-  <meta property="og:description" content="按学院与年份统计华南师范大学学术讲座数量，并汇总访问量、点赞数与想听数。" />
-  <meta property="og:url" content="https://danchekey.github.io/lecture-aggregator/stats.html" />
-  <meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg" />
-  <meta property="og:image:width" content="800" />
-  <meta property="og:image:height" content="800" />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="各学院讲座统计 · 木铎金声" />
-  <meta name="twitter:description" content="按学院与年份统计华南师范大学学术讲座数量，并汇总访问量、点赞数与想听数。" />
-  <meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg" />
-  <link rel="stylesheet" href="vendor/tailwind.css" />
+  <meta name="description" content="按学院与年份统计华南师范大学学术讲座数量，并汇总访问量、点赞数与想听数。">
+  <link rel="icon" href="scnu-emblem.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="vendor/tailwind.css">
   <script defer src="vendor/vue.global.prod.js"></script>
     <style>
       /* 防点击劫持预隐藏（2026-10-14 P1-1）：与 index.html 同一方案，由

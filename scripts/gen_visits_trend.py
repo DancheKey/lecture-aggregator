@@ -498,6 +498,17 @@ def main():
      ⚠ 本 HTML 是产物：改动须落本模板，直接改 site/visits-trend.html 会被
      次日 CI 的 gen_visits_trend.py 覆盖（2026-10-08 已踩过坑）。 -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 分享卡片：与 index.html 同一套，刻意前置（抓取器可能只读前 4KB）。 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="木铎金声">
+<meta property="og:title" content="站点访问量趋势 · 木铎金声">
+<meta property="og:description" content="木铎金声站点每日访问量与累计访问次数趋势。">
+<meta property="og:url" content="https://danchekey.github.io/lecture-aggregator/visits-trend.html">
+<meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
+<meta property="og:image:width" content="800">
+<meta property="og:image:height" content="800">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
 <!-- CSP（2026-10-02）：本报告页此前是全站唯一无 CSP 的页面（2026-09-30 评审 P5），
      补 CSP 时因脚本与数据整体内联而被迫放行 script-src 'unsafe-inline'。
      同日两项改动使其可以完全收紧：
@@ -515,16 +526,6 @@ def main():
 <link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="description" content="木铎金声站点每日访问量与累计访问次数趋势（数据来自自建计数快照）。">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="木铎金声">
-<meta property="og:title" content="站点访问量趋势 · 木铎金声">
-<meta property="og:description" content="木铎金声站点每日访问量与累计访问次数趋势。">
-<meta property="og:url" content="https://danchekey.github.io/lecture-aggregator/visits-trend.html">
-<meta property="og:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
-<meta property="og:image:width" content="800">
-<meta property="og:image:height" content="800">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://danchekey.github.io/lecture-aggregator/og-cover.jpg">
 <link rel="stylesheet" href="visits-trend.css">
 </head>
 <body><div class="wrap">
