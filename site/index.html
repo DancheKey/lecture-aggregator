@@ -378,8 +378,18 @@
                   待开始
                   <button type="button" @click="toggleUpcoming()"
                     class="px-2 py-0.5 rounded-full font-semibold transition"
-                    :class="upcomingOnly ? 'bg-blue-600 text-white' : 'text-blue-600 hover:bg-blue-100'"
+                    :class="upcomingOnly ? 'bg-blue-600 text-white' : 'text-orange-600 hover:bg-orange-100'"
                     :title="upcomingOnly ? '点击取消待开始筛选' : '只看还没开始的讲座'">{{ upcomingCount }}</button>
+                  场
+                </template>
+                <!-- 进行中内联段（2026-10-20 用户补充）：有正在进行的讲座时紧跟待开始后显示。
+                     数字用 bg-blue-100/text-blue-700，与卡片「进行中」徽章同色（待开始数字
+                     用 orange 对齐卡片「即将开始」橙）。纯展示、不可点筛选（用户仅要求显示数量）。
+                     仅 >0 时显示——绝大多数时段无进行中讲座，整段隐藏不占宽。 -->
+                <template v-if="ongoingCount > 0">
+                  <span class="text-slate-300">·</span>
+                  进行中
+                  <span class="px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700">{{ ongoingCount }}</span>
                   场
                 </template>
 
@@ -725,7 +735,7 @@
                        （与整组入口同判据 _calLive，此前只有整组入口过滤过期）。 -->
                   <button v-if="canAddCal(l)" @click="addToCalendar(l)"
                     class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
-                    title="只把这一场加进日历（.ics）">
+                    title="把当前讲座加进日历，双击 .ics 文件导入">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
@@ -807,7 +817,7 @@
         · 订阅：
         <a href="feed.xml" class="hover:text-slate-600 underline decoration-dotted" title="用 RSS 阅读器（Feedly / Inoreader / 一读等）订阅，有新讲座时推送">RSS</a>
         <span class="mx-1 text-slate-300">|</span>
-        <a href="feed.ics" class="hover:text-slate-600 underline decoration-dotted" title="这个文件里是全部未结束的讲座（不是一场）；双击导入系统日历（一次性）。想改期自动同步，在日历里用「订阅日历」填 https://danchekey.github.io/lecture-aggregator/feed.ics">日历 .ics（全部未结束讲座）</a>
+        <a href="feed.ics" class="hover:text-slate-600 underline decoration-dotted" title="这是全部未结束的讲座；双击 .ics 文件导入系统日历。想改期自动同步，在日历里用「订阅日历」填 https://danchekey.github.io/lecture-aggregator/feed.ics">日历 .ics（全部未结束讲座）</a>
       </span>
       <!-- 2026-10-20 实测反馈：用户在企业微信日历里找「订阅公共日历 / 创建公共日历」，
            以为能填本站 feed.ics——那两个入口都是**企业组织内部的日历本**，
@@ -902,7 +912,7 @@
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=5e3372093c"></script>
   <script defer src="app.state.js?v=53fe7b787c"></script>
-  <script defer src="app.computed.js?v=56ab6fe9bc"></script>
+  <script defer src="app.computed.js?v=3c7112525b"></script>
   <script defer src="app.display.js?v=b61f721ed6"></script>
   <script defer src="app.cloud.js?v=48b48189e4"></script>
   <script defer src="app.social.js?v=542796ce38"></script>

@@ -71,6 +71,17 @@ const APP_COMPUTED = {
       return n;
     },
 
+    // 进行中讲座数（2026-10-20 用户补充）：与 upcomingCount 同模式——恒按全库 all 计、
+    // 读 tick 建响应式依赖（开场瞬间 +1、结束瞬间 −1 实时跳变）。仅在 >0 时在计数行显示
+    // （v-if，绝大多数时段无进行中讲座、整段隐藏）；数字用 bg-blue-100/text-blue-700，
+    // 与卡片「进行中」徽章同色（待开始数字则用 orange 对齐卡片「即将开始」橙）。
+    ongoingCount() {
+      this.tick;   // 建立响应式依赖（秒级心跳驱动重算）
+      let n = 0;
+      for (const l of this.all) if (this.statusOf(l) === 'ongoing') n++;
+      return n;
+    },
+
     // 数据中出现过的年份（倒序，字符串便于与下拉值比较）
     years() {
       const set = new Set();
