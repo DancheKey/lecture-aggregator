@@ -68,11 +68,11 @@ async function run() {
     console.log('T2 配置空值 = 云端禁用（静默）  pass');
   }
 
-  // T3：批量读解析（含脏行过滤与数值规整）
+  // T3：批量读解析（含脏行过滤与数值规整；2026-10-20 起全表含 cal_downloads 列）
   {
     const rows = [
-      { url: 'http://a/1', visits: '9', likes: 3, wants: 1 },
-      { url: 'http://a/2', visits: 0, likes: 0, wants: 0 },
+      { url: 'http://a/1', visits: '9', likes: 3, wants: 1, cal_downloads: '2' },
+      { url: 'http://a/2', visits: 0, likes: 0, wants: 0, cal_downloads: 0 },
       { visits: 5 },                       // 无 url → 丢弃
     ];
     const { cloud } = loadCloud((url) => {
@@ -83,8 +83,8 @@ async function run() {
     });
     const got = await cloud.fetchAll();
     assert.ok(sameJson(got, {
-      'http://a/1': { visits: 9, likes: 3, wants: 1 },   // '9' 字符串规整为数字
-      'http://a/2': { visits: 0, likes: 0, wants: 0 },
+      'http://a/1': { visits: 9, likes: 3, wants: 1, cal_downloads: 2 },   // '9'/'2' 字符串规整为数字
+      'http://a/2': { visits: 0, likes: 0, wants: 0, cal_downloads: 0 },
     }), 'T3 fetchAll 解析结果不符: ' + JSON.stringify(got));
     console.log('T3 批量读解析（脏行过滤+数值规整）  pass');
   }

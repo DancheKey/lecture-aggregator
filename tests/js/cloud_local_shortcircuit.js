@@ -53,10 +53,10 @@ function cloudFetch(url) {
     return jsonResp({ url: 'https://x.supabase.co', anonKey: 'k' });
   }
   if (/\/rpc\/increment_/.test(url)) {
-    return jsonResp({ url: 'http://a/1', visits: 5, likes: 0, wants: 0 });
+    return jsonResp({ url: 'http://a/1', visits: 5, likes: 0, wants: 0, cal_downloads: 0 });
   }
   if (/\/rest\/v1\/lecture_stats/.test(url)) {
-    return jsonResp([{ url: 'http://a/1', visits: 5, likes: 0, wants: 0 }]);
+    return jsonResp([{ url: 'http://a/1', visits: 5, likes: 0, wants: 0, cal_downloads: 0 }]);
   }
   throw new Error('未预期的云端请求: ' + url);
 }
@@ -79,7 +79,7 @@ async function run() {
     const { ctx, calls } = makeCtx(cloudFetch, { hostname: 'danchekey.github.io' });
     const cloud = loadCloud(ctx);
     const row = await cloud.bump('visit', 'http://a/1', 1);
-    assert.ok(row && sameJson(row, { url: 'http://a/1', visits: 5, likes: 0, wants: 0 }),
+    assert.ok(row && sameJson(row, { url: 'http://a/1', visits: 5, likes: 0, wants: 0, cal_downloads: 0 }),
       'L1 公网域名 bump 应返回权威行，实得: ' + JSON.stringify(row));
     assert.strictEqual(calls.length, 2, `L1 应恰 2 次请求（config+rpc），实得 ${calls.length}`);
     assert.ok(calls[1].url.includes('/rpc/increment_visit'), 'L1 第二次应为 rpc 增量: ' + calls[1].url);
@@ -106,7 +106,7 @@ async function run() {
     const { ctx, calls } = makeCtx(cloudFetch, { hostname: 'localhost', store: { forceCloud: '1' } });
     const cloud = loadCloud(ctx);
     const row = await cloud.bump('like', 'http://a/1', 1);
-    assert.ok(row && sameJson(row, { url: 'http://a/1', visits: 5, likes: 0, wants: 0 }),
+    assert.ok(row && sameJson(row, { url: 'http://a/1', visits: 5, likes: 0, wants: 0, cal_downloads: 0 }),
       'L5 逃生门开启时 bump 应返回权威行，实得: ' + JSON.stringify(row));
     assert.ok(calls.some(c => /\/rpc\/increment_like/.test(c.url)),
       'L5 逃生门应放行 rpc 请求，实得调用: ' + JSON.stringify(calls.map(c => c.url)));
@@ -128,7 +128,7 @@ async function run() {
     const { ctx, calls } = makeCtx(cloudFetch, { hostname: 'danchekey.github.io' });
     const cloud = loadCloud(ctx);
     const got = await cloud.fetchAll();
-    assert.ok(got && sameJson(got['http://a/1'], { visits: 5, likes: 0, wants: 0 }),
+    assert.ok(got && sameJson(got['http://a/1'], { visits: 5, likes: 0, wants: 0, cal_downloads: 0 }),
       'L7 公网 fetchAll 应返回全表 map，实得: ' + JSON.stringify(got));
     assert.ok(calls.some(c => /\/rest\/v1\/lecture_stats/.test(c.url)),
       'L7 应发 rest 读表请求，实得调用: ' + JSON.stringify(calls.map(c => c.url)));

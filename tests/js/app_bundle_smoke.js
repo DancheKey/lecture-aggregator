@@ -113,8 +113,10 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   _calUtcMs / _calStamp / _calSpan / _calEsc / _calFold / _calEvent /
 //   calIcsFor / canAddCal / _calDownload / _calWeChatHint /
 //   addToCalendar / addGroupToCalendar，112 → 124）
+// （2026-10-20：日历云端计数 + 直播判定 —— calCount / bumpCal（三按钮统一，
+//   日历加入次数云端共享）/ _calLive / hasLiveRecs（直播中场次判定），124 → 128）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 124) errs.push(`方法数 ${nMethods} != 124`);
+if (nMethods !== 128) errs.push(`方法数 ${nMethods} != 128`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');

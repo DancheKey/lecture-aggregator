@@ -53,7 +53,7 @@ function pagedFetch(pages) {
 
 function fullPage(tag, n) {
   return Array.from({ length: n }, (_, k) =>
-    ({ url: `http://${tag}/${k}`, visits: 1, likes: 0, wants: 0 }));
+    ({ url: `http://${tag}/${k}`, visits: 1, likes: 0, wants: 0, cal_downloads: 0 }));
 }
 
 // 跨 vm realm 的对象不能直接 deepStrictEqual（prototype 不同源会假红，
@@ -79,8 +79,8 @@ async function run() {
     assert.strictEqual(d.length, 2, `G1 应恰 2 次数据请求（满页续翻+尾批即停），实得 ${d.length}`);
     assert.ok(d[1].url.includes('offset=1000'), 'G1 第二批 offset 应为 1000: ' + d[1].url);
     assert.strictEqual(Object.keys(got).length, 1499, `G4 合并应 1499 行，实得 ${Object.keys(got).length}`);
-    assert.ok(sameJson(got['http://a/0'], { visits: 1, likes: 0, wants: 0 }), 'G4 首批行进 map');
-    assert.ok(sameJson(got['http://b/498'], { visits: 1, likes: 0, wants: 0 }), 'G4 尾批行进 map');
+    assert.ok(sameJson(got['http://a/0'], { visits: 1, likes: 0, wants: 0, cal_downloads: 0 }), 'G4 首批行进 map');
+    assert.ok(sameJson(got['http://b/498'], { visits: 1, likes: 0, wants: 0, cal_downloads: 0 }), 'G4 尾批行进 map');
     console.log('G1+G2+G4 满页续翻/尾批即停/多批合并  pass');
   }
 
