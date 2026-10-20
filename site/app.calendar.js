@@ -176,6 +176,8 @@ Object.assign(APP_METHODS, {
   },
 
   // 单场：加进日历
+  // 文件名带 single-：下载目录里与 group-（整组）、feed.ics（全量）一眼可分。
+  // 2026-10-20 实测：用户点了卡片图标后以为「下载了全部日历」，只看到一场以为出错。
   addToCalendar(l) {
     if (!this.canAddCal(l)) return;
     const span = this._calSpan(l);
@@ -183,7 +185,7 @@ Object.assign(APP_METHODS, {
     if (!text) return;
     const d = new Date(span.start);
     const p = n => String(n).padStart(2, '0');
-    const name = `muduojinsheng-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}.ics`;
+    const name = `muduojinsheng-single-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}.ics`;
     this._calWeChatHint();
     this._calDownload(name, text);
   },

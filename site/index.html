@@ -566,7 +566,7 @@
                          只收「还没结束」的场次（见 addGroupToCalendar）。 -->
                     <button v-if="u.recs && u.recs.length" @click="addGroupToCalendar(u)"
                       class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
-                      title="整组加入日历（.ics）">
+                      title="整组加入日历：把这一组里还没结束的场次一次性导出（.ics）">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                       </svg>
@@ -721,7 +721,7 @@
                        没有时间的讲座塞进日历只会是个错误提醒。 -->
                   <button v-if="canAddCal(l)" @click="addToCalendar(l)"
                     class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
-                    title="加入日历（.ics）">
+                    title="只把这一场加进日历（.ics）">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
@@ -802,7 +802,16 @@
         · 订阅：
         <a href="feed.xml" class="hover:text-slate-600 underline decoration-dotted" title="用 RSS 阅读器（Feedly / Inoreader / 一读等）订阅，有新讲座时推送">RSS</a>
         <span class="mx-1 text-slate-300">|</span>
-        <a href="feed.ics" class="hover:text-slate-600 underline decoration-dotted" title="下载后双击导入系统日历（一次性）；若想改期自动同步，在日历里用「订阅日历」填 https://danchekey.github.io/lecture-aggregator/feed.ics">日历 .ics</a>
+        <a href="feed.ics" class="hover:text-slate-600 underline decoration-dotted" title="这个文件里是全部未结束的讲座（不是一场）；双击导入系统日历（一次性）。想改期自动同步，在日历里用「订阅日历」填 https://danchekey.github.io/lecture-aggregator/feed.ics">日历 .ics（全部未结束讲座）</a>
+      </span>
+      <!-- 2026-10-20 实测反馈：用户在企业微信日历里找「订阅公共日历 / 创建公共日历」，
+           以为能填本站 feed.ics——那两个入口都是**企业组织内部的日历本**，
+           不接收外部 URL；企业微信官方文档里的「同步日程」方向也是
+           企业微信 → 系统日历/Exchange（导出），不是把外部 ics 订进来。
+           这句话写在这里，省得下次再试错。 -->
+      <span class="block mt-1 text-slate-400">
+        · 注：微信 / 企业微信内置日历只能「导入」不能「订阅」外部日历；要自动跟着更新，
+        请用手机系统日历或 Outlook 通过网址订阅上面的 .ics 地址。
       </span>
     </footer>
 
@@ -892,7 +901,7 @@
   <script defer src="app.display.js?v=b61f721ed6"></script>
   <script defer src="app.cloud.js?v=5d758201e3"></script>
   <script defer src="app.social.js?v=b3ba6c9a3b"></script>
-  <script defer src="app.calendar.js?v=c5340b3dce"></script>
+  <script defer src="app.calendar.js?v=caa00580e9"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=3cdcecc6f3"></script>
