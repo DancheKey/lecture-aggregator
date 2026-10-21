@@ -381,11 +381,17 @@ _AFFIL_RE = re.compile(
 )
 # 从正文抽职称用：词表取自 field_vocab。主任医师/副主任医师已入主表 ORG_TITLE_SUFFIXES
 # （2026-09-26 核对），此处模式串保留冗余分支无害。
-# 2026-10-22 补：并入 COMPLEX_TITLE_ALT_RE（荣誉/聘任/人才计划型，如「青年英才」
+# 2026-10-22 补：并入 COMPLEX_TITLE_SUFFIXES（荣誉/聘任/人才计划型，如「青年英才」
 # 「青年教授」），让并列职称合并与 bio 回退能识别非 NAME_TITLE 主表的称号词。
+#
+# ⚠ 用 COMPLEX_TITLE_SUFFIXES 而非 COMPLEX_TITLE_ALT_RE：后者的词表
+# _COMPLEX_ALL_WORDS 还并入了 HONORIFIC_SUFFIXES（先生/女士）——尊称不是职称，
+# 并进来会让「饶明亮先生是华为集团…」「陈洪浪先生是广汽资本…」这类**称谓式
+# 开头**的简介被推出职称「先生」（2026-10-22 独立复评实测：3 条库内职称为空的
+# 记录会被写成「先生」）。
 _TITLE_RE = re.compile(
     _fv.NAME_TITLE_SUFFIX_RE.pattern
-    + r'|' + _fv.COMPLEX_TITLE_ALT_RE.pattern
+    + '|' + _fv.COMPLEX_TITLE_PURE_RE.pattern
     + r'|主任医师|副主任医师')
 
 
@@ -406,7 +412,17 @@ _AFFIL_PREFIX_NOISE = re.compile(
 # 并入/加盟/受聘于/供职于…），一律剥掉后再取机构名。
 _AFFIL_MID_NOISE = re.compile(
     r'^(?:之后|后于|原|原为|教于|现于|曾于|并入|加盟|加入|受聘于|供职于|'
-    r'进入|入职|调入|转入|赴|赴任|前往|随后|后来)\s*'
+    r'进入|入职|调入|转入|赴|赴任|前往|随后|后来|入选|入选为|'
+    r'荣膺|获评|被评为|获聘)\s*'
+)
+# 2026-10-22 独立复评新增：时间状语残片。「2022年至今任同济大学物理科学与工程学院
+# 副教授」——年份+「至今任」的残片没剥掉，产出单位「年至今任同济大学物理科学与
+# 工程学院」（库内本已正确，但 CI 重跑会写脏）。
+# 判据：机构名前紧邻「YYYY年至今任 / 年至今任 / N年起任 / 至今任 / 迄今任」
+# 等时间状语 -> 一律剥掉。
+_AFFIL_TIME_NOISE = re.compile(
+    r'^(?:\d{4}\s*年)?\s*(?:年)?\s*(?:至今|迄今|起)\s*(?:任|担任|任职|就职|在|于)\s*'
+    r'|(?:\d{4}\s*年\s*)?起\s*(?:任|担任|任职|就职|在|于)\s*'
 )
 # 2026-10-22 审计新增（第二类垃圾值）：「现任心理研究所所长」「现任国家教育部大学」
 # 这类形态里，机构名被前面的「现任」切掉，剩下的是**机构内部的部门名**或
@@ -457,12 +473,45 @@ _AFFIL_EN_STOP_WORDS = {
 # 2026-10-22 审计新增：期刊/文献名不是机构。英文机构分支会把
 # 「Journal of Labor Economics」缩成「Lab」（末尾的 Lab 是缩写后缀），
 # 2026-10-22 全库回归实测产出单位垃圾值 'Lab'（钟灵，module/10804）。
-# 判据：候选串里含期刊/文献类词（Journal/Transactions/Review/Proceedings/
-# Bulletin/Advances/Perspectives/Annual …）-> 直接拒，绝不作为单位。
+#
+# ⚠ 判据必须是**期刊名形态**，不能只含裸词（2026-10-22 独立复评指出）：
+#   裸 'science'/'nature' 会误杀正规院系（School of Computer Science、
+#   Department of Materials Science）。故要求：
+#   ① 期刊类词**前面**是实义词（Journal of / Transactions on / Physics Reports），
+#      或整个候选就是期刊名（Nature / Science 这类刊名）；
+#   ② 含 'of'/'on'/'in' 等介词的期刊结构，或候选**整体**就是刊名。
 _AFFIL_PUBLICATION_RE = re.compile(
     r'\b(?:journal|transactions|review|reviews|proceedings|bulletin|'
-    r'advances|perspectives|annual|international\s+journal|'
-    r'economics\s+letters|nature|science)\b', re.I)
+    r'advances|perspectives|annual|economics\s+letters)\b'
+    r'|\b(?:physics|physical|applied|mathematical|computational|'
+    r'organic|inorganic|analytical|statistical)\s+reports\b'
+    r'|^(?:nature|science|lancet|cell|science\s+advances)$', re.I)
+
+
+def _is_publication_name(aff):
+    """候选是否是期刊/文献名（不是机构）。
+
+    2026-10-22 独立复评指出：裸 'science'/'nature' 会误杀正规院系
+    （School of Computer Science / Department of Materials Science）。
+    故除期刊类词外，另判两种形态：
+    ① 「XX of YY」/「XX on YY」/「XX in YY」——期刊名的典型结构；
+    ② 候选**整体**是刊名（Nature / Science / Lancet / Cell）。
+    """
+    if not aff:
+        return False
+    s = str(aff).strip()
+    if _AFFIL_PUBLICATION_RE.search(s):
+        return True
+    # 「Journal of X」「Transactions on X」「Reports in X」等介词结构
+    if re.search(r'\b(?:of|on|in)\s+[A-Z]', s) and re.search(
+            r'\b(?:journal|transactions|review|proceedings|reports|bulletin|'
+            r'annals|advances|perspectives|economics\s+letters)\b', s, re.I):
+        return True
+    # 整体就是刊名
+    if re.fullmatch(r'(?:Nature|Science|Lancet|Cell|'
+                    r'Science\s+Advances|Nature\s+Communications)', s, re.I):
+        return True
+    return False
 
 
 def _strip_affil_prefix(aff):
@@ -543,7 +592,7 @@ def _clean_affil_candidate(raw):
     aff = str(raw).strip()
     # 期刊/文献名不是机构（2026-10-22 审计：「Journal of Labor Economics」被英文
     # 分支缩成 'Lab'）-> 清洗前先拒，避免产出垃圾单位。
-    if _AFFIL_PUBLICATION_RE.search(aff):
+    if _is_publication_name(aff):
         return ''
     for _ in range(3):
         new_aff = _AFFIL_PREFIX_NOISE.sub('', aff)
@@ -554,6 +603,12 @@ def _clean_affil_candidate(raw):
     # 只管句首，这些残片在句中剥不掉（2026-10-22 审计实测产出垃圾单位）。
     for _ in range(3):
         new_aff = _AFFIL_MID_NOISE.sub('', aff)
+        if new_aff == aff:
+            break
+        aff = new_aff
+    # 时间状语残片（年至今任 / 年起任…）：同上，句中剥不掉
+    for _ in range(3):
+        new_aff = _AFFIL_TIME_NOISE.sub('', aff)
         if new_aff == aff:
             break
         aff = new_aff
@@ -601,6 +656,59 @@ def _affil_is_not_a_unit(clause, cm, cand):
         if _AFFIL_INTERNAL_CTX.search(after):
             return True
     return False
+
+
+# 2026-10-22 独立复评新增：出版物语境的分句里的机构是**刊名/出版社**，
+# 不是讲者单位。典型：吕艳坤 bio「…在《课程·教材·教法》《天津师范大学学报
+# (基础教育版)》等期刊发表论文17篇」——「天津师范大学学报」是刊名（主办方
+# 恰是天津师范大学），不是讲者单位（真实单位是东北师范大学教育学部）。
+# 判据：分句含书名号/「期刊/学报/学刊/杂志/发表」等出版物语境 -> 该分句不取单位。
+_AFFIL_PUBLICATION_CTX = re.compile(
+    r'[《》〈〉]'
+    r'|(?:期刊|学报|学刊|杂志|丛刊)'
+    r'|(?:发表|刊登|载于|收录|投稿|出版)')
+
+
+def _clause_is_publication_context(clause):
+    """分句是否是「发表论文/著作」这类出版物语境（其中的机构不是讲者单位）。"""
+    return bool(_AFFIL_PUBLICATION_CTX.search(clause))
+
+
+# 2026-10-22 独立复评新增：分句切分必须**保护括号/书名号内容**。
+# 直接按 [,，、] 切会把书名号和括号里的内容切散：
+# 「《天津师范大学学报(基础教育版)》」-> 切出「…《天津师范大学学报(基础教育版」
+# 和「)」两段，前段里的「天津师范大学」被当成机构（吕艳坤实测）。
+# 实现：先用占位符把括号/书名号内的分隔符换掉，切完再还原。
+_CLAUSE_PROTECT_RE = re.compile(r'[（(《〈][^）)》〉]{0,80}[）)》〉]')
+
+
+def _split_clauses_protect_brackets(text):
+    """按 [,，、] 切分，但保护括号/书名号内部的分隔符。"""
+    if not text:
+        return []
+    holders = []
+
+    def _hold(m):
+        holders.append(m.group(0))
+        return '\x00%d\x00' % (len(holders) - 1)
+
+    prot = _CLAUSE_PROTECT_RE.sub(_hold, text)
+    parts = re.split(r'[,，、]', prot)
+    out = []
+    for p in parts:
+        p = re.sub(r'\x00(\d+)\x00', lambda m: holders[int(m.group(1))], p)
+        out.append(p)
+    return out
+
+
+# 2026-10-22 独立复评新增：荣誉称号/奖学金短语不是机构。
+# 「"吉林省优秀大学生"」-> 「优秀大学」被切出来当机构（吕艳坤实测）。
+# 判据：引号内的**荣誉/奖项短语**（含「优秀/杰出/一等/二等/奖学金/奖章/称号/
+# 先进个人/优秀学生」等）不是单位 -> 整段跳过。
+_AFFIL_HONOR_PHRASE_RE = re.compile(
+    r'(?:优秀|杰出|先进|一等|二等|三等奖|奖学金|奖章|校长奖|奖学金|'
+    r'先进个人|优秀学生|优秀大学生|优秀研究生|优秀干部|人才奖|'
+    r'特等奖|一等奖|二等奖)')
 
 
 # 2026-10-22 经管 11210 实测缺口：bio 开头「姓名,学历学校,现职单位,职称…」形态里
@@ -665,9 +773,12 @@ def _infer_affiliation(bio):
         if aff:
             return aff
     # 分句扫描兜底（仅当 LEAD 命中但被学历守卫跳过）：按逗号切分 bio，逐段找机构，
-    # 跳过学历/履历语境段，取第一个合法现职单位。
+    # 跳过学历/履历/出版物语境段，取第一个合法现职单位。
     if _lead_skipped:
-        for clause in re.split(r'[,，、]', bio):
+        for clause in _split_clauses_protect_brackets(bio):
+            # 出版物语境（发表论文/著作/期刊名）里的机构不是讲者单位
+            if _clause_is_publication_context(clause):
+                continue
             cm = _AFFIL_RE.search(clause)
             if not cm:
                 continue
@@ -686,6 +797,9 @@ def _infer_affiliation(bio):
             # 该段含历史/履历词 -> 非现职，跳过
             if _AFFIL_HISTORY_RE.search(clause):
                 continue
+            # 荣誉称号/奖学金短语（"吉林省优秀大学生"）-> 不是单位
+            if _AFFIL_HONOR_PHRASE_RE.search(clause):
+                continue
             # 「…重点实验室固定成员」这类「所属机构」表述 -> 不是现职单位
             if _AFFIL_MEMBERSHIP_RE.search(clause):
                 continue
@@ -700,19 +814,86 @@ def _infer_affiliation(bio):
     return ''
 
 
-def _is_honor_title(t):
-    """是否荣誉/聘任/人才计划型称号（field_vocab COMPLEX 组，如「青年英才」）。
+# 人才计划/荣誉称号型称号（2026-10-22 独立复评后收窄）。
+#
+# 口径分两层：
+#   · _TALENT_TITLE_WORDS —— **人才计划/荣誉称号**（用户口径：11210 的「青年英才」
+#     是一个 title）。只有这类才允许「、」并列职称合并并**改写库内已有值**。
+#   · 其余荣誉/等级型（一级/二级教授、讲座/讲席/客座/名誉/兼职教授等）——虽是
+#     荣誉型，但与「教授、博士生导师」合并会改写库内已有正确值
+#     （2026-10-22 独立复评实测 5 条），与「绝不覆盖已有值」原则冲突，故**不**触发
+#     覆盖；它们仍会被 _infer_title 取为首匹配（如「二级教授」），只是不扩链。
+_TALENT_TITLE_WORDS = (
+    '青年英才', '青年教授', '青年学者', '青年之星',
+    '杰青', '优青', '长江学者', '孔雀计划', '万人计划', '卓越人才',
+)
 
-    用于限定「、」连读并列职称的合并范围：只有并列链里含这类称号时才合并，
-    避免把「教授、博士生导师」「教授、博导」这类常规组合也扩进来。
+
+def _is_talent_title(t):
+    """是否人才计划/荣誉称号（如「青年英才」）。
+
+    用于限定「、」连读并列职称**改写已有值**的范围：只有并列链里含这类
+    人才计划称号时才补全（2026-10-22 经管 11210 用户口径「青年英才是一个
+    title」）。等级/聘任型（二级教授、讲座教授…）不触发改写——它们与
+    「教授、博士生导师」一样会改写库内已有正确值（2026-10-22 独立复评实测
+    5 条），与「绝不覆盖已有值」原则冲突。
     """
     if not t:
         return False
     t = str(t).strip()
-    for w in _fv.COMPLEX_TITLE_SUFFIXES:
+    for w in _TALENT_TITLE_WORDS:
         if w in t:
             return True
     return False
+
+
+# 括号（注释说明）区间：括号内的职称词不是并列职称，是注释
+# （2026-10-22 独立复评实测：「教授（相当于北美首席教授、讲座教授）」）。
+_TITLE_BRACKET_RE = re.compile(r'[（(][^）)]{0,60}[）)]')
+
+# 2026-10-22 独立复评 P3-c（用户已确认口径）：**纯学位描述**不是职称。
+# bio 开头「姓名,博士,」形态里，第一个逗号分句只有学位词（博士/硕士/学士），
+# 那是学历描述（「唐春明,博士,教授,博士生导师」——「博士」是学历，「教授」是职称），
+# 不应作为职称返回。
+#
+# 判别式：学位词前面紧邻「姓名,」（即它是 bio 开头**第一个**逗号分句的内容），
+# 且该分句到下一个分隔符之间**只有**这个学位词 -> 纯学位描述，跳过。
+# ⚠ 与「王五，博士，华南师范大学研究员」这类区分：那里「博士」后面跟的是
+# 机构（研究员），说明它可能是独立身份表述；但按用户确认的口径，
+# 「姓名,学位词,」形态一律按学历处理（该用例的锁定期望值同步更新）。
+_TITLE_DEGREE_ONLY_CLAUSE = re.compile(r'^\s*(?:博士|硕士|学士)\s*$')
+
+
+def _is_pure_degree_description(head, m):
+    """该学位词是否 bio 开头第一个逗号分句里的**纯学历描述**。
+
+    「唐春明,博士,教授,…」-> 「博士」独占第二个分句（前后都是逗号）-> 学历描述。
+    「王五，博士，华南师范大学研究员」-> 同样独占第二个分句 -> 按用户确认口径
+    也按学历处理（该用例锁定期望值同步更新）。
+    """
+    if m.group(0) not in ('博士', '硕士', '学士'):
+        return False
+    # 该词**自己所在**的分句：上一个分隔符与下一个分隔符之间
+    prev_sep = -1
+    for i in range(m.start() - 1, -1, -1):
+        if head[i] in ',，、':
+            prev_sep = i
+            break
+    next_sep = len(head)
+    for i in range(m.end(), len(head)):
+        if head[i] in ',，、':
+            next_sep = i
+            break
+    clause = head[prev_sep + 1:next_sep]
+    if not _TITLE_DEGREE_ONLY_CLAUSE.match(clause):
+        return False
+    # 必须是 bio 开头的**第一个**分句（前面只有姓名，无逗号）
+    name_part = head[:prev_sep] if prev_sep >= 0 else head
+    if not name_part.strip():
+        return False
+    if re.search(r'[,，、]', name_part):
+        return False
+    return True
 
 
 def _infer_title(bio):
@@ -723,16 +904,25 @@ def _infer_title(bio):
        ——那是学位不是现职称（否则「北京师范大学经济学博士」会产出职称「博士」）；
     ③ 同分句「、」连读的**荣誉称号型**并列职称整体返回（「青年英才、特聘副研究员」）。
 
-    ⚠ ③ 只对**荣誉/聘任/人才计划型**称号生效（field_vocab.COMPLEX_TITLE_SUFFIXES
-    组，如「青年英才」「青年教授」），不对「教授、博士生导师」「教授、博导」这类
-    常规组合生效——2026-10-22 全库回归实测：全量合并会把 324 条记录的职称从
-    「教授」扩成「教授、博士生导师」，远超本次需求面，属过度扩张。
+    ⚠ ③ 只对**人才计划/荣誉称号型**生效（_TALENT_TITLE_WORDS，如「青年英才」），
+    不对「教授、博士生导师」「二级教授、博士生导师」「教授、讲座教授」这类
+    常规/等级组合生效——2026-10-22 全库回归 + 独立复评实测：全量合并会把 324 条
+    记录的职称从「教授」扩成「教授、博士生导师」，且改写库内已有的正确值，
+    与「绝不覆盖已有值」原则冲突，属过度扩张。
+    ⚠ ③ 还要求两个职称**同在括号外**：括号内是注释说明而非并列职称
+    （2026-10-22 独立复评实测：「Gang Li…教授（相当于北美首席教授、讲座教授）」
+    ——括号内「讲座教授」是注释，合并会得出「教授、讲座教授」的错误值）。
     """
     if not bio:
         return ''
     head = bio[:40]
+    # 括号内的内容是注释说明，不是并列职称 -> 先标记出来
+    _in_bracket = [(bm.start(), bm.end()) for bm in _TITLE_BRACKET_RE.finditer(head)]
     kept = []  # (词, start, end)：finditer 真实命中位置（不能用 head.find 重定位）
+    degree_kept = []  # 学位词单独收集：只在**没有任何真职称**时才作为兜底
     for m in _TITLE_RE.finditer(head):
+        if any(bs <= m.start() < be for bs, be in _in_bracket):
+            continue  # 括号内的职称词跳过
         t = m.group(0)
         if t == '博士' and any(k in head[m.end():m.end() + 3]
                                for k in ('毕业', '学位', '后')):
@@ -741,7 +931,19 @@ def _infer_title(bio):
             pre = head[max(0, m.start() - 8):m.start()]
             if re.search(r'(?:大学|学院|研究院|研究所|系|实验室|学校)', pre):
                 continue
+            # bio 开头「姓名,博士,」形态里的纯学历描述 -> 跳过（2026-10-22
+            # 独立复评 P3-c，用户已确认口径：学位不是职称）
+            if _is_pure_degree_description(head, m):
+                continue
+            # 学位词不参与首匹配竞争：句内另有真职称时取真职称
+            # （「曾长兴,教育硕士,正高级教师」-> 正高级教师，不是硕士；
+            #   2026-10-22 独立复评 P3-c 的延伸口径）
+            degree_kept.append((t, m.start(), m.end()))
+            continue
         kept.append((t, m.start(), m.end()))
+    if not kept:
+        # 只有学位词 -> 学位词兜底（bio 里确实只交代了学位）
+        kept = degree_kept
     if not kept:
         return ''
     if len(kept) >= 2:
@@ -771,8 +973,8 @@ def _infer_title(bio):
                     break
                 if not re.search(r'[,，;；。]', between):
                     chain = [t1, merged2]
-                    # ③ 仅荣誉/人才计划型称号触发合并（见 docstring）
-                    if any(_is_honor_title(p) for p in chain):
+                    # ③ 仅人才计划/荣誉称号触发合并（见 docstring）
+                    if any(_is_talent_title(p) for p in chain):
                         return '、'.join(chain)
                     break
     # 首职称本身的修饰前缀并回（同上，防止词表截断丢「青年/资深/特聘」等限定词）

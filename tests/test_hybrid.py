@@ -282,12 +282,29 @@ class TestInferTitleNoCrash(unittest.TestCase):
         cases = {
             '张三，北京大学教授，博士生导师': '教授',
             '李四，博士毕业于清华大学，现为副教授': '副教授',
-            '王五，博士，华南师范大学研究员': '博士',  # 首个匹配即返回（预存词表行为）
+            # 2026-10-22 独立复评 P3-c（用户已确认口径）：bio 开头第一个逗号分句
+            # 只有学位词时，那是**学历描述**不是职称 -> 跳过，取后续真职称。
+            # 旧行为是「首个匹配即返回『博士』」（锁的是旧行为，非期望行为）。
+            '王五，博士，华南师范大学研究员': '研究员',
             '赵六': '',
             '': '',
         }
         for bio, want in cases.items():
             self.assertEqual(_infer_title(bio), want, bio)
+
+    def test_pure_degree_description_skipped(self):
+        """纯学历描述（姓名,博士,…）不当职称（2026-10-22 独立复评 P3-c）。"""
+        self.assertEqual(
+            _infer_title('唐春明,博士,教授,博士生导师。现任广西大学数学学院副院长。'),
+            '教授')
+        self.assertEqual(
+            _infer_title('徐家伟，博士，二级教授，博士生导师，遗传咨询师。'),
+            '二级教授')
+        # 但「经济学博士」形态（学位紧跟学校）本来就跳过，行为不变
+        self.assertEqual(
+            _infer_title('邱康权,北京师范大学经济学博士,华南师范大学经济与管理学院'
+                         '青年英才、特聘副研究员。'),
+            '青年英才、特聘副研究员')
 
     def test_bio_fallback_fills_title_on_real_record(self):
         """端到端：兜底确实能把职称写进 result（旧代码此处抛异常）。"""
@@ -552,6 +569,38 @@ class TestInferAffiliation(unittest.TestCase):
         self.assertEqual(_clean_affil_candidate('Journal of Labor Economics'), '')
         self.assertEqual(_clean_affil_candidate('IEEE Transactions on Circuits'), '')
 
+    def test_regular_english_dept_not_rejected(self):
+        """正规英文院系**不能**被期刊名规则误杀（2026-10-22 独立复评指出：
+        裸 'science'/'nature' 会误杀 School of Computer Science 等）。"""
+        from hybrid import _is_publication_name
+        self.assertFalse(_is_publication_name('School of Computer Science'))
+        self.assertFalse(_is_publication_name('Department of Materials Science'))
+        self.assertFalse(_is_publication_name('College of Engineering'))
+        # 真期刊名仍被拦
+        self.assertTrue(_is_publication_name('Journal of Labor Economics'))
+        self.assertTrue(_is_publication_name('Physics Reports'))
+        self.assertTrue(_is_publication_name('Nature'))
+
+    def test_chinese_journal_not_affiliation(self):
+        """中文学报名不是单位（2026-10-22 独立复评指出：吕艳坤 bio 里的
+        《天津师范大学学报》被当单位，实际是刊名）。"""
+        from hybrid import _infer_affiliation
+        bio = ('吕艳坤,东北师范大学教育学部博士,主要研究方向为物理课程与教学论、'
+               '科学教育。以第一作者在《课程·教材·教法》《现代基础教育研究》'
+               '《天津师范大学学报(基础教育版)》等期刊发表论文17篇,'
+               '其中CSSCI论文7篇。')
+        # 出版物语境分句里的机构不取 -> 应回落到真实单位
+        self.assertNotEqual(_infer_affiliation(bio), '天津师范大学')
+
+    def test_time_adverb_residual_stripped(self):
+        """时间状语残片（年至今任…）必须剥掉（2026-10-22 独立复评指出：
+        张潇竹 -> '年至今任同济大学物理科学与工程学院'）。"""
+        from hybrid import _clean_affil_candidate
+        got = _clean_affil_candidate('年至今任同济大学物理科学与工程学院')
+        self.assertEqual(got, '同济大学物理科学与工程学院')
+        self.assertNotIn('至今', got)
+        self.assertNotIn('年任', got)
+
     def test_junk_affiliation_values_rejected(self):
         """全库审计实测的垃圾单位必须被清洗成合法机构名或直接拒
         （2026-10-22 审计第二/三/四类）。
@@ -588,6 +637,42 @@ class TestInferAffiliation(unittest.TestCase):
                                '纽约州立大学石溪分校(博士),华中师范大学教授,'
                                '中国科学院近代物理研究所资深研究员。'),
             '华中师范大学')
+
+
+class TestHonorificNotTitle(unittest.TestCase):
+    """尊称（先生/女士）不是职称（2026-10-22 独立复评 P1）。
+
+    _TITLE_RE 曾并入 field_vocab.COMPLEX_TITLE_ALT_RE，而该正则的词表
+    _COMPLEX_ALL_WORDS 含 HONORIFIC_SUFFIXES -> 「饶明亮先生是华为集团…」
+    「陈洪浪先生是广汽资本…」这类称谓式简介被推出职称「先生」
+    （实测 3 条库内职称为空的记录会被写脏）。
+    """
+
+    def test_honorific_not_matched_by_title_re(self):
+        from hybrid import _TITLE_RE
+        self.assertIsNone(_TITLE_RE.search('张先生'))
+        self.assertIsNone(_TITLE_RE.search('李女士'))
+        # 职称仍要能匹配
+        self.assertTrue(_TITLE_RE.search('青年英才'))
+        self.assertTrue(_TITLE_RE.search('二级教授'))
+
+    def test_honorific_bio_yields_no_title(self):
+        from hybrid import _infer_title
+        for bio in ('饶明亮先生是华为集团海外国家子公司CFO,海外地区部CFO,'
+                    '产品线CFO,华为大学金牌讲师及讲师资格认证评委。',
+                    '陈洪浪先生是广汽资本人力资源总监,职业生涯咨询师,'
+                    '广东省人力资源研究会常务理事和学术委员。'):
+            self.assertEqual(_infer_title(bio), '', bio)
+
+    def test_field_vocab_pure_complex_entry(self):
+        """field_vocab 提供「纯 COMPLEX 组」入口（不含尊称）。"""
+        import field_vocab as FV
+        self.assertTrue(FV.COMPLEX_TITLE_PURE_RE.search('青年英才'))
+        # 尊称不在纯 COMPLEX 组里（这是与 COMPLEX_TITLE_ALT_RE 的关键区别）
+        self.assertIsNone(FV.COMPLEX_TITLE_PURE_RE.search('先生'))
+        self.assertIsNone(FV.COMPLEX_TITLE_PURE_RE.search('女士'))
+        # 对照：COMPLEX_TITLE_ALT_RE 含尊称（故不能用于职称词表）
+        self.assertTrue(FV.COMPLEX_TITLE_ALT_RE.search('先生'))
 
 
 class TestHostAffilBioCorroboration(unittest.TestCase):
@@ -657,10 +742,10 @@ class TestInferTitleParallel(unittest.TestCase):
         self.assertEqual(r5['speakerTitle'], '教授')
 
     def test_single_title_still_first_match(self):
-        """锁定 @285 行为：单职称取首匹配不变。"""
+        """单职称取首匹配不变（@285 用例的锁定口径已按 P3-c 更新：纯学历描述跳过）。"""
         from hybrid import _infer_title
         self.assertEqual(_infer_title('张三，北京大学教授，博士生导师'), '教授')
-        self.assertEqual(_infer_title('王五，博士，华南师范大学研究员'), '博士')
+        self.assertEqual(_infer_title('王五，博士，华南师范大学研究员'), '研究员')
 
     def test_degree_word_in_academic_clause_skipped(self):
         """学历句段里的学位词（学校名+学科+学位词）不当职称 -> 跳过后取下一职称。"""
@@ -669,25 +754,39 @@ class TestInferTitleParallel(unittest.TestCase):
             _infer_title('某君,清华大学计算机科学博士,北京大学教授。'), '教授')
 
     def test_regular_title_pairs_not_merged(self):
-        """常规职称组合**不合并**（2026-10-22 全库回归实测：全量合并会把 324 条
-        记录的职称从「教授」扩成「教授、博士生导师」，属过度扩张）。
-        只对荣誉/人才计划型称号（如「青年英才」）触发合并。
+        """常规职称组合**不合并**（2026-10-22 全库回归 + 独立复评实测：
+        全量合并会把 324 条记录的职称从「教授」扩成「教授、博士生导师」，
+        且会**改写库内已有的正确值**（实测 5-6 条），与「绝不覆盖已有值」冲突）。
 
-        期望值按**新旧一致**锁定：这两条 bio 的旧实现本就取首个匹配
-        （'博士' / '教授'），新实现不得改变。
+        收窄后：只有**人才计划称号**（如「青年英才」）才允许并列合并并改写已有值；
+        等级/聘任型（「二级教授、博士生导师」）不再改写。
+
+        期望值按**新旧一致**锁定：这几条 bio 的旧实现本就取首个匹配
+        （'教授' / '二级教授'），新实现不得改变。
         """
         from hybrid import _infer_title
-        # 「博士」出现在姓名后独立分句 -> 首匹配是它（非学历句段）
+        # 「博士」是姓名后的纯学历描述 -> 跳过，取真职称「教授」（P3-c）
         self.assertEqual(
             _infer_title('陈和柏,博士,中南大学数学与统计学院教授、博导,'
-                         '国家级青年人才。'), '博士')
+                         '国家级青年人才。'), '教授')
         # 「教授、博士生导师」-> 取「教授」，不扩成「教授、博士生导师」
         self.assertEqual(
             _infer_title('王腾,北京工业大学教授、博士生导师。国家级青年人才。'), '教授')
-        # 荣誉/等级型称号在词表内 -> 允许合并
+        # 等级型称号（二级教授）**不**触发合并（避免改写库内已有正确值）
         self.assertEqual(
             _infer_title('罗星凯,广西师范大学物理科学与技术学院'
-                         '二级教授、博士生导师。'), '二级教授、博士生导师')
+                         '二级教授、博士生导师。'), '二级教授')
+        # 括号内是注释说明，不是并列职称
+        self.assertEqual(
+            _infer_title('Gang Li，澳大利亚迪肯大学信息技术学院教授'
+                         '（相当于北美首席教授、讲座教授），目前担任…'), '教授')
+
+    def test_talent_title_pair_merged(self):
+        """人才计划称号（用户口径：11210「青年英才是一个title」）仍允许合并补全。"""
+        from hybrid import _infer_title
+        self.assertEqual(
+            _infer_title('中山大学经济学博士,华南师范大学经济与管理学院'
+                         '青年英才、特聘副研究员。'), '青年英才、特聘副研究员')
 
 
 class TestSelfExtractFill(unittest.TestCase):

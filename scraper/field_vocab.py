@@ -430,6 +430,16 @@ _COMPLEX_ALL_WORDS = (COMPLEX_TITLE_SUFFIXES + _EXTRA_COMPLEX_JOBS
                       + NAME_TITLE_SUFFIXES + HONORIFIC_SUFFIXES)
 COMPLEX_TITLE_ALT_RE = re.compile(_alt(_COMPLEX_ALL_WORDS))
 
+# **纯 COMPLEX 组**（荣誉/聘任/人才计划型称号）的正则：只含
+# COMPLEX_TITLE_SUFFIXES 自身，不含 NAME/HONORIFIC/职务/复合扩展。
+#
+# 用途：hybrid._TITLE_RE 需要「荣誉称号」但**不能**带进尊称（先生/女士）——
+# 2026-10-22 独立复评实测：用 COMPLEX_TITLE_ALT_RE 会把「饶明亮先生是华为集团…」
+# 「陈洪浪先生是广汽资本…」这类称谓式简介推出职称「先生」（3 条库内职称为空的
+# 记录会被写脏）。COMPLEX_TITLE_ALT_RE 语义是「整串职称剥离用」，词表刻意放宽，
+# 不能直接当「职称词表」用——故另开这个纯组入口。
+COMPLEX_TITLE_PURE_RE = re.compile(_alt(COMPLEX_TITLE_SUFFIXES))
+
 
 def strip_name_title_suffix(name):
     """去掉姓名尾部的**一个**职称/称号后缀（长词优先）。
