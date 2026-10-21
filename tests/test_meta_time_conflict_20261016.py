@@ -222,5 +222,66 @@ class MetaTimeConflictJudgeTest(unittest.TestCase):
             '时间：2026年10月15日上午10:00'))
 
 
+class MetaBoilerplateAbstractTest(unittest.TestCase):
+    """C：站点固定 meta 简介不得被当成讲座摘要（2026-10-21，mks 20261020/19|20）。
+
+    根因：马克思主义学院站在 <meta name="description"> 与 og:description 里放
+    **全站统一的学院沿革简介**（每页一字不差）。这类页正文几乎全在海报图里，
+    body_text 只剩导航 + 这段简介，叙事兜底把简介当摘要 → 卡片显示
+    「XX学院，起始于1957年…」，与讲座毫无关系。
+
+    ⚠ 判据必须收窄为「meta 全文不含任何讲座语汇」：美术学院/maths/physics 等站的
+    meta 存的是真正的讲座摘要（正文是图片骨架），只判「候选是 meta 子串」会把
+    它们全部误杀。故 test_41 / test_42 是保护面。
+    """
+
+    _COLLEGE_ABOUT = (
+        '华南师范大学马克思主义学院，起始于1957年建立的华南师范大学马列主义教研室，'
+        '改革开放后发展成为思想教育管理学系（思教系），2000年整合德育教研室成立思想'
+        '政治理论课教学部，2012年正式挂牌成立马克思主义学院。学院主要负责全校本科生、'
+        '研究生思想政治理论课的教学、马克思主义理论学科建设，承担博士生、硕士生的'
+        '培养和各层次的培训任务。'
+    )
+    _NAV = '<p>首页 学院概况 师资队伍 学术预告 通知公告 联系我们</p>'
+
+    def _page(self, meta_desc, body=''):
+        return ('<html><head><title>学术预告</title>'
+                '<meta name="description" content="%s">'
+                '</head><body><div class="wp_articlecontent">%s%s</div>'
+                '</body></html>') % (meta_desc, self._NAV, body)
+
+    def test_40_站点固定学院简介不得当摘要(self):
+        """meta 只有学院沿革简介、正文只剩导航 → abstract 必须为空。"""
+        r = parse(self._page(self._COLLEGE_ABOUT))
+        self.assertNotIn('起始于1957年', str(r.get('abstract') or ''),
+                         '站点固定简介被当成讲座摘要（mks 20261020/19 根因复发）')
+        self.assertEqual(str(r.get('abstract') or ''), '',
+                         '无摘要海报页的 abstract 应为空')
+
+    def test_41_meta是真讲座摘要_仍采用(self):
+        """保护面：meta 含讲座语汇（真摘要，美术学院类）→ 必须照旧取用。"""
+        meta = ('讲座内容：本报告将围绕蛋白质组学在作物抗逆中的应用展开，'
+                '主讲人将结合最新研究成果介绍技术路线与数据分析方法。')
+        r = parse(self._page(meta))
+        self.assertIn('蛋白质组学', str(r.get('abstract') or ''),
+                      'meta 中的真讲座摘要被 meta-boilerplate 守卫误杀（美术学院类回归）')
+
+    def test_42_正文自有摘要_meta是学院简介(self):
+        """保护面：正文有独立摘要段时，meta 简介不得抢走摘要位。
+
+        ⚠ 导航必须自带句号：生产页导航无标点时会被 `_extract_narrative` 与正文
+        粘成一句，再被「首页」元信息前缀整句过滤（mks 实测形态，test_40 已覆盖）；
+        要验证「正文摘要优先」就必须让正文成为独立句。
+        """
+        page = self._page(self._COLLEGE_ABOUT,
+                          '<p>本讲座系统介绍马克思主义理论前沿问题，围绕经典文本解读与'
+                          '当代实践展开，结合案例讨论研究方法。</p>')
+        # 把导航改成独立句
+        page = page.replace('联系我们</p>', '联系我们。</p>')
+        r = parse(page)
+        ab = str(r.get('abstract') or '')
+        self.assertIn('马克思主义理论前沿', ab, '正文摘要未取到（守卫误杀了正文摘要）')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

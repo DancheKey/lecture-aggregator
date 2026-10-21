@@ -5442,7 +5442,8 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
 
 
 def _extract_abstract_bio(_st, result, title, content_div, college,
-                                     list_title, speaker_label_found):
+                                     list_title, speaker_label_found,
+                                     meta_parts=None):
     """阶段 5c：speakerBio/abstract/narrative 抽取与守卫清洗。
     bio 正则/正文兜底/摘要标签链/OCR 兜底/叙事兜底/CTLD 专用/单位混入守卫/
     bio-abstract 迁移等。无返回值，纯写入 result 与 _st。
@@ -5725,7 +5726,23 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
                         r'研讨会主题|研讨会题目|会议主题|论坛主题|沙龙主题')
                     _is_title_artifact = (_nt and _na.startswith(_nt)) or bool(
                         _header_marker.search(_narr_abs or ''))
-                    if not _is_title_artifact:
+                    # meta 固定描述守卫（2026-10-21，mks 20261020/19|20 根因）：
+                    # 部分站点把**全站统一的学院/学校简介**写进 <meta name="description">
+                    # 与 og:description（每页一字不差，属站点模板而非本场讲座摘要）。
+                    # 这类页正文几乎全在海报图里，body_text 只剩导航 + 这段简介，
+                    # 叙事兜底遂把简介当摘要 → 卡片显示「XX学院，起始于1957年…」，
+                    # 与讲座毫无关系。
+                    # ⚠ 判据必须收窄，不能只判「候选是 meta 子串」：美术学院/maths/
+                    # physics 等站的 meta 里存的是**真正的讲座摘要**（正文是图片骨架），
+                    # 一刀切会把它们的摘要全部误杀。故追加「meta 全文不含任何讲座语汇」
+                    # —讲座摘要必含讲座/报告/主讲/时间/地点/题目之一，学院沿革简介不含。
+                    # 判据失效方向是「放行」（退回旧行为），不会误杀。
+                    _meta_flat = _norm_punct(re.sub(r'\s+', '', ' '.join(meta_parts or [])))
+                    _is_meta_boilerplate = (
+                        bool(_meta_flat) and len(_na) >= 8 and _na in _meta_flat
+                        and not re.search(r'(讲座|报告|主讲|报告人|时间|地点|题目|主题|'
+                                          r'学术活动|研讨会|论坛)', _meta_flat))
+                    if not _is_title_artifact and not _is_meta_boilerplate:
                         result['abstract'] = _narr_abs
 
     # --- 通用后处理（narrative fallback 之后统一执行）---
@@ -6353,7 +6370,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     # 内容摘要类标签：出现这些说明主讲人简介已结束、讲座内容介绍开始
     # N1e/英文：补充 Abstract/Synopsis。
     _extract_abstract_bio(_st, result, title, content_div, college,
-                          list_title, speaker_label_found)
+                          list_title, speaker_label_found,
+                          meta_parts=meta_parts)
     return _finalize_record(soup, url, title, list_title, _st, result,
                             poster_only, publish_time, title_year, url_year,
                             url_date, default_year, skip_news_filter, imgs,
