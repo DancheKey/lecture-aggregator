@@ -581,6 +581,21 @@ class TestInferAffiliation(unittest.TestCase):
         self.assertTrue(_is_publication_name('Physics Reports'))
         self.assertTrue(_is_publication_name('Nature'))
 
+    def test_english_dept_not_truncated_to_type_word(self):
+        """英文院系不能被截成类型词残片（2026-10-22 独立复评：
+        「School of Computer Science」旧版返回空，放宽期刊闸门后一度变成
+        垃圾值 'School'——因为它对 _AFFIL_RE 不匹配，走兜底只取首个关键词）。"""
+        from hybrid import _clean_affil_candidate
+        for raw in ('School of Computer Science', 'Department of Materials Science',
+                    'College of Engineering', 'Institute of Automation',
+                    'School of Physics', 'Faculty of Engineering'):
+            got = _clean_affil_candidate(raw)
+            self.assertNotIn(got, ('School', 'Department', 'College',
+                                   'Institute', 'Faculty'), raw)
+        # 真正的单个类型词本身也不该当单位
+        self.assertEqual(_clean_affil_candidate('School'), '')
+        self.assertEqual(_clean_affil_candidate('Department'), '')
+
     def test_chinese_journal_not_affiliation(self):
         """中文学报名不是单位（2026-10-22 独立复评指出：吕艳坤 bio 里的
         《天津师范大学学报》被当单位，实际是刊名）。"""
@@ -665,14 +680,33 @@ class TestHonorificNotTitle(unittest.TestCase):
             self.assertEqual(_infer_title(bio), '', bio)
 
     def test_field_vocab_pure_complex_entry(self):
-        """field_vocab 提供「纯 COMPLEX 组」入口（不含尊称）。"""
+        """field_vocab 提供「去尊称版 COMPLEX 组」入口（不含尊称）。
+
+        ⚠ 口径必须是「_COMPLEX_ALL_WORDS − HONORIFIC_SUFFIXES」：
+        只取 COMPLEX_TITLE_SUFFIXES 会丢掉 _SUBJ_GRADED 等复合词，
+        「中学物理高级教师」被截成「高级教师」（2026-10-22 实测库内 4 条退化）。
+        """
         import field_vocab as FV
         self.assertTrue(FV.COMPLEX_TITLE_PURE_RE.search('青年英才'))
-        # 尊称不在纯 COMPLEX 组里（这是与 COMPLEX_TITLE_ALT_RE 的关键区别）
+        # 尊称不在该组里（这是与 COMPLEX_TITLE_ALT_RE 的关键区别）
         self.assertIsNone(FV.COMPLEX_TITLE_PURE_RE.search('先生'))
         self.assertIsNone(FV.COMPLEX_TITLE_PURE_RE.search('女士'))
         # 对照：COMPLEX_TITLE_ALT_RE 含尊称（故不能用于职称词表）
         self.assertTrue(FV.COMPLEX_TITLE_ALT_RE.search('先生'))
+        # 复合职称必须整词匹配，不能被截断成基础词
+        for w in ('中学物理高级教师', '物理高级教师', '小学数学高级教师',
+                  '语文高级教师', '特聘研究员'):
+            m = FV.COMPLEX_TITLE_PURE_RE.search(w)
+            self.assertIsNotNone(m, w)
+            self.assertEqual(m.group(0), w, w)
+
+    def test_compound_title_not_truncated(self):
+        """学段/学科+高级职称不得被截断（2026-10-22 实测：库内 4 条
+        「中学物理高级教师」被写成「高级教师」，属信息退化）。"""
+        from hybrid import _infer_title
+        self.assertEqual(_infer_title('张三，中学物理高级教师。'), '中学物理高级教师')
+        self.assertEqual(_infer_title('李四，物理高级教师，硕士生导师。'), '物理高级教师')
+        self.assertEqual(_infer_title('王五,小学数学高级教师。'), '小学数学高级教师')
 
 
 class TestHostAffilBioCorroboration(unittest.TestCase):

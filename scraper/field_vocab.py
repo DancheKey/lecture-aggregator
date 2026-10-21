@@ -318,6 +318,11 @@ HONORIFIC_SUFFIXES = ('先生', '女士')
 COMPLEX_TITLE_SUFFIXES = (
     # 学段+学科+高级职称：「中学数学高级教师」「小学语文高级教师」等
     '高级实验师', '高级讲师', '高级教师', '高级工程师', '高级会计师', '高级经济师',
+    # 正高级系列（专业技术职务最高档，对应教授级）。2026-10-22 库内量化：
+    # 19 条 bio 含「正高级」，实际出现的是正高级教师 / 正高级会计师 /
+    # 正高级工程师三类（其余系列未在库内出现，不做无据扩张）。
+    # 缺这些词时规则层会把「正高级教师」截成「高级教师」（丢「正高级」限定）。
+    '正高级教师', '正高级会计师', '正高级工程师',
     '特级教师', '实验师', '会计师', '经济师',
     # 等级教授（高校职级）：仅在简介「现为…二级教授」这类句子里出现
     '一级教授', '二级教授', '三级教授', '四级教授',
@@ -430,15 +435,19 @@ _COMPLEX_ALL_WORDS = (COMPLEX_TITLE_SUFFIXES + _EXTRA_COMPLEX_JOBS
                       + NAME_TITLE_SUFFIXES + HONORIFIC_SUFFIXES)
 COMPLEX_TITLE_ALT_RE = re.compile(_alt(_COMPLEX_ALL_WORDS))
 
-# **纯 COMPLEX 组**（荣誉/聘任/人才计划型称号）的正则：只含
-# COMPLEX_TITLE_SUFFIXES 自身，不含 NAME/HONORIFIC/职务/复合扩展。
+# **去尊称版 COMPLEX 组**：_COMPLEX_ALL_WORDS 减去 HONORIFIC_SUFFIXES。
 #
-# 用途：hybrid._TITLE_RE 需要「荣誉称号」但**不能**带进尊称（先生/女士）——
+# 用途：hybrid._TITLE_RE 需要复合职称（含学段学科组合「中学物理高级教师」、
+# 修饰词组合「特聘研究员」），但**不能**带进尊称（先生/女士）——
 # 2026-10-22 独立复评实测：用 COMPLEX_TITLE_ALT_RE 会把「饶明亮先生是华为集团…」
 # 「陈洪浪先生是广汽资本…」这类称谓式简介推出职称「先生」（3 条库内职称为空的
-# 记录会被写脏）。COMPLEX_TITLE_ALT_RE 语义是「整串职称剥离用」，词表刻意放宽，
-# 不能直接当「职称词表」用——故另开这个纯组入口。
-COMPLEX_TITLE_PURE_RE = re.compile(_alt(COMPLEX_TITLE_SUFFIXES))
+# 记录会被写脏）。而直接只取 COMPLEX_TITLE_SUFFIXES 又会丢掉 _SUBJ_GRADED /
+# _MOD_TITLE_WORDS / _EXTRA_COMPLEX_JOBS（实测「中学物理高级教师」被截成
+# 「高级教师」，库内 4 条记录信息退化）。
+# 故口径取「ALT 组 − 尊称」：既保住全部复合职称形态，又不把尊称当职称。
+_COMPLEX_PURE_WORDS = tuple(
+    w for w in _COMPLEX_ALL_WORDS if w not in HONORIFIC_SUFFIXES)
+COMPLEX_TITLE_PURE_RE = re.compile(_alt(_COMPLEX_PURE_WORDS))
 
 
 def strip_name_title_suffix(name):

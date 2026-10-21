@@ -381,14 +381,16 @@ _AFFIL_RE = re.compile(
 )
 # 从正文抽职称用：词表取自 field_vocab。主任医师/副主任医师已入主表 ORG_TITLE_SUFFIXES
 # （2026-09-26 核对），此处模式串保留冗余分支无害。
-# 2026-10-22 补：并入 COMPLEX_TITLE_SUFFIXES（荣誉/聘任/人才计划型，如「青年英才」
-# 「青年教授」），让并列职称合并与 bio 回退能识别非 NAME_TITLE 主表的称号词。
+# 2026-10-22 补：并入 COMPLEX 组（荣誉/聘任/人才计划型，如「青年英才」
+# 「青年教授」，以及学段学科组合「中学物理高级教师」），让并列职称合并与
+# bio 回退能识别非 NAME_TITLE 主表的称号词。
 #
-# ⚠ 用 COMPLEX_TITLE_SUFFIXES 而非 COMPLEX_TITLE_ALT_RE：后者的词表
-# _COMPLEX_ALL_WORDS 还并入了 HONORIFIC_SUFFIXES（先生/女士）——尊称不是职称，
-# 并进来会让「饶明亮先生是华为集团…」「陈洪浪先生是广汽资本…」这类**称谓式
-# 开头**的简介被推出职称「先生」（2026-10-22 独立复评实测：3 条库内职称为空的
-# 记录会被写成「先生」）。
+# ⚠ 用 COMPLEX_TITLE_PURE_RE（= _COMPLEX_ALL_WORDS − HONORIFIC_SUFFIXES）：
+# 尊称（先生/女士）不是职称，并进来会让「饶明亮先生是华为集团…」「陈洪浪先生是
+# 广汽资本…」这类**称谓式开头**的简介被推出职称「先生」（2026-10-22 独立复评
+# 实测：3 条库内职称为空的记录会被写成「先生」）。
+# 但也不能只取 COMPLEX_TITLE_SUFFIXES —— 那会丢掉 _SUBJ_GRADED 等复合词，
+# 「中学物理高级教师」被截成「高级教师」（同日实测库内 4 条信息退化）。
 _TITLE_RE = re.compile(
     _fv.NAME_TITLE_SUFFIX_RE.pattern
     + '|' + _fv.COMPLEX_TITLE_PURE_RE.pattern
@@ -486,6 +488,15 @@ _AFFIL_PUBLICATION_RE = re.compile(
     r'|\b(?:physics|physical|applied|mathematical|computational|'
     r'organic|inorganic|analytical|statistical)\s+reports\b'
     r'|^(?:nature|science|lancet|cell|science\s+advances)$', re.I)
+
+
+# 英文机构**类型词**单独成值：专名被切掉的残片，不是机构名（2026-10-22 独立复评）。
+# 「School of Computer Science」-> 'School'（_AFFIL_RE 对该形态无匹配，
+# _strip_affil_prefix 兜底只取首个关键词词，剩下的专名全丢）。
+_AFFIL_EN_TYPE_ONLY_RE = re.compile(
+    r'^(?:School|Department|Dept\.?|College|Institute|Faculty|University|'
+    r'Center|Centre|Lab|Laboratory|Academy|Graduate\s+School|'
+    r'Division|Program(?:me)?)$', re.I)
 
 
 def _is_publication_name(aff):
@@ -625,6 +636,13 @@ def _clean_affil_candidate(raw):
     if _AFFIL_GOV_DEPT.search(aff):
         return ''
     if _AFFIL_INTERNAL_UNIT.match(aff):
+        return ''
+    # 英文机构**类型词**单独成值 = 专名被切掉（2026-10-22 独立复评：
+    # 「School of Computer Science」-> 'School'、「Department of Materials
+    # Science」-> 'Department'）。这类词本身不是机构名，写库即垃圾值。
+    # 说明：放宽期刊名闸门后本条路径才可达（旧版被裸 science 误杀返回空），
+    # 属本次改动新暴露的既有缺陷，故在此兜底拒掉。
+    if _AFFIL_EN_TYPE_ONLY_RE.match(aff):
         return ''
     aff = _fv.TAIL_TITLE_RE.sub('', aff).strip(' ,，')
     return aff if _is_valid_affiliation(aff) else ''
