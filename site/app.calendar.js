@@ -164,8 +164,21 @@ Object.assign(APP_METHODS, {
   // 这条记录能不能加日历：时间可用、非「时间未知」，且（2026-10-20 二修）**还没结束**。
   // 此前单场入口不查过期、整组入口查——已结束的讲座仍显示单场按钮，两处口径不一致，
   // 把过期讲座加进日历没有意义。过期判定收敛到 _calLive 单点。
+  // 注意：这是「**能不能加**」的判据，不等于「**要不要显示按钮**」——见 showCalBtn。
   canAddCal(l) {
     return this._calLive(l, Date.now());
+  },
+
+  // 单场日历按钮的**显示**判据（2026-10-21 方案 B+）：
+  //   「能加」或「我加过」→ 显示。
+  // 为什么不是直接用 canAddCal：日历按钮身兼两职——①动作（把未来事件加进日历）、
+  // ②状态（我加过这场）。canAddCal 只管①，用它做显示条件会让「加过」的本机高亮
+  // 在讲座一结束就跟着按钮消失，与「想听/点赞」纯状态标记的语义不一致（它们结束
+  // 后高亮仍在）。故显示放宽到②：加过的场次即使结束，蓝色高亮也留着当历史记录。
+  // 点击行为仍由 addToCalendar 把关——已结束的只提示、不下载，不会误加过去事件。
+  showCalBtn(l) {
+    const key = l && (l.ck || l.sourceUrl);
+    return this.canAddCal(l) || (!!key && this.hasCalAdded(key));
   },
 
   // 触发下载。filename 用纯 ASCII：中文文件名在部分安卓机型上会变成乱码或 .bin
@@ -201,8 +214,14 @@ Object.assign(APP_METHODS, {
   // 单场：加进日历
   // 文件名带 single-：下载目录里与 group-（整组）、feed.ics（全量）一眼可分。
   // 2026-10-20 实测：用户点了卡片图标后以为「下载了全部日历」，只看到一场以为出错。
+  // 2026-10-21 方案 B+：按钮改为「能加或加过」都显示（见 showCalBtn），所以本函数
+  // 会收到已结束的场次。此时**不下载**（把过去事件塞进日历没有意义），只提示——
+  // 否则就是个点了没反应的死按钮，用户会以为坏了。
   addToCalendar(l) {
-    if (!this.canAddCal(l)) return;
+    if (!this.canAddCal(l)) {
+      this.showToast('该讲座已结束，无法再加入日历');
+      return;
+    }
     const span = this._calSpan(l);
     const text = this.calIcsFor([l]);
     if (!text) return;
@@ -236,14 +255,26 @@ Object.assign(APP_METHODS, {
     return ((u && u.recs) || []).some(l => this.hasCalAdded(l.ck || l.sourceUrl));
   },
 
+  // 整组按钮的**显示**判据（2026-10-21 方案 B+，与单场 showCalBtn 同思路）：
+  //   「组内还有能加的」或「组内我加过任意一场」→ 显示。
+  // 让「加过」的高亮在整组过期后仍留着；点击行为仍由 addGroupToCalendar 把关。
+  showGroupCalBtn(u) {
+    return this.hasLiveRecs(u) || this.hasGroupCalAdded(u);
+  },
+
   // 论坛卡（同页同日 ≥3 场折叠成一张卡）：整组一起加。
   // 只取「还没结束」的场次——把上周的讲座塞进日历没有意义（判据见 _calLive）。
+  // 本函数会收到「全组已结束但加过」的组（见 showGroupCalBtn），此时过滤后为空，
+  // 需提示而非静默返回——否则按钮点了没反应（与单场 addToCalendar 同处理）。
   addGroupToCalendar(u) {
     const recs = (u && u.recs) || [];
     const now = Date.now();
     const live = recs.filter(l => this._calLive(l, now));
     const text = this.calIcsFor(live);
-    if (!text) return;
+    if (!text) {
+      this.showToast('这一组讲座均已结束，无法再加入日历');
+      return;
+    }
     const first = this._calSpan(live[0]);
     const d = new Date(first.start);
     const p = n => String(n).padStart(2, '0');

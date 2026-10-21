@@ -261,6 +261,68 @@ const cal = loadCal();
   ok(b.hasGroupCalAdded(group) === false, 'test_13g 未加过时整组按钮不亮');
 }
 
+// ---------- test_14：方案 B+ 过期后保留「已加」标记（2026-10-21） ----------
+// 背景：日历按钮身兼两职——①动作（加未来事件）、②状态（我加过这场）。
+// 旧实现用 canAddCal（只管①）做显示条件，导致「加过」的蓝色高亮在讲座一结束
+// 就跟着按钮一起消失，与想听/点赞（纯状态标记，结束后高亮仍在）语义不一致。
+// B+ 把**显示**放宽到「能加 或 加过」，但**点击**仍禁止对已结束的下载。
+{
+  const raw = loadCalRaw();
+  const dead = { ck: 'd1', lectureStart: '2020-01-01 14:00:00' };
+  const future = { ck: 'f1', lectureStart: '2099-01-01 14:00:00' };
+
+  const mk = () => {
+    const app = Object.assign({}, raw);
+    app.calAddedUrls = new Set();
+    app.toasts = [];
+    app.downloads = 0;
+    app.bumped = [];
+    app._calWeChatHint = () => {};
+    app._calDownload = () => { app.downloads++; return true; };
+    app.bumpCal = k => app.bumped.push(k);
+    app.saveCalAdded = () => {};
+    app.hasCalAdded = k => app.calAddedUrls.has(k);
+    app.showToast = m => app.toasts.push(m);
+    return app;
+  };
+
+  // 显示判据
+  const a = mk();
+  ok(a.showCalBtn(dead) === false, 'test_14 已结束且没加过 → 不显示日历按钮');
+  ok(a.showCalBtn(future) === true, 'test_14b 未结束 → 显示日历按钮');
+  a.calAddedUrls.add('d1');
+  ok(a.showCalBtn(dead) === true, 'test_14c 已结束但加过 → 仍显示（高亮保留）');
+
+  // 点击行为：已结束的不得下载，但要给提示（不能是点了没反应的死按钮）
+  a.addToCalendar(dead);
+  ok(a.downloads === 0, 'test_14d 已结束的讲座点击不得下载 .ics');
+  ok(a.bumped.length === 0, 'test_14e 已结束的讲座点击不得计数');
+  ok(a.toasts.length === 1 && a.toasts[0].includes('已结束'),
+    `test_14f 已结束的点击应提示，实际 ${JSON.stringify(a.toasts)}`);
+
+  // 未结束的照常下载 + 留痕
+  a.addToCalendar(future);
+  ok(a.downloads === 1 && a.bumped.join(',') === 'f1',
+    'test_14g 未结束的讲座应正常下载并计数');
+
+  // 整组：全组过期但加过 → 仍显示；点击提示、不下载
+  const g = mk();
+  const grp = { recs: [dead] };
+  ok(g.showGroupCalBtn(grp) === false, 'test_14h 整组全过期且没加过 → 不显示整组按钮');
+  g.calAddedUrls.add('d1');
+  ok(g.showGroupCalBtn(grp) === true, 'test_14i 整组全过期但加过 → 仍显示');
+  g.addGroupToCalendar(grp);
+  ok(g.downloads === 0, 'test_14j 整组全过期时点击不得下载');
+  ok(g.toasts.length === 1 && g.toasts[0].includes('已结束'),
+    'test_14k 整组全过期时应提示，而非静默返回');
+  // 组内还有未结束的 → 正常下载
+  const g2 = mk();
+  g2.calAddedUrls.add('d1');
+  g2.addGroupToCalendar({ recs: [dead, future] });
+  ok(g2.downloads === 1 && g2.bumped.join(',') === 'f1',
+    'test_14l 组内仍有未结束场次时应正常下载未结束的那些');
+}
+
 if (errs.length) {
   errs.forEach(e => console.error('  ✗ ' + e));
   console.error(`calendar_ics: ${errs.length} 项失败`);

@@ -574,12 +574,13 @@
                   <div class="card-actions flex items-center gap-2 shrink-0">
                     <!-- 整组加入日历（2026-10-20 批次 B）：合并卡代表「同页同日 ≥3 场」，
                          逐场按钮会挤爆卡片，所以整组生成一个含多条 VEVENT 的 .ics。
-                         只在组内还有「还没结束」场次时显示（hasLiveRecs，二修：与
-                         addGroupToCalendar 的过滤同判据 _calLive——否则全组过期时
-                         按钮点了静默无反应）。 -->
-                    <button v-if="hasLiveRecs(u)" @click="addGroupToCalendar(u)"
+                         显示条件是 showGroupCalBtn（2026-10-21 方案 B+）：
+                         「组内还有能加的」或「组内我加过任意一场」。后半让「加过」的
+                         蓝色高亮在整组过期后仍保留（与想听/点赞的纯状态语义一致）；
+                         全组已结束时点击由 addGroupToCalendar 提示、不下载。 -->
+                    <button v-if="showGroupCalBtn(u)" @click="addGroupToCalendar(u)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border', hasGroupCalAdded(u) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
-                      :title="hasGroupCalAdded(u) ? '已加入日历（本机标记，组内至少一场）' : '整组加入日历：把这一组里还没结束的场次一次性导出（.ics）'">
+                      :title="hasGroupCalAdded(u) ? (hasLiveRecs(u) ? '已加入日历（本机标记，组内至少一场）' : '已加入日历（本机标记）·本组已结束') : '整组加入日历：把这一组里还没结束的场次一次性导出（.ics）'">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                       </svg>
@@ -730,12 +731,13 @@
                        两按钮仍相邻同行）；桌面端由 .card-actions 的媒体查询恢复右推。 -->
                   <div class="card-actions flex items-center gap-2 shrink-0">
                   <!-- 加入日历（2026-10-20 批次 B）：生成单场 .ics，点开即加到系统日历。
-                       canAddCal 挡掉「时间未知」的 50 条和缺开始时间的 1 条——
-                       没有时间的讲座塞进日历只会是个错误提醒；二修再挡已结束的场次
-                       （与整组入口同判据 _calLive，此前只有整组入口过滤过期）。 -->
-                  <button v-if="canAddCal(l)" @click="addToCalendar(l)"
+                       showCalBtn（2026-10-21 方案 B+）挡掉「时间未知」的 50 条和缺开始
+                       时间的 1 条，也挡掉「已结束且没加过」的场次；但「加过的」即使
+                       结束仍显示——蓝色高亮当作历史记录留着（与想听/点赞纯状态标记一致）。
+                       已结束的点击由 addToCalendar 提示、不下载，不会误加过去事件。 -->
+                  <button v-if="showCalBtn(l)" @click="addToCalendar(l)"
                     :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border', hasCalAdded(l.ck || l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
-                    :title="hasCalAdded(l.ck || l.sourceUrl) ? '已加入日历（本机标记）' : '把当前讲座加进日历，下载后双击 .ics 文件导入'">
+                    :title="hasCalAdded(l.ck || l.sourceUrl) ? (canAddCal(l) ? '已加入日历（本机标记）' : '已加入日历（本机标记）·本场已结束') : '把当前讲座加进日历，下载后双击 .ics 文件导入'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
@@ -916,7 +918,7 @@
   <script defer src="app.display.js?v=9a9d17612f"></script>
   <script defer src="app.cloud.js?v=48b48189e4"></script>
   <script defer src="app.social.js?v=53c95b667e"></script>
-  <script defer src="app.calendar.js?v=84599a522c"></script>
+  <script defer src="app.calendar.js?v=3731053cf3"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=00516d2e4d"></script>

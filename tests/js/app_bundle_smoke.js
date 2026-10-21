@@ -121,8 +121,11 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   （本机高亮态 localStorage，同 likedUrls/wantedUrls），131 → 134）
 // （2026-10-21：整组下载留痕 —— hasGroupCalAdded（论坛卡整组按钮高亮判定，
 //   组内任意一场已加即亮），134 → 135）
+// （2026-10-21：方案 B+ 日历按钮过期保留 —— showCalBtn / showGroupCalBtn
+//   （显示判据从「能加」放宽到「能加或加过」，让本机高亮在讲座结束后仍保留；
+//   点击行为仍由 addToCalendar / addGroupToCalendar 把关），135 → 137）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 135) errs.push(`方法数 ${nMethods} != 135`);
+if (nMethods !== 137) errs.push(`方法数 ${nMethods} != 137`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');
