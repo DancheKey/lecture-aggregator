@@ -578,8 +578,8 @@
                          addGroupToCalendar 的过滤同判据 _calLive——否则全组过期时
                          按钮点了静默无反应）。 -->
                     <button v-if="hasLiveRecs(u)" @click="addGroupToCalendar(u)"
-                      class="px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400"
-                      title="整组加入日历：把这一组里还没结束的场次一次性导出（.ics）">
+                      :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border', hasGroupCalAdded(u) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
+                      :title="hasGroupCalAdded(u) ? '已加入日历（本机标记，组内至少一场）' : '整组加入日历：把这一组里还没结束的场次一次性导出（.ics）'">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                       </svg>
@@ -734,8 +734,8 @@
                        没有时间的讲座塞进日历只会是个错误提醒；二修再挡已结束的场次
                        （与整组入口同判据 _calLive，此前只有整组入口过滤过期）。 -->
                   <button v-if="canAddCal(l)" @click="addToCalendar(l)"
-                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border', hasCalAdded(l.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
-                    :title="hasCalAdded(l.ck) ? '已加入日历（本机标记）' : '把当前讲座加进日历，双击 .ics 文件导入'">
+                    :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border', hasCalAdded(l.ck || l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
+                    :title="hasCalAdded(l.ck || l.sourceUrl) ? '已加入日历（本机标记）' : '把当前讲座加进日历，下载后双击 .ics 文件导入'">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
@@ -817,7 +817,7 @@
         · 订阅：
         <a href="feed.xml" class="hover:text-slate-600 underline decoration-dotted" title="用 RSS 阅读器（Feedly / Inoreader / 一读等）订阅，有新讲座时推送">RSS</a>
         <span class="mx-1 text-slate-300">|</span>
-        <a href="feed.ics" class="hover:text-slate-600 underline decoration-dotted" title="这是全部未结束的讲座；双击 .ics 文件导入系统日历。想改期自动同步，在日历里用「订阅日历」填 https://danchekey.github.io/lecture-aggregator/feed.ics">日历 .ics（全部未结束讲座）</a>
+        <a href="feed.ics" class="hover:text-slate-600 underline decoration-dotted" title="这是全部未结束的讲座；下载后双击 .ics 文件导入系统日历。想改期自动同步，在日历里用「订阅日历」填 https://danchekey.github.io/lecture-aggregator/feed.ics">日历 .ics（全部未结束讲座）</a>
       </span>
       <!-- 2026-10-20 实测反馈：用户在企业微信日历里找「订阅公共日历 / 创建公共日历」，
            以为能填本站 feed.ics——那两个入口都是**企业组织内部的日历本**，
@@ -916,7 +916,7 @@
   <script defer src="app.display.js?v=9a9d17612f"></script>
   <script defer src="app.cloud.js?v=48b48189e4"></script>
   <script defer src="app.social.js?v=53c95b667e"></script>
-  <script defer src="app.calendar.js?v=989b267746"></script>
+  <script defer src="app.calendar.js?v=84599a522c"></script>
   <script defer src="app.data.js?v=d7c1bd2321"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=00516d2e4d"></script>

@@ -32,6 +32,14 @@ function loadCal() {
   return m;
 }
 
+// 不 bind 的版本：留给「需要把 this 指向测试替身」的用例（test_13）
+function loadCalRaw() {
+  const ctx = { APP_METHODS: {}, TextEncoder, console };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(SITE, 'app.calendar.js'), 'utf8'), ctx);
+  return ctx.APP_METHODS;
+}
+
 const cal = loadCal();
 
 // ---------- test_01：北京时间 → UTC 毫秒 ----------
@@ -211,6 +219,46 @@ const cal = loadCal();
   }]);
   ok(ics3.includes('主讲：张三') && !ics3.includes('（'),
     'test_12c 无单位时不得输出孤立括号');
+}
+
+// ---------- test_13：整组下载必须给组内每场留痕（2026-10-21） ----------
+// 背景：整组入口此前只生成 .ics，不写本机高亮、也不计次数——用户下了一整组日历，
+// 回头组内每张单场卡仍是灰的、数字还是 0，与单场入口行为分叉。
+// 这条同时锁三件事：下载成功逐场留痕 / 已结束场次不参与 / 下载失败不虚增。
+{
+  const raw = loadCalRaw();
+  // hasCalAdded 真身在 app.social.js（bundle 冒烟保证其存在），这里只验组逻辑的调用契约
+  const makeApp = downloadOk => {
+    const app = Object.assign({}, raw);
+    app.calAddedUrls = new Set();
+    app.saved = 0;
+    app.bumped = [];
+    app._calWeChatHint = () => {};
+    app._calDownload = () => downloadOk;
+    app.bumpCal = k => app.bumped.push(k);
+    app.saveCalAdded = () => { app.saved++; };
+    app.hasCalAdded = k => app.calAddedUrls.has(k);
+    return app;
+  };
+  const live1 = { ck: 'g1', lectureStart: '2099-10-22 10:00:00' };
+  const live2 = { ck: 'g2', lectureStart: '2099-10-22 14:00:00' };
+  const dead = { ck: 'g3', lectureStart: '2020-10-22 10:00:00' };
+  const group = { recs: [live1, live2, dead] };
+
+  const a = makeApp(true);
+  a.addGroupToCalendar(group);
+  ok(a.calAddedUrls.has('g1') && a.calAddedUrls.has('g2'),
+    'test_13 整组下载后组内每场都应写入本机高亮');
+  ok(!a.calAddedUrls.has('g3'), 'test_13b 已结束场次不参与整组下载，也不得留痕');
+  ok(a.bumped.join(',') === 'g1,g2', `test_13c 整组下载应逐场计数，实际 ${a.bumped.join(',')}`);
+  ok(a.saved === 1, `test_13d 整组下载应持久化一次，实际 ${a.saved}`);
+  ok(a.hasGroupCalAdded(group) === true, 'test_13e 组内任意一场已加 → 整组按钮高亮');
+
+  const b = makeApp(false);   // 下载失败
+  b.addGroupToCalendar(group);
+  ok(b.calAddedUrls.size === 0 && b.bumped.length === 0,
+    'test_13f 下载失败不得写高亮、不得计数（避免虚增）');
+  ok(b.hasGroupCalAdded(group) === false, 'test_13g 未加过时整组按钮不亮');
 }
 
 if (errs.length) {

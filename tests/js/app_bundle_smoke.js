@@ -119,8 +119,10 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   （多主讲只显示第一位+等），128 → 131）
 // （2026-10-20：日历加过高亮 —— loadCalAdded / saveCalAdded / hasCalAdded
 //   （本机高亮态 localStorage，同 likedUrls/wantedUrls），131 → 134）
+// （2026-10-21：整组下载留痕 —— hasGroupCalAdded（论坛卡整组按钮高亮判定，
+//   组内任意一场已加即亮），134 → 135）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 134) errs.push(`方法数 ${nMethods} != 134`);
+if (nMethods !== 135) errs.push(`方法数 ${nMethods} != 135`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');

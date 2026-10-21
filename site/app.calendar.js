@@ -229,6 +229,13 @@ Object.assign(APP_METHODS, {
     return ((u && u.recs) || []).some(l => this._calLive(l, now));
   },
 
+  // 整组按钮的高亮态（2026-10-21）：组内**任意一场**已加过就亮，与单场按钮同色系。
+  // 不给整组按钮加数字——组内计数加总没有意义（3 场各 5 次 ≠ 15 人加了这一组），
+  // 数字仍只在单场卡上按场显示。
+  hasGroupCalAdded(u) {
+    return ((u && u.recs) || []).some(l => this.hasCalAdded(l.ck || l.sourceUrl));
+  },
+
   // 论坛卡（同页同日 ≥3 场折叠成一张卡）：整组一起加。
   // 只取「还没结束」的场次——把上周的讲座塞进日历没有意义（判据见 _calLive）。
   addGroupToCalendar(u) {
@@ -242,6 +249,18 @@ Object.assign(APP_METHODS, {
     const p = n => String(n).padStart(2, '0');
     const name = `muduojinsheng-group-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}.ics`;
     this._calWeChatHint();
-    this._calDownload(name, text);
+    if (!this._calDownload(name, text)) return;
+    // 组内逐场留痕（2026-10-21）：此前整组下载既不写本机高亮、也不计入次数——
+    // 用户下了一整组日历，回头组内每张单场卡还是灰的、数字还是 0，与单场入口
+    // 行为分叉（2026-10-21 用户反馈「有数字却不亮」时顺带查出的第二个缺口）。
+    // 口径与 addToCalendar 完全一致：先写本机高亮，再 bumpCal 云端计数，
+    // 且只在下载真正触发成功后执行——下载失败还记一次会虚增。
+    live.forEach(l => {
+      const key = l.ck || l.sourceUrl;
+      if (!key) return;
+      if (this.calAddedUrls) this.calAddedUrls.add(key);
+      this.bumpCal(key);
+    });
+    if (this.calAddedUrls) this.saveCalAdded();
   },
 });
