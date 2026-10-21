@@ -4124,11 +4124,22 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
     vlm_fields = None
     _t_vlm = None
     _vlm_sessions = None
+    # 讲座结构化字段标签（时间/地点/主讲人/报告人 + 冒号）。poster 判定的多处触发
+    # 共用此单一正则，避免各处手抄漂移。
+    _LECLABEL = r'(?:时间|地点|主讲[人师]|报告人)[：:]'
     poster_only = ((len(_st.body_text) < 150
-                    and not re.search(r'(?:时间|地点|主讲[人师]|报告人)[：:]', _st.body_text))
+                    and not re.search(_LECLABEL, _st.body_text))
                    or (bool(imgs) and (_is_meta_skeleton(_st.body_text)
                                        or _is_column_intro(_st.body_text)))
-                   or _pdf_poster_converted)
+                   or _pdf_poster_converted
+                   # 【2026-10-21 新增】无讲座字段标签 + 有内容图 → 海报页，无论正文长短。
+                   # 覆盖「导航/CMS 外壳文字很多、正文全在海报图里」的形态（如 mks
+                   # 20261020/19：整页 620 字全是导航菜单+发布元信息，讲座信息只在图里，
+                   # 旧判据因 body_text≥150 漏判 → VLM 不跑 → 讲者只能走 OCR+LLM 单讲者路）。
+                   # 安全性：①「无标签」门槛保护能从文本抽取的页（它们必带时间/主讲人标签，
+                   # 不会误入本分支）；② imgs 已滤 logo/二维码/横幅等装饰图（_is_chrome_img）；
+                   # ③ VLM 失败仍回退 OCR/文本路，行为不劣于改前。
+                   or (bool(imgs) and not re.search(_LECLABEL, _st.body_text)))
     if poster_only:
         # 优先用多模态 LLM 结构化提取海报；无 key / 失败则降级回 rapidocr。
         # 逐张尝试候选图（URL 图取前 3 张，另加 PDF 转出的本地图；不拼接发送）：
