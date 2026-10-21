@@ -110,6 +110,16 @@
       100% { transform: scale(1); }
     }
     .pop-bounce { animation: pop-bounce-kf 0.32s ease; }
+    /* 远期折叠条「微光呼吸」：琥珀光晕缓慢起伏，滚动时更容易被余光捕获。
+       仅光晕不变形（避免布局抖动）；系统开启减弱动效时停用。 */
+    @keyframes far-fold-glow-kf {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+      50% { box-shadow: 0 0 16px 3px rgba(245, 158, 11, .28); }
+    }
+    .far-fold-bar { animation: far-fold-glow-kf 3s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) {
+      .far-fold-bar { animation: none; }
+    }
     /* Toast：淡入淡出 + 上浮位移。不用 Vue <transition>（其 enter 起始类依赖
        rAF 移除，页面非前台被节流时过渡会卡死在 opacity:0）；改为常驻元素 +
        toast-on/toff 类切换，纯 CSS transition 在任何环境都安全。 */
@@ -494,12 +504,13 @@
                    完全相同的渲染分支（分页不受影响：fold 容器恒占 1 个渲染单元位）。
                    展开态存 localStorage（toggleFarFuture），刷新不丢。 -->
               <button v-if="isFarFoldGroup(g)" type="button" @click="toggleFarFuture()"
-                class="far-fold-bar w-full text-left flex items-center gap-2 text-12pt text-slate-600 bg-white border border-dashed border-slate-300 rounded-xl px-4 py-3 mb-3 hover:border-blue-300 hover:text-blue-700 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                class="far-fold-bar w-full text-left flex items-center gap-2 text-12pt text-amber-900 bg-amber-50 border border-dashed border-amber-400 rounded-xl px-4 py-3 mb-3 hover:bg-amber-100 hover:border-amber-500 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>
-                <span class="font-medium">距今 7 天以上的预告（<span class="font-bold text-slate-900">{{ g.count }}</span> 场）</span>
-                <span class="ml-auto shrink-0 text-blue-600">{{ farFutureOpen ? '收起 ▲' : '展开 ▼' }}</span>
+                <span class="font-medium">距今 7 天以上的预告</span>
+                <span class="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 font-bold text-white">{{ g.count }} 场</span>
+                <span class="ml-auto shrink-0 font-medium text-amber-700">{{ farFutureOpen ? '收起 ▲' : '展开 ▼' }}</span>
               </button>
               <div v-else class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">
                 <span class="w-1 h-5 rounded-full bg-blue-500"></span>
