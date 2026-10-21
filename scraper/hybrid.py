@@ -399,6 +399,46 @@ _AFFIL_PREFIX_NOISE = re.compile(
     r'是|曾|曾任职|曾在|曾任|曾为|于|在|分别|先后'
     r')\s*[于在,，]?\s*'
 )
+# 2026-10-22 审计新增：上表的 ^ 锚定只能剥**句首**噪声，句中残留的动词残片
+# 剥不掉——分句扫描实测产出「之后加入中科院物理研究所」「教于香港理工大学应用数学系」
+# 「原北京大学中文系」「后于中山大学心理学系」等垃圾单位。
+# 判据：机构名**前面**紧邻的动词/连词残片（之后/原/教于/后于/现于/曾于/
+# 并入/加盟/受聘于/供职于…），一律剥掉后再取机构名。
+_AFFIL_MID_NOISE = re.compile(
+    r'^(?:之后|后于|原|原为|教于|现于|曾于|并入|加盟|加入|受聘于|供职于|'
+    r'进入|入职|调入|转入|赴|赴任|前往|随后|后来)\s*'
+)
+# 2026-10-22 审计新增（第二类垃圾值）：「现任心理研究所所长」「现任国家教育部大学」
+# 这类形态里，机构名被前面的「现任」切掉，剩下的是**机构内部的部门名**或
+# 错误切分（「国家教育部大学」根本不是学校）——都不是现职单位。
+# 判据：候选机构名**本身**不以「研究所/研究院/实验室」结尾时，若其前面紧邻
+# 「现任/现为/原/原为」，说明抓到的是被切掉前缀后的残片 -> 拒。
+# 而「教育部…重点实验室固定成员」这类「所属实验室」不是任职单位，由
+# _AFFIL_MEMBERSHIP_RE 单独排除。
+_AFFIL_RESIDUAL_PREFIX = re.compile(r'^(?:现任|现为|原为|原|曾任|曾为)')
+# 2026-10-22 审计新增（第三类垃圾值）：_AFFIL_RE 的中文分支是**贪婪前缀**，
+# 「现任国家教育部大学」被整体当成机构名（现+任+国家教育部+大学，前缀「现任」被
+# 吞进候选里），「现任心理研究所所长」同理。此时 cm.start()==0，残片判据无从下手。
+# 判据：候选**自身**以「现任/原/曾任」等动词前缀开头 -> 剥掉该前缀再判合法性；
+# 剥完仍不是合法机构（心理研究所/国家教育部大学 这类部门名/错误切分）-> 拒。
+_AFFIL_LEADING_VERB = re.compile(r'^(?:现任|现为|原为|曾任|曾为|原)')
+# 2026-10-22 审计新增（第四类垃圾值）：剥掉「现任/原」等动词前缀后，剩余串
+# 仍可能**不是单位**：
+#   「国家教育部大学」——教育部是政府机构，不是大学（白名单按「大学」结尾放行）；
+#   「心理研究所」——是某所内的部门名，不是任职单位。
+# 判据：剥前缀后若以政府部门名开头（教育部/教育厅/科技部/…）-> 拒；
+# 若剥出的名字里带「所」但前面是机构内部的泛称（心理研究所/教育研究所…）且
+# 原文紧随其后是职务（所长/副所长/主任…）-> 那是所内部门 -> 拒。
+_AFFIL_GOV_DEPT = re.compile(
+    r'^(?:国家)?(?:教育|科技|财政|人事|劳动|农业|工业|信息|卫生|文化|'
+    r'民政|交通|水利|林业|邮政|统计|能源|国防|商务|自然资源)部')
+_AFFIL_INTERNAL_UNIT = re.compile(
+    r'^[一-鿿]{0,4}(?:研究所|研究室|实验室|中心)$')
+_AFFIL_INTERNAL_CTX = re.compile(r'(?:所长|副所长|主任|副主任|秘书长|理事长)')
+# 「…实验室固定成员」「…重点实验室成员」「…研究员」这类「所属机构成员」
+# 表述：机构是所挂靠的单位，不是现职单位。
+_AFFIL_MEMBERSHIP_RE = re.compile(
+    r'(?:固定成员|重点实验室成员|实验室成员|团队成员|课题组|课题组核心成员)')
 _AFFIL_VALID_KEYWORDS = (
     '大学', '学院', '研究院', '研究所', '学部', '系', '中心',
     'University', 'College', 'Institute', 'School', 'Department',
@@ -413,6 +453,16 @@ _AFFIL_EN_STOP_WORDS = {
     'born', 'received', 'earned', 'obtained', 'got', 'gotten', 'before', 'when',
     'where', 'who', 'which', 'while', 'during', 'until', 'since', 'between',
 }
+
+# 2026-10-22 审计新增：期刊/文献名不是机构。英文机构分支会把
+# 「Journal of Labor Economics」缩成「Lab」（末尾的 Lab 是缩写后缀），
+# 2026-10-22 全库回归实测产出单位垃圾值 'Lab'（钟灵，module/10804）。
+# 判据：候选串里含期刊/文献类词（Journal/Transactions/Review/Proceedings/
+# Bulletin/Advances/Perspectives/Annual …）-> 直接拒，绝不作为单位。
+_AFFIL_PUBLICATION_RE = re.compile(
+    r'\b(?:journal|transactions|review|reviews|proceedings|bulletin|'
+    r'advances|perspectives|annual|international\s+journal|'
+    r'economics\s+letters|nature|science)\b', re.I)
 
 
 def _strip_affil_prefix(aff):
@@ -491,28 +541,92 @@ def _clean_affil_candidate(raw):
     if not raw:
         return ''
     aff = str(raw).strip()
+    # 期刊/文献名不是机构（2026-10-22 审计：「Journal of Labor Economics」被英文
+    # 分支缩成 'Lab'）-> 清洗前先拒，避免产出垃圾单位。
+    if _AFFIL_PUBLICATION_RE.search(aff):
+        return ''
     for _ in range(3):
         new_aff = _AFFIL_PREFIX_NOISE.sub('', aff)
         if new_aff == aff:
             break
         aff = new_aff
+    # 句中动词残片（之后加入/原/教于/后于…）：_AFFIL_PREFIX_NOISE 的 ^ 锚定
+    # 只管句首，这些残片在句中剥不掉（2026-10-22 审计实测产出垃圾单位）。
+    for _ in range(3):
+        new_aff = _AFFIL_MID_NOISE.sub('', aff)
+        if new_aff == aff:
+            break
+        aff = new_aff
     aff = _strip_affil_prefix(aff)
+    # 候选自身以「现任/原/曾任」开头：这些是动词前缀被贪婪匹配吞进来的残片
+    # （2026-10-22 审计：「现任国家教育部大学」「现任心理研究所所长」）
+    # -> 剥掉前缀后重新判定；剥完不是合法机构就丢弃。
+    stripped = _AFFIL_LEADING_VERB.sub('', aff).strip()
+    if stripped != aff:
+        aff = stripped
+    # 剥完仍不是单位：政府部门名（「国家教育部大学」）/ 所内部门名（「心理研究所」）
+    # -> 直接拒（2026-10-22 审计第四类垃圾值）。这两类在 _AFFIL_CURRENT_RE
+    # （现职表达）路径也会命中，故必须放在这里统一拦。
+    if _AFFIL_GOV_DEPT.search(aff):
+        return ''
+    if _AFFIL_INTERNAL_UNIT.match(aff):
+        return ''
     aff = _fv.TAIL_TITLE_RE.sub('', aff).strip(' ,，')
     return aff if _is_valid_affiliation(aff) else ''
+
+
+def _affil_candidate_is_residual(clause, cm):
+    """候选机构是否只是被切掉前缀后的**残片**（2026-10-22 审计第二类垃圾值）。
+
+    「现任心理研究所所长」-> 候选「心理研究所」是所内部门，不是单位；
+    「现任国家教育部大学」-> 候选「国家教育部大学」根本不是学校。
+    判据：候选前面的紧邻文字是「现任/现为/原/原为/曾任/曾为」这类前缀残片。
+    """
+    before = str(clause[:cm.start()])
+    if not before:
+        return False
+    return bool(_AFFIL_RESIDUAL_PREFIX.search(before[-4:]))
+
+
+def _affil_is_not_a_unit(clause, cm, cand):
+    """候选是否根本**不是单位**（2026-10-22 审计第四类垃圾值）。
+
+    ① 政府部门名（「国家教育部大学」——教育部不是大学）；
+    ② 所内部门名 + 紧随职务（「心理研究所所长」——心理研究所是该所内的部门）。
+    """
+    if _AFFIL_GOV_DEPT.search(cand):
+        return True
+    if _AFFIL_INTERNAL_UNIT.match(cand):
+        after = str(clause[cm.end():cm.end() + 8])
+        if _AFFIL_INTERNAL_CTX.search(after):
+            return True
+    return False
 
 
 # 2026-10-22 经管 11210 实测缺口：bio 开头「姓名,学历学校,现职单位,职称…」形态里
 # 第一个机构常是**学历学校**（「北京师范大学经济学博士」），旧实现直接取 LEAD 首匹配
 # 把学历学校当现职单位污染。判别式（对齐 parsers._derive_affiliation_from_bio 的
-# 学历守卫）：机构后 8 字内紧跟学历词（博士/硕士/学士/学位/毕业/就读）→ 学历学校，跳过；
-# 继续扫描后续分句找现职单位。
-_AFFIL_DEGREE_TAIL_RE = re.compile(r'(?:毕业|学位|学士|硕士|博士|博士后|就读)')
+# 学历守卫）：机构后紧跟**独立的学位词** -> 是学历学校，跳过并继续分句扫描。
+#
+# ⚠ 学位词必须排除「职称型复合词」，否则误伤（2026-10-22 全库回归实测 170 条）：
+#   「博士生导师」「硕士生导师」「博士后」「博士点负责人」「在读博士」「博士候选人」
+#   里的「博士/硕士」都不是学位，不能触发学历守卫。判别式：
+#   前置排除「生/导/读」（研究生/导师/在读），后置排除「后/生/点/候」。
+#   反之「经济学博士」（学科紧跟）**要**算学位——故前置排除集里不能有「学」。
+_AFFIL_DEGREE_TAIL_RE = re.compile(
+    r'(?:毕业|学位|学士|就读'
+    r'|(?<![生导读])博士(?![后生点候])'
+    r'|(?<![生导读])硕士(?![生候]))'
+)
 # 履历/历史语境词：所在分句含这些词即非现职单位（学历句/曾任职句）。
-_AFFIL_HISTORY_RE = re.compile(r'(?:曾任|曾在|历任|原为|原任|获得|毕业于|就读于)')
+# ⚠ 「曾于…工作」也要排（「曾」+「于」），否则历史任职单位被当现职（单测锁定）。
+_AFFIL_HISTORY_RE = re.compile(
+    r'(?:曾任|曾在|曾于|曾获|曾获得|曾任职|历任|原为|原任|'
+    r'毕业后|毕业后曾|曾就职)')
 
 
 def _affil_is_degree_school(bio, m_end, aff):
-    """机构候选后 8 字内紧跟学历词 -> 是学历学校，不是现职单位。"""
+    """机构候选后紧跟独立学位词 -> 是学历学校，不是现职单位。"""
     tail = str(bio[m_end:m_end + 8])
     return bool(_AFFIL_DEGREE_TAIL_RE.search(tail))
 
@@ -528,8 +642,8 @@ def _infer_affiliation(bio):
     「2016年获得大连理工大学博士学位」取成「得大连理工大学」，2026-09-22 前
     实测污染线上 11 条（刘科海·杨文·陈淑慧·韩彪·肖林·曾路等）。
 
-    2026-10-22 补：开头形态的机构若是学历学校（后紧跟学历词），跳过它继续扫描
-    后续分句（「姓名,学历学校,现职单位,职称…」形态，11210 邱康权实测）。
+    2026-10-22 补：开头形态的机构若是学历学校（后紧跟独立学位词），跳过它继续
+    分句扫描找现职单位（「姓名,学历学校,现职单位,职称…」形态，11210 邱康权实测）。
     分句扫描仅在 LEAD 命中但被学历守卫跳过时启用（避免放宽既有负例：
     肖林/陈淑慧/韩彪/张振/李博士 等负例的 bio 里 LEAD 本就未命中，行为不变）。
     """
@@ -557,27 +671,63 @@ def _infer_affiliation(bio):
             cm = _AFFIL_RE.search(clause)
             if not cm:
                 continue
-            cand = _clean_affil_candidate(cm.group(1))
+            # ⚠ 必须取 group(0)：_AFFIL_RE 有三个分支（带院系后缀 / 裸大学 /
+            # 英文），裸「华中师范大学」命中的是**第二个**分支，group(1) 是 None
+            # ——2026-10-22 全库回归实测踩坑（分句扫描大面积落空）。
+            cand = _clean_affil_candidate(cm.group(0))
             if not cand:
                 continue
-            # 该**分句内**机构后 8 字紧跟学历词 -> 学历学校段，跳过。
+            # 该**分句内**机构后紧跟独立学位词 -> 学历学校段，跳过。
             # ⚠ 必须用分句文本而非 bio 绝对偏移：bio 是逗号切分的连续串，
             # 「…北京师范大学,华南师范大学经济与管理学院青年英才…」里下一分句
             # 开头的「博士」属另一段（11210 实测误跳现职单位的根因）。
-            tail = str(clause[cm.end():cm.end() + 8])
-            if _AFFIL_DEGREE_TAIL_RE.search(tail):
+            if _AFFIL_DEGREE_TAIL_RE.search(str(clause[cm.end():cm.end() + 8])):
                 continue
             # 该段含历史/履历词 -> 非现职，跳过
             if _AFFIL_HISTORY_RE.search(clause):
+                continue
+            # 「…重点实验室固定成员」这类「所属机构」表述 -> 不是现职单位
+            if _AFFIL_MEMBERSHIP_RE.search(clause):
+                continue
+            # 候选只是被「现任/原」等前缀切掉后的残片（心理研究所/国家教育部大学）
+            # -> 拒
+            if _affil_candidate_is_residual(clause, cm):
+                continue
+            # 候选根本不是单位（政府部门名 / 所内部门名+职务）-> 拒
+            if _affil_is_not_a_unit(clause, cm, cand):
                 continue
             return cand
     return ''
 
 
+def _is_honor_title(t):
+    """是否荣誉/聘任/人才计划型称号（field_vocab COMPLEX 组，如「青年英才」）。
+
+    用于限定「、」连读并列职称的合并范围：只有并列链里含这类称号时才合并，
+    避免把「教授、博士生导师」「教授、博导」这类常规组合也扩进来。
+    """
+    if not t:
+        return False
+    t = str(t).strip()
+    for w in _fv.COMPLEX_TITLE_SUFFIXES:
+        if w in t:
+            return True
+    return False
+
+
 def _infer_title(bio):
-    """从 bio 提取现职称。单职称取首匹配（锁定行为）；「、」连读的同分句并列职称
-    （「青年英才、特聘副研究员」）整体返回。学位词（博士/硕士/学士）在学历句段
-    （学校名+学科+学位词）里跳过——是学位而非现职称。"""
+    """从 bio 提取现职称。
+    三条口径（2026-10-22 经管 11210 修订）：
+    ① 单职称取首匹配（锁定既有行为）；
+    ② 学位词（博士/硕士/学士）出现在**学历句段**（前 8 字有学校/机构名）时跳过
+       ——那是学位不是现职称（否则「北京师范大学经济学博士」会产出职称「博士」）；
+    ③ 同分句「、」连读的**荣誉称号型**并列职称整体返回（「青年英才、特聘副研究员」）。
+
+    ⚠ ③ 只对**荣誉/聘任/人才计划型**称号生效（field_vocab.COMPLEX_TITLE_SUFFIXES
+    组，如「青年英才」「青年教授」），不对「教授、博士生导师」「教授、博导」这类
+    常规组合生效——2026-10-22 全库回归实测：全量合并会把 324 条记录的职称从
+    「教授」扩成「教授、博士生导师」，远超本次需求面，属过度扩张。
+    """
     if not bio:
         return ''
     head = bio[:40]
@@ -595,7 +745,7 @@ def _infer_title(bio):
     if not kept:
         return ''
     if len(kept) >= 2:
-        # 相邻两职称之间若**只有**「、」(可带修饰前缀) 且未跨分句，则合并整链。
+        # 相邻两职称之间若**只有**「、」(可带修饰前缀) 且未跨分句，则可能是并列链。
         # 用 finditer 的真实区间判断，避免 head.find 把「博士」误定位到
         # 「北京大学」子串位置（2026-10-22 11210 实测踩坑）。
         # 「、」后可能紧跟 TITLE_MODIFIERS 里的修饰前缀（「青年英才、特聘副研究员」
@@ -620,7 +770,11 @@ def _infer_title(bio):
                     # 剩余不是合法修饰前缀，不合并
                     break
                 if not re.search(r'[,，;；。]', between):
-                    return '、'.join((t1, merged2))
+                    chain = [t1, merged2]
+                    # ③ 仅荣誉/人才计划型称号触发合并（见 docstring）
+                    if any(_is_honor_title(p) for p in chain):
+                        return '、'.join(chain)
+                    break
     # 首职称本身的修饰前缀并回（同上，防止词表截断丢「青年/资深/特聘」等限定词）
     t0, s0, e0 = kept[0]
     if s0 >= 2:

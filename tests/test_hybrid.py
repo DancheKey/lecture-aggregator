@@ -529,6 +529,66 @@ class TestInferAffiliation(unittest.TestCase):
         self.assertEqual(
             _infer_affiliation('某君,某某大学经济学博士,曾于某某研究院工作。'), '')
 
+    def test_supervisor_titles_not_treated_as_degree(self):
+        """「教授、博士生导师」里的「博士」是**职称**不是学位（2026-10-22 全库回归
+        实测：原先被当成学位，把 170 条本该正确的单位清空）。"""
+        self.assertEqual(
+            _infer_affiliation('黄海平，中山大学教授，博士生导师，'
+                               '2011年获得中国科学院理论物理所博士学位。'),
+            '中山大学')
+        self.assertEqual(
+            _infer_affiliation('王腾,北京工业大学教授、博士生导师。国家级青年人才。'),
+            '北京工业大学')
+        # 「在读博士」「博士候选人」同理是身份不是学位
+        self.assertEqual(
+            _infer_affiliation('梁炜杰,华东师范大学物理学院在读博士,'
+                               '主要从事周期驱动冷原子系统中的动力学与多体相理论研究。'),
+            '华东师范大学物理学院')
+
+    def test_publication_name_not_affiliation(self):
+        """期刊名不是机构（2026-10-22 审计：英文分支曾把
+        「Journal of Labor Economics」缩成 'Lab' 当单位）。"""
+        from hybrid import _clean_affil_candidate
+        self.assertEqual(_clean_affil_candidate('Journal of Labor Economics'), '')
+        self.assertEqual(_clean_affil_candidate('IEEE Transactions on Circuits'), '')
+
+    def test_junk_affiliation_values_rejected(self):
+        """全库审计实测的垃圾单位必须被清洗成合法机构名或直接拒
+        （2026-10-22 审计第二/三/四类）。
+
+        注：动词残片类（「之后加入中科院物理研究所」）剥掉动词后是**合法机构**
+        （中科院物理研究所）——期望是「剥干净」，不是「必须为空」。
+        """
+        from hybrid import _clean_affil_candidate
+        # 句中动词残片：^ 锚定的前缀表剥不掉，须由 _AFFIL_MID_NOISE 剥掉
+        for raw, want in (('之后加入中科院物理研究所', '中科院物理研究所'),
+                          ('教于香港理工大学应用数学系', '香港理工大学应用数学系'),
+                          ('原北京大学中文系', '北京大学中文系'),
+                          ('后于中山大学心理学系', '中山大学心理学系')):
+            got = _clean_affil_candidate(raw)
+            self.assertEqual(got, want, raw)
+            for verb in ('之后', '加入', '教于', '原', '后于'):
+                self.assertNotIn(verb, got, raw)
+        # 政府部门名 / 所内部门名：剥掉「现任」后仍不是单位 -> 直接拒
+        self.assertEqual(_clean_affil_candidate('国家教育部大学'), '')
+        self.assertEqual(_clean_affil_candidate('心理研究所'), '')
+        # 「所属实验室固定成员」不是现职单位；该 bio 里「美国波士顿大学联合培养
+        # 博士」是学历、「重点实验室固定成员」是所属机构 -> 无现职单位，取空
+        self.assertEqual(
+            _infer_affiliation('董高高,美国波士顿大学联合培养博士,教授,博导,'
+                               '江苏省高校青蓝工程中青年学术带头人,'
+                               '教育部大规模复杂系统数值模拟重点实验室固定成员。'),
+            '')
+
+    def test_bare_university_in_clause_scan(self):
+        """分句扫描须支持**裸大学**（无院系后缀）：「华中师范大学教授」这类形态
+        的机构走 _AFFIL_RE 第二分支，取 group(1) 会得到 None（2026-10-22 踩坑）。"""
+        self.assertEqual(
+            _infer_affiliation('许怒,毕业于中国科学技术大学(学士)和'
+                               '纽约州立大学石溪分校(博士),华中师范大学教授,'
+                               '中国科学院近代物理研究所资深研究员。'),
+            '华中师范大学')
+
 
 class TestHostAffilBioCorroboration(unittest.TestCase):
     """裸主办校名的 bio 佐证闸门（2026-10-22，11210 缺口 / cs/5826 防线）：
@@ -607,6 +667,27 @@ class TestInferTitleParallel(unittest.TestCase):
         from hybrid import _infer_title
         self.assertEqual(
             _infer_title('某君,清华大学计算机科学博士,北京大学教授。'), '教授')
+
+    def test_regular_title_pairs_not_merged(self):
+        """常规职称组合**不合并**（2026-10-22 全库回归实测：全量合并会把 324 条
+        记录的职称从「教授」扩成「教授、博士生导师」，属过度扩张）。
+        只对荣誉/人才计划型称号（如「青年英才」）触发合并。
+
+        期望值按**新旧一致**锁定：这两条 bio 的旧实现本就取首个匹配
+        （'博士' / '教授'），新实现不得改变。
+        """
+        from hybrid import _infer_title
+        # 「博士」出现在姓名后独立分句 -> 首匹配是它（非学历句段）
+        self.assertEqual(
+            _infer_title('陈和柏,博士,中南大学数学与统计学院教授、博导,'
+                         '国家级青年人才。'), '博士')
+        # 「教授、博士生导师」-> 取「教授」，不扩成「教授、博士生导师」
+        self.assertEqual(
+            _infer_title('王腾,北京工业大学教授、博士生导师。国家级青年人才。'), '教授')
+        # 荣誉/等级型称号在词表内 -> 允许合并
+        self.assertEqual(
+            _infer_title('罗星凯,广西师范大学物理科学与技术学院'
+                         '二级教授、博士生导师。'), '二级教授、博士生导师')
 
 
 class TestSelfExtractFill(unittest.TestCase):
