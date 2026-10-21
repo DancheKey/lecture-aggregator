@@ -251,7 +251,13 @@ def _is_valid_affiliation(v):
 # 主办校名（页面框架常出现，易被模型 A 误当主讲人单位）。蔡瑞初 cs/5826 实战：页面仅
 # 「报告人：蔡瑞初 教授」无单位，模型 A 把页眉/页脚的「华南师范大学」当单位填入；snippet
 # 溯源闸门无法识别（校名每页必现）。故增加 host 守卫：裸主办校名（无更具体院系后缀）视为
-# 页面框架，拒填。真实本校主讲人单位多为「华南师范大学XX学院」（含院系后缀），不受影响。
+# 页面框架，拒填。
+# 2026-10-22 经管 11210 修订：「真实本校主讲人单位多为华南师范大学XX学院（含院系后缀），
+# 不受影响」的假设被 11210 证伪——bio 为「姓名,学历学校,现职单位,职称」形态时，规则层
+# bio 反推把学历学校（北京师范大学）当现职单位，模型 A 给出的裸主办校名（华南师范大学）
+# 反被本守卫拦掉。判别式改为 bio 佐证：裸主办校名在**讲者 bio**（讲者专属字段，非页眉
+# 版式）里出现且后跟院系/职称语境 -> 放行；仅页眉版式（校名在标题/页眉，bio 无该语境）
+# 仍拒（cs/5826 防线不破，见 _host_affil_bio_corroborated 与 TestHostAffilBioCorroboration）。
 _AFFIL_HOST_NAMES = ('华南师范大学', 'south china normal university', 'scnu')
 
 
@@ -259,6 +265,46 @@ def _is_host_affiliation(v):
     if not v:
         return False
     return v.strip().lower() in _AFFIL_HOST_NAMES
+
+
+# 2026-10-22 经管 11210 实测缺口：cs/5826 的 host 守卫把**一切**裸主办校名一律拒填，
+# 但本校主讲人（如「华南师范大学经济与管理学院青年英才」）的真实单位就是裸校名——
+# 规则层（bio 反推）/模型层都给出「华南师范大学」时反被 host 守卫拦掉，最终污染成
+# 学历学校（北京师范大学）。判别式：讲者 bio（讲者专属字段，非页眉页脚版式）里
+# 主办校名后紧跟院系后缀/现职表述 → 是真实单位，放行；仅页眉版式（校名后是
+# 地址/版权/院级栏目名等）仍拒。页眉里「华南师范大学经济与管理学院」的「学院」
+# 前缀是「广州大学城」而非讲者语境，bio 佐证天然区分两者。
+# 说明：bio 里「华南师范大学」与职称词之间可隔院系/部门/方向等修饰
+# （「经济与管理学院」「金融系」「人工智能方向」），故校名后 30 字内
+# 出现职称/人才计划词即视为佐证成立。
+_AFFIL_HOST_BIO_CORROB = re.compile(
+    r'[\u4e00-\u9fff]{0,30}?'
+    r'(?:青年英才|特聘副研究员|副研究员|研究员|讲席教授|讲座教授|教授|副教授|特级教师)'
+)
+
+
+def _host_affil_bio_corroborated(lv, result, a=None):
+    """裸主办校名 + 讲者 bio 佐证（校名后 30 字内出现职称/人才计划词）-> 判定为真实单位。
+
+    bio 优先取 result['speakerBio']（当前已有值），再取模型 A 提供的 a['speakerBio']
+    （本道闸门在 A 值采纳处执行，A 的 bio 常比 result 里已有的更全）。
+    仅检查 bio（讲者专属字段）；页眉/页脚校名不会进 bio，故 cs/5826 防线不破。
+    """
+    if not _is_host_affiliation(lv):
+        return False
+    bio = str((result or {}).get('speakerBio') or '').strip()
+    if not bio and a:
+        bio = str(a.get('speakerBio') or '').strip()
+    if not bio:
+        return False
+    host = lv.strip()
+    i = bio.find(host)
+    while i >= 0:
+        # 校名后 30 字内出现职称/人才计划词 -> 佐证成立（允许中间有院系/方向等修饰）
+        if _AFFIL_HOST_BIO_CORROB.search(bio[i + len(host):i + len(host) + 30]):
+            return True
+        i = bio.find(host, i + 1)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -335,7 +381,12 @@ _AFFIL_RE = re.compile(
 )
 # 从正文抽职称用：词表取自 field_vocab。主任医师/副主任医师已入主表 ORG_TITLE_SUFFIXES
 # （2026-09-26 核对），此处模式串保留冗余分支无害。
-_TITLE_RE = re.compile(_fv.NAME_TITLE_SUFFIX_RE.pattern + r'|主任医师|副主任医师')
+# 2026-10-22 补：并入 COMPLEX_TITLE_ALT_RE（荣誉/聘任/人才计划型，如「青年英才」
+# 「青年教授」），让并列职称合并与 bio 回退能识别非 NAME_TITLE 主表的称号词。
+_TITLE_RE = re.compile(
+    _fv.NAME_TITLE_SUFFIX_RE.pattern
+    + r'|' + _fv.COMPLEX_TITLE_ALT_RE.pattern
+    + r'|主任医师|副主任医师')
 
 
 # 规则兜底提取单位时，可能连带命中「毕业于/就读于/现为」等动词前缀或学历词，
@@ -422,6 +473,8 @@ _AFFIL_LEAD_RE = re.compile(
 # 现职单位锚点：只在明确「当前单位」表达处取机构。带年份的「20XX年X月起在…工作」
 # 「20XX-至今在…」算现职；学历表述（获得/毕业于/就读于）与历史任职（曾任/曾在）
 # 一律不算——那些是履历学校，不是现职单位。
+# ⚠ 该正则的机构捕获组与 _AFFIL_LEAD_RE 不同（LEAD 无年份锚点），分句扫描
+# 兜底只认 LEAD 已命中但被学历词跳过的场景，不会误伤仅 CURRENT 命中的正例。
 _AFFIL_CURRENT_RE = re.compile(
     r'(?:'
     r'现任职于|现任职|现任于|现任|现为|现就职于|目前任职于|目前在|现担任|现受聘于|受聘于|'
@@ -448,6 +501,22 @@ def _clean_affil_candidate(raw):
     return aff if _is_valid_affiliation(aff) else ''
 
 
+# 2026-10-22 经管 11210 实测缺口：bio 开头「姓名,学历学校,现职单位,职称…」形态里
+# 第一个机构常是**学历学校**（「北京师范大学经济学博士」），旧实现直接取 LEAD 首匹配
+# 把学历学校当现职单位污染。判别式（对齐 parsers._derive_affiliation_from_bio 的
+# 学历守卫）：机构后 8 字内紧跟学历词（博士/硕士/学士/学位/毕业/就读）→ 学历学校，跳过；
+# 继续扫描后续分句找现职单位。
+_AFFIL_DEGREE_TAIL_RE = re.compile(r'(?:毕业|学位|学士|硕士|博士|博士后|就读)')
+# 履历/历史语境词：所在分句含这些词即非现职单位（学历句/曾任职句）。
+_AFFIL_HISTORY_RE = re.compile(r'(?:曾任|曾在|历任|原为|原任|获得|毕业于|就读于)')
+
+
+def _affil_is_degree_school(bio, m_end, aff):
+    """机构候选后 8 字内紧跟学历词 -> 是学历学校，不是现职单位。"""
+    tail = str(bio[m_end:m_end + 8])
+    return bool(_AFFIL_DEGREE_TAIL_RE.search(tail))
+
+
 def _infer_affiliation(bio):
     """从简介兜底提取**现职**单位；无明确依据时返回空——绝不凭空产生单位。
 
@@ -458,55 +527,142 @@ def _infer_affiliation(bio):
     那些是履历学校而非现职单位。旧实现回退时硬取 bio 开头第一个机构，把
     「2016年获得大连理工大学博士学位」取成「得大连理工大学」，2026-09-22 前
     实测污染线上 11 条（刘科海·杨文·陈淑慧·韩彪·肖林·曾路等）。
+
+    2026-10-22 补：开头形态的机构若是学历学校（后紧跟学历词），跳过它继续扫描
+    后续分句（「姓名,学历学校,现职单位,职称…」形态，11210 邱康权实测）。
+    分句扫描仅在 LEAD 命中但被学历守卫跳过时启用（避免放宽既有负例：
+    肖林/陈淑慧/韩彪/张振/李博士 等负例的 bio 里 LEAD 本就未命中，行为不变）。
     """
     if not bio:
         return ''
     bio = str(bio).strip()
     m = _AFFIL_LEAD_RE.match(bio)
+    _lead_skipped = False
     if m:
         aff = _clean_affil_candidate(m.group(1))
         if aff:
-            return aff
+            if _affil_is_degree_school(bio, m.end(1), aff):
+                # 开头是学历学校：不返回，标记后走分句扫描兜底
+                _lead_skipped = True
+            else:
+                return aff
     for m in _AFFIL_CURRENT_RE.finditer(bio):
         aff = _clean_affil_candidate(m.group(1))
         if aff:
             return aff
+    # 分句扫描兜底（仅当 LEAD 命中但被学历守卫跳过）：按逗号切分 bio，逐段找机构，
+    # 跳过学历/履历语境段，取第一个合法现职单位。
+    if _lead_skipped:
+        for clause in re.split(r'[,，、]', bio):
+            cm = _AFFIL_RE.search(clause)
+            if not cm:
+                continue
+            cand = _clean_affil_candidate(cm.group(1))
+            if not cand:
+                continue
+            # 该**分句内**机构后 8 字紧跟学历词 -> 学历学校段，跳过。
+            # ⚠ 必须用分句文本而非 bio 绝对偏移：bio 是逗号切分的连续串，
+            # 「…北京师范大学,华南师范大学经济与管理学院青年英才…」里下一分句
+            # 开头的「博士」属另一段（11210 实测误跳现职单位的根因）。
+            tail = str(clause[cm.end():cm.end() + 8])
+            if _AFFIL_DEGREE_TAIL_RE.search(tail):
+                continue
+            # 该段含历史/履历词 -> 非现职，跳过
+            if _AFFIL_HISTORY_RE.search(clause):
+                continue
+            return cand
     return ''
 
 
 def _infer_title(bio):
+    """从 bio 提取现职称。单职称取首匹配（锁定行为）；「、」连读的同分句并列职称
+    （「青年英才、特聘副研究员」）整体返回。学位词（博士/硕士/学士）在学历句段
+    （学校名+学科+学位词）里跳过——是学位而非现职称。"""
     if not bio:
         return ''
     head = bio[:40]
+    kept = []  # (词, start, end)：finditer 真实命中位置（不能用 head.find 重定位）
     for m in _TITLE_RE.finditer(head):
-        # ⚠ 取 group(0)：_TITLE_RE 由 field_vocab 的姓名职称词表（全 (?:...) 非捕获组）
-        # 拼接而成，整条正则捕获组数为 0。旧代码写 group(1)，命中即抛
-        # IndexError: no such group，把后续 bio 回退（时间校验/单位兜底）整段带崩
-        # （G4 词表统一时留下的旧伤，2026-09-22 修复）。
         t = m.group(0)
-        # 排除「博士毕业于 / 博士学位 / 博士后」这类非当前职称的误匹配
         if t == '博士' and any(k in head[m.end():m.end() + 3]
                                for k in ('毕业', '学位', '后')):
             continue
-        return t
-    return ''
+        if t in ('博士', '硕士', '学士'):
+            pre = head[max(0, m.start() - 8):m.start()]
+            if re.search(r'(?:大学|学院|研究院|研究所|系|实验室|学校)', pre):
+                continue
+        kept.append((t, m.start(), m.end()))
+    if not kept:
+        return ''
+    if len(kept) >= 2:
+        # 相邻两职称之间若**只有**「、」(可带修饰前缀) 且未跨分句，则合并整链。
+        # 用 finditer 的真实区间判断，避免 head.find 把「博士」误定位到
+        # 「北京大学」子串位置（2026-10-22 11210 实测踩坑）。
+        # 「、」后可能紧跟 TITLE_MODIFIERS 里的修饰前缀（「青年英才、特聘副研究员」
+        # 里「特」是「副研究员」的限定词，词表无整体词条故只匹配到「副研究员」），
+        # 把这些修饰前缀并回后职称，避免丢失限定词。
+        for a in range(len(kept) - 1):
+            t1, s1, e1 = kept[a]
+            for b in range(a + 1, len(kept)):
+                t2, s2, e2 = kept[b]
+                between = head[e1:s2].strip()
+                if not between.startswith('、'):
+                    # 已跨分句/有其他词，后续不可能同「、」连读，跳出内层
+                    break
+                after = between[1:]  # 「、」之后的剩余部分
+                # 剩余部分若是 TITLE_MODIFIERS 里的修饰前缀 -> 并入后职称
+                merged2 = t2
+                if after and after in _fv.TITLE_MODIFIERS:
+                    merged2 = after + t2
+                elif after == '':
+                    pass
+                else:
+                    # 剩余不是合法修饰前缀，不合并
+                    break
+                if not re.search(r'[,，;；。]', between):
+                    return '、'.join((t1, merged2))
+    # 首职称本身的修饰前缀并回（同上，防止词表截断丢「青年/资深/特聘」等限定词）
+    t0, s0, e0 = kept[0]
+    if s0 >= 2:
+        pre = head[s0 - 2:s0]
+        if pre in _fv.TITLE_MODIFIERS and pre not in t0:
+            return pre + t0
+    return t0
 
 
 def _apply_bio_fallback(result):
     """规则兜底：模型 A 未提供 affiliation/title 时，从已有 speakerBio 开头片段正则提取。
 
-    华师讲座简介通用格式为「姓名,单位职称,...」，此兜底确定性、不依赖模型可用性，
-    仅在字段仍为空时触发，绝不覆盖已有值。需在 A 成功融合后、以及 A 完全失败提前
-    return 前各调用一次（A 失败时 apply 不会进入 _merge，兜底必须独立存在）。
+    华师讲座简介通用格式为「姓名,单位职称,...」，此兜底确定性、不依赖模型可用性。
+    单位字段仅在仍为空时触发（绝不覆盖已有值）；职称字段额外做**并列补全**：
+    模型 A 只取了同分句并列职称链的一部分（如「特聘副研究员」，漏了前面的
+    「青年英才」）时，把 bio 同分句「、」连读职称链补全（2026-10-22 经管 11210
+    实测：邱康权 bio 为「…青年英才、特聘副研究员」，A 只取「特聘副研究员」，用户
+    口径「青年英才是一个title」——补全为「青年英才、特聘副研究员」）。补全仅在
+    当前职称是补全后链的真后缀时进行，绝不凭空改动或覆盖模型已含全链的值。
     """
-    if not (result.get('speakerAffiliation') or '').strip() and (result.get('speakerBio') or '').strip():
-        _a = _infer_affiliation(result['speakerBio'])
+    bio = (result.get('speakerBio') or '').strip()
+    if not bio:
+        return
+    if not (result.get('speakerAffiliation') or '').strip():
+        _a = _infer_affiliation(bio)
         if _a:
             result['speakerAffiliation'] = _a
-    if not (result.get('speakerTitle') or '').strip() and (result.get('speakerBio') or '').strip():
-        _t = _infer_title(result['speakerBio'])
-        if _t:
-            result['speakerTitle'] = _t
+    cur_title = (result.get('speakerTitle') or '').strip()
+    chain = _infer_title(bio)  # 单职称首匹配；同分句「、」连读则返回全链
+    if not chain:
+        return
+    if not cur_title:
+        result['speakerTitle'] = chain
+    elif '、' in chain:
+        chain_parts = chain.split('、')
+        cur_parts = [p for p in cur_title.split('、') if p]
+        # 当前职称的「、」子集 ⊆ 全链子集 且 非全链 -> 模型漏取了同分句并列
+        # 职称（如只取「特聘副研究员」，漏「青年英才」）-> 补全为全链；
+        # 子集外有其它并列职称（值与全链无关，如「研究员」⊄全链）-> 保持不动。
+        if (cur_parts and cur_parts != chain_parts
+                and all(p in chain_parts for p in cur_parts)):
+            result['speakerTitle'] = chain
 
 
 # rich_only 模式只处理丰富/补全型字段，绝不碰结构字段（speaker/topic/location），
@@ -969,7 +1125,13 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                 # ）被形状白名单误拒时，满足「非职称/非校名/非人名/邻近报告人标签」
                 # 四条件即放行——仅跳过本道白名单；下方 refine 守卫与
                 # _is_plausible_affiliation 值级溯源终检照常生效（双保险不变）。
-                if not _brand_affiliation_exempt(lv, body_text, result, a):
+                # 主办校名 bio 佐证（2026-10-22，经管 11210）：本校讲者真实单位即
+                # 裸校名时，bio 里「校名+院系+职称」的现职表述佐证其真实，放行——
+                # 页眉/页脚版式噪声（cs/5826）不会进 bio，防线不破。
+                if (_brand_affiliation_exempt(lv, body_text, result, a)
+                        or _host_affil_bio_corroborated(lv, result, a)):
+                    pass
+                else:
                     _reject(fld, 'invalid', lv)
                     continue
             # 2026-09-24 守卫：A 对合法机构过度细化（追加院系/研究中心等子单元）

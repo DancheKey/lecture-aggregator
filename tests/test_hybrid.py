@@ -512,6 +512,102 @@ class TestInferAffiliation(unittest.TestCase):
         """姓名与机构间无分隔符 -> 不匹配（防「李博士是新加坡…」切出「士是」残片）。"""
         self.assertEqual(_infer_affiliation('李博士是新加坡南洋理工大学教授'), '')
 
+    def test_degree_school_then_current_unit(self):
+        """「姓名,学历学校,现职单位,职称」形态（2026-10-22 经管 11210 邱康权实测）：
+        开头机构是学历学校（后紧跟学位词）时跳过它，取分句扫描里的现职单位。"""
+        self.assertEqual(
+            _infer_affiliation(
+                '邱康权,北京师范大学经济学博士,华南师范大学经济与管理学院'
+                '青年英才、特聘副研究员。主要研究领域为劳动经济学。'),
+            '华南师范大学经济与管理学院')
+
+    def test_degree_school_lead_alone_still_empty(self):
+        """开头是学历学校且**无**后续现职单位 -> 不取（防放宽负例：整段履历不臆造）。"""
+        self.assertEqual(
+            _infer_affiliation('某君,某某大学经济学博士。'), '')
+        # 现职单位分句被履历词/学位词标记 -> 仍不取
+        self.assertEqual(
+            _infer_affiliation('某君,某某大学经济学博士,曾于某某研究院工作。'), '')
+
+
+class TestHostAffilBioCorroboration(unittest.TestCase):
+    """裸主办校名的 bio 佐证闸门（2026-10-22，11210 缺口 / cs/5826 防线）：
+    讲者 bio 里「主办校名 + 院系/职称语境」佐证其真实 -> 放行；
+    仅页眉版式（bio 无职称语境）-> 仍拒。"""
+
+    def test_real_host_affiliation_corroborated(self):
+        from hybrid import _host_affil_bio_corroborated
+        bio = ('邱康权,北京师范大学经济学博士,华南师范大学经济与管理学院'
+               '青年英才、特聘副研究员。主要研究领域为劳动经济学。')
+        self.assertTrue(_host_affil_bio_corroborated('华南师范大学', {'speakerBio': bio}))
+
+    def test_page_chrome_not_corroborated(self):
+        """cs/5826 防线：bio 无职称语境（只有姓名/页眉式校名）-> 不佐证。"""
+        from hybrid import _host_affil_bio_corroborated
+        self.assertFalse(_host_affil_bio_corroborated('华南师范大学',
+                                                       {'speakerBio': '蔡瑞初，博士。'}))
+        self.assertFalse(_host_affil_bio_corroborated('华南师范大学', {}))
+        self.assertFalse(_host_affil_bio_corroborated('华南师范大学', None))
+
+    def test_non_host_value_not_eligible(self):
+        """非裸主办校名不走本闸门（由品牌豁免/白名单管）。"""
+        from hybrid import _host_affil_bio_corroborated
+        self.assertFalse(_host_affil_bio_corroborated('阿里云',
+                                                       {'speakerBio': '陈天翔,阿里云算法专家'}))
+
+
+class TestInferTitleParallel(unittest.TestCase):
+    """并列职称合并（2026-10-22）：同分句「、」连接的多个职称整体返回；
+    学位词在学历句段里跳过；单一职称仍取首匹配（锁定行为）。"""
+
+    def test_parallel_titles_merged(self):
+        """同分句「、」并列职称整体返回；词表截断的「副研究员」前并回修饰词「特聘」。"""
+        from hybrid import _infer_title
+        got = _infer_title('邱康权,北京师范大学经济学博士,华南师范大学'
+                           '经济与管理学院青年英才、特聘副研究员。')
+        self.assertIn('青年英才', got)
+        self.assertIn('副研究员', got)
+        # 完整期望：青年英才 + 「、」+ （并回修饰前缀的）特聘副研究员
+        self.assertEqual(got, '青年英才、特聘副研究员')
+
+    def test_parallel_title_fold_into_existing(self):
+        """补全：模型已取「、」链的后半（「特聘副研究员」）时，把同分句并列职称
+        补全为全链（「青年英才、特聘副研究员」）；单职称/已含全链/值不同时不动。"""
+        from hybrid import _apply_bio_fallback
+        bio = ('邱康权,北京师范大学经济学博士,华南师范大学经济与管理学院'
+               '青年英才、特聘副研究员。')
+        r = {'speakerTitle': '特聘副研究员', 'speakerBio': bio}
+        _apply_bio_fallback(r)
+        self.assertEqual(r['speakerTitle'], '青年英才、特聘副研究员')
+        # 模型已含全链 -> 不动
+        r2 = {'speakerTitle': '青年英才、特聘副研究员', 'speakerBio': bio}
+        _apply_bio_fallback(r2)
+        self.assertEqual(r2['speakerTitle'], '青年英才、特聘副研究员')
+        # 值与 bio 链无关 -> 不覆盖（仅填空+后缀补全两类才动）
+        r3 = {'speakerTitle': '研究员', 'speakerBio': bio}
+        _apply_bio_fallback(r3)
+        self.assertEqual(r3['speakerTitle'], '研究员')
+        # 单职称（无「、」链）：空则填、非空不动（锁定既有 fill-only 行为）
+        bio2 = '张三，北京大学教授，博士生导师。'
+        r4 = {'speakerTitle': '', 'speakerBio': bio2}
+        _apply_bio_fallback(r4)
+        self.assertEqual(r4['speakerTitle'], '教授')
+        r5 = {'speakerTitle': '教授', 'speakerBio': bio2}
+        _apply_bio_fallback(r5)
+        self.assertEqual(r5['speakerTitle'], '教授')
+
+    def test_single_title_still_first_match(self):
+        """锁定 @285 行为：单职称取首匹配不变。"""
+        from hybrid import _infer_title
+        self.assertEqual(_infer_title('张三，北京大学教授，博士生导师'), '教授')
+        self.assertEqual(_infer_title('王五，博士，华南师范大学研究员'), '博士')
+
+    def test_degree_word_in_academic_clause_skipped(self):
+        """学历句段里的学位词（学校名+学科+学位词）不当职称 -> 跳过后取下一职称。"""
+        from hybrid import _infer_title
+        self.assertEqual(
+            _infer_title('某君,清华大学计算机科学博士,北京大学教授。'), '教授')
+
 
 class TestSelfExtractFill(unittest.TestCase):
     """Step3（2026-09-24）：分歧裁决后，用 B 的 self_extract 回填规则+A 仍空字段。
