@@ -424,6 +424,12 @@ jobs:
       - name: Run audit report escape tests
         run: python tests/test_audit_html_escape.py
 
+      # 无摘要回填口径（2026-10-22）：backfill_abstract.py 的 judge() 与前端
+      # app.display.js::abstractOf 必须同一套过滤（bio 前缀 / 与简介重复 / 行政
+      # 通知噪声），否则出现「数据里有、页面不显示」的脏数据。
+      - name: Run abstract backfill gate tests
+        run: python tests/test_backfill_abstract.py
+
       # 职称词表收敛门禁（2026-10-02）：项目铁律是职称/职务词表只维护一份
       # （scraper/field_vocab.py），其他代码引用而不许手抄。历史上真实发生过
       # 「秘书长」在两边词表分叉，导致同一值一条路径判正常单位、另一条判脏值。

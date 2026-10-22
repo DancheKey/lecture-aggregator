@@ -124,6 +124,7 @@ jobs:
             tests/test_source_count_consistency.py
             tests/test_llm_cache.py
             tests/test_audit_html_escape.py
+            tests/test_backfill_abstract.py
             tests/test_title_vocab_convergence.py
             tests/test_meta_time_conflict_20261016.py
         run: |

@@ -118,10 +118,11 @@ GROUPS = [
      'tests': ['tests/test_data_quality.py', 'tests/test_data_reconciliation.py',
                'tests/test_audit_excluded_records.py', 'tests/test_source_count_consistency.py',
                'tests/test_speaker_corpus_gate.py']},
-    # 审计报告脚本（HTML 转义门禁的被测对象）
+    # 审计报告脚本（HTML 转义门禁的被测对象）+ 数据回填脚本
     {'name': 'audit', 'pats': ['scripts/audit_fields.py', 'scripts/audit_data_quality.py',
-                               'scripts/gen_title_audit_html.py', 'scripts/gen_reparse_review_html.py'],
-     'tests': ['tests/test_audit_html_escape.py']},
+                               'scripts/gen_title_audit_html.py', 'scripts/gen_reparse_review_html.py',
+                               'scripts/backfill_abstract.py'],
+     'tests': ['tests/test_audit_html_escape.py', 'tests/test_backfill_abstract.py']},
     # 一次性运维工具（fix_/apply_/scan_/resplit_/reparse_）：无任何测试覆盖是现状，
     # 显式列出而非通配——新增工具脚本会逼一次 conscious 决策（见 docstring 红线）。
     {'name': 'tools', 'pats': ['scripts/apply_duty_suffix_fix.py', 'scripts/apply_title_fragment_fix.py',
