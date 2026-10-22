@@ -154,3 +154,6 @@ data/admin_token.json
 # 真正的闸门在数据库侧（RLS + RPC 钳位），见 supabase-migration.sql。
 
 .workbuddy-ai/
+
+# 一次性本地修复脚本（依赖网络抓取，AGENTS.md §1 不入库）
+/reparse_*.py
