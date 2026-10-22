@@ -69,10 +69,22 @@ CSS = """
    IIFE）与三处 .pre-hidden 规则改动须同步。 */
 .pre-hidden{display:none}
 *{box-sizing:border-box}
-body{margin:0;padding:36px 20px 48px;background:#F7F7F5;color:#2C2C2A;
+body{margin:0;padding:0;background:#f7f8fa;color:#2C2C2A;
   font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
   font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
-.wrap{max-width:960px;margin:0 auto}
+/* 顶部站点栏（2026-10-22）：与 index.html / stats.html 同一套视觉——白底、
+   底部 1px 分隔线、左侧校徽+站名、右侧页面导航。此前本页没有站点栏，导航
+   直接浮在灰色页面背景上，与另两页明显脱节（用户截图反馈「表头跟其他页面
+   风格不搭」）。
+   宽度取 1000px（= 960 内容 + 左右各 20 padding），使 logo 与正文左边缘对齐。 */
+.sitebar{background:#fff;border-bottom:1px solid #E2E8F0}
+.sitebar-in{max-width:1000px;margin:0 auto;padding:0 20px;height:56px;
+  display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:8px;flex-shrink:0;text-decoration:none}
+.brand .emblem{width:36px;height:36px;border-radius:8px;background:#fff;
+  box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.brand .wordmark{height:32px;width:auto;object-fit:contain}
+.wrap{max-width:1000px;margin:0 auto;padding:24px 20px 48px}
 h1{font-size:22px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
 /* 顶部导航（2026-10-08 补，2026-10-09 修正落点；2026-10-22 统一位置与样式）：
    本页此前无任何返回链接，是首页/统计页/趋势页三页里唯一的死胡同。
@@ -80,11 +92,11 @@ h1{font-size:22px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
    按钮与边框），顺序统一为「另一个页面 → 返回首页」。
    与 HTML 一并落在本模板常量里——site/visits-trend.css 同为本脚本产物
    （main() 里 _write(css, CSS)），直接改产物会被下一次 CI 覆盖。 */
-.topnav{display:flex;align-items:center;justify-content:flex-end;gap:16px;margin:0 0 18px}
+.topnav{display:flex;align-items:center;gap:16px;margin:0 0 0 auto}
 .topnav a{font-size:13.5px;color:#475569;text-decoration:none}
 .topnav a:hover{color:#1E293B}
 .sub{color:#888780;font-size:13.5px;margin:0}
-header{margin-bottom:24px}
+.wrap header{margin-bottom:24px}
 .subline{color:#B4B2A9;font-size:13px;margin:4px 0 0}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));
   gap:12px;margin-bottom:22px}
@@ -529,24 +541,36 @@ def main():
 <meta name="description" content="木铎金声站点每日访问量与累计访问次数趋势（数据来自自建计数快照）。">
 <link rel="stylesheet" href="visits-trend.css">
 </head>
-<body><div class="wrap">
+<body>
 
-<!-- 页面导航（2026-10-08 补，2026-10-09 修正落点，2026-10-22 统一）：
+<!-- 顶部站点栏（2026-10-22）：与 index.html / stats.html 同一套视觉——白底、
+     底部 1px 分隔线、左侧校徽+站名、右侧页面导航。此前本页没有站点栏，导航
+     直接浮在灰色页面背景上，与另两页明显脱节（用户截图反馈）。
+
+     导航入口（2026-10-08 补，2026-10-09 修正落点，2026-10-22 统一）：
      本页此前**没有任何**返回链接——首页与统计页都有「访问量趋势 / 返回首页」互跳，
      唯独本页面是死胡同，手机上（无可见后退键）只能自己改地址栏。
-     2026-10-22：用户反馈「统计页导航在右上、趋势页在左上」，两页入口位置与样式
-     不统一。现改为右对齐 + 纯文字链接，顺序与 stats.html 一致
-     （另一个页面在前、返回首页在后）。
+     2026-10-22：与 stats.html 对齐——右上角、纯文字链接、顺序统一为
+     「另一个页面 → 返回首页」。
 
      ⚠ 改动必须落在这里（模板），不能直接改 site/visits-trend.html：
      该 HTML 是本脚本的**产物**，每次 CI 跑 gen_visits_trend.py 都会被整体重写。
      2026-10-08 那版直接改了产物文件，当日部署成功、但次日 10-09 的自动提交
      （chore: 自动更新讲座数据）就把它覆盖掉了，公网导航随之消失。 -->
-<nav class="topnav">
-  <a href="stats.html">讲座统计</a>
-  <a href="./">返回首页</a>
-</nav>
+<header class="sitebar">
+  <div class="sitebar-in">
+    <a href="./" class="brand">
+      <img src="scnu-emblem.png" alt="华南师范大学" class="emblem">
+      <img src="site-title.png" alt="木铎金声" class="wordmark">
+    </a>
+    <nav class="topnav">
+      <a href="stats.html">讲座统计</a>
+      <a href="./">返回首页</a>
+    </nav>
+  </div>
+</header>
 
+<div class="wrap">
 <header>
   <h1>站点访问量趋势</h1>
   <p class="sub">数据来源：自建 Supabase 每日快照（2026-10-17 前为 busuanzi）· 覆盖

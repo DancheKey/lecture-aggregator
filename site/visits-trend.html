@@ -34,31 +34,43 @@
 <link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="description" content="木铎金声站点每日访问量与累计访问次数趋势（数据来自自建计数快照）。">
-<link rel="stylesheet" href="visits-trend.css?v=44e904bb6a">
+<link rel="stylesheet" href="visits-trend.css?v=97cde1e543">
 </head>
-<body><div class="wrap">
+<body>
 
-<!-- 页面导航（2026-10-08 补，2026-10-09 修正落点，2026-10-22 统一）：
+<!-- 顶部站点栏（2026-10-22）：与 index.html / stats.html 同一套视觉——白底、
+     底部 1px 分隔线、左侧校徽+站名、右侧页面导航。此前本页没有站点栏，导航
+     直接浮在灰色页面背景上，与另两页明显脱节（用户截图反馈）。
+
+     导航入口（2026-10-08 补，2026-10-09 修正落点，2026-10-22 统一）：
      本页此前**没有任何**返回链接——首页与统计页都有「访问量趋势 / 返回首页」互跳，
      唯独本页面是死胡同，手机上（无可见后退键）只能自己改地址栏。
-     2026-10-22：用户反馈「统计页导航在右上、趋势页在左上」，两页入口位置与样式
-     不统一。现改为右对齐 + 纯文字链接，顺序与 stats.html 一致
-     （另一个页面在前、返回首页在后）。
+     2026-10-22：与 stats.html 对齐——右上角、纯文字链接、顺序统一为
+     「另一个页面 → 返回首页」。
 
      ⚠ 改动必须落在这里（模板），不能直接改 site/visits-trend.html：
      该 HTML 是本脚本的**产物**，每次 CI 跑 gen_visits_trend.py 都会被整体重写。
      2026-10-08 那版直接改了产物文件，当日部署成功、但次日 10-09 的自动提交
      （chore: 自动更新讲座数据）就把它覆盖掉了，公网导航随之消失。 -->
-<nav class="topnav">
-  <a href="stats.html">讲座统计</a>
-  <a href="./">返回首页</a>
-</nav>
+<header class="sitebar">
+  <div class="sitebar-in">
+    <a href="./" class="brand">
+      <img src="scnu-emblem.png" alt="华南师范大学" class="emblem">
+      <img src="site-title.png" alt="木铎金声" class="wordmark">
+    </a>
+    <nav class="topnav">
+      <a href="stats.html">讲座统计</a>
+      <a href="./">返回首页</a>
+    </nav>
+  </div>
+</header>
 
+<div class="wrap">
 <header>
   <h1>站点访问量趋势</h1>
   <p class="sub">数据来源：自建 Supabase 每日快照（2026-10-17 前为 busuanzi）· 覆盖
     2026-09-10 至 2026-10-22</p>
-  <p class="subline">生成于 2026-10-22 09:49 · 台账 data/visits_history.json</p>
+  <p class="subline">生成于 2026-10-22 10:00 · 台账 data/visits_history.json</p>
 </header>
 
 <div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v">1,849</div><div class="kpi-d">较前次 +2</div></div><div class="kpi"><div class="kpi-k">近 7 条快照新增</div><div class="kpi-v">148</div><div class="kpi-d">覆盖 2026-10-15 起共 7 次快照</div></div><div class="kpi"><div class="kpi-k">日均新增访问</div><div class="kpi-v">18</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">43 天</div><div class="kpi-d">快照 40 条，缺 3 天</div></div></div>

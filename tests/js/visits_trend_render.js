@@ -69,10 +69,18 @@ if (/<nav class="topnav"[^>]*\sstyle=/.test(html)) {
 }
 const css = fs.readFileSync(path.join(SITE, 'visits-trend.css'), 'utf-8');
 if (!/\.topnav\b/.test(css)) errs.push('visits-trend.css 缺 .topnav 样式（导航会无样式）');
-// 2026-10-22：三页导航位置统一——趋势页原先左对齐（内容区左上角），而统计页的
-// 入口在 header 右侧。此处锁住右对齐，防止后续改样式时又退回左上角。
-if (!/\.topnav\{[^}]*justify-content:flex-end/.test(css)) {
-  errs.push('趋势页导航未右对齐（.topnav 缺 justify-content:flex-end）——'
+// 2026-10-22：三页顶部统一——趋势页原先既没有站点栏（导航浮在灰底上），
+// 导航又在左上角；统计页则是白色表头 + 右上角入口。此处锁住三点，防止回退：
+// ① 站点栏存在且有底部分隔线；② 导航在站点栏内；③ 导航右推。
+if (!/\.sitebar\{[^}]*border-bottom/.test(css)) {
+  errs.push('缺顶部站点栏样式（.sitebar 无 border-bottom）——'
+            + '与首页/统计页的白色表头不一致');
+}
+if (!/<header class="sitebar">[\s\S]*?<nav class="topnav">/.test(html)) {
+  errs.push('导航未放进站点栏（<header class="sitebar"> 内找不到 <nav class="topnav">）');
+}
+if (!/\.topnav\{[^}]*margin:0 0 0 auto/.test(css)) {
+  errs.push('趋势页导航未右推（.topnav 缺 margin:0 0 0 auto）——'
             + '与统计页右上角的入口位置不一致');
 }
 
