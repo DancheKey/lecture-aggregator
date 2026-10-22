@@ -416,6 +416,9 @@ jobs:
           # 海报页事后发布判据 + 出口终检（2026-10-22）：海报页不再无条件豁免，
           # 且所有拆分路径的最终记录都过一遍 publishTime vs lectureStart。
           python tests/test_poster_late_gate.py
+          # 摘要溯源纪律（2026-10-22）：abstract 必须逐字来自网页原始资料，
+          # 有则取、无则空，禁止生成式补全。锁住规则/VLM/LLM 三条路径 + 出口清洗。
+          python tests/test_abstract_provenance.py
 
       # 审计报告转义门禁（2026-10-02）：audit_fields.py 的 HTML 报告把抓来的
       # speaker/location/speakerBio 直接拼进 HTML（报告是 CI 附件，维护者

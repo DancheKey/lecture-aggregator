@@ -117,6 +117,7 @@ jobs:
             tests/test_main_water_gate.py
             tests/test_gate_source_base.py
             tests/test_poster_late_gate.py
+            tests/test_abstract_provenance.py
             tests/test_module_compile.py
             tests/test_time_unknown_autotag.py
             tests/test_time_fixes_20261004.py
