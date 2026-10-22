@@ -2,19 +2,19 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://danchekey.github.io/lecture-aggregator/</loc>
-    <lastmod>2026-10-21T16:08:52+08:00</lastmod>
+    <lastmod>2026-10-22T18:13:57+08:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://danchekey.github.io/lecture-aggregator/stats.html</loc>
-    <lastmod>2026-10-21T16:08:52+08:00</lastmod>
+    <lastmod>2026-10-22T18:13:57+08:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://danchekey.github.io/lecture-aggregator/visits-trend.html</loc>
-    <lastmod>2026-10-21T16:08:52+08:00</lastmod>
+    <lastmod>2026-10-22T18:13:57+08:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.3</priority>
   </url>

@@ -5,19 +5,8 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 21 Oct 2026 16:08:52 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 22 Oct 2026 18:13:57 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>华师经英seminar第62期｜灵活用工与劳动者福祉变动:来自主观幸福感的证据</title>
-      <link>http://em.scnu.edu.cn/a/20261022/11210.html</link>
-      <guid isPermaLink="false">http://em.scnu.edu.cn/a/20261022/11210.html</guid>
-      <pubDate>Thu, 22 Oct 2026 12:30:00 +0800</pubDate>
-      <category>经济与管理学院</category>
-      <description>题目：灵活用工与劳动者福祉变动:来自主观幸福感的证据
-主讲：邱康权（华南师范大学）
-地点：文2栋301会议室
-主办：经济与管理学院</description>
-    </item>
     <item>
       <title>第十九届“勷勤论坛”主论坛之第十四届“明日之师”研究...</title>
       <link>http://mks.scnu.edu.cn/a/20261020/19.html</link>
@@ -59,6 +48,17 @@
       <category>数学科学学院</category>
       <description>题目：两类局部零和问题
 主讲：蒋枭（成都理工大学）
+地点：数科院东楼401
+主办：数学科学学院</description>
+    </item>
+    <item>
+      <title>勷勤数学•专家报告-高维东｜Some open problems in zero-sum theory</title>
+      <link>http://maths.scnu.edu.cn/a/20261031/8871.html</link>
+      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261031/8871.html</guid>
+      <pubDate>Sat, 31 Oct 2026 11:00:00 +0800</pubDate>
+      <category>数学科学学院</category>
+      <description>题目：Some open problems in zero-sum theory
+主讲：高维东（天津大学）
 地点：数科院东楼401
 主办：数学科学学院</description>
     </item>

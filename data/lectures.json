@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-21T16:08:52+08:00",
+  "updatedAt": "2026-10-22T18:13:57+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8857.html",
@@ -32,6 +32,35 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-陈天翔"
+    },
+    {
+      "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8871.html",
+      "images": [],
+      "college": "数学科学学院",
+      "campus": "石牌",
+      "title": "勷勤数学•专家报告-高维东",
+      "topic": "Some open problems in zero-sum theory",
+      "lectureStart": "2026-10-31 11:00:00",
+      "lectureEnd": "2026-10-31 12:00:00",
+      "location": "数科院东楼401",
+      "speaker": "高维东",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "天津大学",
+      "inviter": "袁平之",
+      "speakerBio": "高维东教授现就职于天津大学应用数学中心。他1994年从四川大学获得博士学位,导师为孙琦教授。1994-1998年他先后于大连理工大学应用数学系和奥地利格拉茨大学数学系从事博士后研究。他的主要研究兴趣在组合数论中的零和理论,1996年他建立了两个著名组合课题Davenport常数和ErdÖs-Ginzburg-Ziv定理之间的基本联系,从而将这两个原被各自独立研究的课题统一起来。这一结论被同行在公开发表的论文和评论中称为基础性结果(a fundamental result)和漂亮(beautiful)的结果,并指出其已众所周知(well known)。目前已发表学术论文110多篇。",
+      "organizer": "数学科学学院",
+      "publishTime": "2026-10-31 09:22:00",
+      "publishTimeSource": "label",
+      "timeConfidence": "high",
+      "timeNote": "same-day-normal",
+      "abstract": "We will present some open problems and related progress in zero-sum theory on finite abelian groups.",
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "勷勤数学•专家报告-高维东"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8868.html",
@@ -109,6 +138,35 @@
       "listTitle": "第十九届“勷勤论坛”主论坛名校长讲座板块之周建国校长...",
       "vlmExtracted": true,
       "sessionNumber": "第十九届"
+    },
+    {
+      "sourceUrl": "http://lswh.scnu.edu.cn/a/20261022/86.html",
+      "images": [
+        "http://statics.scnu.edu.cn/statics/images/lswh/title.png",
+        "http://statics.scnu.edu.cn/pics/lswh/2026/1022/1792657075357422.jpg"
+      ],
+      "college": "历史文化学院",
+      "campus": "石牌",
+      "title": "第十九届“勷勤论坛”之历史文化学院分论坛",
+      "topic": "第十九届“勷勤论坛”之历史文化学院分论坛",
+      "lectureStart": "2026-10-26 00:00:00",
+      "lectureEnd": null,
+      "location": "文科楼423、428会议室",
+      "speaker": "李红岩",
+      "speakerTitle": "",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "历史文化学院",
+      "publishTime": "2026-10-22 16:17",
+      "publishTimeSource": "companion",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "timeConfidence": "high",
+      "timeNote": "same-year",
+      "timeUnknownSource": "auto",
+      "timeUnknown": true,
+      "listTitle": "第十九届“勷勤论坛”之历史文化学院分论坛"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20261019/6830.html",
