@@ -19,6 +19,7 @@
 """
 import os
 import re
+import subprocess
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -141,6 +142,61 @@ class GateSanityTest(unittest.TestCase):
         self.assertNotIn('workflow_run', head,
                          'deploy.yml 改用了 workflow_run 跨工作流门禁——'
                          '请重新评估「test.yml 被改名则静默停发」的风险')
+
+
+class TrackedScriptsTest(unittest.TestCase):
+    """被测试加载的 scripts/*.py 必须已入库（2026-10-22 引入）。
+
+    起因：`scripts/backfill_abstract.py` 被 .gitignore 的 `scripts/backfill_*.py`
+    吃掉。本地磁盘有文件 → 测试全绿；CI 检出后缺文件 →
+    `tests/test_backfill_abstract.py` 在**收集期**就 FileNotFoundError，
+    test.yml 与 deploy.yml 两条流水线同时红。
+
+    这类问题本地跑测试永远发现不了（文件就在那里），只能比对 git 索引。
+    凡是「磁盘存在但未入库」又被测试引用的脚本，CI 必红，故在此提前拦住。
+    """
+
+    # 允许不入库的脚本，两类各有理由：
+    ALLOW_UNTRACKED = {
+        # ① 本地专用（依赖本地路径/网络），test_frontend_consistency.py 内有 SkipTest 保护
+        'scripts/merge_remote.py',
+        # ② test_layer_mapping.py 只把它当**字符串**喂给 select_tests 的分组映射，
+        #    断言「未登记的脚本归 NONE」，从不加载文件本身
+        'scripts/fix_psy_speaker_restore.py',
+    }
+
+    # 两种引用写法：字面量 'scripts/x.py'、os.path.join('scripts', 'x.py')
+    PATS = (
+        re.compile(r"'scripts/([A-Za-z0-9_]+\.py)'"),
+        re.compile(r"os\.path\.join\(\s*'scripts'\s*,\s*'([A-Za-z0-9_]+\.py)'\s*\)"),
+    )
+
+    def _tracked(self):
+        try:
+            out = subprocess.check_output(['git', 'ls-files'], cwd=ROOT,
+                                          text=True, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest('无 git 环境，跳过（该断言只在仓库工作区有意义）')
+        return set(out.splitlines())
+
+    def test_06_被测试引用的脚本已入库(self):
+        tracked = self._tracked()
+        bad = set()
+        for name in sorted(os.listdir(TESTS_DIR)):
+            if not name.endswith('.py'):
+                continue
+            with open(os.path.join(TESTS_DIR, name), encoding='utf-8') as f:
+                src = f.read()
+            for pat in self.PATS:
+                for fn in pat.findall(src):
+                    rel = 'scripts/' + fn
+                    if rel in self.ALLOW_UNTRACKED or rel in tracked:
+                        continue
+                    if os.path.exists(os.path.join(ROOT, rel)):
+                        bad.add('%s 引用 %s（磁盘有、未入库）' % (name, rel))
+        self.assertFalse(bad,
+                         '以下脚本被测试引用却未入库，CI 检出后必红：\n  '
+                         + '\n  '.join(sorted(bad)))
 
 
 class CronDocConsistencyTest(unittest.TestCase):

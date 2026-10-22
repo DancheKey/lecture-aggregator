@@ -157,3 +157,14 @@ data/admin_token.json
 
 # 一次性本地修复脚本（依赖网络抓取，AGENTS.md §1 不入库）
 /reparse_*.py
+
+# ===== 例外（2026-10-22）：常驻工具及其依赖，必须入库 =====
+# 起因：scripts/backfill_abstract.py 被上面的 `scripts/backfill_*.py` 吃掉，
+# 本地跑测试全绿，CI 检出后缺文件 → tests/test_backfill_abstract.py 在收集期
+# 直接 FileNotFoundError，两条流水线全红（干净 clone 实测复现）。
+# 它不属于「一次性修复脚本」：有完整 CLI（--college/--apply/--workers）、
+# 19 个测试、可重复使用（只补「网页有而库空」的摘要，幂等）。
+!scripts/backfill_abstract.py
+# 上面工具的落库依赖：主库统一原子写（备份 + 原子替换 + 格式铁律），
+# 是 2026-09-27 P1-4 审计的收敛产物，不是历史数据修复脚本。
+!scripts/lectures_writer.py
