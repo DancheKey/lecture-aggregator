@@ -53,7 +53,9 @@ if (/<style[\s>]/.test(html)) errs.push('页面仍有内联 <style>');
 // 访问量趋势」，stats.html 顶部也有「访问量趋势/返回首页」，唯独本页面是死胡同，
 // 手机上（无后退键可见）用户只能自己改地址栏。此处锁住两个返回入口，
 // 防止后续重构把导航又删掉。
-const needNav = [['./', '返回首页'], ['stats.html', '去统计页']];
+// 2026-10-22：入口文案与顺序与 stats.html 统一（另一个页面在前、返回首页在后）。
+// 原为「返回首页 / 去统计页」且导航在左上角，与统计页右上角的写法不一致。
+const needNav = [['stats.html', '讲座统计'], ['./', '返回首页']];
 for (const [href, label] of needNav) {
   const re = new RegExp(`<a[^>]+href=["']${href.replace('.', '\\.')}["'][^>]*>\\s*${label}\\s*</a>`);
   if (!re.test(html)) {
@@ -67,6 +69,12 @@ if (/<nav class="topnav"[^>]*\sstyle=/.test(html)) {
 }
 const css = fs.readFileSync(path.join(SITE, 'visits-trend.css'), 'utf-8');
 if (!/\.topnav\b/.test(css)) errs.push('visits-trend.css 缺 .topnav 样式（导航会无样式）');
+// 2026-10-22：三页导航位置统一——趋势页原先左对齐（内容区左上角），而统计页的
+// 入口在 header 右侧。此处锁住右对齐，防止后续改样式时又退回左上角。
+if (!/\.topnav\{[^}]*justify-content:flex-end/.test(css)) {
+  errs.push('趋势页导航未右对齐（.topnav 缺 justify-content:flex-end）——'
+            + '与统计页右上角的入口位置不一致');
+}
 
 // ---------- ⑥ 产物必须与生成脚本模板一致（2026-10-09 补） ----------
 // 背景：site/visits-trend.{html,css} 都是 scripts/gen_visits_trend.py 的**产物**
@@ -76,8 +84,8 @@ if (!/\.topnav\b/.test(css)) errs.push('visits-trend.css 缺 .topnav 样式（�
 // 模板缺导航 → 产物迟早被覆盖 → 门禁提前报红。
 const genSrc = fs.readFileSync(
   path.join(SITE, '..', 'scripts', 'gen_visits_trend.py'), 'utf-8');
-for (const [label, needle] of [['返回首页', '<a href="./">返回首页</a>'],
-                               ['去统计页', '<a href="stats.html">去统计页</a>'],
+for (const [label, needle] of [['讲座统计', '<a href="stats.html">讲座统计</a>'],
+                               ['返回首页', '<a href="./">返回首页</a>'],
                                ['.topnav 样式', '.topnav{'] /* CSS 常量内 */]) {
   if (!genSrc.includes(needle)) {
     errs.push(`scripts/gen_visits_trend.py 模板缺「${label}」——`
