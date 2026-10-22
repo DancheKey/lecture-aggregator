@@ -1211,6 +1211,46 @@ def _effective_listdate_cutoff(cutoff_date_str, src_latest_date):
     return cutoff_date_str or ''
 
 
+# 入库时间门的绝对下限（天）。见 _effective_gate_cutoff 的说明。
+GATE_FLOOR_DAYS = 730
+
+
+def _effective_gate_cutoff(cutoff_dt, src_base_date):
+    """入库时间门的水位：min(全局水位, 本源基线)，且不早于全局水位前 GATE_FLOOR_DAYS 天。
+
+    为什么要有（2026-10-22 修复）：
+        列表页侧的 `_effective_listdate_cutoff` 早已改成 min 口径（2026-09-28 gap
+        审计），但入库前最后一道门（main() 的 is_recent）**仍只用全局水位 since**。
+        两者不同源 → 源中断一段时间后恢复时，中断期讲座的 publishTime 与
+        lectureStart 都早于全局水位 → 全部 [SKIP-OLD] 丢弃，并被 ledger_add(_, 'old')
+        锁 180 天；而水位每轮前移，这个空洞只增不减。
+
+        实测（2026-10-22）：台账 13 条 old 里 7 条「条目日期 ≥ 该源库内最新」，
+        逐个 fetch + parse_detail 均能解析出完整记录（讲者/时间/地点齐全），
+        纯粹被这道门砍掉 —— 如教科院 a/20250411/6169（2025-04-09 辛涛，
+        本源基线仅 2024-11-01）、阿伯丁 a/20240716/418|419（2024-07 曾碧卿）。
+
+    为什么必须加绝对下限（**不能只改成 min**）：
+        列表页侧用 min 只决定「要不要 fetch」，多抓一页的代价是网络开销；
+        入库侧用 min 是「真的写进库」。若本源基线停在 2013-05-23（哲社实测），
+        单纯 min 会让 2013 年之后的所有条目一次性入库 —— 直接部分回退
+        2026-08-01 那次修复（那次的目的正是杜绝「2014/2021 远古旧讲座当新事件
+        灌入主数据」）。故再取 max(_, cutoff - GATE_FLOOR_DAYS)：只回收最近
+        GATE_FLOOR_DAYS 天内的中断期，更久远的存量仍不碰。
+
+    口径与列表页侧保持「同一语义一处实现」：都取本源基线与全局水位的更早者，
+    差别只在这里多一道地板。改任一侧请同步另一侧与 tests/ 的回归用例。
+    """
+    eff = cutoff_dt
+    b = _parse_iso(src_base_date) if src_base_date else None
+    if b is not None:
+        if b.tzinfo is not None:
+            b = b.replace(tzinfo=None)
+        if b < eff:
+            eff = b
+    return max(eff, cutoff_dt - datetime.timedelta(days=GATE_FLOOR_DAYS))
+
+
 def _build_source_latest_date(existing):
     """建 {源名: 该源已入库的最晚条目日期 'YYYY-MM-DD'}。
 
@@ -2219,6 +2259,22 @@ def main():
             #   - 发布早于水位线的远古/过期旧讲座 → 在 publishTime 这一维被排除；
             #   - 事件在未来(≥水位线)的真实 upcoming 讲座 → 永不被漏掉；
             #   - 已进主数据的 URL 由 incremental_merge 的 key 锁定，不会重复加入。
+            #
+            # 2026-10-22 修复：水位线改为**按源**算（_effective_gate_cutoff），
+            # 与列表页侧同源，不再是单一的全局 since。原因见该函数 docstring：
+            # 源中断恢复后，中断期讲座两维都早于全局水位 → 全丢 + 台账锁 180 天。
+            # 按源水位 = min(全局水位, 本源基线)，并带 GATE_FLOOR_DAYS 绝对下限
+            # （防止基线停在远古的源一次性灌入十年存量）。逐条只查一次预建字典。
+            _gate_srcbase = env_flag('SCNU_GATE_SRCBASE', default='1')
+            _gate_eff_by_col = {}
+            if _gate_srcbase:
+                for _n, _d in (src_latest_date or {}).items():
+                    _gate_eff_by_col[_n] = _effective_gate_cutoff(cutoff, _d)
+                if _gate_eff_by_col:
+                    _moved = sum(1 for v in _gate_eff_by_col.values() if v < cutoff)
+                    if _moved:
+                        print(f'[GATE] 入库时间门按源放宽 {_moved} 个源'
+                              f'（水位早于全局 since={cutoff.date()}，下限 {GATE_FLOOR_DAYS} 天）')
             kept, dropped = [], 0
             dropped_keys, kept_keys = set(), set()
             for r in all_fetched:
@@ -2240,12 +2296,15 @@ def main():
                     pub = pub.replace(tzinfo=None)
                 if lec is not None and lec.tzinfo is not None:
                     lec = lec.replace(tzinfo=None)
-                is_recent = (pub is not None and pub >= cutoff) or (lec is not None and lec >= cutoff)
+                # 本源水位（无该源基线 / 开关关闭 → 退化为全局 cutoff，与改前一致）
+                _eff = _gate_eff_by_col.get(r.get('college') or '', cutoff)
+                is_recent = (pub is not None and pub >= _eff) or (lec is not None and lec >= _eff)
                 if not is_recent:
                     dropped += 1
                     dropped_keys.add(_canon_url_key(r.get('sourceUrl')))
                     print(f'[SKIP-OLD] 增量跳过历史旧讲座(早于时间门) {r.get("sourceUrl")} | '
-                          f'lectureStart={r.get("lectureStart")} | publishTime={r.get("publishTime")}')
+                          f'lectureStart={r.get("lectureStart")} | publishTime={r.get("publishTime")}'
+                          f' | gate={_eff.date()}')
                     continue
                 kept.append(r)
                 kept_keys.add(_canon_url_key(r.get('sourceUrl')))

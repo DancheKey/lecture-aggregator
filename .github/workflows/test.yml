@@ -410,6 +410,9 @@ jobs:
           node tests/js/liked_filter_keys.js
           node tests/js/stats_wants.js
           python tests/test_main_water_gate.py
+          # 入库时间门按源水位（2026-10-22）：与列表页侧 min 口径对齐，
+          # 防止源中断恢复后中断期讲座被 [SKIP-OLD] 全丢 + 台账锁 180 天。
+          python tests/test_gate_source_base.py
 
       # 审计报告转义门禁（2026-10-02）：audit_fields.py 的 HTML 报告把抓来的
       # speaker/location/speakerBio 直接拼进 HTML（报告是 CI 附件，维护者

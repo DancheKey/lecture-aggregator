@@ -107,6 +107,7 @@ GROUPS = [
                'tests/test_data_reconciliation.py', 'tests/test_full_shrink_protection.py',
                'tests/test_gate_reject_evidence.py', 'tests/test_list_page_failure.py',
                'tests/test_main_water_gate.py', 'tests/test_new_source_full_scan.py',
+               'tests/test_gate_source_base.py',
                'tests/test_source_count_consistency.py', 'tests/test_ledger.py',
                'tests/test_listdate.py', 'tests/test_llm_cache.py',
                'tests/test_module_compile.py', 'tests/test_env_flags.py']},
