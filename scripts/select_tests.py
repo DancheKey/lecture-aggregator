@@ -96,6 +96,7 @@ GROUPS = [
                'tests/test_hybrid.py', 'tests/test_cited_judge.py',
                'tests/test_hallucination_guard.py', 'tests/test_stage_var_leak.py',
                'tests/test_listdate.py', 'tests/test_module_compile.py',
+               'tests/test_poster_late_gate.py',
                'tests/test_env_flags.py']},
     # 抓取主流程 / 水位 / 台账 / 缓存 / sources.yaml
     {'name': 'crawl', 'pats': ['scraper/scraper.py', 'scraper/sources.yaml',

@@ -1987,7 +1987,16 @@ def _date_head(s):
         return None
 
 
-def is_news_record(rec, poster_page=False):
+# 海报页「事后发布」容差（天）。讲座当天/次日上传的海报仍按预告处理（管理员
+# 事后补传属合理延迟），超过即判事后公告。取值依据见 is_news_record 内的实测注释。
+POSTER_LATE_TOLERANCE_DAYS = 2
+
+# 发布时间早于讲座时间的最大合理提前量（天）。库内 2929 条「发布早于讲座」的
+# 记录无一超过 90 天，超出即发布年份解析错误 → 时间不可信，不按预告收。
+PUB_BEFORE_LECTURE_MAX_DAYS = 180
+
+
+def is_news_record(rec, poster_page=False, same_day_grace=False):
     """判断是否为新闻/回顾而非讲座预告。
 
     主规则：发布时间晚于讲座时间（即讲座结束后才发布），视为对已结束讲座的
@@ -2005,22 +2014,23 @@ def is_news_record(rec, poster_page=False):
 
     海报页豁免（poster_page=True）：海报本质是「讲座预告/通知」图片，由网站管理
     员择时上传，发布时间晚于讲座开始属常态（如当天 15:00 讲座、当晚 23:34 才发
-    海报），不能据此判为回顾稿。故海报页直接返回 False，不套本函数的发布时间比较
-    规则。真正的文字回顾报道（如「顺利举办」「圆满结束」「在…召开」）由
+    海报），不能据此判为回顾稿。故    讲座当天/次日上传的海报仍按预告处理，超过 POSTER_LATE_TOLERANCE_DAYS 即判
+    事后公告。真正的文字回顾报道（如「顺利举办」「圆满结束」「在…召开」）另由
     parse_detail 内 is_news_article 的标题/正文关键词独立把关（2026-07-31 文学院
     说文论语系列等海报误杀根治：此前把「海报+占位08:00」当真实时刻比大小，把真实
     讲座公告当回顾稿错杀）。
+
+    same_day_grace（默认 False，仅 parse_detail 出口终检传入）：发布日与讲座日
+    同一天即放行。见函数内「时刻真实已知」分支的说明。
     辅助规则：标题含明显新闻/回顾类关键词（已在 EXCLUDE_KW 中，由 is_lecture 拦截）。
     """
     if not rec:
-        return False
-    # 海报页 = 讲座公告，不套「发布时间晚于讲座」的回顾稿规则
-    if poster_page:
         return False
     ls = rec.get('lectureStart') or ''
     pub = rec.get('publishTime') or ''
     if not ls or not pub:
         return False
+
     def _parse_dt(s):
         if not s:
             return None
@@ -2036,6 +2046,35 @@ def is_news_record(rec, poster_page=False):
     pub_dt = _parse_dt(pub)
     if not ls_dt or not pub_dt:
         return False
+
+    # 海报页不再**无条件**豁免（2026-10-22）。
+    #
+    # 原实现（2026-07-31）直接 return False，理由是「海报由管理员择时上传，晚于讲座
+    # 开始属常态」——当时为救「文学院说文论语系列」等真海报被误杀。但它放得太宽：
+    # 只要页面有图、正文没有「时间：」这类结构化标签就被判海报页，于是「讲座结束
+    # 之后才发布的公告/回顾页」也一并豁免，全靠 is_news_article 的关键词兜底。
+    #
+    # 实测（2026-10-22，哲社/阿伯丁/政公 三个零更新源全历史回溯）：11 条能过
+    # parse_detail 的候选里 10 条是事后发布——政公 6468（+17 天）、阿伯丁 418/419
+    # （+8/+7 天）、哲社 2276（+7 天）、2249（+27 天）、2171×2（+625 天）、
+    # 2180/2176（+741 天）。关键词表漏了「举办」「通讯稿」「——记…活动」，全部漏网。
+    #
+    # 现在改为**有条件豁免**：只放过「讲座当天或次日上传」的海报（管理员事后补传的
+    # 合理延迟），超出即判事后公告。容差取值依据库内实测：574 条海报页记录中
+    # 547 条（95.3%）发布早于讲座，差值落在 0~1 天的 25 条，>2 天的仅 2 条
+    # （行知书院 2 条，均为真讲座——属本判据的已知代价：它们已入库不会被删，
+    # 仅在重抓时会被判非预告，数量极小且不再增长）。
+    if poster_page:
+        _delta_days = (pub_dt - ls_dt).total_seconds() / 86400.0
+        if _delta_days > POSTER_LATE_TOLERANCE_DAYS:
+            return True          # 讲座结束后多日才发布 → 事后公告，不享豁免
+        if _delta_days < -PUB_BEFORE_LECTURE_MAX_DAYS:
+            # 发布时间比讲座还早半年以上：正常预告最多提前 90 天（库内 2929 条
+            # 「发布早于讲座」的记录无一超过 90 天），超出即发布年份解析错误。
+            # 时间不可信 → 无法确认是预告，按非预告处理（宁可少收，不可混入）。
+            return True
+        return False
+
     src = rec.get('publishTimeSource')
     # url_proxy：发布时间仅由 URL 日期代理，精度低，放宽 1 天容差，避免把正常预告误杀
     if src == 'url_proxy':
@@ -2050,6 +2089,16 @@ def is_news_record(rec, poster_page=False):
     # 现在三条口径同源：timeUnknown 显式优先，其次按 00:00/08:00 填充约定。
     if not _fv.is_placeholder_time(rec):
         # 讲座时刻真实已知 → 用「时刻」比较（抓「当天讲座、当晚发回顾」）
+        #
+        # same_day_grace（2026-10-22，仅出口终检传入）：发布日 == 讲座日即放行。
+        # 依据：出口终检要补判的是**跨日的事后发布**（讲座结束后多日才发的回顾稿）。
+        # 同日发布的多为当天通知/海报——实测 swc 32 系列「扬帆教学论坛」讲座
+        # 09:30、页面 09:44 发布（差 14 分钟，CMS 录入延迟），wxy 3585「说文论语
+        # 之一」讲座 15:00、当晚 23:34 补发海报，都不是回顾稿。这类记录若按严格
+        # 时刻比较剔除，会直接丢掉一整场历史讲座（用户明确要求历史场次统计完整）。
+        # 入口（L6060/L6179）不传此参数，保持原有严格口径不变，零回归。
+        if same_day_grace and pub_dt.date() == ls_dt.date():
+            return False
         return pub_dt > ls_dt
     # 讲座时刻占位（只给日期、无具体时刻）：
     # 规则（2026-08-01 用户裁定）：占位 + 发布日==讲座日 + 发布在当晚(>=18:00)
@@ -2244,6 +2293,10 @@ _NEWS_TITLE_RETRO = r'回顾(?!与|及|·|、|—|－|和)'
 # 活动必已结束，不可能是预告。与 title-conduct 互补——title-conduct 要求「举办/开展/举行」
 # + 讲座类关键词，本规则覆盖「圆满落幕」等纯完成态、未必含「举办」字样的回顾稿标题（如 ibc）。
 _NEWS_TITLE_DONE = r'(圆满落幕|圆满结束|圆满完成|成功举办|顺利举办|顺利开展|顺利召开|成功召开|落下帷幕|讲座圆满|报告圆满|活动圆满|取得圆满成功|取得圆满|在沪举行|在穗举行|在京举行|在深举行|在汉举行|在宁举行|在杭举行|在蓉举行|在渝举行|在陕举行|在粤举行)'
+# 标题自带新闻体裁标记（2026-10-22）：作者已在标题里明示这是「报道/通讯」，
+# 不可能是预告。此前只靠「举办+讲座」组合判据，漏掉了「程恩富教授讲座通讯稿」
+# 这类（含「讲座」但无「举办」）。这类词不会出现在任何真预告标题里，风险极低。
+_NEWS_TITLE_VERBATIM = r'(通讯稿|新闻稿|活动报道|讲座报道|活动通讯|会议报道|讲座侧记|活动侧记)'
 # 回顾叙事：欢迎词回顾体（"热烈欢迎…莅临讲学"活动已发生，区别于"热烈欢迎广大师生参加"预告）
 _NEWS_WELCOME = r'热烈欢迎.{0,40}?(莅临|出席|来到|光临).{0,20}?(讲学|讲座|报告|指导|交流|访问|作学术)'
 # 回顾叙事：访谈/纪要/会务等过程体标记（活动已结束的纪实，非预告）
@@ -2346,6 +2399,9 @@ def is_news_article(title, body, lecture_start=None):
     # 3.6) 标题回顾完成式（RT2h）：标题含完成态动词（圆满落幕/圆满结束/成功举办…），活动已结束，非预告
     if re.search(_NEWS_TITLE_DONE, t):
         return 'title-done'
+    # 3.7) 标题自带体裁标记（通讯稿/新闻稿/活动报道）：作者已明示是报道，非预告
+    if re.search(_NEWS_TITLE_VERBATIM, t):
+        return 'title-verbatim'
     # 4) 新闻署名审签链（供稿+初审+终审 / 初审+复审+终审），华师新闻稿专属页脚
     if re.search(_NEWS_SIGNATURE_CHAIN, b):
         return 'signature-block'
@@ -3645,6 +3701,59 @@ def apply_exit_gate(out, url=''):
     return out
 
 
+def _post_publish_final_check(out, url='', skip_news_filter=False):
+    """出口终检：所有拆分/富化结束后，再按 publishTime vs lectureStart 判一次事后发布。
+
+    为什么必须在出口再判一次（2026-10-22）：
+      `is_news_record` 的调用点在 `_finalize_record` 内部，早于**场次拆分**与
+      **时间字段定型**，存在四条逃逸路径——
+        ① MS 多场次拆分：L6179 已逐条判过，这条路径本就有覆盖；
+        ② 多主讲人连写拆分（_split_by_speakers）：直接 return，未过判定；
+        ③ VLM 多场拆分：直接 return，未过判定；
+        ④ 判定时 `lectureStart` 尚为空（场次时间随后才从正文/OCR 拆出）：
+           `is_news_record` 遇空时间直接放过，此后无人再判。
+      实测（哲社 2171 / 2180 / 2176，2026-10-22 全历史回溯）：②④叠加——判定时
+      lectureStart=None，随后拆出 1~2 场，最终记录的 lectureStart 比 publishTime
+      早 625 / 741 天，却已无人再判，全部入库。
+
+    本函数在**所有出口合并之后**统一兜底，复用同一套 `is_news_record` 口径
+    （含海报页容差 POSTER_LATE_TOLERANCE_DAYS），不引入第三套判定标准。
+    skip_news_filter 与既有口径保持一致：来源显式跳过新闻过滤时不判。
+
+    口径差异（唯一一处，已显式化）：本函数传 `same_day_grace=True`，即「发布日
+    与讲座日同一天」一律放行。因为终检负责的是**跨日的事后发布**（回顾稿通常隔
+    天及更晚），同日发布的多为当天通知/海报的录入延迟（swc 32：讲座 09:30、
+    发布 09:44，差 14 分钟）。入口不传该参数，原有严格口径零变化。
+    """
+    if out is None or skip_news_filter:
+        return out
+    if isinstance(out, dict):
+        recs = [out]
+    elif isinstance(out, list):
+        recs = [x for x in out if isinstance(x, dict)]
+    else:
+        return out
+    if not recs:
+        return out
+    # poster_only 是**页级**属性（同一页面要么是海报页要么不是），但拆分/派生记录
+    # 可能丢该键。按整页取「任一为真」，避免派生记录被误按普通页的严格口径判掉
+    # 真海报（普通页口径 pub>lec 即拦，海报页有 2 天容差）。
+    _poster_page = any(bool(x.get('poster_only')) for x in recs)
+    kept = []
+    for r in recs:
+        if is_news_record(r, poster_page=_poster_page, same_day_grace=True):
+            print('[SKIP-RETRO-FINAL] %s publishTime=%s > lectureStart=%s'
+                  % (url or '?', r.get('publishTime'), r.get('lectureStart')),
+                  file=sys.stderr)
+            continue
+        kept.append(r)
+    if len(kept) == len(recs):
+        return out          # 无剔除：原样返回，保持 list 对象身份不变
+    if isinstance(out, dict):
+        return kept[0] if kept else None
+    return kept or None
+
+
 def parse_detail(html, url, college, campus, default_year=None, list_title=None, skip_news_filter=False):
     """详情页解析对外入口：完整管线 + 出口统一闸门。"""
     out = _parse_detail_impl(html, url, college, campus, default_year=default_year,
@@ -3670,7 +3779,10 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         if _r.get('speakerBio') and _is_org_intro_bio(_r['speakerBio']):
             _r['speakerBio'] = ''
         _mark_time_unknown(_r)
-    return out
+    # 出口终检（2026-10-22）：必须放在 _mark_time_unknown 之后——is_news_record 的
+    # 占位时刻判定依赖 timeUnknown 已定型；放在 apply_exit_gate 之后——确保看到的是
+    # 清洗后的终值。详见 _post_publish_final_check 的说明。
+    return _post_publish_final_check(out, url=url, skip_news_filter=skip_news_filter)
 
 
 class _OcrSt:
