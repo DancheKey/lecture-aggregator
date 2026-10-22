@@ -8,25 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://mks.scnu.edu.cn/a/20261020/19.html@danchekey.github.io
-DTSTAMP:20261022T102837Z
-DTSTART:20261022T110000Z
-DTEND:20261022T120000Z
-SUMMARY:第十九届“勷勤论坛”主论坛之第十四届“明日之
- 师”研究...
-LOCATION:桃李园顺德厅(石牌校园)
-DESCRIPTION:题目：第十九届“勷勤论坛”主论坛之第十四
- 届“明日之师”研究...\n主讲：王红军、冯志旭（广州
- 市花都区教师发展中心）\n地点：桃李园顺德厅(石牌校
- 园)\n主办：马克思主义学院
-URL:http://mks.scnu.edu.cn/a/20261020/19.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://life.scnu.edu.cn/a/20261019/6830.html@danchekey.github.io
 DTSTAMP:20261022T102837Z
 DTSTART:20261023T070000Z
