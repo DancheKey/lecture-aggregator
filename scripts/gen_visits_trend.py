@@ -90,10 +90,12 @@ h1{font-size:22px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
    本页此前无任何返回链接，是首页/统计页/趋势页三页里唯一的死胡同。
    2026-10-22 起与 stats.html 对齐：右对齐到右上角、纯文字链接（去掉早期的胶囊
    按钮与边框），顺序统一为「另一个页面 → 返回首页」。
+   字号/间距同 stats.html 的 text-12pt（12pt=16px）+ gap-2（8px）——此前本页写
+   13.5px/16px，并排看会比统计页的导航明显小一号（用户截图反馈）。
    与 HTML 一并落在本模板常量里——site/visits-trend.css 同为本脚本产物
    （main() 里 _write(css, CSS)），直接改产物会被下一次 CI 覆盖。 */
-.topnav{display:flex;align-items:center;gap:16px;margin:0 0 0 auto}
-.topnav a{font-size:13.5px;color:#475569;text-decoration:none}
+.topnav{display:flex;align-items:center;gap:8px;margin:0 0 0 auto}
+.topnav a{font-size:12pt;color:#475569;text-decoration:none}
 .topnav a:hover{color:#1E293B}
 .sub{color:#888780;font-size:13.5px;margin:0}
 .wrap header{margin-bottom:24px}
@@ -126,9 +128,10 @@ h2{font-size:16px;font-weight:600;margin:0}
 .tb-head button:hover{border-color:#C9C7BE;background:#FAFAF8}
 .tbl{max-height:560px;overflow:auto;border:1px solid #E8E6E0;border-radius:12px}
 table{width:100%;border-collapse:collapse;font-size:15px}
-th,td{padding:11px 15px;text-align:right;border-bottom:1px solid #F1F0EC;white-space:nowrap}
+/* 2026-10-22：三列全部居中（此前日期左对齐、两列数字右对齐，中间留出大片
+   空白，用户反馈「表中间空的地方太多」）。日期列是等宽字符，居中后纵向仍对齐。 */
+th,td{padding:11px 15px;text-align:center;border-bottom:1px solid #F1F0EC;white-space:nowrap}
 th{position:sticky;top:0;background:#FAFAF8;font-weight:600;color:#5F5E5A;font-size:14px;z-index:1}
-td:first-child,th:first-child{text-align:left}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#FCFCFB}
 .foot{margin-top:28px;color:#888780;font-size:13.5px;line-height:1.8}
