@@ -4801,6 +4801,18 @@ LABELS = (
 # （seri 页面用 "*" 开启主讲人简介列表）、以及 bio/介绍类关键词。
 STOP = rf'(?=\s*(?:{LABELS}|点击|浏览|评论|供稿|\d{{4}}[-/年]\d|【|\[|[*＊•·]|主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))'
 
+# 宽松字段标签（容忍字间空格）：仅供「主讲人值里混进后续字段标签」时的截断兜底，
+# 不参与 LABELS/STOP 主正则（避免改动面扩散）。
+# 起因：华师等站点排版「报 告 人：陈钊 教授　主 持 人：刘愿 教授」，HTML 取文后成
+# 「陈钊 教授主 持人:刘愿 教授」——LABELS 只收连写的「主持人」，STOP 拦不住，
+# 主持人被当成第二位主讲人一起合并（skc786/skc691 实测）。
+_LOOSE_FIELD_LABEL_RE = re.compile(
+    r'主\s*持\s*人|主\s*持|主\s*席|邀\s*请\s*人|学\s*术\s*主\s*持|'
+    r'时\s*间|地\s*点|日\s*期|'
+    r'主\s*办\s*单\s*位|承\s*办\s*单\s*位|协\s*办\s*单\s*位|组\s*织\s*单\s*位|'
+    r'主\s*讲\s*人\s*简\s*介|报\s*告\s*人\s*简\s*介|主\s*讲\s*嘉\s*宾\s*简\s*介|'
+    r'简\s*介|摘\s*要|题\s*目|主\s*题|内\s*容\s*简\s*介|面\s*向\s*对\s*象')
+
 
 def _sp_glue_boundary_evidence(_st, name, rest):
     """「姓名+机构首字」粘连判别的原文空格边界证据（2026-10-14 复核补）。
@@ -4891,6 +4903,23 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
         rf'|Speaker|Presenter|Lecturer)\s*[：:]\s*(.+?){STOP}'
     )
     m = re.search(speaker_pat, _st.text)
+    # 连写多主讲人预检（2026-10-23，cs 4145 实测）。
+    # 页面「报告人：国家杰青刘梦赤教授长江学者陈建二教授长江学者卢晓中教授」在 meta
+    # description 与正文双份文本粘连后，主搜索的 STOP 落点会偏移，整串匹配失败 →
+    # 落到 OCR 兜底正则（值限 2~4 字）把「国家杰青」截成「国家杰」、另两位整个丢失。
+    # 这里先用连写解析试一次：能拆出 ≥2 位互异真实姓名就先记进 multi_speakers。
+    # 主搜索成功时会在下方覆盖（两处口径一致，无害）；失败时由它兜住。
+    if m:
+        # 先按字段标签截断：源页「报 告 人：陈钊 教授　主 持 人：刘愿 教授」归一化后成
+        # 「陈钊 教授主 持人:刘愿 教授」——「主 持人」不在 LABELS（只收「主持人」），
+        # STOP 拦不住，主持人会被当成第二位主讲人一起合并（skc786/skc691 实测：
+        # speaker 变成「陈钊、刘愿」，主持人丢了）。故先用宽松标签（容忍字间空格）
+        # 切一刀，只保留第一个标签之前的主讲人串。
+        _raw_val = _LOOSE_FIELD_LABEL_RE.split(m.group(1), 1)[0].strip()
+        _pre_segs = _parse_concat_speakers(_raw_val)
+        _pre_names = [x['name'] for x in _pre_segs]
+        if len(_pre_segs) >= 2 and len(set(_pre_names)) == len(_pre_names):
+            multi_speakers = _pre_segs
     # 跳过空值或被下一个字段标签填充的伪匹配；部分页面顶部有"报告人: 地点: 时间:"
     # 等空字段骨架，真实值在后续重复标签中（如 seri 11.html）。
     _search_text = _st.text
@@ -7782,6 +7811,8 @@ def _split_by_speakers(base, speakers):
     sourceCount 仅首条计 1，统计页不膨胀。
     题目分场配对：题目含 n 个编号段（1)…2)…）且每段带 "By <拉丁名>" 时，按拼音把
     段配给对应主讲人、各条采用自己的段（剥序号与 By 尾部）；配对不成立则共享题目。
+    **题目拆不出 n 段时不拆**，返回 1 条合并记录（speaker 用「、」连接）——见下方
+    共享题目分支的说明。
     """
     n = len(speakers) if speakers else 0
     _names = [str(s.get('name') or '').strip() for s in (speakers or [])]
@@ -7800,6 +7831,26 @@ def _split_by_speakers(base, speakers):
     if segs and seg_assign is None:
         # 无 By 拼音配对时按顺序配对（xz301 黄加耀↔集成光子学、刘轩奕↔超快光学）
         seg_assign = {i: i for i in range(min(len(segs), n))}
+    if not segs:
+        # 共享题目 → 合并为 1 条，不拆（2026-10-23 用户拍板口径）。
+        # 「一场讲座、多位主讲人共讲同一题目」与「多场讲座、各有独立题目」是两种形态：
+        #   · 拆：题目能按「1)…2)…」或「A和B」拆成 n 段，各场题目互异（xz301 集成光子学/
+        #     超快光学，physics791 带 By 拼音配对）；
+        #   · 合：题目拆不出 n 段 = 大家讲的是同一个题目。
+        # 实测两例：em 8855「【题目】破产法庭与债券发行市场化 【主讲人】辛宇教授、徐莉萍
+        # 教授」；cs 4145「题目：人工智能、大数据、教育科学论坛 报告人：国家杰青刘梦赤
+        # 教授 长江学者陈建二教授 长江学者卢晓中教授」（页面 3 个简介表格只有姓名/单位/
+        # 头衔，无各自题目）。此前一律拆成 n 条，导致同一题目在列表里出现 n 张几乎相同的
+        # 卡片；按 VLM 提示词「一场多人·勿拆」的既有口径，改为合并。
+        rec = dict(base)
+        rec['speaker'] = '、'.join(_names)
+        # 职称/单位取首位（页面通常只给首位完整信息；其余人在 speaker 串里可辨）
+        rec['speakerTitle'] = speakers[0].get('honorific') or ''
+        rec['speakerAffiliation'] = speakers[0].get('aff') or ''
+        rec['speakerSource'] = 'label'
+        # 不写 isMultiLecture/sourceCount/notes：合并后仍是「1 条普通记录」，
+        # 字段集合须与单条路径一致（否则 golden/快照比对会多出字段，skc786 实测）。
+        return [rec]
     for i, spk in enumerate(speakers):
         rec = dict(base)
         rec['speaker'] = spk['name']

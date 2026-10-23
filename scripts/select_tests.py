@@ -98,6 +98,7 @@ GROUPS = [
                'tests/test_listdate.py', 'tests/test_module_compile.py',
                'tests/test_poster_late_gate.py',
                'tests/test_poster_series_multisession.py',
+               'tests/test_multi_speaker_merge_20261023.py',
                'tests/test_abstract_provenance.py',
                'tests/test_env_flags.py']},
     # 抓取主流程 / 水位 / 台账 / 缓存 / sources.yaml
