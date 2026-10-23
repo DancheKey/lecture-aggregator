@@ -173,6 +173,15 @@ class TrackedScriptsTest(unittest.TestCase):
 
     def _tracked(self):
         try:
+            # ⚠ 2026-10-23：纯净检出复跑（git archive → tmp/_clean）场景下，cwd 虽有
+            # 文件却归属外层主仓库 .git，ls-files 返回的是主仓库根的跟踪清单 ——
+            # 'scripts/x.py' 永不命中 → 全部误报「磁盘有、未入库」（实测 16 条假红）。
+            # 工作区 ≠ git 仓库根时本断言无意义，按既有惯例 skipTest。
+            top = subprocess.check_output(['git', 'rev-parse', '--show-toplevel'],
+                                          cwd=ROOT, text=True,
+                                          stderr=subprocess.DEVNULL).strip()
+            if os.path.realpath(top) != os.path.realpath(ROOT):
+                self.skipTest('非 git 仓库根（纯净检出目录），跳过（该断言只在仓库工作区有意义）')
             out = subprocess.check_output(['git', 'ls-files'], cwd=ROOT,
                                           text=True, stderr=subprocess.DEVNULL)
         except (OSError, subprocess.CalledProcessError):
