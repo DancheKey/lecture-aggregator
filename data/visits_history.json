@@ -444,13 +444,13 @@
     },
     {
       "date": "2026-10-23",
-      "capturedAt": "2026-10-23T04:09:02+08:00",
-      "site_pv": 1866,
+      "capturedAt": "2026-10-23T12:54:55+08:00",
+      "site_pv": 1873,
       "site_uv": null,
       "page_pv": null,
       "page_uv": null,
       "uv_delta": null,
-      "pv_delta": 2,
+      "pv_delta": 9,
       "note": ""
     }
   ]
