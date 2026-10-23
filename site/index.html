@@ -120,6 +120,22 @@
     @media (prefers-reduced-motion: reduce) {
       .far-fold-bar { animation: none; }
     }
+    /* 远期折叠条两态（2026-10-23 用户反馈「分不出展开还是折叠」）：
+       折叠态 = 琥珀底 + 虚线边框（提示「这里有一坨可以点开」）；
+       展开态 = 白底 + 实线边框（内容已在下方，条退为普通分隔）。
+       底色差异是主信号，箭头文字只是辅证。展开态同时停掉呼吸光晕——
+       光晕的作用是「吸引注意力去点」，已经展开还闪会盖过底色变化。
+       注意：vendor/tailwind.css 是预编译产物，不能靠 bg-amber-50/40 这类
+       任意值类实现（静默失效），故走显式 CSS。 */
+    .far-fold-bar--open {
+      background-color: #ffffff;
+      border-style: solid;
+      border-color: #fde68a;
+      animation: none;
+    }
+    .far-fold-bar--open:hover { background-color: #fffbeb; }
+    /* 展开态白底上，白底计数徽章会「融进背景」，换成浅琥珀保住轮廓 */
+    .far-fold-bar--open .far-fold-count { background-color: #fffbeb; }
     /* Toast：淡入淡出 + 上浮位移。不用 Vue <transition>（其 enter 起始类依赖
        rAF 移除，页面非前台被节流时过渡会卡死在 opacity:0）；改为常驻元素 +
        toast-on/toff 类切换，纯 CSS transition 在任何环境都安全。 */
@@ -504,12 +520,14 @@
                    完全相同的渲染分支（分页不受影响：fold 容器恒占 1 个渲染单元位）。
                    展开态存 localStorage（toggleFarFuture），刷新不丢。 -->
               <button v-if="isFarFoldGroup(g)" type="button" @click="toggleFarFuture()"
-                class="far-fold-bar w-full text-left flex items-center gap-2 text-12pt text-slate-900 bg-amber-50 border border-dashed border-amber-200 rounded-xl px-4 py-3 mb-3 hover:bg-amber-100 transition">
+                :aria-expanded="farFutureOpen ? 'true' : 'false'"
+                :class="['far-fold-bar w-full text-left flex items-center gap-2 text-12pt text-slate-900 border border-amber-200 rounded-xl px-4 py-3 mb-3 transition',
+                         farFutureOpen ? 'far-fold-bar--open' : 'bg-amber-50 border-dashed hover:bg-amber-100']">
                 <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>
                 <span class="font-medium">距今 7 天以上的预告</span>
-                <span class="shrink-0 rounded-full bg-white border border-amber-200 px-2 py-0.5 font-bold text-amber-700">{{ g.count }} 场</span>
+                <span class="far-fold-count shrink-0 rounded-full bg-white border border-amber-200 px-2 py-0.5 font-bold text-amber-700">{{ g.count }} 场</span>
                 <span class="ml-auto shrink-0 font-medium text-amber-700">{{ farFutureOpen ? '收起 ▲' : '展开 ▼' }}</span>
               </button>
               <div v-else class="date-sticky sticky flex items-center gap-2 text-base font-bold text-slate-700 mt-6 mb-3 bg-[#f7f8fa]/95 py-2 border-b border-slate-200 z-10">
