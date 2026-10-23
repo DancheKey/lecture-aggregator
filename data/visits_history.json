@@ -452,6 +452,17 @@
       "uv_delta": null,
       "pv_delta": 13,
       "note": ""
+    },
+    {
+      "date": "2026-10-24",
+      "capturedAt": "2026-10-24T03:59:50+08:00",
+      "site_pv": 1880,
+      "site_uv": null,
+      "page_pv": null,
+      "page_uv": null,
+      "uv_delta": null,
+      "pv_delta": 3,
+      "note": ""
     }
   ]
 }
