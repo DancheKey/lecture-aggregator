@@ -1895,6 +1895,20 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
             # title 不改写（方案A）：多场共享源页列表标题，各场差异由 topic 体现。
             t = _apply_vlm_to_result(r, item, default_year, publish_time, title_year, url_year)
             results.append((r, t))
+        # 2026-10-23（lswh 20261022/86 用户反馈）：系列海报的讲者简介在图上只
+        # 出现一次，VLM 常只挂到首场——同一主讲人（normalize_speaker_key 归一
+        # 同键）的其余场次 speakerBio 为空时从同键场次补全。fill-only：有值
+        # 不覆盖，跨主讲人不串用（bio 归属以讲者键为准）。
+        _bio_by_key = {}
+        for _r, _ in results:
+            _k = tuple(_fv.normalize_speaker_key(_r.get('speaker') or ''))
+            if _k and (_r.get('speakerBio') or '').strip() and _k not in _bio_by_key:
+                _bio_by_key[_k] = _r['speakerBio']
+        for _r, _ in results:
+            if not (_r.get('speakerBio') or '').strip():
+                _k = tuple(_fv.normalize_speaker_key(_r.get('speaker') or ''))
+                if _k in _bio_by_key:
+                    _r['speakerBio'] = _bio_by_key[_k]
         return results
 
     # --- 单场讲座（原逻辑）---

@@ -103,14 +103,15 @@ _FAKE_CS5487 = [
 ]
 
 
-def _parse(html, url=URL):
+def _parse(html, url=URL, vlm=None):
     # 密封双桩：OCR 返回空（海报无可识别文字 → speaker 只来自正文标签）+
     # VLM 用用例自带桩。不依赖网络、不依赖 test_parser_golden 的 OCR 回放
     # 密封状态（否则全套运行时未录制图 URL 会撞 replay 硬抛，单独跑又会
     # 走真实网络 OCR——两种环境行为都不确定，2026-10-23 全套实测踩坑）。
+    if vlm is None:
+        vlm = [dict(s) for s in _VLM_4_SESSIONS] if url == URL else _FAKE_CS5487
     with mock.patch.object(P, '_img_to_text', lambda img: ''), \
-         mock.patch.object(P, '_vlm_extract_fields',
-                           lambda urls, cfgs: [dict(s) for s in _VLM_4_SESSIONS] if url == URL else _FAKE_CS5487):
+         mock.patch.object(P, '_vlm_extract_fields', lambda urls, cfgs: vlm):
         out = P.parse_detail(html, url, '历史文化学院', '石牌', 2026,
                              list_title='第十九届“勷勤论坛”之历史文化学院分论坛',
                              skip_news_filter=True)
@@ -139,6 +140,33 @@ class TestSeriesOverviewExempt(unittest.TestCase):
         for r in recs:
             self.assertEqual(r.get('speakerAffiliation'), '华南师范大学',
                              '「华南师范大学兼职特聘教授」须剥成「华南师范大学」')
+
+    def test_same_speaker_bio_reused_across_sessions(self):
+        """系列海报简介只出现一次（VLM 常挂首场）→ 同主讲人其余场次补全 bio。"""
+        # 桩里仅首场有 bio（复刻 lswh/86 实际 VLM 返回形态）
+        sessions = [dict(s) for s in _VLM_4_SESSIONS]
+        for s in sessions[1:]:
+            s['speakerBio'] = ''
+        sessions[0]['speakerBio'] = '李红岩，华南师范大学兼职特聘教授，中国编辑学会副会长。'
+        recs = _parse(_OVERVIEW_BODY, vlm=sessions)
+        self.assertEqual(len(recs), 4)
+        for r in recs:
+            self.assertIn('中国编辑学会副会长', r.get('speakerBio') or '',
+                          '同主讲人各场 speakerBio 须复用首场简介')
+
+    def test_bio_not_crossed_between_speakers(self):
+        """不同主讲人之间不得串用简介（bio 归属以讲者键为准）。"""
+        sessions = [dict(s) for s in _VLM_4_SESSIONS]
+        for s in sessions[1:]:
+            s['speaker'] = '张三'
+            s['speakerBio'] = ''
+        sessions[0]['speakerBio'] = '李红岩，华南师范大学兼职特聘教授，中国编辑学会副会长。'
+        recs = _parse(_OVERVIEW_BODY, vlm=sessions)
+        self.assertEqual(len(recs), 4)
+        self.assertIn('中国编辑学会副会长', recs[0].get('speakerBio') or '')
+        for r in recs[1:]:
+            self.assertEqual(r.get('speakerBio'), '',
+                             '张三的 bio 为空时不得复用李红岩的简介')
 
 
 class TestCs5487GuardStillWorks(unittest.TestCase):
