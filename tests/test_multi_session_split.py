@@ -39,6 +39,20 @@ NTH_FIELD = (
     '时间:2013年12月20日(周五)上午9:00-12:00 地点:文二栋五楼会议室'
 )
 
+# ── 形态4：「主题N」换行接「题目：」（em/5196 型，两场共用页眉时段）──
+TOPIC_NUM_TITLE = ('(地点更改)复旦大学陈钊教授、上海交通大学陆铭教授讲座'
+                   '暨193期、194期“华南经济论坛”通知')
+TOPIC_NUM_FIELD = (
+    TOPIC_NUM_TITLE + ' '
+    '2016-11-21 16:33:00 来源：院科研办 '
+    '主题一 题目：中国企业的税基侵蚀和利润转移：来自避税天堂的证据 '
+    '主讲人：陈钊(复旦大学教授) '
+    '主题二 题目：地的城市化：土地产权保护传统有利于新城建设效率的证据 '
+    '主讲人：陆铭(上海交通大学教授) '
+    '时间：2016年11月21日（周一）上午9:00-11:30 '
+    '地点：大学城华南师范大学经管学院一楼演讲厅'
+)
+
 # 单讲座页：含一个「第3期」标记，不应拆
 SINGLE = (
     '学术活动 2024-05-01 10:00:00 讲座通知 '
@@ -214,6 +228,32 @@ class NumberedAgendaTest(unittest.TestCase):
             '10:10-12:00 大会主题报告 1. 张曙光 (中国社科院研究员) 题目:X',
             title='论坛')
         self.assertEqual(len(r), 0)
+
+
+class TopicNumberFieldTest(unittest.TestCase):
+    """候选4 形态4：「主题一 / 题目：…」换行排版（em 5196）。
+
+    此前候选4 只认编号与题目标签**同行相邻**的写法（「（一）题目：」「讲座一题目：」
+    「讲座一(15:00-16:15) 题目：」），换行把编号与标签隔开时整批落空 → 页面被当
+    单场，topic 取到「主题」标签值「二」（两场讲座只剩一条、题目还丢了）。
+    """
+
+    def test_newline_numbered_topic_split(self):
+        r = parsers.detect_multi_session(TOPIC_NUM_FIELD, title=TOPIC_NUM_TITLE)
+        self.assertEqual(len(r), 2)
+        self.assertEqual([s['topic'] for s in r],
+                         ['中国企业的税基侵蚀和利润转移：来自避税天堂的证据',
+                          '地的城市化：土地产权保护传统有利于新城建设效率的证据'])
+        # 两场共用页眉时段（候选4 的 _numbered 豁免：不因无独立时钟而合并）
+        self.assertEqual(r[0]['start'].strftime('%Y-%m-%d %H:%M'), '2016-11-21 09:00')
+        self.assertEqual(r[0]['end'].strftime('%H:%M'), '11:30')
+        self.assertEqual(r[1]['start'], r[0]['start'])
+
+    def test_single_topic_number_not_split(self):
+        """只有一处「主题一」时不足以拆（候选4 要求 ≥2 处编号）。"""
+        t = ('主题一 题目：只有一个题目 主讲人：张三 '
+             '时间：2016年11月21日9:00-11:30 地点：某会议室')
+        self.assertEqual(parsers.detect_multi_session(t, title='通知'), [])
 
 
 class LabelSpeakersTest(unittest.TestCase):
