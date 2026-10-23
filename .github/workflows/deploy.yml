@@ -59,6 +59,7 @@ jobs:
             tests/test_hallucination_guard.py
             tests/test_poster_series_multisession.py
             tests/test_multi_speaker_merge_20261023.py
+            tests/test_field_hygiene_20261023.py
             tests/test_data_quality.py
             tests/test_multi_session_split.py
             tests/test_hybrid.py
