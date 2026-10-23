@@ -57,6 +57,7 @@ jobs:
             tests/test_frontend_consistency.py
             tests/test_timeparse.py
             tests/test_hallucination_guard.py
+            tests/test_poster_series_multisession.py
             tests/test_data_quality.py
             tests/test_multi_session_split.py
             tests/test_hybrid.py

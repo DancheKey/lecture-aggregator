@@ -366,6 +366,27 @@ def main():
              and (not args.only or args.only in c['fixture'])]
 
     if args.bless:
+        if args.only:
+            # 2026-10-23 修复：--only 此前把「过滤后的用例集」整体写回基线，
+            # 其余用例的基线被抹掉（实测 xz65 单刷后 20 例全「基线缺该用例」红）。
+            # 改为：合并写入 —— 只替换/新增 --only 命中的用例，其余基线原样保留。
+            old = {c['url']: c['records'] for c in _load_baseline()}  # url -> records
+            merged = []
+            replaced = set()
+            for c in G.CASES:
+                if not os.path.exists(os.path.join(FIXDIR, c['fixture'])):
+                    continue
+                if args.only in c['fixture']:
+                    merged.append({'url': c['url'], 'fixture': c['fixture'],
+                                   'records': _parse(c)})
+                    replaced.add(c['url'])
+                elif c['url'] in old:
+                    merged.append({'url': c['url'], 'fixture': c['fixture'],
+                                   'records': old[c['url']]})
+            _bless(merged)
+            print(f'--only 合并刷新：替换 {len(replaced)} 例，'
+                  f'共 {len(merged)} 例（其余基线保留）')
+            return 0
         all_snap = []
         for c in cases:
             all_snap.append({'url': c['url'], 'fixture': c['fixture'],

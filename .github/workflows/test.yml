@@ -39,6 +39,8 @@ jobs:
         run: python tests/test_timeparse.py
       - name: Run hallucination-guard tests
         run: python tests/test_hallucination_guard.py
+      - name: Run poster-series multisession tests
+        run: python tests/test_poster_series_multisession.py
       - name: Run data-quality tests
         run: python tests/test_data_quality.py
       # 以下五项 2026-09-26 纳入：多场拆分候选9/10/11与质量闸门（2026-09-25/26 两次

@@ -263,6 +263,34 @@ def _parse_compact_run(m, seg, yy, run):
     return None
 
 
+def _attach_range_end(r, seg, y):
+    """「M月D1-D2日」跨日区间总览 → 补 r['end']（2026-10-23，lswh 20261022/86）。
+
+    系列讲座正文常写「时间:2026年10月26-29日」（4 场共享总览，无逐场钟点），
+    旧逻辑只解出 start（10-26）、end=None，下游多场守卫因此失去「正文是区间
+    总览」的直接证据。此处对同月、尾日>首日的区间补 end=尾日（钟点继承 start）。
+    刻意保守：
+      - 仅当 r 尚无同日时段 end（「26日15:00-17:45」的钟点区间优先，不覆盖）；
+      - 跨月区间（9月30-10月2日，尾日<首日）跳过，行为同旧；
+      - 月/日必须与已解出的 start 完全一致，防止 seg 内其他数字串误配。
+    """
+    if not r or r.get('end'):
+        return r
+    m = re.search(r'(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?\s*[-–—~至到]\s*(\d{1,2})\s*[日号]', seg)
+    if not m:
+        return r
+    mo, d1, d2 = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if not (1 <= d2 <= 31) or d2 <= d1:
+        return r
+    if r['start'].month != mo or r['start'].day != d1:
+        return r
+    try:
+        r['end'] = r['start'].replace(day=d2)
+    except ValueError:
+        return r
+    return r
+
+
 def _parse_segment(seg, default_year, publish_time):
     """在单段文本里找第一个日期。完整日期用其显式年；仅月日用 default_year 补年。
 
@@ -281,7 +309,7 @@ def _parse_segment(seg, default_year, publish_time):
         if not r:
             return None
         r['from_full'] = True
-        return r
+        return _attach_range_end(r, seg, m.group(1))
 
     # 2) 完整日期 YYYY-MM-DD / YYYY.MM.DD / YYYY/M/D / YYYY/MMDD：
     #    跳过等于发布日期的（避免把发布日期当讲座日期）。
@@ -313,7 +341,7 @@ def _parse_segment(seg, default_year, publish_time):
         if not r:
             return None
         r['from_full'] = False
-        return r
+        return _attach_range_end(r, seg, y)
 
     # 5) 图片 OCR 常见美式月日：06/10，默认取 default_year
     sm = re.search(SLASH_MONTHDAY, seg)

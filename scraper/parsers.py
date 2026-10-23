@@ -1373,7 +1373,7 @@ VLM_PROMPT = """你是一个学术讲座海报信息提取助手。下面是一�
 - sessionNumber: «第N讲/第N场/第N期»（如「第七讲」「Lecture 7」「第3场」），单讲座则留空
 - title: 讲座主标题（若无独立主标题，用主题概括，不要含「第N讲/期」等场次数）
 - topic: 讲座主题或副标题（若与 title 实质相同则留空字符串）
-- speaker: 主讲人姓名（只写姓名，不要含职称、单位、职务）。【同一场】讲座有多位主讲人【共用同一主题/题目、无各自独立题目】时，把全部主讲人姓名写进本字段，用「、」分隔（如「王红军、冯志旭」）——系统据此识别多主讲、只展示第一位并加「等」。
+- speaker: 主讲人姓名（只写姓名，不要含职称、单位、职务）。【同一场】讲座有多位主讲人【共用同一主题/题目、无各自独立题目】时，把全部主讲人姓名写进本字段，用「、」分隔（如「王红军、冯志旭」）——系统据此识别多主讲、只展示第一位并加「等」。【主持人不是主讲人】：海报每场标注的「主持人/Chair/评议人/评论人/与谈人」是本场活动的主持角色，绝不能写进 speaker——即使「主持人：X教授」紧贴在讲座题目旁边也一样；只提取标签为「主讲人/主讲嘉宾/报告人/演讲人」的人。系列讲座海报若只在顶部标注一位「主讲人」，则每一场的 speaker 都写这位主讲人，不得用各场主持人顶替。
 - speakerTitle: 主讲人职称（如 教授、研究员、副教授、博士、讲师）
 - speakerAffiliation: 主讲人单位（如 某某大学某某学院、某某研究院）。多位主讲人共用同一主题时，写【第一位】主讲人的单位。
 - lectureStart: 讲座开始时间，格式 "YYYY-MM-DD HH:MM"（若只有日期无钟点，钟点用 00:00）
@@ -1389,6 +1389,7 @@ VLM_PROMPT = """你是一个学术讲座海报信息提取助手。下面是一�
   · 【同一时段并列多场】同一张海报在同一日期并列安排了 ≥2 场讲座（如上下或左右分块，各自有独立的主讲人、题目、地点，即使没有「第N讲」字样）。典型如「上午 9:00 分论坛A（主讲人甲，地点X）／分论坛B（主讲人乙，地点Y）」「平行论坛」「分会场」「专题一/专题二」。
   · 只要海报上出现 ≥2 个独立的主讲人+题目组合，就应按多场输出数组，【不要合并成一场】。
   · 【一场多人·勿拆】反之，多位讲者【共用同一主题/题目、无各自独立题目】（如「王红军（单位A）」「冯志旭（单位B）」并列同一主题）=【一场】讲座，写进同一个 speaker 字段（用「、」分隔），【不要】拆成多场数组。
+  · 【同一主讲人·系列多场】一位主讲人开系列讲座，海报列出多场（各场有独立题目/日期/地点/主持人）→ 按多场拆成数组，且【每一场的 speaker 都写这位主讲人】；各场的「主持人」只是主持角色，不得写入任何一场的 speaker。
 - 字段缺失则对应值为空字符串 ""
 - 实事求是，绝对不要编造：只提取海报上【实际印出】的文字并逐字照抄；海报上没有的字段一律留空字符串 ""
 - 如果图片只是人物照片、风景图或不含讲座文字（无标题/主讲人/时间），所有字段返回空字符串，不要根据图片内容想象或补全任何讲座信息
@@ -1882,6 +1883,15 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
         for item in f:
             r = result.copy()  # 浅拷贝（讲座特有字段会被覆盖，通用字段保留）
             r['sessionNumber'] = (item.get('sessionNumber') or '').strip()
+            # 2026-10-23（lswh 20261022/86 实测）：VLM 对系列多场海报常把各场
+            # 题目写进 title、topic 留空。按「title=列表标题、topic=单场题目」
+            # 口径，把 item.title 转移为 item.topic 再走单场回填——否则各场题目
+            # 全部丢失（partial.title 恒为列表标题，topic 又是空）。
+            _vt = (item.get('title') or '').strip()
+            if _vt and not (item.get('topic') or '').strip():
+                item = dict(item)
+                item['topic'] = _vt
+                item['title'] = ''
             # title 不改写（方案A）：多场共享源页列表标题，各场差异由 topic 体现。
             t = _apply_vlm_to_result(r, item, default_year, publish_time, title_year, url_year)
             results.append((r, t))
@@ -4336,10 +4346,20 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
             # 双份文本/VLM 幻觉误拆信号（physics12723 实测：meta+正文双份导致
             # VLM 识别成 2 场同主讲人，其中一场 topic 还是导航垃圾）。不通过时
             # 视为 VLM 失败（applied=None），放行文本/OCR/多讲座拆分兜底。
+            # 2026-10-23 收窄（lswh 20261022/86 实测）：同一主讲人开系列讲座（4 场
+            # 各有独立题目/日期/主持人）也是「主讲人全同」，不能一刀切判幻觉。
+            # 幻影场次（physics12723）是同一文本切两遍，topic+lectureStart 联合键
+            # 必全同；真系列讲座各场题目/日期互异。故主讲人全同时改验联合键互异：
+            # 互异 → 放行；仍全同 → 维持判幻觉。
             _sp_names = [str(p.get('speaker') or '').strip() for p, _ in applied]
             if len(applied) > 1 and not (all(_sp_names)
                                          and len(set(_sp_names)) == len(_sp_names)):
-                applied = None
+                _sess_keys = {(str(p.get('topic') or '').strip(),
+                               str(p.get('lectureStart') or '').strip())
+                              for p, _ in applied}
+                if not (all(str(p.get('speaker') or '').strip() for p, _ in applied)
+                        and len(_sess_keys) == len(applied)):
+                    applied = None
         if isinstance(vlm_fields, list) and isinstance(applied, list):
             # 多讲座拆分：按讲座开始时间排序，时间早的期数靠前（避免海报视觉排版顺序≠时间顺序）
             if len(applied) > 1:
@@ -5490,7 +5510,12 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
             result['speaker'] = _sp
             if _aff and not result.get('speakerAffiliation'):
                 result['speakerAffiliation'] = _aff
-            result['speakerSource'] = _src or 'ocr'
+            # 2026-10-23 加 'ocr:' 前缀：OCR 海报提取的 speaker 必须能与**正文标签**
+            # 提取的区分开——_finalize_record 的多场退回守卫依赖这一区分（lswh 20261022/86
+            # 实测：正文只有 4 场共享总览时间，speaker 来自海报 OCR「主讲人：李红岩」，
+            # 旧值 'label' 与正文标签同值，守卫误把 VLM 正确拆出的 4 场当幻觉丢弃）。
+            # 正文标签路径（4960 等）仍是裸 'label'，行为不变。
+            result['speakerSource'] = 'ocr:' + (_src or 'plain')
             if _src == 'pattern4':
                 # 2026-08-05 体检修正：notes 统一为 list（拆分路径本就是 list/append，
                 # 单条路径此前是字符串拼接，同字段两种类型下游序列化必踩坑）。
@@ -6333,7 +6358,42 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     # VLM「多场」结果不得顶替正文——报告人证件照/无字图被 VLM 编造成多场讲座
     # （李四/王五）会经此路径整页覆盖正文权威值。真实多场海报页正文无字段标签，
     # speaker/lectureStart 为空，不受影响。命中时仅补非幻觉的摘要/简介后丢弃场次。
+    # 2026-10-23 两处收窄：
+    # ① speakerSource 以 'ocr:' 开头 = speaker 由海报 OCR 提取，result 的「权威值」
+    #   与 VLM 读的是同一张海报，不比 VLM 更权威——不得据此丢弃（语义标记，
+    #   现行控制流下 OCR 与 VLM 多场少有共存，但防御未来路径重组）。
+    # ② 系列总览豁免（lswh 20261022/86 实测根因）：正文「主讲人:李红岩
+    #   时间:2026年10月26-29日」是 4 场共享的总览行——日期是跨日区间、各场时间
+    #   落在区间内，并非单场权威值。判据（须全部满足才豁免）：
+    #   a. 正文 lectureEnd-lectureStart ≥ 2 天（真区间，排除单日）；
+    #   b. VLM 各场 lectureStart ≥2 个且互异（真拆分，排除重复幻觉）；
+    #   c. 各场时间均落在正文区间内（防编造场次的日期跳出正文时间范围）。
+    #   cs 5487 正文是单日 → a 不成立 → 守卫照常生效。
+    _series_exempt = False
     if _vlm_sessions and result.get('speaker') and result.get('lectureStart'):
+        try:
+            _ls = datetime.datetime.fromisoformat(result['lectureStart'])
+            _le = (datetime.datetime.fromisoformat(result['lectureEnd'])
+                   if result.get('lectureEnd') else None)
+            if _le and (_le - _ls).days >= 2:
+                _vlm_starts = []
+                for _p, _ in _vlm_sessions:
+                    _v = _p.get('lectureStart')
+                    if _v:
+                        _vlm_starts.append(datetime.datetime.fromisoformat(_v))
+                # 日期级比较（忽略钟点）：区间 end 是尾日 00:00（总览行无钟点），
+                # 各场常在当日 15:00 等——按含钟点比较会让末场误判越界
+                #（lswh/86 实测：10-29 15:00 > 10-29 00:00）。
+                if (len(_vlm_starts) >= 2
+                        and len(set(_vlm_starts)) == len(_vlm_starts)
+                        and all(_ls.date() <= v.date() <= _le.date()
+                                for v in _vlm_starts)):
+                    _series_exempt = True
+        except Exception:
+            pass
+    if _vlm_sessions and result.get('speaker') and result.get('lectureStart') \
+            and not (result.get('speakerSource') or '').startswith('ocr:') \
+            and not _series_exempt:
         for _p, _pt in _vlm_sessions:
             for _k in ('abstract', 'speakerBio'):
                 if not (result.get(_k) or '').strip() and (_p.get(_k) or '').strip() \
@@ -6361,6 +6421,23 @@ def _finalize_record(soup, url, title, list_title, _st, result,
                     r'巡视员|科员|干事|二级|一级|三级)$', r['speaker']):
                 r['speaker'] = ''
                 r['speakerAffiliation'] = ''
+            # 2026-10-23（lswh/86 实测）：VLM 常把「华南师范大学兼职特聘教授」这类
+            # 「单位+职称」整串填进 speakerAffiliation。与 F-AFF 同口径：剥职称尾缀
+            # （含聘任修饰前缀，词表引 field_vocab.TITLE_MODIFIERS），迭代到不动点；
+            # 剥后为空则整字段清空（纯职称不该留在单位位）。
+            if r.get('speakerAffiliation'):
+                _mod_alt = '|'.join(map(re.escape, _fv.TITLE_MODIFIERS))
+                _mod_tail = r'(?:(?:' + _mod_alt + r')\s*)?' + _fv.TAIL_TITLE_RE.pattern
+                # 尾部孤立修饰词（如「复旦大学客座讲席教授」剥掉「讲席教授」后剩「客座」）
+                _mod_only = r'(?:' + _mod_alt + r')\s*$'
+                _aff = r['speakerAffiliation']
+                for _ in range(3):
+                    _aff2 = re.sub(_mod_tail, '', _aff)
+                    _aff2 = re.sub(_mod_only, '', _aff2).strip(' ,，/、')
+                    if _aff2 == _aff:
+                        break
+                    _aff = _aff2
+                r['speakerAffiliation'] = _aff
             _vlm_recs.append(r)
         # VLM 多场共享 topic 时按 title 拆分逐场分配（xz301：海报只印系列名+合题，
         # VLM 给各场填同一个系列名 topic；可拆题目在 title「集成光子学和超快光学

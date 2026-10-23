@@ -9,7 +9,7 @@ X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
 UID:http://life.scnu.edu.cn/a/20261019/6830.html@danchekey.github.io
-DTSTAMP:20261022T102837Z
+DTSTAMP:20261023T012647Z
 DTSTART:20261023T070000Z
 DTEND:20261023T080000Z
 SUMMARY:学术讲座：早期胚胎发育和体轴建立
@@ -25,8 +25,62 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://lswh.scnu.edu.cn/a/20261022/86.html@danchekey.github.io
+DTSTAMP:20261023T012647Z
+DTSTART:20261026T070000Z
+DTEND:20261026T094500Z
+SUMMARY:第十九届“勷勤论坛”之历史文化学院分论坛｜关
+ 于中国近代史的主题与线索问题
+LOCATION:文科楼423
+DESCRIPTION:题目：关于中国近代史的主题与线索问题\n主讲
+ ：李红岩（华南师范大学）\n地点：文科楼423\n主办：历
+ 史文化学院
+URL:http://lswh.scnu.edu.cn/a/20261022/86.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:http://lswh.scnu.edu.cn/a/20261022/86.html@danchekey.github.io
+DTSTAMP:20261023T012647Z
+DTSTART:20261027T070000Z
+DTEND:20261027T094500Z
+SUMMARY:第十九届“勷勤论坛”之历史文化学院分论坛｜新
+ 中国史学的“五朵金花”
+LOCATION:文科楼428
+DESCRIPTION:题目：新中国史学的“五朵金花”\n主讲：李红
+ 岩（华南师范大学）\n地点：文科楼428\n主办：历史文化
+ 学院
+URL:http://lswh.scnu.edu.cn/a/20261022/86.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:http://lswh.scnu.edu.cn/a/20261022/86.html@danchekey.github.io
+DTSTAMP:20261023T012647Z
+DTSTART:20261028T070000Z
+DTEND:20261028T094500Z
+SUMMARY:第十九届“勷勤论坛”之历史文化学院分论坛｜十
+ 七年史学关于历史人物的评价讨论
+LOCATION:文科楼423
+DESCRIPTION:题目：十七年史学关于历史人物的评价讨论\n主
+ 讲：李红岩（华南师范大学）\n地点：文科楼423\n主办：
+ 历史文化学院
+URL:http://lswh.scnu.edu.cn/a/20261022/86.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://mks.scnu.edu.cn/a/20261020/20.html@danchekey.github.io
-DTSTAMP:20261022T102837Z
+DTSTAMP:20261023T012647Z
 DTSTART:20261028T103000Z
 DTEND:20261028T113000Z
 SUMMARY:第十九届“勷勤论坛”主论坛名校长讲座板块之周
@@ -45,8 +99,26 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://lswh.scnu.edu.cn/a/20261022/86.html@danchekey.github.io
+DTSTAMP:20261023T012647Z
+DTSTART:20261029T070000Z
+DTEND:20261029T094500Z
+SUMMARY:第十九届“勷勤论坛”之历史文化学院分论坛｜中
+ 国社会性质论战与中国马克思主义史学的形成
+LOCATION:文科楼423
+DESCRIPTION:题目：中国社会性质论战与中国马克思主义史
+ 学的形成\n主讲：李红岩（华南师范大学）\n地点：文科
+ 楼423\n主办：历史文化学院
+URL:http://lswh.scnu.edu.cn/a/20261022/86.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261031/8868.html@danchekey.github.io
-DTSTAMP:20261022T102837Z
+DTSTAMP:20261023T012647Z
 DTSTART:20261031T020000Z
 DTEND:20261031T030000Z
 SUMMARY:勷勤数学•专家报告-蒋枭｜两类局部零和问题
@@ -62,7 +134,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261031/8871.html@danchekey.github.io
-DTSTAMP:20261022T102837Z
+DTSTAMP:20261023T012647Z
 DTSTART:20261031T030000Z
 DTEND:20261031T040000Z
 SUMMARY:勷勤数学•专家报告-高维东｜Some open problems in zero
@@ -80,7 +152,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261031/8857.html@danchekey.github.io
-DTSTAMP:20261022T102837Z
+DTSTAMP:20261023T012647Z
 DTSTART:20261031T060000Z
 DTEND:20261031T070000Z
 SUMMARY:勷勤数学•专家报告-陈天翔｜从医学视觉到多模
