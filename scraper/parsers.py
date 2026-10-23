@@ -7850,9 +7850,13 @@ def _split_by_speakers(base, speakers):
         # 卡片；按 VLM 提示词「一场多人·勿拆」的既有口径，改为合并。
         rec = dict(base)
         rec['speaker'] = '、'.join(_names)
-        # 职称/单位取首位（页面通常只给首位完整信息；其余人在 speaker 串里可辨）
-        rec['speakerTitle'] = speakers[0].get('honorific') or ''
-        rec['speakerAffiliation'] = speakers[0].get('aff') or ''
+        # 职称/单位取首位（页面通常只给首位完整信息；其余人在 speaker 串里可辨）；
+        # 首位无显式值时保留基底值——仅填空，不得覆写（2026-10-23 em/8855 修复）。
+        # 根因：派生路径（_pairs「姓名职称，姓名」拆分、标签串顿号拆分）的 aff 恒为
+        # 空串，此前无条件覆写会把 hybrid 刚填入并采纳的单位（llmAdopted 有记录）
+        # 抹成空值——实测 llmAdopted='speakerAffiliation' 与终值 '' 自相矛盾。
+        rec['speakerTitle'] = speakers[0].get('honorific') or base.get('speakerTitle') or ''
+        rec['speakerAffiliation'] = speakers[0].get('aff') or base.get('speakerAffiliation') or ''
         rec['speakerSource'] = 'label'
         # 不写 isMultiLecture/sourceCount/notes：合并后仍是「1 条普通记录」，
         # 字段集合须与单条路径一致（否则 golden/快照比对会多出字段，skc786 实测）。
@@ -7860,8 +7864,11 @@ def _split_by_speakers(base, speakers):
     for i, spk in enumerate(speakers):
         rec = dict(base)
         rec['speaker'] = spk['name']
-        rec['speakerTitle'] = spk['honorific'] or ''
-        rec['speakerAffiliation'] = spk.get('aff') or ''
+        # 仅填空（2026-10-23 em/8855 修复，同共享合并分支）：本场无显式 aff/honorific
+        # 时保留基底值。拆分支的页面通常无整页单位（base 为空则行为与原来一致）；
+        # base 非空时它来自页面级 bio/规则，比清空更接近真相。
+        rec['speakerTitle'] = spk['honorific'] or base.get('speakerTitle') or ''
+        rec['speakerAffiliation'] = spk.get('aff') or base.get('speakerAffiliation') or ''
         rec['speakerSource'] = 'label'
         rec['isMultiLecture'] = True
         rec['lectureIndex'] = i + 1

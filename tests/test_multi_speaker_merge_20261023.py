@@ -69,6 +69,29 @@ class SameTopicMergeTest(unittest.TestCase):
         self.assertEqual(out[0]['speakerTitle'], '国家杰青')
         self.assertEqual(out[0]['speakerAffiliation'], 'A大学')
 
+    def test_merge_keeps_base_affiliation_when_speaker_aff_empty(self):
+        """8855 回归：派生路径 aff 恒空时，合并不得抹掉基底已有单位。
+
+        端到端实测：hybrid 填入并采纳「中山大学管理学院」（llmAdopted 有记录），
+        旧代码在共享合并分支用空 aff 覆写 → 终值为 ''，llmAdopted 与终值矛盾。
+        """
+        base = {'topic': '破产法庭与债券发行市场化',
+                'title': '华师经管学术讲座第399期（管理）',
+                'speakerAffiliation': '中山大学管理学院',
+                'speakerTitle': '教授'}
+        out = parsers._split_by_speakers(base, _spk('辛宇', '徐莉萍'))
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['speakerAffiliation'], '中山大学管理学院')
+        self.assertEqual(out[0]['speakerTitle'], '教授')
+
+    def test_merge_fills_title_from_base_when_honorific_empty(self):
+        base = {'topic': '同一个题目', 'title': '', 'speakerTitle': '副教授'}
+        spk = [{'name': '张三', 'honorific': '', 'aff': ''},
+               {'name': '李四', 'honorific': '', 'aff': ''}]
+        out = parsers._split_by_speakers(base, spk)
+        self.assertEqual(out[0]['speakerTitle'], '副教授')
+        self.assertEqual(out[0]['speakerAffiliation'], '')
+
 
 class SplitStillWorksTest(unittest.TestCase):
     """题目能拆成 n 段 → 仍拆 N 条（防本次改动误伤原行为）。"""
@@ -83,6 +106,16 @@ class SplitStillWorksTest(unittest.TestCase):
         self.assertEqual(out[1]['topic'], '超快光学与微纳加工')
         self.assertTrue(out[0]['isMultiLecture'])
         self.assertEqual([r['sourceCount'] for r in out], [1, 0])
+
+    def test_split_inherits_base_affiliation(self):
+        """拆分支同为仅填空：本场无 aff 时保留基底单位（em/8855 同族修复）。"""
+        base = {'topic': '1) 题目甲 2) 题目乙', 'title': '论坛',
+                'speakerAffiliation': '中山大学管理学院', 'speakerTitle': '教授'}
+        out = parsers._split_by_speakers(base, _spk('黄加耀', '刘轩奕'))
+        self.assertEqual(len(out), 2)
+        for r in out:
+            self.assertEqual(r['speakerAffiliation'], '中山大学管理学院')
+            self.assertEqual(r['speakerTitle'], '教授')
 
 
 class GuardTest(unittest.TestCase):
