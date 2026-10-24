@@ -5796,7 +5796,12 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
                # 履历里的期刊名（Fuzzy Sets and Systems…）截取。lookahead 要求标签后
                # 紧跟「冒号+2~4 字姓名+逗号」，排除「报告人：张三」这类纯姓名短标签
                # （后面无逗号 → 不匹配，仍由字段解析处理），避免把姓名行当简介。
-               rf'|报告人(?=[：:]\s*[\u4e00-\u9fff]{{2,4}}[，,]))[\s\]:：]*')
+               # 2026-10-24 cs/5472 实测放宽：姓名后可再跟**一个**职称/学位词
+               # （词表按语义引 _fv.TAIL_TITLE_ANY_RE，禁手抄）——「张天威博士，」
+               # 姓名+博士共 5 字，旧判据 {2,4}+逗号不匹配致 bio 漏抓；纯姓名短标签
+               # 仍不匹配（无逗号），「报告人：李明教授，计算机学院…」履历段正常命中。
+               rf'|报告人(?=[：:]\s*[\u4e00-\u9fff]{{2,4}}(?:' + _fv.TAIL_TITLE_ANY_RE.pattern
+               + r')?\s*[，,]))[\s\]:：]*')
     m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|{BIO_STOP}|$))', _st.body_text)
     if m:
         bio = m.group(1).strip()
@@ -5806,6 +5811,12 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         bio = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', bio).strip()
         # 截断页面噪声
         bio = re.split(rf'(?:{NOISE_MARKERS})', bio)[0].strip()
+        # 折叠 CMS 嵌套 span 拆号造成的数字伪空格（cs/5472 实测：源页把年份包成
+        # `<span>2</span><span>011</span>`，get_text(' ') 拼成「2 011 年」；
+        # 清后得「2011年」）。与地点系统级清理（6121 行）同一函数、同一语义。
+        # ⚠ 副作用：bio 与 body_text 不再逐字一致，依赖「bio 是 narrative abstract
+        # 子串」的判据必须归一化比较（见 6007 行 _flat_cmp，physics807 实测回归）。
+        bio = _despace_cjk_digits(bio)
         if len(bio) > 10:
             result['speakerBio'] = bio
 
@@ -5999,7 +6010,19 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
             # 履历特征词开头），则不应污染 abstract；仅在 speakerBio 为空时迁移过去。
             _BIO_SIG_START = ('现任', '曾任', '毕业于', '获', '主要从事', '研究方向',
                               '个人简介', '专家简介', '学者简介')
-            _is_bio = (_bio and (_narr_abs in _bio or _bio in _narr_abs
+            # ⚠ 子串判据必须**归一化后**比较（physics807 实测回归）：bio 出口清理
+            # （数字 span 空格折叠、标签截断等）会打破「bio 逐字来自 body_text」的
+            # 假设——cs/5472 引入 _despace_cjk_digits 后，807 页 bio 与未清理的
+            # narrative abstract 不再逐字一致，子串关系断裂 → 元信息骨架
+            # 「嘉宾:刘玉鑫 主题:…」被当摘要写入 → gate 截剩 9 字置空，只剩
+            # qaGate='abstract:emptied' 噪声。去空白+统一全半角标点后比较，
+            # 对一切出口清理鲁棒（清理不改变语义内容）。
+            _flat_cmp = lambda s: re.sub(r'\s+', '', (s or '')
+                                         .replace('（', '(').replace('）', ')')
+                                         .replace('：', ':').replace('，', ',')
+                                         .replace('“', '"').replace('”', '"'))
+            _fb, _fn = _flat_cmp(_bio), _flat_cmp(_narr_abs)
+            _is_bio = (_bio and (_fn in _fb or _fb in _fn
                                  or any(_narr_abs.startswith(s) for s in _BIO_SIG_START)))
             if _is_bio:
                 if not _bio:

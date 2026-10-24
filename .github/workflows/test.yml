@@ -58,6 +58,11 @@ jobs:
       # 齐全且 start 不错位）+ 学位单位提取 + 「现为」无单位回退 + 块内连写简介防误伤
       - name: Run field-list split tests
         run: python tests/test_field_list_split_20261024.py
+      # 2026-10-24：cs 5472「报告人：姓名+学位，」连写履历段 bio 提取（旧 lookahead
+      # {2,4} 字不含学位词漏抓）+ 嵌套 span 数字伪空格折叠 + physics807 回归锁
+      # （bio 出口清理后叙事兜底子串判据须归一化比较，防元信息骨架污染 abstract）
+      - name: Run bio speaker-prefix life tests
+        run: python tests/test_bio_speaker_prefix_20261024.py
       - name: Run data-quality tests
         run: python tests/test_data_quality.py
       # 以下五项 2026-09-26 纳入：多场拆分候选9/10/11与质量闸门（2026-09-25/26 两次
