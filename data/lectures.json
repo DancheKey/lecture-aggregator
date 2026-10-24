@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-24T10:52:56",
+  "updatedAt": "2026-10-24T11:37:03",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8857.html",
@@ -58704,7 +58704,7 @@
       "college": "经济与管理学院",
       "campus": "大学城",
       "title": "华师经管学术讲座第404期（管理）",
-      "topic": "WEB",
+      "topic": "WEB 3.0下的文化遗产图像智能应用-让价值触手可及",
       "lectureStart": "2022-04-01 14:00:00",
       "lectureEnd": null,
       "location": "文二栋536会议室",
@@ -101193,13 +101193,13 @@
       "college": "计算机学院",
       "campus": "石牌",
       "title": "学术讲座信息",
-      "topic": "Collaborative",
+      "topic": "Collaborative Topic Ranking: Leveraging Item Meta-data for Sparsity Reduction(协同话题排序:借助项目元数据减少稀疏性)",
       "lectureStart": "2015-04-23 16:00:00",
       "lectureEnd": null,
       "location": "计算机学院院楼102会议室",
       "speaker": "何静",
       "speakerTitle": "博士",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "澳大利亚维多利亚大学工程与科学学院",
       "inviter": "",
       "organizer": "计算机学院",
       "publishTime": "2015-04-22 16:40:44",
@@ -101207,7 +101207,8 @@
       "timeConfidence": "high",
       "timeNote": "same-year",
       "listTitle": "学术讲座信息",
-      "abstract": "目前已经在多个国际核心期刊和会议发表论文60余篇。本次讲座,何静博士将介绍一种新的基于分层贝叶斯框架、采用\"词袋\"式的元数据项成对排序模型的协同过滤方法。该方法的主要思想是用概率主题模型扩展成对地排序。"
+      "abstract": "目前已经在多个国际核心期刊和会议发表论文60余篇。本次讲座,何静博士将介绍一种新的基于分层贝叶斯框架、采用\"词袋\"式的元数据项成对排序模型的协同过滤方法。该方法的主要思想是用概率主题模型扩展成对地排序。",
+      "speakerBio": "何静博士来自澳大利亚维多利亚大学工程与科学学院,主要研究方向为数据挖掘、人工智能、Web服务和Web搜索、时空数据库、多准则决策智能系统以及计算机在医疗、石油勘探与开发、水资源管理和电子商务领域的应用。目前已经在多个国际核心期刊和会议发表论文60余篇。并且受到了澳大利亚多个科研基金项目的资助。"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20150422/3991.html",

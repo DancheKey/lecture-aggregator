@@ -583,12 +583,15 @@ _AFFIL_LEAD_RE = re.compile(
 # 现职单位锚点：只在明确「当前单位」表达处取机构。带年份的「20XX年X月起在…工作」
 # 「20XX-至今在…」算现职；学历表述（获得/毕业于/就读于）与历史任职（曾任/曾在）
 # 一律不算——那些是履历学校，不是现职单位。
+# 「来自」锚点（2026-10-24 cs/1818 修复）：讲座 bio 开头「何静博士来自澳大利亚
+# 维多利亚大学工程与科学学院」是现职的可靠表述（讲者介绍惯例），此前不认导致
+# 规则层提不到单位、只靠 LLM（还会省略国别成「维多利亚大学工程与科学学院」）。
 # ⚠ 该正则的机构捕获组与 _AFFIL_LEAD_RE 不同（LEAD 无年份锚点），分句扫描
 # 兜底只认 LEAD 已命中但被学历词跳过的场景，不会误伤仅 CURRENT 命中的正例。
 _AFFIL_CURRENT_RE = re.compile(
     r'(?:'
     r'现任职于|现任职|现任于|现任|现为|现就职于|目前任职于|目前在|现担任|现受聘于|受聘于|'
-    r'任职于|就职于|工作于|全职工作|'
+    r'任职于|就职于|工作于|全职工作|来自|'
     r'\d{4}\s*年(?:\s*\d{1,2}\s*月)?\s*起\s*(?:至今)?\s*在|'
     r'\d{4}\s*[-–—~]\s*(?:至今|现在)\s*在'
     r')\s*(?:于|在)?\s*'
@@ -1018,9 +1021,18 @@ def _apply_bio_fallback(result):
     bio = (result.get('speakerBio') or '').strip()
     if not bio:
         return
-    if not (result.get('speakerAffiliation') or '').strip():
-        _a = _infer_affiliation(bio)
-        if _a:
+    _cur_aff = (result.get('speakerAffiliation') or '').strip()
+    _a = _infer_affiliation(bio)
+    if _a:
+        if not _cur_aff:
+            result['speakerAffiliation'] = _a
+        elif _a != _cur_aff and _a.endswith(_cur_aff) and len(_a) > len(_cur_aff):
+            # 补全式覆盖（2026-10-24 cs/1818 修复）：LLM 常省略单位名里的国别/地域
+            # 前缀（「维多利亚大学工程与科学学院」vs bio 现职原文「澳大利亚维多利亚
+            # 大学工程与科学学院」——澳洲 Victoria University 与加拿大 University of
+            # Victoria 仅靠中文名无法区分）。bio 反推值以现有值为**真后缀且更长** =
+            # 现有值是截断省略版，补全而非覆盖；非后缀关系（如「北京大学」vs
+            # 「东京大学」）不动，防张冠李戴。
             result['speakerAffiliation'] = _a
     cur_title = (result.get('speakerTitle') or '').strip()
     chain = _infer_title(bio)  # 单职称首匹配；同分句「、」连读则返回全链

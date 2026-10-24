@@ -50,6 +50,10 @@ jobs:
       # 2026-10-24：跨 URL 同一讲座（存量重复自愈 + 「报告人：」履历段 bio 提取）
       - name: Run cross-URL duplicate tests
         run: python tests/test_cross_url_dup_20261024.py
+      # 2026-10-24：英文题目不被 Topic/Title 标签截断 + 重复主题标签取完整份 +
+      # 「来自」现职锚点与 bio 反推单位补全（cs 1818）
+      - name: Run topic-repeat & affiliation-live tests
+        run: python tests/test_topic_repeat_affil_life_20261024.py
       - name: Run data-quality tests
         run: python tests/test_data_quality.py
       # 以下五项 2026-09-26 纳入：多场拆分候选9/10/11与质量闸门（2026-09-25/26 两次

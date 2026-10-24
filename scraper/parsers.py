@@ -4599,6 +4599,12 @@ def _extract_topic_location(_st, result, title, loc_times):
         r'报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|'
         r'讲座题目|讲座时间|讲座地点|主办单位|学术主持|上一篇|下一篇|标签|Tags|'
         r'讲座主题|演讲题目|报告主题|'
+        # 带冒号的「主题：/题目：」重复标签（2026-10-24 cs/1818 修复）：CMS 页面常把
+        # 主题同时写进 meta description 与正文 title，取文后同一标签出现两遍
+        # （「…减少稀疏 主题： Collaborative…」），无此 STOP 会把第二遍整段吞进
+        # topic。必须带冒号——主题值内嵌「主题」二字（「为主题内容」「活动主题为」）
+        # 无冒号，不受影响（13295 的教训不变）。
+        r'主题\s*[：:]|题目\s*[：:]'
         # 时间/地点作字段终止符时须真是字段：时间 后须紧跟时间标记（数字/年/月/日/上午…），
         # 否则「时间晶体/时间序列」等主题内词会被误判为字段而截断主题（13295 修复）；
         # 地点 后须紧跟楼/室/厅/校区等，避免误吞主题内偶现的"地点"二字。
@@ -4609,7 +4615,13 @@ def _extract_topic_location(_st, result, title, loc_times):
         r'主要内容(?=[:：])|摘要|讲座内容提要|内容提要|讲座内容摘要|内容摘要|内容简介|'
         r'讲座内容|讲座简介|报告内容|讲座概要|内容概要|'
         r'简历|主讲人简介|主讲人简历|简介|专家介绍|专家简介|面向对象|会议报名截止日期|报名截止日期|截止日期|截止时间|发布|来源'
-        r'|Topic|Title|Venue|Location|Abstract|Bio|Synopsis'
+        # 英文字段标签同样须「后跟冒号」才算标签（2026-10-24 cs/1818 修复）：
+        # 英文题目里大量出现这些单词本体（"Collaborative Topic Ranking: …" 的
+        # Topic、"Title Screening" 的 Title、"Bio-inspired …" 的 Bio），无冒号判据
+        # 会把题目截到第一个英文单词（实测 1818 topic 只剩 'Collaborative'）。
+        # 页面级英文字段标签（"Topic: xxx" 换行起新字段）都有冒号，不受影响。
+        r'|Topic\s*[：:]|Title\s*[：:]|Venue\s*[：:]|Location\s*[：:]'
+        r'|Abstract\s*[：:]|Bio\s*[：:]|Synopsis\s*[：:]'
         r'|点击|浏览|评论|供稿|\d{4}[-/年]\d|【|\[|[*＊•·]|主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|$))'
     )
 
@@ -4627,9 +4639,40 @@ def _extract_topic_location(_st, result, title, loc_times):
     m = re.search(_topic_pat_a, _t) or re.search(_topic_pat_a2, _t) or re.search(_topic_pat_b, _t)
     if m:
         tp = (m.group(1) or m.group(2) or m.group(3) or '').strip()
+        # 重复主题/题目标签取完整份（2026-10-24 cs/1818 修复）：CMS 常把主题同时写进
+        # meta description 与正文 title，取文后同一标签出现两遍，且第一遍（meta）常被
+        # HTML 截断而不完整（「…减少稀疏 主题： …减少稀疏性）」）。TOPIC_STOP 命中重复
+        # 标签时，从该标签起再提取一份，两份取更长者——正文完整份优先；无重复标签时
+        # re.match 直接失败，行为与原来完全一致。
+        _pos = m.end()
+        for _ in range(3):  # 重复标签成串时最多跳 3 次，防异常文本死循环
+            _rm = re.match(r'\s*(?:主题|题目)\s*[：:]\s*(.+?)' + TOPIC_STOP, _t[_pos:])
+            if not _rm:
+                break
+            _rt = (_rm.group(1) or '').strip()
+            if _rt and len(_rt) > len(tp):
+                tp = _rt
+            _pos += _rm.end()
+        # 更早锚点补全（2026-10-24 cs/1818 修复，同根族的另一形态）：N1 折叠删除
+        # CJK 间空格后，正文「学术讲座信息 主题：X」的「主题」失去左边界（「息主题」），
+        # pat_a 的边界集（、/空格/（/行首）不再满足而跳过；页面尾部 meta description
+        # 追加段的「。 主题：X'」因标点后空格被保留反而满足边界 → pat_a 匹配到的是
+        # 末尾那份**不完整**的主题（meta 常被 HTML 截断）。故若首个「主题：」锚点
+        # 早于当前匹配，从该锚点再提取一份；仅当现有份**未以收尾符结尾**（不像完整
+        # 主题）且锚点份更长时才顶替——tp 已正常收尾时不补，防散文假阳性污染。
+        _anchor_m = re.search(r'(?:主题|题目)\s*[：:]', _t)
+        if _anchor_m and _anchor_m.start() < m.start():
+            _m0 = re.match(r'\s*(.+?)' + TOPIC_STOP, _t[_anchor_m.end():])
+            if _m0:
+                _t0 = (_m0.group(1) or '').strip()
+                if _t0 and len(_t0) > len(tp) and not re.search(r'[)）。\]」》]\s*$', tp):
+                    tp = _t0
         # 清除首尾可能粘连的章节序号（「一、主题」式结构里值后可能带「二、」下一节序号）
-        tp = re.sub(r'^\s*[一二三四五六七八九十百零0-9]+[、.．]\s*', '', tp).strip()
-        tp = re.sub(r'\s*[一二三四五六七八九十百零0-9]+[、.．].*$', '', tp).strip()
+        # ⚠ 序号分隔只认「、」与全角「．」（2026-10-24 em/8924 修复）：旧正则含半角
+        # 「.」，主题里的版本号「WEB 3.0下的文化遗产…」被当成「3.」序号从根部截断
+        # （topic 只剩 'WEB'）。半角 '1.' 序号在讲座主题里罕见，漏切的代价远小于误杀。
+        tp = re.sub(r'^\s*[一二三四五六七八九十百零0-9]+[、．]\s*', '', tp).strip()
+        tp = re.sub(r'\s*[一二三四五六七八九十百零0-9]+[、．].*$', '', tp).strip()
         # 清除尾部粘连的「摘要」「主讲人」「预告」「特邀专家」等非正文词（换行后字段值泄漏）
         tp = re.sub(r'\s*(?:摘要|主讲人?|报告人|预告|讲座特邀专家|特邀专家|特邀嘉宾|讲座嘉宾)\s*[:：]?.*$', '', tp).strip()
         # 截断到 "姓名 :" 式列表/履历开头，避免 topic 吸进主讲人履历（seri 页面）。
