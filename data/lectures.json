@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-23T17:38:02+08:00",
+  "updatedAt": "2026-10-24T09:33:11+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8857.html",
@@ -79867,7 +79867,7 @@
       "campus": "大学城",
       "title": "2019年华南师范大学经济与管理学院 “五四青年论坛”议程安排",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "谭春桥,男,中南大学商学院教授,博士生导师,管理学博士,中国运筹学会员,中国运筹学会对策论专业委员会理事。2010年入选中南大学\"升华育英\"人才计划,2012年入选教育部\"新世纪优秀人才支持计划\"人才工程,2013年入选中南大学\"531\"人才队伍建设工程第三层次人才计划,2013年获教育部第六届高等学校科学研究优秀成果奖(人文社科)二等奖(排名第二),多伦多大学访问学者。主要研究方向是:经济理论与建模、博弈论及应用、决策理论与方法、行为运作管理、供应链与物流管理、风险管理,到目前为止,已在国内外重要期刊Fuzzy Sets and Systems、IEEE Transactions on Fuzzy System、Asia-Pacific Journal of Operational Research、管理科学学报、系统工程理论与实践、系统工程学报等发表论文40多篇(SCI检索10余篇),主持了国家自然科学基金面上项目2项,作为骨干成员参与了国家创新群体项目、国家自然科学基金重点项目、国家自科基金国际重点合作项目及多个国家自科基金面上项目。现担任European Journal of Operation Research、International Journal of Production Research、Information Sciences、IEEE Transactions on Fuzzy System、Applied Soft Computing等多个国际SCI期刊的审稿人,以及《运筹学学学报》、《系统工程理论与实践》等多个国内重要期刊的审稿人,国家自然科学基金委管理科学部通讯评审人。",
       "organizer": "经济与管理学院",
       "publishTime": null,
       "publishTimeSource": "url_proxy",
@@ -79880,8 +79880,8 @@
       "listTitle": "● 2019年华南师范大学经济与管理学院 “五四青年论坛”议程安排",
       "topic": "基于谈判能力的旅游 O2O 供应链定价与服务策略研究",
       "speaker": "谭春桥",
-      "speakerTitle": "",
-      "speakerAffiliation": "",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "中南大学商学院",
       "location": "文科3栋MBA中心501课室",
       "lectureStart": "2019-05-09 14:15:00",
       "lectureEnd": "2019-05-09 15:15:00",
@@ -79890,7 +79890,17 @@
       "lectureIndex": 3,
       "host": "韩卫彬",
       "needsHumanReview": "",
-      "lectureCount": 7
+      "lectureCount": 7,
+      "sources": [
+        {
+          "sourceUrl": "http://em.scnu.edu.cn/a/20190509/6966.html",
+          "college": "经济与管理学院",
+          "campus": "大学城",
+          "title": "(此讲座已列入五四青年论坛)谭春桥教授讲座"
+        }
+      ],
+      "merged": true,
+      "sourceCount": 2
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20190509/6973.html",
@@ -79985,31 +79995,6 @@
       "ocrExtracted": false,
       "abstract": "",
       "speakerBio": "郑宇云,任职于华南师范大学党委宣传部,担任华南师范大学官微《晚安华师》和校报《华南师大报》的责任编辑、华南师范大学新闻社指导老师。深耕高校新闻宣传和新媒体运营十多年,所运营的公众号《晚安华师》,2018年排名全国高校官微前10位,多次排名全国高校官微周榜第一位,曾多次策划阅读量为10万+的微信推文;新闻作品曾多次获得中国高校校报好新闻一等奖、广东省教育新闻一等奖,广东高校校报好新闻一等奖,研究论文曾获广东高校校报好论文一等奖。"
-    },
-    {
-      "sourceUrl": "http://em.scnu.edu.cn/a/20190509/6966.html",
-      "images": [],
-      "college": "经济与管理学院",
-      "campus": "大学城",
-      "title": "(此讲座已列入五四青年论坛)谭春桥教授讲座",
-      "topic": "基于谈判能力的旅游O2O供应链定价与服务策略研究",
-      "lectureStart": "2019-05-09 00:00:00",
-      "lectureEnd": null,
-      "location": "",
-      "speaker": "谭春桥",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "中南大学商学院",
-      "inviter": "",
-      "speakerBio": "",
-      "organizer": "经济与管理学院",
-      "publishTime": "2019-05-09 12:32",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "authoritative-label",
-      "newsFilterBypass": true,
-      "timeUnknownSource": "auto",
-      "timeUnknown": true,
-      "listTitle": "● (此讲座已列入五四青年论坛)谭春桥教授讲座"
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20190429/22.html",

@@ -38,6 +38,33 @@ def get(r, *keys):
     return ''
 
 
+def _norm_url_simple(u):
+    """URL 归一（判同页用）：去协议、去末尾斜杠、小写。"""
+    return re.sub(r'^https?://', '', (u or '').strip().rstrip('/')).lower()
+
+
+def _norm_cmp_text(t):
+    """比较用文本归一：只留中英数字，去标点/空格/大小写差异。
+
+    中文题目跨页常只差空格与全半角（「旅游 O2O 供应链」vs「旅游O2O供应链」），
+    归一后可比；同时避免把标点差异当成两场不同讲座。
+    """
+    return re.sub(r'[^0-9A-Za-z\u4e00-\u9fff]+', '', t or '').lower()
+
+
+def _bigrams(t):
+    if not t:
+        return set()
+    return {t[i:i + 2] for i in range(len(t) - 1)} if len(t) >= 2 else {t}
+
+
+def _jaccard(a, b):
+    sa, sb = _bigrams(a), _bigrams(b)
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
 # ---------------- 规则库 ----------------
 # 职称/职务词（姓名与单位都不该含）
 # 注：不含「研究生」——「XX研究生院」是机构名，会造成大量误报（清华深研院、工程物理研究院研究生院）
@@ -174,6 +201,9 @@ def fixability(cat, desc, val=''):
     if cat == '缺失':
         return 'nfix', ('源页未提供则无法凭空补；可回源页重解析或用 LLM/VLM 补录，'
                         '若源页本身未写则确实无法修')
+    if cat == '重复':
+        return 'manual', ('两个不同页面发布同一场讲座，应合并为一条：保留时间/地点更全的'
+                          '为主记录，另一条并入 sources 保留溯源链接')
     # 院士称号+机构名是项目规则允许的合规写法，不是污染
     if desc.startswith('单位含职称') and re.search(r'院士\s*$', v):
         return 'nfix', ('院士称号+机构名属项目规则允许的合规写法（如「中国科学院院士，清华大学」），'
@@ -464,6 +494,46 @@ def scan(recs, excluded=None):
                 issues.append(('排除', 'sourceUrl', '低',
                                '隐形记录：关联 URL 命中排除名单，前端不展示但占用主库条数',
                                ' ; '.join(_hits), r))
+
+    # ---------- 跨 URL 重复（跨记录，2026-10-24 新增）----------
+    # 背景：同一场讲座被两个不同页面发布（如 em/6973 议程页第 3 场 与 em/6966 单场页，
+    # 同主讲谭春桥、同日 2019-05-09、同题目，仅 6966 未给具体时间）。入库侧的去重
+    # （_cross_source_dup_with_existing）只在「新记录 vs 已入库基底」时生效，**基底
+    # 内部的存量重复永远不会被复查** → 机制建立前入库的重复对会长期残留，前端显示
+    # 成两张卡。此档把存量重复显式报出来，避免依赖人工偶然发现。
+    # 判据与入库侧同源但更保守：同归一化主讲人 + 同日 + 题目归一后完全相等或
+    # Jaccard ≥ 0.9；双方均有非占位精确时刻且不同 → 视为同日不同场次，不报。
+    _dup_groups = collections.defaultdict(list)
+    for _r in recs:
+        _keys = _fv.normalize_speaker_key(get(_r, 'speaker') or '')
+        _spk = _keys[0] if _keys else ''
+        _d = (get(_r, 'lectureStart') or '')[:10]
+        if _spk and _d and not _d.startswith('0000'):
+            _dup_groups[(_spk, _d)].append(_r)
+    for (_spk, _d), _g in _dup_groups.items():
+        if len(_g) < 2:
+            continue
+        for _i in range(len(_g)):
+            for _j in range(_i + 1, len(_g)):
+                _a, _b = _g[_i], _g[_j]
+                if _norm_url_simple(_a.get('sourceUrl')) == _norm_url_simple(_b.get('sourceUrl')):
+                    continue
+                _ta = _norm_cmp_text(get(_a, 'topic') or get(_a, 'title'))
+                _tb = _norm_cmp_text(get(_b, 'topic') or get(_b, 'title'))
+                if not _ta or not _tb:
+                    continue
+                if not (_ta == _tb or _jaccard(_ta, _tb) >= 0.9):
+                    continue
+                _s1 = get(_a, 'lectureStart') or ''
+                _s2 = get(_b, 'lectureStart') or ''
+                if (len(_s1) >= 16 and len(_s2) >= 16
+                        and _s1[11:16] not in ('00:00', '08:00')
+                        and _s2[11:16] not in ('00:00', '08:00')
+                        and _s1[:16] != _s2[:16]):
+                    continue
+                issues.append(('重复', 'sourceUrl', '高',
+                               f'跨 URL 重复：同主讲「{_spk}」+ 同日 {_d} + 同题，两条不同页面应合并',
+                               f'{_a.get("sourceUrl")} ｜ {_b.get("sourceUrl")}', _a))
 
     return issues
 

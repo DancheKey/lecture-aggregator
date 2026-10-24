@@ -1506,18 +1506,106 @@ def _protect_sources_from_shrink(raw, existing, abort_single=None, shrink_ratio=
     return out
 
 
+def _strict_dup_pair(a, b):
+    """两条记录是否为「同一讲座的不同页面」（严格判据，供基底自愈用）。
+
+    比 cross_source_dedup 的入库判据更严（那里是相似度 0.25 / 同地点 / 同精确
+    时刻三条充分条件任一），因为这里要动的是**已在库、可能经过人工精修**的记录，
+    误合并代价更高：
+      - 不同 sourceUrl（同页多场靠 lectureIndex 区分，不算重复）
+      - 题目归一后相似度 ≥ 0.9（中文题目跨页通常只差空格/全半角，实测 1.0）
+      - 排除「双方都是非占位精确时刻且不同」——那是同日两场不同讲座
+    """
+    if _norm_url(a.get('sourceUrl')) == _norm_url(b.get('sourceUrl')):
+        return False
+    ta = a.get('topic') or a.get('title') or ''
+    tb = b.get('topic') or b.get('title') or ''
+    if not ta or not tb:
+        return False
+    if _topic_similarity(ta, tb) < 0.9:
+        return False
+    s1 = a.get('lectureStart') or ''
+    s2 = b.get('lectureStart') or ''
+    if (len(s1) >= 16 and len(s2) >= 16
+            and s1[11:16] not in ('00:00', '08:00')
+            and s2[11:16] not in ('00:00', '08:00')
+            and s1[:16] != s2[:16]):
+        return False
+    return True
+
+
+def _heal_base_dups(base_map, existing_index):
+    """基底内部跨 URL 重复自愈：把「两条都已在库」的同一讲座融合为一条。
+
+    背景（2026-10-24 用户实测 em/6973 idx3 与 em/6966）：入库侧去重
+    `_cross_source_dup_with_existing` 只判「新记录 vs 基底」，**两条都在基底的历史
+    重复永远不被复查**——去重机制建立前入库的重复对会长期残留，前端显示成两张卡。
+    用户明确要求「每天爬取不应让同一讲座重复出现」，故在增量收尾做一次严格自愈：
+    以后任何一天抓到该讲座的新页面时，顺带把基底里的旧重复一并合掉；即使没有新
+    页面，每日增量也会扫一遍（严格判据下成本可忽略，3844 条分组遍历 < 1s）。
+
+    融合语义复用 `_merge_record_into`：字段更全者为主，另一方进 sources 保留溯源
+    链接，信息零丢失。返回融合条数。
+    """
+    def _key(r):
+        li = r.get('lectureIndex')
+        return _norm_url(r.get('sourceUrl')) + ('#' + str(li) if li is not None else '')
+
+    healed = 0
+    for _grp in list(existing_index.values()):
+        if len(_grp) < 2:
+            continue
+        # 过滤已被本轮删掉的记录（同一函数内可能连续合并）
+        alive = [r for r in _grp if _key(r) in base_map]
+        if len(alive) < 2:
+            continue
+        changed = True
+        while changed:
+            changed = False
+            for i in range(len(alive)):
+                for j in range(i + 1, len(alive)):
+                    a, b = alive[i], alive[j]
+                    if not _strict_dup_pair(a, b):
+                        continue
+                    # 主记录选择：**有精确时刻的优先**（时间是讲座卡的第一信息，
+                    # 「时间待定」那条即使 bio/单位更全也不该当主——它只能提供
+                    # 字段补全），其次比字段完整度。实测：6966 有 bio+单位+职称，
+                    # 若只比完整度会把 14:15 精确时间换成 00:00 待定，属于倒退。
+                    if _is_placeholder_time(a.get('lectureStart')) != \
+                            _is_placeholder_time(b.get('lectureStart')):
+                        primary, other = (a, b) if not _is_placeholder_time(
+                            a.get('lectureStart')) else (b, a)
+                    elif _completeness(a) >= _completeness(b):
+                        primary, other = a, b
+                    else:
+                        primary, other = b, a
+                    _merge_record_into(other, primary)
+                    base_map.pop(_key(other), None)
+                    alive.remove(other)
+                    healed += 1
+                    changed = True
+                    print(f'[HEAL-DUP] 基底重复已融合: {other.get("sourceUrl")} → '
+                          f'{primary.get("sourceUrl")}（{primary.get("lectureStart")}）')
+                    break
+                if changed:
+                    break
+    return healed
+
+
 def incremental_merge(existing, new_records):
-    """增量模式合并：existing 基底原样锁定（不删除/不重组已精修记录），
-    仅对新增记录做去重后追加。
+    """增量模式合并：existing 基底锁定（不删除/不重组已精修记录），
+    仅对新增记录做去重后追加；收尾对基底做一次**严格**跨 URL 重复自愈。
 
     修复（2026-07-31）：此前为保护精修而完全跳过跨源去重，导致每日增量
     会反复追加「与基底已有讲座跨源重复」的新 URL 记录（即不同学院发布同一
     讲座），日积月累产生重复（钱捷系列、刘学兰等即因此冗余）。现改为：
       1) new_records 内部先做同源去重 + 跨源去重，避免本次批量抓取多 URL
          同讲座互相重复；
-      2) new_records 与 existing 基底做跨源比对，命中则跳过该新增记录
-         （不重复追加），existing 保持原样、其 merged 状态不变。
-    这样未来增量不再产生重复，且存量数据由人工/--full 清理统一处理。
+      2) new_records 与 existing 基底做跨源比对，命中则融合进基底（不重复追加）；
+      3) 收尾 `_heal_base_dups`：基底内部「两条都已在库」的严格重复也一并融合
+         （2026-10-24 用户要求：先发后发的同一讲座不能长期并存两张卡）。
+    「基底锁定」的边界因此收窄为：**不重组、不改动非重复记录**；仅当两条在库
+    记录被严格判为同一讲座（同人同日同题、不同 URL）时才融合。
     """
     base_map = {}
     # 空 sourceUrl 的记录此前被静默丢弃（二轮审计 P0-1 实证）：单独保存，随输出
@@ -1632,6 +1720,11 @@ def incremental_merge(existing, new_records):
         print(f'[MULTI-ROUND] 共替换 {len(replaced_new_keys)} 条旧轮次（保留最新一轮）')
     if skip:
         print(f'[INCREMENTAL] 跨源重复 {skip} 条（命中即 merge-into-A 融合；基底更新 merged/sources）')
+    # 基底内部存量重复自愈（2026-10-24）：先发后发的同一讲座若两条都已在库，
+    # 前两路都检测不到，靠这一步融合（严格判据，只动同人同日同题的不同页面）。
+    healed = _heal_base_dups(base_map, existing_index)
+    if healed:
+        print(f'[HEAL-DUP] 基底内部跨 URL 重复 {healed} 条已融合')
     return no_url_recs + list(base_map.values()) + final_new
 
 

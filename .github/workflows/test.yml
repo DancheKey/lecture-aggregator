@@ -47,6 +47,9 @@ jobs:
       # 2026-10-23：字段卫生（单位/主讲人/地点/主题编号，对应 audit 报出的 7 条脏数据）
       - name: Run field hygiene tests
         run: python tests/test_field_hygiene_20261023.py
+      # 2026-10-24：跨 URL 同一讲座（存量重复自愈 + 「报告人：」履历段 bio 提取）
+      - name: Run cross-URL duplicate tests
+        run: python tests/test_cross_url_dup_20261024.py
       - name: Run data-quality tests
         run: python tests/test_data_quality.py
       # 以下五项 2026-09-26 纳入：多场拆分候选9/10/11与质量闸门（2026-09-25/26 两次
