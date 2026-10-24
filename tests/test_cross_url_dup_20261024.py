@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 import parsers as P  # noqa: E402
 import audit_data_quality as A  # noqa: E402
 import scraper as S  # noqa: E402
+import generate_frontend_data as G  # noqa: E402
 
 _HEAD = """<html><head><title>学术活动</title></head><body>
 <div class="content">
@@ -192,6 +193,119 @@ class BaseHealDupTest(unittest.TestCase):
         b = _base_rec('http://a.edu.cn/2.html', '谭春桥', '2019-05-09 14:00:00', '同一题目研究')
         out = S.incremental_merge([a, b], [])
         self.assertEqual(len(out), 2)
+
+
+_ONE_HEAD = """<html><head><title>学术讲座</title></head><body>
+<div class="content">
+<p>【题目】破产法庭与债券发行市场化</p>
+<p>【时间】2022年3月4日（周五）上午10：00</p>
+<p>【地点】文二栋五楼会议室</p>
+<p>【主讲人】{speaker}</p>
+<p>【报告人简介】</p>
+{body}
+</div></body></html>"""
+
+
+def _parse_bio(speaker, body):
+    html = _ONE_HEAD.format(speaker=speaker, body=body)
+    out = P.parse_detail(html, 'http://example.com/a/8855.html',
+                         '经济与管理学院', '大学城', skip_news_filter=True)
+    recs = out if isinstance(out, list) else [out]
+    return (recs[0].get('speakerBio') or '') if recs else ''
+
+
+class CopyrightTailAndMultiBioTest(unittest.TestCase):
+    """版权清理正则误伤（CICPA）+ 多主讲人简介只留第一位（2026-10-24 用户实测）。"""
+
+    def test_cicpa_not_treated_as_icp_beian(self):
+        """简介里的「CICPA（中国注册会计师）」不得被裸 ICP 规则清空（em/8855 病根）"""
+        bio = _parse_bio(
+            '辛宇教授',
+            '<p>辛宇，博士，中山大学管理学院教授、博士生导师。中国注册会计师协会'
+            '非执业会员，曾任及现任多家公司独立董事。</p>')
+        self.assertGreater(len(bio), 30)
+        self.assertIn('中山大学管理学院', bio)
+        self.assertIn('独立董事', bio)
+
+    def test_real_icp_beian_still_truncated(self):
+        """真实备案号「粤ICP备12345678号」仍须截断（修复不能放过版权尾巴）"""
+        bio = _parse_bio(
+            '辛宇教授',
+            '<p>辛宇，博士，中山大学管理学院教授、博士生导师，主要研究公司治理。</p>'
+            '<p>粤ICP备12345678号 版权所有</p>')
+        self.assertIn('公司治理', bio)
+        self.assertNotIn('12345678', bio)
+        self.assertNotIn('版权所有', bio)
+
+    def test_multi_speaker_bio_keeps_first_only(self):
+        """一场讲座两位主讲、各带履历 → 简介只保留第一位（用户口径）"""
+        bio = _parse_bio(
+            '辛宇教授、徐莉萍教授',
+            '<p>辛宇，博士，中山大学管理学院教授、博士生导师。主要研究领域为公司治理'
+            '与会计财务，发表论文六十余篇。</p>'
+            '<p>徐莉萍，女，博士，中山大学管理学院会计系教授、博士生导师，'
+            '中国注册会计师（CICPA）非执业会员。</p>')
+        self.assertIn('辛宇', bio)
+        self.assertIn('公司治理', bio)
+        self.assertNotIn('徐莉萍', bio)
+        self.assertNotIn('CICPA', bio)
+
+
+class CollegeCountDedupTest(unittest.TestCase):
+    """统计口径（用户 2026-10-24 要求）：
+
+    「同一个学院的讲座数量只能算一次，不能算两次；不同学院/部门各算自己的」。
+    合并记录在 sources 里可能挂着同学院 URL（同院两页发布同一场），统计时必须
+    按单位集合去重；跨学院则各计一次（联合发布）。
+    """
+
+    def _item(self, sources):
+        return {
+            'sourceUrl': 'http://a.edu.cn/1.html',
+            'college': '经济与管理学院',
+            'campus': '大学城',
+            'lectureStart': '2019-05-09 14:15:00',
+            'lectureEnd': '2019-05-09 15:15:00',
+            'speaker': '谭春桥',
+            'topic': '同一场讲座',
+            'title': '同一场讲座',
+            'merged': True,
+            'sourceCount': len(sources) + 1,
+            'sources': sources,
+        }
+
+    def test_same_college_source_counts_once(self):
+        """同学院两个页面合并 → 该学院只计 1 场（不得算 2 次）"""
+        st = G.build_stats([self._item([
+            {'sourceUrl': 'http://a.edu.cn/2.html', 'college': '经济与管理学院',
+             'campus': '大学城', 'title': '同一场讲座'}]),
+        ], '2026-10-24T00:00:00+08:00')
+        self.assertEqual(st['matrix']['经济与管理学院']['2019'], 1)
+        self.assertEqual(st['yearTotals']['2019'], 1)
+        self.assertEqual(st['lectureCount'], 1)
+
+    def test_cross_college_source_counts_each(self):
+        """跨学院联合发布 → 各学院各计 1 场"""
+        st = G.build_stats([self._item([
+            {'sourceUrl': 'http://b.edu.cn/3.html', 'college': '物理学院',
+             'campus': '大学城', 'title': '同一场讲座'}]),
+        ], '2026-10-24T00:00:00+08:00')
+        self.assertEqual(st['matrix']['经济与管理学院']['2019'], 1)
+        self.assertEqual(st['matrix']['物理学院']['2019'], 1)
+        # 单位计数之和大于唯一讲座数属既定口径（统计页有说明）
+        self.assertEqual(st['yearTotals']['2019'], 2)
+        self.assertEqual(st['lectureCount'], 1)
+
+    def test_same_and_cross_mixed(self):
+        """同学院 + 跨学院混合：主学院仍只计 1 次"""
+        st = G.build_stats([self._item([
+            {'sourceUrl': 'http://a.edu.cn/2.html', 'college': '经济与管理学院',
+             'campus': '大学城', 'title': '同一场讲座'},
+            {'sourceUrl': 'http://b.edu.cn/3.html', 'college': '物理学院',
+             'campus': '大学城', 'title': '同一场讲座'},
+        ])], '2026-10-24T00:00:00+08:00')
+        self.assertEqual(st['matrix']['经济与管理学院']['2019'], 1)
+        self.assertEqual(st['matrix']['物理学院']['2019'], 1)
 
 
 if __name__ == '__main__':

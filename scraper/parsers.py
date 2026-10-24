@@ -2497,6 +2497,17 @@ def is_news_article(title, body, lecture_start=None):
     return None
 
 
+# 版权/备案尾部清理：命中即从该处起截断整段（bio/abstract/地点通用）。
+# ⚠ 「ICP」不能裸匹配（2026-10-24 修复）：简介正文里的「CICPA（中国注册会计师）」
+# 含 ICP 子串，裸词会让整段 bio 被清空——em/8855 辛宇、徐莉萍两人简介因此长期为空
+# （llmRejected=speakerBio 也是同一原因触发的幻觉守卫）。判据收紧为真实备案号形态
+# 「ICP + 备/证 + 数字」（如「粤ICP备12345号」），并保留「备案号」多字形态；
+# 「ICP-MS」等正文用词与「CICPA」均不再误命中。
+_COPYRIGHT_TAIL_RE = re.compile(
+    r'[\s\S]*(?:Copyright|版权所有|备案号|ICP\s*[备证]?\s*\d{3,}|'
+    r'All Rights Reserved|Reserved)[\s\S]*')
+
+
 def _extract_narrative(body_text, title):
     """无结构化标签的叙事体文章兜底提取：主题、地点、主讲人、摘要。"""
     result = {}
@@ -2600,7 +2611,7 @@ def _extract_narrative(body_text, title):
         abstract = re.split(r'\s+[*＊•·]\s+', abstract)[0].strip()
         abstract = re.split(r'(?:主讲人介绍|报告人简介|主讲人简介|主讲人简历|专家介绍|专家简介|简历|Bio)', abstract)[0].strip()
         abstract = re.split(r'\s+[A-Z][a-z]+(?:\s+[A-Z][a-z\.]+){1,2}\s*[:：](?=\s*$|\s+[*＊•·\-\d])', abstract)[0].strip()
-        abstract = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', abstract).strip()
+        abstract = re.sub(_COPYRIGHT_TAIL_RE, '', abstract).strip()
         abstract = re.sub(r'图\s*\d+\s*[：:].*?(?=(?:图\s*\d+|$))', '', abstract).strip()
         abstract = re.sub(r'\s*图\s*\d+\s*.*$', '', abstract).strip()
         if len(abstract) > 15:
@@ -5747,7 +5758,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
     if m:
         bio = m.group(1).strip()
         # 清理版权声明等尾部噪声
-        bio = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', bio).strip()
+        bio = re.sub(_COPYRIGHT_TAIL_RE, '', bio).strip()
         # 清理图片路径等残留
         bio = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', bio).strip()
         # 截断页面噪声
@@ -5766,7 +5777,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
             start = re.sub(r'^\s*(Professor|Dr\.|Mr\.|Ms\.|教授|副教授|讲师|研究员|博士)\s*', '', p_text)
             if start.startswith(speaker):
                 p_text = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', p_text).strip()
-                p_text = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', p_text).strip()
+                p_text = re.sub(_COPYRIGHT_TAIL_RE, '', p_text).strip()
                 p_text = re.split(rf'(?:{NOISE_MARKERS})', p_text)[0].strip()
                 if len(p_text) > 10:
                     result['speakerBio'] = p_text
@@ -5812,7 +5823,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
     if m:
         abstract = (m.group(1) or '').strip()
         # 清理版权噪声和图片
-        abstract = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', abstract).strip()
+        abstract = re.sub(_COPYRIGHT_TAIL_RE, '', abstract).strip()
         abstract = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', abstract).strip()
         # 截断页面噪声/侧边栏
         abstract = re.split(rf'(?:{NOISE_MARKERS})', abstract)[0].strip()
@@ -5828,7 +5839,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
     # 兜底：若正文来自图片 OCR 且没有明确「摘要」标签，把 OCR 文本清理后作为摘要
     if _st.ocr_text and not result.get('abstract'):
         clean = _clean_ocr_text(_st.ocr_text)
-        clean = re.sub(r'[\s\S]*(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved|粤ICP)[\s\S]*', '', clean).strip()
+        clean = re.sub(_COPYRIGHT_TAIL_RE, '', clean).strip()
         clean = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', clean).strip()
         clean = re.split(rf'(?:{NOISE_MARKERS})', clean)[0].strip()
         # 去掉海报顶部常见噪声（学院/学生会/系列讲座等重复字样）
@@ -6200,6 +6211,34 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
             result['abstract'] = _abs
         else:
             result['abstract'] = ''
+
+
+def _trim_bio_to_first_speaker(bio, speaker):
+    """多主讲人记录：简介只保留第一位主讲人的段落（用户 2026-10-24 口径）。
+
+    背景：em/8855「辛宇教授、徐莉萍教授」是一场讲座两位主讲，页面【报告人简介】
+    下连着两段履历。合并为一条后 bio 含两人，前端展示会串味；用户要求
+    「给出第一个人的简介就可以了，如果任何人的简介都不给，这样显得太空了」。
+
+    截断判据：后续主讲人姓名后紧跟「，+ 男/女/博士/教授…/年份」——只在姓名处于
+    **段首履历形态**时切，避免正文里偶然提及（如「与徐莉萍合作」）被误切。
+    截断结果过短（<20 字）则保留原文，宁可多给也不给空。
+    """
+    if not bio or not speaker or '、' not in speaker:
+        return bio
+    names = [x.strip() for x in speaker.split('、') if x.strip()]
+    if len(names) < 2:
+        return bio
+    cut = len(bio)
+    for nm in names[1:]:
+        m = re.search(re.escape(nm) + r'\s*[，,]\s*(?:男|女|博士|教授|副教授|讲师|'
+                      r'研究员|副研究员|博士生导师|硕士生导师|\d{4}\s*年)', bio)
+        if m and m.start() < cut:
+            cut = m.start()
+    if cut >= len(bio):
+        return bio
+    out = bio[:cut].strip().rstrip('；;，,、 ')
+    return out if len(out) >= 20 else bio
 
 
 def _finalize_record(soup, url, title, list_title, _st, result,
@@ -6638,6 +6677,10 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     # ---- bio 反推单位（保底，2026-09-25 经管 530 期实测）----
     # 规则/模型均未提取到单位、但 speakerBio 以「姓名，」开头且首句含现任机构时，
     # 从 bio 首句反推 speakerAffiliation。仅填空、不覆盖已有干净值；多主讲人不触发。
+    # 先做「多主讲只留第一位」截断，再做反推——否则会从第二位主讲人的单位反推。
+    if result.get('speakerBio'):
+        result['speakerBio'] = _trim_bio_to_first_speaker(
+            result['speakerBio'], result.get('speaker') or '')
     if not (result.get('speakerAffiliation') or '').strip() and \
             (result.get('speakerBio') or '').strip() and \
             (result.get('speaker') or '').strip():
@@ -7998,6 +8041,10 @@ def _split_by_speakers(base, speakers):
         rec['speakerTitle'] = speakers[0].get('honorific') or base.get('speakerTitle') or ''
         rec['speakerAffiliation'] = speakers[0].get('aff') or base.get('speakerAffiliation') or ''
         rec['speakerSource'] = 'label'
+        # 多主讲人合并：简介只留第一位（用户 2026-10-24 口径）。此路径为早退，
+        # 不经过 _finalize_record 的统一截断，故在此补一次（base 无 bio 时为空操作）。
+        if rec.get('speakerBio'):
+            rec['speakerBio'] = _trim_bio_to_first_speaker(rec['speakerBio'], rec['speaker'])
         # 不写 isMultiLecture/sourceCount/notes：合并后仍是「1 条普通记录」，
         # 字段集合须与单条路径一致（否则 golden/快照比对会多出字段，skc786 实测）。
         return [rec]
