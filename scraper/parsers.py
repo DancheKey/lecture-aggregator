@@ -7692,6 +7692,14 @@ def _extract_affiliation(rest):
         r'(?:现为|现任|现供职于|目前任职于|就职于|现任教于|现职)\s*', rest)
     _scope = rest[_status.end():] if _status else rest
     m = _UNIT_RE.search(_scope)
+    _fell_back = False
+    if not m and _scope is not rest:
+        # 「现为/现任」标记后未含任何单位（cs 5400 陈莉实测：「现为CCF杰出会员」——
+        # 标记后是会员身份而非机构，而真实单位「西北大学二级教授」写在标记之前）：
+        # 该标记不是现职单位锚点，回退全文提取首个单位，否则会误把首个学位词
+        # （博士）之后的文本当单位（得「中共党员,工学」）。
+        m = _UNIT_RE.search(rest)
+        _fell_back = bool(m)
     if m:
         aff = m.group(1)
         # 2026-10-17 兼任头衔守卫（skc512 白凯实测）：现任标记后的单位若在单位名
@@ -7700,7 +7708,9 @@ def _extract_affiliation(rest):
         # 该单位并非主单位——弃用此片段，改取全文首个非学位、非兼任头衔单位
         # （白凯主单位陕西师范大学）。无现任标记时行为不变（首单位即旧行为）；
         # 全部候选都是学位/兼任单位时保持原选中值，不引入新空值。
-        if _status and re.match(
+        # _fell_back（回退路径）跳过：m 的下标基准是全文 rest 而非 _scope，
+        # 兼任守卫的 _scope[m.end():] 下标会错位。
+        if _status and not _fell_back and re.match(
                 r'^[\u4e00-\u9fff]{0,8}?(?:特约|客座|兼职|访问学者|进修|返聘)',
                 _scope[m.end():]):
             aff = None
@@ -8431,7 +8441,19 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         topic = _clean_session_topic(topic)
         if not topic or len(topic) < 2:
             continue
-        dt = parse_cn_time(block, default_year=default_year, publish_time=publish_time,
+        # 字段顺序修正（2026-10-24，cs 5400 实测）：字段列表型页面每场字段顺序为
+        # 「报告时间:X → 报告题目:A → 摘要 → 报告人」，按题目标签分块后块内**首个**
+        # 时钟是下一场的报告时间（末块无时钟整场被丢，全场 start 错位一位：4 场
+        # 只出 3 场、start 10:00/10:40/11:20）。若上一题目标签（或文本起点）到
+        # 本题目标签之间存在「报告时间:」标签，说明本场时钟排在题目标签之前，
+        # 时间解析文本从该标签起点开始（块文本边界不变，topic/主讲人提取不受影响）。
+        _prev_lab_end = labels[i - 1].end() if i > 0 else 0
+        _rt_m = None
+        for _m in re.finditer(r'报告时间\s*[：:]', text[_prev_lab_end:lab.start()]):
+            _rt_m = _m
+        _dt_text = (text[_prev_lab_end + _rt_m.start():blk_end]
+                    if _rt_m else block)
+        dt = parse_cn_time(_dt_text, default_year=default_year, publish_time=publish_time,
                             title_year=title_year, url_year=url_year)
         if not dt or not dt.get('start'):
             # 窄口径页眉日期回填（2026-09-26）：块内含「时间：HH:MM」**标签**（表格
@@ -8439,7 +8461,10 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             # 而缺日期时，用页眉日期补全重试。裸时钟不回填：em/7264 型议程块
             # 「推动制造业… 9:00-9:30 黄少安(…)」里的时段属于**下一场**，回填会把
             # 时间配错位——该格式交由候选10 的「时段 人名(单位) 题目：」行解析处理。
-            if re.search(r'(?:时间|日期|开始时间)\s*[:：]\s*\d{1,2}\s*[:：]\s*\d{2}', block):
+            # 判据查 _dt_text（与解析文本同源，cs 5400 末块实测）：字段顺序修正后
+            # 本场「报告时间:」标签在题目标签之前、块文本里没有它，查 block 会让
+            # 末场回填不命中而整场丢失（i=3 武继刚实测）。
+            if re.search(r'(?:时间|日期|开始时间)\s*[:：]\s*\d{1,2}\s*[:：]\s*\d{2}', _dt_text):
                 if _page_dt1 is None:
                     _page_dt1 = parse_cn_time(text, default_year=default_year,
                                               publish_time=publish_time,
@@ -8447,7 +8472,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                                               url_year=url_year)
                 if _page_dt1 and _page_dt1.get('start'):
                     _d1 = _page_dt1['start']
-                    dt = parse_cn_time(f'{_d1.year}年{_d1.month}月{_d1.day}日 ' + block,
+                    dt = parse_cn_time(f'{_d1.year}年{_d1.month}月{_d1.day}日 ' + _dt_text,
                                        default_year=default_year,
                                        publish_time=publish_time,
                                        title_year=title_year, url_year=url_year)
@@ -9260,9 +9285,11 @@ def split_record_by_sessions(base, sessions, full_text=''):
                     rec['speakerSource'] = 'block'
                     if speaker_title:
                         rec['speakerTitle'] = speaker_title
-                    # 用 cand_core（已删尾部职称后缀）计算姓名之后残余，避免把删掉的
-                    # 「教授」等又塞回 rest；中间单位（如「姓名,工学博士,西北大学」）得以保留。
-                    rest = cand_core[len(name):].strip(' （(，,）)')
+                    # 从**原始 cand** 计算姓名之后残余，交由 _extract_affiliation 自行
+                    # 前导剥离/尾部清理。cand_core 自首个职称 token 起删到尾，会把
+                    # 「工学博士，西北大学…」的单位连带删掉（cs 5400 陈莉实测：
+                    # rest='中共党员,工学' → aff 空 → 保持 base 古天龙「暨南大学」串场）。
+                    rest = cand[len(name):].strip(' （(，,）)')
                     if rest:
                         aff = _extract_affiliation(rest)
                         if aff:
@@ -9379,6 +9406,47 @@ def split_record_by_sessions(base, sessions, full_text=''):
                     # bio 起首为姓名且本块 speaker 为空时，用 F4 思路回填 speaker
                     if not rec.get('speaker'):
                         _nm = re.match(r'^([\u4e00-\u9fff·]{2,4})', _bio_m.group(1))
+                        if _nm and _looks_like_real_name(_nm.group(1)) and \
+                                not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', _nm.group(1)):
+                            rec['speaker'] = _nm.group(1)
+                            rec['speakerSource'] = 'block-bio'
+            # 块内「报告人：姓名，简介长段」连写兜底（2026-10-24 cs/5400 修复）：
+            # CS 多报告会把每场简介直接写在「报告人：」标签后、无独立简介类标签
+            # （「…报告人：古天龙，暨南大学教授，博士生导师，…科研工作。 报告时间：…」）。
+            # 原逻辑只有简介类标签路径，_bio_map（共享简介区姓名锚定）也不适用
+            # （无「简介」标签区）→ 三条记录共享 base 的同一份简介（古天龙简介复制给
+            # 曹永知/陈莉，陈莉的单位还被串成暨南大学）。
+            # 位置限定在 else（_bio_map 为空的路径）内：CTLD 式共享简介区（姓名锚定
+            # 已生效）走 if 分支不受影响。块内提取**无条件覆盖** base 共享继承值——
+            # base 简介是整页第一份、只属于第一场，块内本场「报告人：」后的长段才是
+            # 本场权威简介。判据比简介类标签更严：去姓名前缀后 ≥30 字且含 ≥2 个
+            # 句读——防「报告人：张三，华南师范大学教授。」这类姓名+单位短行被误当
+            # 简介（短行无内嵌句读）；提取不到时保持 base 原值（无变更差）。
+            # ⚠ 防误伤（ctld4391/4299 实测回归）：
+            # ① lookahead 补「时间：/地点：/主持人：/简介：」等字段标签，块内连写文本
+            #    遇到下一个字段标签即止，防跨字段抓取（原 lookahead 只有报告类标签，
+            #    CTLD 表格展平的「黄卫祖教授时间:11月15日…」整段被当简介）——
+            #    本层由 test_label_bio_not_overridden 破坏验证覆盖（回退 lookahead 即红）；
+            # ② 句读判据（≥2 个「。/；」）是保守过滤：连写段无字段标签可截时，只放行
+            #    带句读的长文本（简介），拦住「张三教授,副教授,博导」这类无句读履历碎片
+            #    （本层被①掩护，无独立可观测增量，故不单独造门禁）。
+            # ⚠ 缩进铁律：本块必须在 else（_bio_map 为空）内——曾因写成与 else 同级
+            # 使 CTLD（_bio_map 非空）也跑兜底，bio 被垃圾覆盖后遭 gate 置空（实测回归）。
+            _bio_sp = re.search(
+                r'(?:报告人|主讲人)\s*[：:]\s*'
+                r'(.+?)(?=\s*(?:报告时间|报告地点|报告题目|报告摘要|题目\d*|'
+                r'报告[一二三四五六七八九十百零0-9]|主讲人[：:]|报告人[：:]|'
+                r'时间\s*[：:]|地点\s*[：:]|主持人\s*[：:]|评议人|'
+                r'简介\s*[：:]|报名方式|联系方式|联系电话|面向对象|参与方式|Email|邮箱|$))',
+                block, re.S)
+            if _bio_sp:
+                _b = _bio_sp.group(1).strip()
+                # 去掉姓名前缀（已在 speaker 提取），保留简介正文
+                _b = re.sub(r'^[\u4e00-\u9fff·]{2,4}\s*[,，]\s*', '', _b).strip()
+                if len(_b) >= 30 and _b.count('。') + _b.count('；') >= 2:
+                    rec['speakerBio'] = _b
+                    if not rec.get('speaker'):
+                        _nm = re.match(r'^([\u4e00-\u9fff·]{2,4})', _bio_sp.group(1))
                         if _nm and _looks_like_real_name(_nm.group(1)) and \
                                 not re.search(r'(学院|大学|中心|学会|协会|研究会|委员会|办公室|编辑部)$', _nm.group(1)):
                             rec['speaker'] = _nm.group(1)

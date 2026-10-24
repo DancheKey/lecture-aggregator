@@ -54,6 +54,10 @@ jobs:
       # 「来自」现职锚点与 bio 反推单位补全（cs 1818）
       - name: Run topic-repeat & affiliation-live tests
         run: python tests/test_topic_repeat_affil_life_20261024.py
+      # 2026-10-24：字段列表型多场拆分（cs 5400：本场「报告时间」在题目前 → 4 场
+      # 齐全且 start 不错位）+ 学位单位提取 + 「现为」无单位回退 + 块内连写简介防误伤
+      - name: Run field-list split tests
+        run: python tests/test_field_list_split_20261024.py
       - name: Run data-quality tests
         run: python tests/test_data_quality.py
       # 以下五项 2026-09-26 纳入：多场拆分候选9/10/11与质量闸门（2026-09-25/26 两次

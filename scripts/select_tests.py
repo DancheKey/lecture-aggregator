@@ -102,6 +102,7 @@ GROUPS = [
                'tests/test_field_hygiene_20261023.py',
                'tests/test_cross_url_dup_20261024.py',
                'tests/test_topic_repeat_affil_life_20261024.py',
+               'tests/test_field_list_split_20261024.py',
                'tests/test_abstract_provenance.py',
                'tests/test_env_flags.py']},
     # 抓取主流程 / 水位 / 台账 / 缓存 / sources.yaml

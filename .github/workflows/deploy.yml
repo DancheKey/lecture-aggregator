@@ -62,6 +62,7 @@ jobs:
             tests/test_field_hygiene_20261023.py
             tests/test_cross_url_dup_20261024.py
             tests/test_topic_repeat_affil_life_20261024.py
+            tests/test_field_list_split_20261024.py
             tests/test_data_quality.py
             tests/test_multi_session_split.py
             tests/test_hybrid.py
