@@ -4,6 +4,7 @@ import io
 import sys
 import datetime
 import unicodedata
+import difflib as _difflib
 import requests
 from urllib.parse import urljoin, unquote, urlparse
 from bs4 import BeautifulSoup
@@ -1709,6 +1710,96 @@ def _vlm_fields_useful(f):
     return False
 
 
+_CJK_CHAR_RE = re.compile(r'^[\u4e00-\u9fff]$')
+
+
+# VLM 题目单字互校（2026-10-25，mks/20 实测驱动，方案A）：
+# VLM 读海报时常把题目里的生僻字认成形近字（「勷」→「勠」、「别」→「家」），
+# 而 title 恒取源页列表锚文本（方案A 2026-09-30，不经 VLM）——同一记录的
+# title 与 topic 因此「同源不同字」。本函数仅在 poster_only 路径调用，检测
+# 这种抄写级差异并以源页文本校正。
+#   ① 对齐用 difflib.SequenceMatcher（禁逐字硬比——错字发生在前缀内部时
+#      startswith 即失败，mks/20 实测：topic 第 6 字起与 title 分岔，前缀
+#      包含判据永远不命中）。认可的差异形态（「单字互校」之名即上限）：
+#      · replace 段 ≤2 个且总差异字数 ≤2（错字是个别字，不是半句话——
+#        swc/2025/0415/91 实测：title 与 topic 是大段不同的两个串，difflib
+#        能对齐出 2 个等长 replace 段共 14 个差异字，只数段数会整体串写）；
+#      · 每个 replace 段等长（非等长 = 混合增删，拒）；
+#      · 至多一个 insert/delete 且位于串头或串尾（列表标题省略形态，
+#        如 mks/20 title 尾部「...」省掉「专场讲座」），增删量 ≤4 字。
+#      中段 insert/delete（swc/21 实测假阳性：标题比题目少「报告」二字，
+#      逐字错位会把「报告会」误「校正」成「会告会」）一律拒绝。
+#   ② replace 段内逐字：仅 CJK 对 CJK 才处理（标点差异跳过）。
+#   ③ 佐证信源 = 源页整页文本（_st.text，含 h3/标题区）+ title（列表锚文本）
+#      拼接计数。仅当 VLM 用字 X 合计 0 次且 title 用字 Y 合计 ≥2 次才替换
+#      （title 本身贡献 1 次，另需正文/标题区至少再现 1 次，双佐证防「列表
+#      标题单方写错」把正确 topic 带偏）；X=0 但 Y 仅 1 次（仅列表页单佐证）
+#      时不替换、标记 needsHumanReview；X ≥1 次说明源页本身就这么写，绝不动
+#      （可能是详情页题目与列表标题确有不同的字）。
+#   ⚠ 2026-10-25 实测三坑：① 佐证不能用 _st.body_text——poster_only 页正文
+#      容器常只剩元信息（mks/20 实测 body_text 仅 166 字、题目字 0 次），判据
+#      永不成立；② Y 的门槛不能单看 _st.text——详情页 h3 里的专名可能只出现
+#      1 次（grep HTML 源码 4 次含 title/meta 属性，get_text 后只剩 1 次），
+#      故 title 计入佐证源、门槛定 ≥2；③ 前缀包含判据对「前缀内部错字」失效
+#      （见 ①），必须用 difflib 对齐。
+def _reconcile_vlm_topic_with_title(topic, title, page_text):
+    """VLM topic 与源页 title 单字互校。
+
+    返回 (new_topic, corrected, need_review)：无动作时 corrected/need_review
+    均为 False 且 new_topic is topic（调用方可依 identity 跳过写回）。
+    page_text 为源页整页文本（_st.text，含标题区）。
+    """
+    topic = (topic or '').strip()
+    title = (title or '').strip()
+    if len(topic) < 8 or not title:
+        return topic, False, False
+    t = title.rstrip('.。…· ')
+    if len(t) < 8:
+        return topic, False, False
+    # ① difflib 对齐：认可的差异形态 = ≤2 个等长 replace + 至多一个两端增删
+    ops = [op for op in _difflib.SequenceMatcher(None, topic, t,
+                                                 autojunk=False).get_opcodes()
+           if op[0] != 'equal']
+    if not ops:
+        return topic, False, False
+    repl_ops = [op for op in ops if op[0] == 'replace']
+    indel_ops = [op for op in ops if op[0] in ('insert', 'delete')]
+    if len(repl_ops) > 2 or len(indel_ops) > 1:
+        return topic, False, False
+    # 「单字互校」上限：replace 总差异字数 ≤2（见上方注释 ① swc/91 实测）
+    if sum(i2 - i1 for _, i1, i2, _, _ in repl_ops) > 2:
+        return topic, False, False
+    for tag, i1, i2, j1, j2 in repl_ops:
+        if i2 - i1 != j2 - j1:
+            return topic, False, False    # 非等长 replace = 混合增删，拒
+    for tag, i1, i2, j1, j2 in indel_ops:
+        at_head = (i1 == 0 and j1 == 0)
+        at_tail = (i2 == len(topic) and j2 == len(t))
+        if not (at_head or at_tail):
+            return topic, False, False    # 中段增删：标题与题目确有不同，拒
+        if max(i2 - i1, j2 - j1) > 4:
+            return topic, False, False    # 增删量过大：不是省略形态
+    # ③ 佐证源：整页文本 + title（title 是列表锚文本，与详情页文本可能互补；
+    #    见上方注释的三处实测坑）
+    evid = (page_text or '') + ' ' + t
+    corrected = need_review = False
+    chars = list(topic)
+    for tag, i1, i2, j1, j2 in repl_ops:
+        for k in range(i2 - i1):
+            i, x, y = i1 + k, topic[i1 + k], t[j1 + k]
+            if not (_CJK_CHAR_RE.match(x) and _CJK_CHAR_RE.match(y)):
+                continue
+            cx, cy = evid.count(x), evid.count(y)
+            if cx == 0 and cy >= 2:
+                chars[i] = y
+                corrected = True
+            elif cx == 0:
+                need_review = True   # X 全源页 0 次但 Y 也只有 1 次：单佐证，保守标记
+    if not corrected and not need_review:
+        return topic, False, False   # 无动作时保持 identity（docstring 契约）
+    return ''.join(chars), corrected, need_review
+
+
 def _parse_vlm_json(text):
     """从模型返回文本中提取 JSON 对象（或数组，支持多场讲座）。容错：去 ```json 围栏、整体解析、截取兜底。"""
     if not text:
@@ -1831,6 +1922,14 @@ def _vlm_extract_fields(img_urls, cfgs):
         if got_empty:
             got_empty_any = True
         if fields:
+            # 缓存归因（2026-10-25 方案B）：把实际产出 provider 名写进缓存 value。
+            # 此前 key 只含「模型组合」、value 无来源信息，agnes（主）/zhipu（备）
+            # 两个视觉通道究竟谁读的图无法归因（mks/20「勷→勠」排查时被迫靠复现
+            # 实验反推）。仅 dict 可挂键；多场 list 保持结构不变暂不归因。
+            # _provider 不在 _apply_vlm_to_result 的 _MAP 白名单，不会漏进 lectures。
+            if isinstance(fields, dict):
+                fields = dict(fields)
+                fields['_provider'] = cfg.get('name') or ''
             _vlm_cache_set(key, fields)
             return fields
     # 全失败：网络/限流失败→软负；模型返回空→硬负
@@ -4444,6 +4543,16 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
                 partial['imageParseMethod'] = 'vlm'
                 partial['hasPosterImage'] = True
                 partial['splitMode'] = 'vlm-poster'
+                # 题目单字互校（同单场分支，2026-10-25 方案A）：各场 topic 与
+                # 源页 title 属抄写关系时以源页文本校正形近字。
+                if poster_only and partial.get('topic'):
+                    _nt, _corr, _rev = _reconcile_vlm_topic_with_title(
+                        partial['topic'], partial.get('title'), _st.text)
+                    if _corr:
+                        partial['topic'] = _nt
+                        partial['vlmTopicCorrected'] = True
+                    if _rev and 'topic' not in (partial.get('needsHumanReview') or ''):
+                        partial['needsHumanReview'] = ((partial.get('needsHumanReview') or '') + '|topic').lstrip('|')
                 if len(applied) > 1:
                     partial['isMultiLecture'] = True
                     partial['lectureIndex'] = i   # 1-based（enumerate 已 start=1）
@@ -4454,6 +4563,18 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
             result['vlmExtracted'] = True
             result['imageParseMethod'] = 'vlm'
             result['hasPosterImage'] = True
+            # 题目单字互校（2026-10-25 方案A）：VLM 读海报把题目里的生僻字认成
+            # 形近字（mks/20「勷」→「勠」实测），title 恒为源页列表锚文本，两者
+            # 「同源不同字」时以源页文本校正。仅 poster_only 走此路径（文本路
+            # topic 来自正文权威标签，不经过 VLM，无需互校）。
+            if poster_only and result.get('topic'):
+                _nt, _corr, _rev = _reconcile_vlm_topic_with_title(
+                    result['topic'], result.get('title'), _st.text)
+                if _corr:
+                    result['topic'] = _nt
+                    result['vlmTopicCorrected'] = True
+                if _rev and 'topic' not in (result.get('needsHumanReview') or ''):
+                    result['needsHumanReview'] = ((result.get('needsHumanReview') or '') + '|topic').lstrip('|')
             if applied:
                 t = applied
 

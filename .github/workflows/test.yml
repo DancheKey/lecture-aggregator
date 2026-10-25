@@ -63,6 +63,11 @@ jobs:
       # （bio 出口清理后叙事兜底子串判据须归一化比较，防元信息骨架污染 abstract）
       - name: Run bio speaker-prefix life tests
         run: python tests/test_bio_speaker_prefix_20261024.py
+      # 2026-10-25：VLM 题目单字互校（mks/20「勷→勠」形近字，difflib 对齐 + 源页
+      # 双佐证才替换）+ VLM 缓存 provider 归因（value 写 _provider，防两视觉通道
+      # 产出无法归因）+ poster_only 接线回归锁
+      - name: Run vlm topic reconcile tests
+        run: python tests/test_vlm_topic_reconcile_20261025.py
       - name: Run data-quality tests
         run: python tests/test_data_quality.py
       # 以下五项 2026-09-26 纳入：多场拆分候选9/10/11与质量闸门（2026-09-25/26 两次
