@@ -10,24 +10,6 @@ X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
 BEGIN:VEVENT
 UID:http://lswh.scnu.edu.cn/a/20261022/86.html@danchekey.github.io
 DTSTAMP:20261026T045252Z
-DTSTART:20261026T070000Z
-DTEND:20261026T094500Z
-SUMMARY:第十九届“勷勤论坛”之历史文化学院分论坛｜关
- 于中国近代史的主题与线索问题
-LOCATION:文科楼423
-DESCRIPTION:题目：关于中国近代史的主题与线索问题\n主讲
- ：李红岩（华南师范大学）\n地点：文科楼423\n主办：历
- 史文化学院
-URL:http://lswh.scnu.edu.cn/a/20261022/86.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://lswh.scnu.edu.cn/a/20261022/86.html@danchekey.github.io
-DTSTAMP:20261026T045252Z
 DTSTART:20261027T070000Z
 DTEND:20261027T094500Z
 SUMMARY:第十九届“勷勤论坛”之历史文化学院分论坛｜新
