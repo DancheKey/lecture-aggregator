@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-25 19:41:12",
+  "updatedAt": "2026-10-26T12:52:52+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261106/8874.html",
@@ -154,6 +154,35 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "updatedAt": "2026-10-23 10:27:18"
+    },
+    {
+      "sourceUrl": "http://em.scnu.edu.cn/a/20261029/11214.html",
+      "images": [],
+      "college": "经济与管理学院",
+      "campus": "大学城",
+      "title": "华师经英Seminar第63期",
+      "topic": "词元市场:一个人工智能时代的竞争经济学",
+      "lectureStart": "2026-10-29 12:30:00",
+      "lectureEnd": null,
+      "location": "大学城校园文2栋401室",
+      "speaker": "林子豪",
+      "speakerTitle": "青年英才、特聘副研究员",
+      "speakerAffiliation": "华南师范大学经济与管理学院",
+      "inviter": "",
+      "speakerBio": "林子豪,中山大学经济学博士,华南师范大学经济与管理学院青年英才、特聘副研究员。主要研究领域为人工智能、数字经济、劳动经济学,聚焦AI经济学、算力经济学与词元经济学、AI算法与劳动力市场等问题。研究成果发表于Computers & Industrial Engineering, International Journal of Finance & Economics等期刊。",
+      "organizer": "经济与管理学院",
+      "publishTime": null,
+      "publishTimeSource": "url_proxy",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "词元已成为人工智能时代的基础生产要素。围绕词元供给形成了高度动态的市场:数十家供应商、每周数百次价格调整、模型以月为单位迭代。人工智能能否形成赢家通吃的格局、从而抬高转换门槛,学界尚无定论:一种观点认为推理服务不可储存、转换模型只需修改一个请求参数、规模经济不来自分摊而来自算法进步,技术摩擦趋零将使份额完全流动;另一种观点认为任务适配的积累会维持市场分割。本文建立竞争均衡模型,推导出转换成本的门槛条件,给出区分上述两种竞争格局的判据,并以OpenRouter 2025年1月至2026年7月的模型级面板数据加以检验。异质性稳健双重差分估计显示,降价对流量的因果效应为正且显著,三个异质性估计量给出一致的稳健估计结果。份额流转数据提供补充证据:尽管操作转换成本为零,份额半衰期中位数约一个月,月度份额转移约达三分之一,同时市场存在显著价格离散。证据支持份额完全流动一侧,表明当前词元市场的转换成本较低,技术摩擦趋零并未带来赢家通吃。本文的理论贡献在于将转换成本从外生障碍重新表述为使用中内生积累的资产,为判定此类市场走向哪一侧提供了可检验的判据。",
+      "newsFilterBypass": true,
+      "llmTextEnhanced": false,
+      "llmVerdict": null,
+      "llmSpeakerSource": null,
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "● 华师经英Seminar第63期"
     },
     {
       "sourceUrl": "http://mks.scnu.edu.cn/a/20261020/20.html",
@@ -28725,6 +28754,38 @@
       "lectureIndex": 2,
       "lectureCount": 2,
       "speakerBio": "雷浩，现为教育部人文社会科学重点研究基地华东师范大学课程与教学研究所副所长，教授、博士生导师。入选国家级青年人才，Elsevier2023年中国高被引学者（教育学）等。主要从事课程改革与教材使用，课程开发等研究。主持国家社科基金（教育学）“十四五”规划国家重点、国家一般、“十三五”国家青年课题。近年来在《Journal of Computer Assisted Learning》《教育研究》等国内外重要期刊发表学术论文80余篇。出版《为学而教：学习中心教学的研究》等专著，参与主编《义务教育课程方案（2022年版）解读》。相关研究成果入选ESI全球高被引论文，荣获高等学校优秀科研成果奖二等奖、青年成果奖，上海市哲学社会科学优秀成果奖一等奖、学术新锐奖，全国教育科学研究优秀成果二等奖、三等奖，国家级教学成果一等奖等奖励。"
+    },
+    {
+      "sourceUrl": "http://jky.scnu.edu.cn/a/20241029/5920.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/jky/2024/1029/1730207467541778.jpg"
+      ],
+      "college": "教育科学学院",
+      "campus": "石牌",
+      "title": "砺儒教育学术论坛107期海报",
+      "topic": "(一):教育家精神引领下 教师教育课程的重构与实现 李洪修,现为天津师范大学教育学部教授、博士生导师,京津冀教师教育发展研究 院院长,全国模范教师、入选国家级青年人才、天津市特聘教授、天津市高校学科领军 人才,主要从事课程与教学论、教育管理等研究,兼任全国课程学术委员会常务理事、 中国社会学学会教育社会学专业委员会常务理事。近年来,主持国家社科基金项目3 项;在《教育研究》《课程教材教法》等刊物发表学术论文100余篇,相关成果被《新华文摘》《高等学校文科学术文摘》全文转载5篇;出版学术著作3部;相关成果获得天 津市级教学成果奖一等奖2项,天津市社会科学优秀成果奖一等奖等4项。7份资政报告 被中央教育工作领导小组秘书局等采纳。兼任《高校教育管理》编委、《民族教育研究》青年编委、苏州大学学报(教科版)青年编委。",
+      "lectureStart": "2024-11-01 08:30:00",
+      "lectureEnd": "2024-11-01 12:00:00",
+      "location": "",
+      "speaker": "李洪修",
+      "speakerTitle": "",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "特邀嘉宾:雷浩教授 主题(二):基于核心素养的 \"教学评\"一致性 雷浩,现为教育部人文社会科学重点研究基地华东师范大学课程与教学研究所副所长,教授、博士生导师。入选国家级青年人才,Elsevier2023年中国高被引学者(教育学)等。主要从事课程改革与教材使用,课程开发等研究。主持国家社科基金(教育学)\"十四五\"规划国家重点、国家一般、\"十三五\"国家青年课题。近年来在《 JournaIofComputerAssistedLearning》《教育研究》等国内外重要期刊发表学术论文80余篇。出版《为学而教:学习中心教学的研究》等专著,参与主编《义务教育课程 方案(2022年版)解读》。相关研究成果入选ESI全球高被引论文,荣获高等学校优秀 科研成果奖二等奖、青年成果奖,上海市哲学社会科学优秀成果一等奖、学术新锐奖, 全国教育科学研究优秀成果二等奖、三等奖,国家级教学成果一等奖等奖励。 与谈人 陈友芳 华南师范大学教育科学学院教授、博士生导师 主持人 马早明 华南师范大学教育科学学院教授、博士生导师时间",
+      "organizer": "教育科学学院",
+      "publishTime": "2024-10-29 21:10:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "ocrExtracted": true,
+      "imageParseMethod": "ocr",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "speakerSource": "ocr:label",
+      "guest": "李洪修",
+      "qaGate": "speakerBio",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "砺儒教育学术论坛107期海报"
     },
     {
       "sourceUrl": "http://xz.scnu.edu.cn/a/20241031/235.html",
