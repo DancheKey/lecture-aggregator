@@ -105,7 +105,7 @@ function makeCtx(allData, over) {
 }
 
 // ================= B1：论坛卡 total 口径 =================
-// 5 场石牌 + 1 场大学城，同 sourceUrl 同一天 → 折叠阈值 MIN=3 命中，
+// 5 场石牌 + 1 场大学城，同 sourceUrl 同一天 → 合并阈值 MIN=4 命中，
 // 无筛选时该组共 6 场（total 应为 6，不是 5——total 统计的是**全集同组场次**）。
 const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
 
@@ -124,7 +124,7 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
 }
 
 // 场景 2：按学院筛选 —— 同源同日 6 场（4 场文学院 + 2 场数学院）
-//   筛「文学院」→ 命中 4 场（≥MIN=3，仍折叠），但全集 6 场 → total=6 > recs=4，
+//   筛「文学院」→ 命中 4 场（≥MIN=4，仍合并），但全集 6 场 → total=6 > recs=4，
 //   正是「部分命中」：论坛卡应默认自动展开，且卡片上显示「命中 4/6 场」。
 {
   const mk2 = (i, college, speaker) => Object.assign(mk(i, speaker), { college });
@@ -148,7 +148,7 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
   }
 }
 
-// 场景 3：单场不折叠（阈值 MIN=3 的回归）
+// 场景 3：单场不折叠（阈值 MIN=4 的回归）
 {
   const cm = makeCtx([mk(1), mk(2)]);
   const units = computed.units.call(cm);
@@ -165,7 +165,7 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
   });
   const units = computed.units.call(cm);
   const forum = units.find(u => u.type === 'forum');
-  ok(!!forum, 'B1: 3 场应折叠');
+  ok(!!forum, 'B1: 命中 5 场应合并');
   if (forum) ok(forum.total >= forum.recs.length, 'B1: 竞态下 total < recs.length，恒等式被破坏');
 }
 
@@ -275,65 +275,62 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
      'B3: 模板仍在用 toggleAbstract(l.sourceUrl) —— 传入 url 无法定位期数');
 }
 
-// ================= B4：场次清单折叠阈值（2026-10-27 用户调整）=================
-// 用户截图：一张「同日 3 场报告」的合并卡也要先点「展开场次清单」才看得到 3 场。
-// 要求：≥4 场才折起，3 场及以下直接铺开。
-// ⚠ 与 FORUM_MIN(3) 是两条线——3 场仍然合成合并卡（卡头「同日 3 场报告」），
-//   只是清单不再折。下面同时锁「合并口径不变」和「折叠口径变了」。
+// ================= B4：合并阈值 3 → 4（2026-10-27 用户调整）=================
+// 用户截图：一张「同日 3 场报告」的合并卡，3 个题目被压成一行灰字清单，
+// 标题/主讲人/点赞入口全没有。要求：**≤3 场一律逐场独立成卡**，≥4 场才合并。
+// 这改的是 FORUM_MIN 本身（合并口径），不是清单展开状态。
 {
-  // ① 3 场：仍合成 forum 卡（FORUM_MIN 未被误改），但清单恒定展开且不给折叠按钮
+  // ① 3 场：不合并，逐场 3 张单卡，且计数键是讲座级 ck（不再是页面级 sourceUrl）
   {
-    const cm = makeCtx([mk(1), mk(2), mk(3)]);
+    const U = 'http://x.scnu.edu.cn/a';
+    const recs3 = [1, 2, 3].map(i => Object.assign(mk(i), { ck: `${U}~${i}` }));
+    const cm = makeCtx(recs3);
     const units = computed.units.call(cm);
-    const forum = units.find(u => u.type === 'forum');
-    ok(!!forum, 'B4: 3 场同源同日仍应合成合并卡（FORUM_MIN=3 不应被改动）');
-    if (forum) {
-      ok(forum.total === 3, `B4: 3 场卡 total 应为 3，实得 ${forum.total}`);
-      const self = Object.assign({}, cm, { expandedForums: {} });
-      ok(methods.isForumFoldable.call(self, forum) === false,
-         'B4: 3 场卡不应再提供展开/收起交互（isForumFoldable 应为 false）');
-      ok(methods.isForumOpen.call(self, forum) === true,
-         'B4: 3 场卡清单应默认展开（修复前默认收起，用户需多点一次）');
-      // 历史 toggle 残留（false）也不该把 3 场卡折起来——按钮都没有，折了就再也展不开
-      const stale = Object.assign({}, cm, { expandedForums: { [forum.url]: false } });
-      ok(methods.isForumOpen.call(stale, forum) === true,
-         'B4: 3 场卡即便 expandedForums 残留 false 也必须展开（否则无按钮可救）');
-    }
+    ok(units.length === 3, `B4: 3 场应渲染 3 张独立卡，实得 ${units.length} 个单元`);
+    ok(units.every(u => u.type === 'single'), 'B4: 3 场不应再出现 forum 合并卡');
+    ok(units.every(u => u.ck !== U),
+       'B4: 3 场拆卡后计数键应是讲座级 ck，不能沿用页面级 sourceUrl（会与历史整页赞串味）');
+    ok(units.every(u => /~[123]$/.test(u.ck)),
+       'B4: 单卡 ck 应逐场不同，实得 ' + JSON.stringify(units.map(u => u.ck)));
   }
 
-  // ② 4 场：达到阈值 → 默认折起，且提供折叠交互
+  // ② 4 场：达到阈值 → 仍合并成一张卡
   {
     const cm = makeCtx([mk(1), mk(2), mk(3), mk(4)]);
     const forum = computed.units.call(cm).find(u => u.type === 'forum');
-    ok(!!forum, 'B4: 4 场应合成合并卡');
+    ok(!!forum, 'B4: 4 场应合成合并卡（阈值 4）');
     if (forum) {
-      const self = Object.assign({}, cm, { expandedForums: {} });
-      ok(methods.isForumFoldable.call(self, forum) === true,
-         'B4: 4 场卡应提供展开/收起交互');
-      ok(methods.isForumOpen.call(self, forum) === false,
-         'B4: 4 场卡应默认收起（阈值从 3 上调到 4）');
-      ok(methods.isForumOpen.call(
-        Object.assign({}, cm, { expandedForums: { [forum.url]: true } }), forum) === true,
-        'B4: 4 场卡显式展开后应保持展开');
+      ok(forum.total === 4, `B4: 4 场卡 total 应为 4，实得 ${forum.total}`);
+      ok(forum.ck === 'http://x.scnu.edu.cn/a', 'B4: 合并卡的计数键应回到页面级 sourceUrl');
     }
   }
 
-  // ③ 单卡（非 forum）不该被这套逻辑影响：isForumFoldable 读到 undefined.total 须为 false
+  // ③ 2 场：回归（阈值 4 不应把更小的组也误合）
   {
     const cm = makeCtx([mk(1), mk(2)]);
-    const single = computed.units.call(cm).find(u => u.type === 'single');
-    ok(!!single, 'B4: 2 场应走单卡');
-    if (single) {
-      ok(methods.isForumFoldable.call(Object.assign({}, cm, { expandedForums: {} }), single) === false,
-         'B4: 单卡 total 为 undefined，isForumFoldable 应为 false 而非抛错/误判');
-    }
+    ok(computed.units.call(cm).every(u => u.type === 'single'), 'B4: 2 场仍应逐场成卡');
   }
 
-  // ④ 模板静态锁：按钮必须挂 v-if="isForumFoldable(u)"，清单容器仍看 isForumOpen
-  ok(/<button\s+v-if="isForumFoldable\(u\)"\s+@click="toggleForum\(u\)"/.test(INDEX_HTML),
-     'B4: index.html 的折叠按钮未挂 v-if="isForumFoldable(u)" —— 3 场卡会多出一个无意义按钮');
-  ok(/<div\s+v-if="isForumOpen\(u\)"/.test(INDEX_HTML),
-     'B4: 场次清单容器未按 isForumOpen(u) 渲染');
+  // ④ 页面级赞兜底必须跟着新口径走：3 场页不再是合并组 → 页面级键不得兜底命中
+  //    （filtered 的 mergedDays 与 units 的 FORUM_MIN 同源，改一处漏一处就会分叉）
+  {
+    const cm = makeCtx([mk(1), mk(2), mk(3)], {
+      showLikedOnly: true,
+      lectureStats: { 'http://x.scnu.edu.cn/a': { likes: 5, wants: 0, visits: 0 } },
+    });
+    ok(cm.filtered.length === 0,
+       `B4: 3 场页已非合并组，页面级赞不应再兜底命中，实际筛出 ${cm.filtered.length} 条`);
+  }
+
+  // ⑤ 4 场页的页面级赞仍应兜底命中整组
+  {
+    const cm = makeCtx([mk(1), mk(2), mk(3), mk(4)], {
+      showLikedOnly: true,
+      lectureStats: { 'http://x.scnu.edu.cn/a': { likes: 5, wants: 0, visits: 0 } },
+    });
+    ok(cm.filtered.length === 4,
+       `B4: 4 场页仍属合并组，页面级赞应命中整组 4 场，实际 ${cm.filtered.length} 条`);
+  }
 }
 
 if (errs.length) {
@@ -341,4 +338,4 @@ if (errs.length) {
   errs.forEach(e => console.log(' -', e));
   process.exit(1);
 }
-console.log('[PASS] B1 论坛卡 total 取全集口径、部分命中自动展开；B2 clamp 签名覆盖全部筛选维度；B4 场次清单 ≥4 场才折叠');
+console.log('[PASS] B1 论坛卡 total 取全集口径、部分命中自动展开；B2 clamp 签名覆盖全部筛选维度；B4 合并阈值 3→4（≤3 场逐场独立成卡）');

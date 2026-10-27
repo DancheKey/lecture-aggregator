@@ -576,10 +576,7 @@
                   </div>
                   <div v-if="u.recs.length < u.total" class="text-amber-600 text-11pt">⚠ 当前筛选命中 {{ u.recs.length }} / {{ u.total }} 场</div>
                 </div>
-                <!-- 场次清单折叠按钮（2026-10-27 用户调整）：只有 ≥4 场才给这层交互；
-                     3 场及以下的合并卡（卡头仍写「同日 3 场报告」）清单直接铺开，
-                     不渲染按钮——多一次点击不值得。 -->
-                <button v-if="isForumFoldable(u)" @click="toggleForum(u)"
+                <button @click="toggleForum(u)"
                   class="text-11pt text-blue-600 hover:text-blue-800 hover:underline mb-1">
                   {{ isForumOpen(u) ? '收起场次清单 ▲' : '展开场次清单 ▼' }}
                 </button>
@@ -945,9 +942,9 @@
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=275a9d84e1"></script>
-  <script defer src="app.state.js?v=e4c8e84ac3"></script>
-  <script defer src="app.computed.js?v=ac85d31208"></script>
-  <script defer src="app.display.js?v=89e33cc795"></script>
+  <script defer src="app.state.js?v=96bb8747d0"></script>
+  <script defer src="app.computed.js?v=b7e60619f7"></script>
+  <script defer src="app.display.js?v=9a9d17612f"></script>
   <script defer src="app.cloud.js?v=48b48189e4"></script>
   <script defer src="app.social.js?v=53c95b667e"></script>
   <script defer src="app.calendar.js?v=3731053cf3"></script>

@@ -126,10 +126,8 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   点击行为仍由 addToCalendar / addGroupToCalendar 把关），135 → 137）
 // （2026-10-27：调度改造 —— _ensureLongTextIdle（chunks 完成后空闲预取长文本桶），
 //   137 → 138）
-// （2026-10-27：场次清单折叠阈值 —— isForumFoldable（≥4 场才给展开/收起交互，
-//   3 场及以下清单直接铺开），138 → 139）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 139) errs.push(`方法数 ${nMethods} != 139`);
+if (nMethods !== 138) errs.push(`方法数 ${nMethods} != 138`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');

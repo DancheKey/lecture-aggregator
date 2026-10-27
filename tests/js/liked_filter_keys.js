@@ -117,7 +117,7 @@ function makeCtx(allData, over) {
 // ---------- 共用数据：一页 3 场（会渲染成合并卡）+ 一条单场 ----------
 const P = 'http://x.scnu.edu.cn/a/1.html';          // 多场源页
 const S = 'http://x.scnu.edu.cn/b/2.html';          // 单场源页
-const multi = [1, 2, 3].map(i => rec({
+const multi = [1, 2, 3, 4].map(i => rec({
   sourceUrl: P, lectureIndex: i, ck: `${P}~${i}`, title: `第${i}场`,
 }));
 const solo = rec({ sourceUrl: S, lectureIndex: null, ck: S, title: '单场' });
@@ -138,14 +138,14 @@ const ALL = multi.concat([solo]);
 {
   const cm = makeCtx(ALL, { showLikedOnly: true, lectureStats: { [P]: { likes: 2, wants: 0, visits: 0 } } });
   const hit = cm.filtered;
-  // 过滤是逐条记录：同页 3 场的 sourceUrl 都命中页面级键 → 整组保留，
-  // 从而仍满足 MIN=3 的合并条件（形态不退化成单卡）。
-  ok(hit.length === 3, `test_02 页面级赞应保留整页 3 场，实际 ${hit.length}`);
+  // 过滤是逐条记录：同页 4 场的 sourceUrl 都命中页面级键 → 整组保留，
+  // 从而仍满足 MIN=4 的合并条件（形态不退化成单卡；2026-10-27 阈值 3→4）。
+  ok(hit.length === 4, `test_02 页面级赞应保留整页 4 场，实际 ${hit.length}`);
   const u = cm.units;
   ok(u.length === 1, `test_02 应仍渲染为 1 个渲染单元，实际 ${u.length}`);
   ok(u[0] && u[0].type === 'forum', `test_02 单元类型应为 forum，实际 ${u[0] && u[0].type}`);
   ok(u[0] && u[0].ck === P, `test_02 合并卡的计数键应为页面级 url，实际 ${u[0] && u[0].ck}`);
-  ok(u[0] && u[0].total === 3, `test_02 合并卡 total 应为 3，实际 ${u[0] && u[0].total}`);
+  ok(u[0] && u[0].total === 4, `test_02 合并卡 total 应为 4，实际 ${u[0] && u[0].total}`);
 }
 
 // ---------- test_03：未赞的不被筛出 ----------
@@ -187,11 +187,11 @@ const ALL = multi.concat([solo]);
     ok(hit.length === 1 && hit[0].ck === `${N}~3`,
        `test_08 只赞第 3 期应命中 1 条，实际 ${hit.length} 条`);
   }
-  // 情形 C：合并页（同页同日 3 场）的页面级键仍须兜底命中整组——口径不能一刀切
+  // 情形 C：合并页（同页同日 4 场）的页面级键仍须兜底命中整组——口径不能一刀切
   {
     const cm = makeCtx(ALL, { showLikedOnly: true, lectureStats: { [P]: { likes: 2, wants: 0, visits: 0 } } });
-    ok(cm.filtered.length === 3,
-       `test_08 合并页的页面级键仍须命中整组 3 场，实际 ${cm.filtered.length} 条`);
+    ok(cm.filtered.length === 4,
+       `test_08 合并页的页面级键仍须命中整组 4 场，实际 ${cm.filtered.length} 条`);
   }
 }
 
@@ -226,8 +226,8 @@ const ALL = multi.concat([solo]);
   // C) 合并页的页面级想听键：仍命中整组
   {
     const cm = makeCtx(ALL, { showWantedOnly: true, lectureStats: { [P]: { likes: 0, wants: 2, visits: 0 } } });
-    ok(cm.filtered.length === 3,
-       `test_09 合并页的页面级想听键仍须命中整组 3 场，实际 ${cm.filtered.length} 条`);
+    ok(cm.filtered.length === 4,
+       `test_09 合并页的页面级想听键仍须命中整组 4 场，实际 ${cm.filtered.length} 条`);
   }
   // D) 两个「已选」开关互斥 + 清除按钮能清掉想听
   {
