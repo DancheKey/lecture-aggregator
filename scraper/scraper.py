@@ -1674,6 +1674,21 @@ def incremental_merge(existing, new_records):
                 suppressed_new_keys.add(new_key)
                 print(f'[MULTI-ROUND] 多轮通知新记录更旧，抑制追加: {new_url}（保留 {old_key}）')
 
+    # === 多场拆分页母记录回退保护（方案 A，2026-10-27）===
+    # 场景：库里某 URL 已拆分为 (url,1)/(url,2) 子记录；增量轮重抓该页时解析器
+    # 若未识别出多场拆分，会产出 (url, None) 母记录——复合键不冲突、直接追加，
+    # 造成同一页「2 张子卡 + 1 张母卡」并存（jky/5920 CI 实测：CI 增量把本地
+    # 已精确删除的母记录复活）。守卫：基底或本批新记录中同 sourceUrl 已存在
+    # 带 int lectureIndex 的子记录时，丢弃该母记录（解析回退产物，保留即脏）。
+    # 反方向（库里单条 None + 新批解析出子记录）不触发，保留「补拆漏期」能力。
+    base_split_urls = set()
+    for _k in base_map:
+        _i = _k.rfind('#')
+        if _i != -1 and _k[_i + 1:].isdigit():
+            base_split_urls.add(_k[:_i])
+    new_split_urls = {_norm_url(_r.get('sourceUrl')) for _r in new_deduped
+                      if _r.get('lectureIndex') is not None}
+
     # 基底跨源索引：用于判断 new 是否与已有讲座跨源重复
     existing_index = {}          # 有有效主讲人：(spk, date) -> [rec]
     no_speaker_index = {}        # 无有效主讲人但有单位：(college, date) -> [rec]
@@ -1694,10 +1709,19 @@ def incremental_merge(existing, new_records):
 
     final_new = []
     skip = 0
+    mother_dropped = 0
     for r in new_deduped:
         key = _norm_url(r.get('sourceUrl')) + ('#' + str(r.get('lectureIndex')) if r.get('lectureIndex') is not None else '')
         if key in seen:
             continue
+        # 母记录回退守卫：基底/本批已有同 URL 拆分子记录时丢弃母记录（置于
+        # replaced/suppressed 判断之前——拆分保护优先于轮次替换语义）
+        if r.get('lectureIndex') is None:
+            _mu = _norm_url(r.get('sourceUrl'))
+            if _mu in base_split_urls or _mu in new_split_urls:
+                mother_dropped += 1
+                print(f'[MOTHER-GUARD] 丢弃多场拆分页回退母记录: {_mu}（同 URL 已有拆分子记录）')
+                continue
         # 多轮通知替换者：跳过跨源去重，直接追加最新一轮（否则会被旧轮判定为跨源重复而跳过）
         if key in replaced_new_keys:
             seen.add(key)
@@ -1720,6 +1744,8 @@ def incremental_merge(existing, new_records):
         print(f'[MULTI-ROUND] 共替换 {len(replaced_new_keys)} 条旧轮次（保留最新一轮）')
     if skip:
         print(f'[INCREMENTAL] 跨源重复 {skip} 条（命中即 merge-into-A 融合；基底更新 merged/sources）')
+    if mother_dropped:
+        print(f'[MOTHER-GUARD] 共丢弃拆分页回退母记录 {mother_dropped} 条')
     # 基底内部存量重复自愈（2026-10-24）：先发后发的同一讲座若两条都已在库，
     # 前两路都检测不到，靠这一步融合（严格判据，只动同人同日同题的不同页面）。
     healed = _heal_base_dups(base_map, existing_index)
