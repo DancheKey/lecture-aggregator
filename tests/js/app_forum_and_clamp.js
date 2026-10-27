@@ -275,9 +275,70 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
      'B3: 模板仍在用 toggleAbstract(l.sourceUrl) —— 传入 url 无法定位期数');
 }
 
+// ================= B4：场次清单折叠阈值（2026-10-27 用户调整）=================
+// 用户截图：一张「同日 3 场报告」的合并卡也要先点「展开场次清单」才看得到 3 场。
+// 要求：≥4 场才折起，3 场及以下直接铺开。
+// ⚠ 与 FORUM_MIN(3) 是两条线——3 场仍然合成合并卡（卡头「同日 3 场报告」），
+//   只是清单不再折。下面同时锁「合并口径不变」和「折叠口径变了」。
+{
+  // ① 3 场：仍合成 forum 卡（FORUM_MIN 未被误改），但清单恒定展开且不给折叠按钮
+  {
+    const cm = makeCtx([mk(1), mk(2), mk(3)]);
+    const units = computed.units.call(cm);
+    const forum = units.find(u => u.type === 'forum');
+    ok(!!forum, 'B4: 3 场同源同日仍应合成合并卡（FORUM_MIN=3 不应被改动）');
+    if (forum) {
+      ok(forum.total === 3, `B4: 3 场卡 total 应为 3，实得 ${forum.total}`);
+      const self = Object.assign({}, cm, { expandedForums: {} });
+      ok(methods.isForumFoldable.call(self, forum) === false,
+         'B4: 3 场卡不应再提供展开/收起交互（isForumFoldable 应为 false）');
+      ok(methods.isForumOpen.call(self, forum) === true,
+         'B4: 3 场卡清单应默认展开（修复前默认收起，用户需多点一次）');
+      // 历史 toggle 残留（false）也不该把 3 场卡折起来——按钮都没有，折了就再也展不开
+      const stale = Object.assign({}, cm, { expandedForums: { [forum.url]: false } });
+      ok(methods.isForumOpen.call(stale, forum) === true,
+         'B4: 3 场卡即便 expandedForums 残留 false 也必须展开（否则无按钮可救）');
+    }
+  }
+
+  // ② 4 场：达到阈值 → 默认折起，且提供折叠交互
+  {
+    const cm = makeCtx([mk(1), mk(2), mk(3), mk(4)]);
+    const forum = computed.units.call(cm).find(u => u.type === 'forum');
+    ok(!!forum, 'B4: 4 场应合成合并卡');
+    if (forum) {
+      const self = Object.assign({}, cm, { expandedForums: {} });
+      ok(methods.isForumFoldable.call(self, forum) === true,
+         'B4: 4 场卡应提供展开/收起交互');
+      ok(methods.isForumOpen.call(self, forum) === false,
+         'B4: 4 场卡应默认收起（阈值从 3 上调到 4）');
+      ok(methods.isForumOpen.call(
+        Object.assign({}, cm, { expandedForums: { [forum.url]: true } }), forum) === true,
+        'B4: 4 场卡显式展开后应保持展开');
+    }
+  }
+
+  // ③ 单卡（非 forum）不该被这套逻辑影响：isForumFoldable 读到 undefined.total 须为 false
+  {
+    const cm = makeCtx([mk(1), mk(2)]);
+    const single = computed.units.call(cm).find(u => u.type === 'single');
+    ok(!!single, 'B4: 2 场应走单卡');
+    if (single) {
+      ok(methods.isForumFoldable.call(Object.assign({}, cm, { expandedForums: {} }), single) === false,
+         'B4: 单卡 total 为 undefined，isForumFoldable 应为 false 而非抛错/误判');
+    }
+  }
+
+  // ④ 模板静态锁：按钮必须挂 v-if="isForumFoldable(u)"，清单容器仍看 isForumOpen
+  ok(/<button\s+v-if="isForumFoldable\(u\)"\s+@click="toggleForum\(u\)"/.test(INDEX_HTML),
+     'B4: index.html 的折叠按钮未挂 v-if="isForumFoldable(u)" —— 3 场卡会多出一个无意义按钮');
+  ok(/<div\s+v-if="isForumOpen\(u\)"/.test(INDEX_HTML),
+     'B4: 场次清单容器未按 isForumOpen(u) 渲染');
+}
+
 if (errs.length) {
   console.log('[FAIL]');
   errs.forEach(e => console.log(' -', e));
   process.exit(1);
 }
-console.log('[PASS] B1 论坛卡 total 取全集口径、部分命中自动展开；B2 clamp 签名覆盖全部筛选维度');
+console.log('[PASS] B1 论坛卡 total 取全集口径、部分命中自动展开；B2 clamp 签名覆盖全部筛选维度；B4 场次清单 ≥4 场才折叠');

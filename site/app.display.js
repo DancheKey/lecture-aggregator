@@ -3,10 +3,19 @@
 const _warnedBadEnd = new Set();
 Object.assign(APP_METHODS, {
     // 论坛卡展开状态：未显式操作过时，「筛选/搜索命中子集」自动展开（2026-09-26 方案B）
+    // 2026-10-27 用户调整：场次清单只在 ≥FORUM_FOLD_MIN(4) 场时才默认折起；
+    // 3 场及以下恒定展开（3 场一屏放得下，不让人多点一次）。此档位下模板也不渲染
+    // 展开/收起按钮（isForumFoldable 为 false），所以这里直接恒 true，不看历史 toggle。
     isForumOpen(u) {
+      if (!this.isForumFoldable(u)) return true;
       const v = this.expandedForums[u.url];
       if (v !== undefined) return v;
       return u.recs.length < u.total;
+    },
+    // 该卡是否给「展开/收起场次清单」这层交互：只有 ≥FORUM_FOLD_MIN 场才给。
+    // 模板 index.html 用它决定按钮显隐，必须走实例方法——模板编译拿不到脚本顶层 const。
+    isForumFoldable(u) {
+      return (u && u.total || 0) >= FORUM_FOLD_MIN;
     },
     // 展开场次清单按时间从早到晚正序（主列表倒序只服务时间线视觉，议程清单按议程自然顺序）；
     // 无时间场次稳定排在最后，保持其余相对顺序

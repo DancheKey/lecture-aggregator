@@ -40,7 +40,8 @@ const APP_STATE = function () {
       expanded: {},         // 多来源讲座的「展开原文链接」状态：sourceUrl -> bool
       expandedAbstract: {}, // 卡片摘要的展开状态：sourceUrl -> bool（默认 3 行截断）
       expandedBio: {},      // 主讲简介的展开状态：sourceUrl -> bool（长文默认折叠）
-      expandedForums: {},   // 论坛卡的展开状态：sourceUrl -> bool（缺省=筛选子集自动展开，2026-09-26 方案B）
+      expandedForums: {},   // 论坛卡的展开状态：sourceUrl -> bool（缺省=筛选子集自动展开，2026-09-26 方案B；
+                            // 2026-10-27 起仅 ≥4 场的卡才读它，3 场及以下恒定展开，见 isForumFoldable）
       // 远期折叠条（>7 天待开始讲座，2026-10-13 方案 B）的展开状态：true=展开被折的
       // 场次。初值 false（默认折叠）；mounted 时 loadFarFuture() 从 localStorage
       // 恢复上次选择（刷新不丢，同点赞/想听的本机偏好模式）。
