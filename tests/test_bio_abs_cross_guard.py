@@ -95,6 +95,49 @@ class BioAbsCrossGuardTest(unittest.TestCase):
         self.assertIn('计算机学院教授', bio, '正常讲者简介应完整保留')
         self.assertNotIn('图像识别中的最新进展', bio)
 
+    def test_姓名职衔简介标签动态截断(self):
+        # 复刻 psy/203 马宁形态：简介段以「马宁博士简介:」起头（静态词表无此形态）
+        html = (_HEAD.format(title='特质推断的神经机制', speaker='马宁')
+                + '<p>【摘要】</p>'
+                + '<p>特质推断一直是社会认知研究的重要主题。近年来随着认知神经科学的'
+                + '快速发展，很多研究开始探讨特质推断的神经机制。</p>'
+                + '<p>马宁博士简介: 马宁，博士毕业于比利时布鲁塞尔自由大学，'
+                + '主要从事社会推断的神经机制研究。</p>'
+                + '</div></body></html>')
+        r = _parse(html)
+        bio = r.get('speakerBio') or ''
+        self.assertIn('布鲁塞尔自由大学', bio, '「姓名+职衔+简介」标签后的真简介应被提取')
+        self.assertNotIn('特质推断一直是社会认知研究', bio, '摘要不得混入 bio')
+
+    def test_复合姓名speaker提取CJK段注入(self):
+        # 复刻 psy/206 李平形态：speaker='Ping Li ( 李平'，简介标签「李平教授简介:」
+        html = (_HEAD.format(title='语言认知研究', speaker='Ping Li ( 李平')
+                + '<p>报告内容简介: A great deal of research has examined '
+                + 'behavioral performance changes associated with learning.</p>'
+                + '<p>李平教授简介: 李平教授1983年在北京大学获得语言学学士学位，'
+                + '主要研究语言的神经和计算基础。</p>'
+                + '</div></body></html>')
+        r = _parse(html)
+        bio = r.get('speakerBio') or ''
+        self.assertIn('语言学学士', bio, '复合名 speaker 应提取 CJK 段动态注入锚点')
+        self.assertNotIn('A great deal', bio, '英文摘要不得混入 bio')
+        self.assertIn('behavioral performance', (r.get('abstract') or ''),
+                      '英文摘要应归位 abstract')
+
+    def test_英文摘要与裸简介标签分离(self):
+        # 复刻 psy/1724 丁晓伟形态：Abstract 英文摘要 + 裸「简介:」中文简介
+        html = (_HEAD.format(title='生物运动感知', speaker='丁晓伟')
+                + '<p>Abstract: Biological motion broadly refers to the '
+                + 'movements of animate entities and carries social signals.</p>'
+                + '<p>简介: 丁晓伟博士，中山大学心理学系副教授，主要研究注意和工作记忆。</p>'
+                + '</div></body></html>')
+        r = _parse(html)
+        bio = r.get('speakerBio') or ''
+        self.assertIn('中山大学心理学系副教授', bio, '裸「简介:」后的真简介应被提取')
+        self.assertNotIn('Biological motion', bio, '英文摘要不得混入 bio')
+        self.assertIn('Biological motion', (r.get('abstract') or ''),
+                      '英文摘要应归位 abstract')
+
     def test_真简介存在时优先采纳且不与摘要重叠(self):
         # 交叉检查回退语义锁定：首个锚点候选（摘要后半段）被拒后，
         # finditer 必须继续找下一个候选（真简介），而不是直接放弃。

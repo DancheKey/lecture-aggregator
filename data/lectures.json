@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-27 12:43:34",
+  "updatedAt": "2026-10-27 14:28:34",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261106/8874.html",
@@ -72192,14 +72192,14 @@
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
       "timeNote": "authoritative-label",
-      "abstract": "This paper presents an equilibrium model of formal and informal sectors of a dualistic developing economy, to enable both supply-side and demand-side analyses of formalization and welfare . In a multi-region setting with perfect labor mobility, a consumer taste for diversity, skill heterogeneity, and regional disparity in regulatory and trade costs, high-skill entrepreneurs self-select to pay the regulatory costs in the formal sector to trade globally and lower-skill entrepreneurs choose the informal sector to trade locally to avoid the regulatory costs. In equilibrium, formalization reflects the balance between consumption diversity, which expands with local informal entrepreneurship, and productivity, which increases with formal-sector employment. The equilibrium accounts for the sectoral disparity in entrepreneur skill, labor productivity, and firm size documented in La Porta and Shelifer (2014). It further accounts for the concurrent rises in education, export, and formalization and for regional sorting of formal entrepreneur skill found in Indonesia. The role of the informal sector in enriching consumption diversity but pushing up the labor cost for are supported by our counterfactual analysis which excludes the informality. 演讲人简介:",
+      "abstract": "This paper presents an equilibrium model of formal and informal sectors of a dualistic developing economy, to enable both supply-side and demand-side analyses of formalization and welfare . In a multi-region setting with perfect labor mobility, a consumer taste for diversity, skill heterogeneity, and regional disparity in regulatory and trade costs, high-skill entrepreneurs self-select to pay the regulatory costs in the formal sector to trade globally and lower-skill entrepreneurs choose the informal sector to trade locally to avoid the regulatory costs. In equilibrium, formalization reflects the balance between consumption diversity, which expands with local informal entrepreneurship, and productivity, which increases with formal-sector employment. The equilibrium accounts for the sectoral disparity in entrepreneur skill, labor productivity, and firm size documented in La Porta and Shelifer (2014). It further accounts for the concurrent rises in education, export, and formalization and for regional sorting of formal entrepreneur skill found in Indonesia. The role of the informal sector in enriching consumption diversity but pushing up the labor cost for are supported by our counterfactual analysis which excludes the informality.",
       "newsFilterBypass": true,
       "llmTextEnhanced": true,
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
       "llmAdopted": "speakerTitle|speakerAffiliation",
       "listTitle": "● “华师经英Seminar”第八期",
-      "qaGate": "abstract"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20191220/1093.html",
@@ -78784,11 +78784,11 @@
       "timeNote": "authoritative-label",
       "speakerSource": "label",
       "listTitle": "砺儒讲坛第68讲：啄食顺序理论在接待业中的应用研究（Woo Gon Kim 教授）",
-      "speakerBio": "Woo Gon Kim ( Woody )教授博士毕业于美国普渡大学,现任美国佛罗里达州立大学 Dedman 酒店管理学院教授 ( 终身教职 ) ,款待服务管理研究中心总监。主要研究方向为收益管理、酒店品牌营销、款客服务等。 Woo Gon Kim ( Woody )教授从事学术研究以来已发表 200 余篇 SSCI 论文,是国际上酒店管理领域被引用频次处于顶尖水平的学者,其在 Google Scholar 引用次数高达 10306 余次 , H-index 是 42 。 Woo Gon Kim ( Woody )教授还担任多部国际期刊的主编或编委和多个国际学术期刊的匿名审稿人,是全球最具影响力的酒店管理研究学者之一。 Dr. Woody Kim is the Robert H. Dedman Professor of Hospitality Management and Director of the International Center for Hospitality Research & Development. He holds a Ph.D. from Purdue University and has taught at universities within the U.S. and abroad. His research and teaching interests include revenue management, pricing, brand management, customer relationship management, and hospitality finance. Prior to joining academia, he worked as a consultant for HVS International in New York. Dr. Kim was recognized as the 5th leading researcher worldwide among esteemed authors of Hospitality research in",
+      "speakerBio": "Woo Gon Kim ( Woody )教授博士毕业于美国普渡大学,现任美国佛罗里达州立大学 Dedman 酒店管理学院教授 ( 终身教职 ) ,款待服务管理研究中心总监。主要研究方向为收益管理、酒店品牌营销、款客服务等。 Woo Gon Kim ( Woody )教授从事学术研究以来已发表200余篇 SSCI 论文,是国际上酒店管理领域被引用频次处于顶尖水平的学者,其在 Google Scholar 引用次数高达10306余次 , H-index 是42 。 Woo Gon Kim ( Woody )教授还担任多部国际期刊的主编或编委和多个国际学术期刊的匿名审稿人,是全球最具影响力的酒店管理研究学者之一。 Dr. Woody Kim is the Robert H. Dedman Professor of Hospitality Management and Director of the International Center for Hospitality Research & Development. He holds a Ph.D. from Purdue University and has taught at universities within the U.S. and abroad. His research and teaching interests include revenue management, pricing, brand management, customer relationship management, and hospitality finance. Prior to joining academia, he worked as a consultant for HVS International in New York. Dr. Kim was recognized as the 5th leading researcher worldwide among esteemed authors of Hospitality research in 2011.",
       "abstract": "",
       "llmTextEnhanced": true,
       "llmVerdict": "rich-only",
-      "qaGate": "abstract:emptied"
+      "qaGate": "abstract:emptied|speakerBio"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20190523/1756.html",
@@ -80683,10 +80683,10 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": "Biological motion (BM), which broadly refers to the movements of animate entities, is a social signal that carries information critical for survival and interpersonal interactions. Processing such movements has immense value for successful daily activities, including normal social interaction (e.g., pro-social behavior and nonverbal communication). As noted by Aristotle, \"Man is by nature a social animal\". To conform to our social nature, as well as promote our abilities related to BM perception, it is important to store BM information in working memory. This ensures that BM information will not decay from the visual system, and allows us to have coherent visual perception of dynamic BM. A series of studies were performed to investigate the processing mechanisms of BM in working memory. In the first study, we explored the working memory capacity and architecture of BM information by examining the maintenance of BM stimuli in working memory. In the second study, 2 critical issues of BM-related binding in working memory were explored: (a) how many BM binding units can be retained in working memory, (b) whether involuntarily object-based binding occurs during BM binding. In the third study, we investigated how interactive BM (e.g., two people shaking hands) is stored in working memory by testing two opposite hypotheses: (a) that working memory stores the interactions individually (the individual-storage hypothesis) and (b) that working memory stores the interactions as chunks (the chunk-storage hypothesis). The results are as follows. First, an independent storage buffer of working memory exists for BM information, which can hold up to 3 to 4 motion units. Second, working memory capacity for BM bindings (e.g., BM-color binding) is rather low; only 1 or 2 BM bindings could be retained in working memory regardless of the presentation manners. Furthermore, no object-based encoding takes place for BM stimuli regardless of the processed dimensions. Third, the working memory automatically and efficiently uses semantic knowledge about interactive biological movements to store them, and the chunk-storage hypothesis is supported. 简介:",
+      "abstract": "Biological motion (BM), which broadly refers to the movements of animate entities, is a social signal that carries information critical for survival and interpersonal interactions. Processing such movements has immense value for successful daily activities, including normal social interaction (e.g., pro-social behavior and nonverbal communication). As noted by Aristotle, \"Man is by nature a social animal\". To conform to our social nature, as well as promote our abilities related to BM perception, it is important to store BM information in working memory. This ensures that BM information will not decay from the visual system, and allows us to have coherent visual perception of dynamic BM. A series of studies were performed to investigate the processing mechanisms of BM in working memory. In the first study, we explored the working memory capacity and architecture of BM information by examining the maintenance of BM stimuli in working memory. In the second study, 2 critical issues of BM-related binding in working memory were explored: (a) how many BM binding units can be retained in working memory, (b) whether involuntarily object-based binding occurs during BM binding. In the third study, we investigated how interactive BM (e.g., two people shaking hands) is stored in working memory by testing two opposite hypotheses: (a) that working memory stores the interactions individually (the individual-storage hypothesis) and (b) that working memory stores the interactions as chunks (the chunk-storage hypothesis). The results are as follows. First, an independent storage buffer of working memory exists for BM information, which can hold up to 3 to 4 motion units. Second, working memory capacity for BM bindings (e.g., BM-color binding) is rather low; only 1 or 2 BM bindings could be retained in working memory regardless of the presentation manners. Furthermore, no object-based encoding takes place for BM stimuli regardless of the processed dimensions. Third, the working memory automatically and efficiently uses semantic knowledge about interactive biological movements to store them, and the chunk-storage hypothesis is supported.",
       "speakerBio": "丁晓伟博士,中山大学心理学系副教授。2015年毕业于浙江大学心理与行为科学系,博士毕业后继续于浙江大学心理与行为科学系从事博士后研究工作。丁晓伟博士主要研究领域为注意和工作记忆,近年来第一作者或通讯作者论文发表于Psychological Science, Cognition, Journal of Experimental Psychology: Human Perception and Performance, Psychonomic Bulletin & Review等国际心理学期刊。",
       "qaRepaired": "2026-09-05.1",
-      "qaGate": "abstract"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20190408/21.html",
@@ -81530,7 +81530,7 @@
       "speakerBio": "韩彪,于2016年获得法国图卢兹大学/法国国家科学研究中心 \"最高荣誉\"(Très honorable)神经科学博士学位,师从Rufin VanRullen博士。在结束博士学习生涯后,获得了法国Fyssen基金会的博士后奖学金并开始了在荷兰唐德思研究所(Donders Institute)的博士后研究,师从Floris de Lange博士。韩彪博士主要使用计算模型、EEG/MEG/sEEG和fMRI研究大脑中的\"反馈\"通路。",
       "llmTextEnhanced": true,
       "llmVerdict": "rich-only",
-      "qaGate": "abstract"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20190314/6816.html",
@@ -86849,10 +86849,10 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": "In general, older adults are perceived negatively (such as decreased physical and mental health, worse social relations and increased loneliness), and the society, especially the younger generation, holds very negative attitude toward them. In this talk I will focus on three related questions: 1) what factors could contribute to the negative attitudes toward older adults; 2) what are the consequences of negative attitudes toward older adults, for both younger adults and older adults; and more essentially 3) could the negative perception of older adults be changed, and present data from 4-5 studies with series of experiments and surveys, aiming at providing some preliminary answers to the above questions. 张昕副教授简介:",
+      "abstract": "In general, older adults are perceived negatively (such as decreased physical and mental health, worse social relations and increased loneliness), and the society, especially the younger generation, holds very negative attitude toward them. In this talk I will focus on three related questions: 1) what factors could contribute to the negative attitudes toward older adults; 2) what are the consequences of negative attitudes toward older adults, for both younger adults and older adults; and more essentially 3) could the negative perception of older adults be changed, and present data from 4-5 studies with series of experiments and surveys, aiming at providing some preliminary answers to the above questions.",
       "speakerBio": "张昕,北京大学心理与认知科学学院副教授,2011年毕业于香港中文大学心理学系。研究人类毕生发展,尤其是老年心理学。目前已发表SCI/SSCI论文20余篇,包括发展领域知名期刊Development Psychology, Psychology and Aging, Journal of Gerontology: Psychological Sciences等.同时他还是Journal of Gerontology: Psychological Sciences大陆唯一编委。",
       "qaRepaired": "2026-09-05.1",
-      "qaGate": "abstract"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://geography.scnu.edu.cn/a/20180112/38.html",
@@ -86903,10 +86903,10 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": "第三代人因工程是主要目的是机器适应生理,而第四代人因工程,基本目的是机器适应认知,综合并发展了认知心理学、动机心理学、美学、符号学,建立了用户模型理论,建立了用户需求理论,建立了以用户为本的人机界面设计系统理论和方法,建立了以用户为本的工作量测试方法,研发了眼动仪,否定\"满意度\",系统建立以用户为本的大数据可用性测试理论和方法,大数据方法研究了依据概率论抽样理论的不足,参与我国航天员中心项目,大飞机驾驶员认知工作量测试,大众公司的汽车驾驶员工作量测试,大数据方法系统测试了软件Word,iPhone,Android,ProE的人机界面的可用性错误。 李乐山教授简介:",
+      "abstract": "第三代人因工程是主要目的是机器适应生理,而第四代人因工程,基本目的是机器适应认知,综合并发展了认知心理学、动机心理学、美学、符号学,建立了用户模型理论,建立了用户需求理论,建立了以用户为本的人机界面设计系统理论和方法,建立了以用户为本的工作量测试方法,研发了眼动仪,否定\"满意度\",系统建立以用户为本的大数据可用性测试理论和方法,大数据方法研究了依据概率论抽样理论的不足,参与我国航天员中心项目,大飞机驾驶员认知工作量测试,大众公司的汽车驾驶员工作量测试,大数据方法系统测试了软件Word,iPhone,Android,ProE的人机界面的可用性错误。",
       "speakerBio": "教授,博士生导师,德国博士。获得国家级高等教育成果二等奖,陕西省高等教育成果特等奖。陕西省工业设计协会名誉会长,西安市工业协会名誉会长,中国工业设计协会常务理事,22所大学兼职教授。原教育部工业设计教学指导委员会委员,原西安交通大学工业设计系主任。曾在德国学习工作11年。在西门子公司工作,参与研发磁悬浮列车控制程序,负责编写大众公司机器人驾驶汽车程序,还在联邦物理技术研究院、布伦瑞克艺术造型大学从事研究、开发和教学工作,是德国设计学第一位博士。1999年回国到西安交通大学,一直坚守设计教育的最前线,使西安交大在我国第一个进入国际工业设计学会,当时全世界只有37所大学(美国两所,德国1所),被评为全国第五名最受欢迎的教授。先后出版了《工业设计思想基础》、《工业设计心理学》、《人机界面设计》、《工业社会学》、《现代社会学》、《设计调查》、《美学与设计》、《符号学与设计》、《感觉与感知》、《设计几何学》、《设计元素》、《工业设计材料手册》等17本论著或译著。",
       "qaRepaired": "2026-09-05.1",
-      "qaGate": "abstract"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20180106/6083.html",
@@ -100324,10 +100324,10 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": "",
+      "abstract": "介绍磁共振研究的进展及课题组的实验开展情况。",
       "speakerBio": "1985年本科毕业于浙江中医学院; 1985-1989在浙江省慈溪人民医院从事临床工作; 1992年和1995年在中科院心理所分别获得硕士和博士学位; 1997年、 1999年分别晋升副研究员和研究员; 2010年调动到杭州师范大学,并与同事们一起建立了杭州师范大学认知与脑疾病研究中心。 1995年开始利用 fMRI 技术研究人脑功能, 1996年建立我国首家 fMRI 专业实验室; 1998年在国际上率先报告汉字加工的 fMRI 研究;随后发现小脑参与复杂运动的准备和语言意义辨别等高级认知功能,并在文字加工和神经、精神疾病研究中取得一定成就。目前主要研究领域包括:文字特别是汉字加工的神经基础,主要关注左侧梭状回对文字加工的特异性和可塑性;应用脑成像技术研究抑郁症等神经、精神疾病的神经基础。",
       "qaRepaired": "2026-09-05.1",
-      "qaGate": "abstract:emptied"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20150625/722.html",
@@ -103536,14 +103536,14 @@
       "publishTimeSource": "url_proxy",
       "timeConfidence": "high",
       "timeNote": "same-day-normal",
-      "abstract": "In common-value second-price auctions of items with uncertain value, we examine the role of fixed-fee return policies that resemble many situations in real business practice: e.g., deposits in oil field auctions, mineral and gas right auctions, spectrum auctions , and money-back guarantees with fixed shipping and handling charges in eBay auctions. Theory makes the prediction that a more generous return policy will hurt the winning bidder by eroding consumer surplus through higher bids. Theory also demonstrates that the seller's revenue increases as the handling fee for returning the auctioned item decreases, but remains positive. For free returns, there are multiple equilibria, all involving zero consumer surplus for the winning bidder, but with different implications for sellers. In our experimental setting, items may have a high value of 100 or a low value of 0 with an a priori 50% probability of each outcome. There are experimental four treatments: No Return (NR), High Fee (HF), Low Fee (LF) and Free Return (FR). We observe that bids increase and bidders' earnings decrease when the handling fee decreases as predicted. However, we also observe that in the FR treatment many bidders bid above the highest possible value and subsequently return the item regardless of the revealed value. While this is consistent with equilibrium behavior, it is an equilibrium that is not optimal for the seller. 杜宁华老师的简介:",
+      "abstract": "In common-value second-price auctions of items with uncertain value, we examine the role of fixed-fee return policies that resemble many situations in real business practice: e.g., deposits in oil field auctions, mineral and gas right auctions, spectrum auctions , and money-back guarantees with fixed shipping and handling charges in eBay auctions. Theory makes the prediction that a more generous return policy will hurt the winning bidder by eroding consumer surplus through higher bids. Theory also demonstrates that the seller's revenue increases as the handling fee for returning the auctioned item decreases, but remains positive. For free returns, there are multiple equilibria, all involving zero consumer surplus for the winning bidder, but with different implications for sellers. In our experimental setting, items may have a high value of 100 or a low value of 0 with an a priori 50% probability of each outcome. There are experimental four treatments: No Return (NR), High Fee (HF), Low Fee (LF) and Free Return (FR). We observe that bids increase and bidders' earnings decrease when the handling fee decreases as predicted. However, we also observe that in the FR treatment many bidders bid above the highest possible value and subsequently return the item regardless of the revealed value. While this is consistent with equilibrium behavior, it is an equilibrium that is not optimal for the seller.",
       "newsFilterBypass": true,
       "llmTextEnhanced": true,
       "llmVerdict": "consistent",
       "llmSpeakerSource": null,
       "llmAdopted": "speakerTitle|speakerAffiliation",
       "listTitle": "● 杜宁华副教授学术讲座通知",
-      "qaGate": "abstract"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20141021/3740.html",
@@ -106170,11 +106170,11 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": "简介: A great deal of research has examined behavioral performance changes associated with second language learning. But what changes are taking place in the brain as learning progresses? How can we identify whether the learner has or has not successfully learned an aspect of the new language? To answer these questions, researchers have developed a variety of methods and paradigms to study the neurocognitive processes of language acquisition. In our research, we have examined the cognitive performance and brain activities associated with second language learning using a fMRI pre-training and post-training paradigm, and attempt to identify the functional connectivity changes over time before and after training on new language vocabulary items. In addition, we identify the individual differences in the participants' cognitive skills, and link these to participants' learning success. Our findings indicate that cognitive skills including working memory and attentional control are positively associated with learning outcomes, and that learners develop more efficient and more integrated brain networks across the left and right hemispheres in key brain areas responsible for phonological and lexical-semantic representation and integration. These findings have significant implications for understanding the linguistic ability of the individual, differences between individuals, and the relationships between language abilities and cognitive capacities . 李平教授简介:",
+      "abstract": "简介: A great deal of research has examined behavioral performance changes associated with second language learning. But what changes are taking place in the brain as learning progresses? How can we identify whether the learner has or has not successfully learned an aspect of the new language? To answer these questions, researchers have developed a variety of methods and paradigms to study the neurocognitive processes of language acquisition. In our research, we have examined the cognitive performance and brain activities associated with second language learning using a fMRI pre-training and post-training paradigm, and attempt to identify the functional connectivity changes over time before and after training on new language vocabulary items. In addition, we identify the individual differences in the participants' cognitive skills, and link these to participants' learning success. Our findings indicate that cognitive skills including working memory and attentional control are positively associated with learning outcomes, and that learners develop more efficient and more integrated brain networks across the left and right hemispheres in key brain areas responsible for phonological and lexical-semantic representation and integration. These findings have significant implications for understanding the linguistic ability of the individual, differences between individuals, and the relationships between language abilities and cognitive capacities .",
       "speakerBio": "李平教授1983年在北京大学获得语言学学士学位, 1990年在荷兰的马普心理语言学研究所获得心理学博士学位。随后在美国加州大学圣地亚哥分校的语言研究中心和 McDonald Pew 认知神经科学中心做博士后研究。他于1992年到1996年在香港中文大学任职, 1996年转至美国的 University of Richmond 任心理学和认知科学教授。他目前是美国宾州州立大学的心理学教授、语言学教授、信息科学与技术学教授,兼任脑、行为和认知中心主任,神经科学研究生项目负责人,学习科学研究高级联合中心副主任。李平教授重点关注语言的神经和计算基础。他使用行为、计算和神经成像等方法来研究母语和二语获得与表征的机制。他在心理语言学、双语、认知神经科学等领域发表论著100多篇(部),其中有影响的专著有《 The Acquisition of Lexical and Grammatical Aspect (词汇和语法获得) 》,《 The Handbook of East Asian Psycholinguistics ( 东亚心理语言学手册)》,《 The Expression of Time ( 时态表达)》,《 The Psycholinguistics of Bilingualism (双语的心理语言学研究)》,《 Having Success with NSF: A Practical Guide ( 美国国家科学基金成功申报指南)》等。他目前是杂志《 Bilingualism: Language and Cognition 》的主编,《 Journal of Neurolinguistics 》和《 Frontiers in Language Science 》的副主编。曾任美国计算机心理学学会主席,美国国家科学基金认知神经科学项目组以及感觉、行动和认知项目组评委会主任,同时也是多项美国国家科学基金项目的首席专家。 详细信息见: http://cogsci.psu.edu/.or.http://blclab.org/",
       "llmTextEnhanced": true,
       "llmVerdict": "rich-only",
-      "qaGate": "abstract"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20130919/203.html",
@@ -106198,10 +106198,10 @@
       "sources": [],
       "merged": false,
       "sourceCount": 1,
-      "abstract": "特质推断一直是社会认知研究的重要主题。近年来,随着社会认知神经科学的快速发展,很多研究开始探讨特质推断的神经机制。 fMRI研究表明在特质推断的任务中,人类的\"社会性大脑\"中前额叶(mPFC)和颞顶联合区(TPJ)被广泛激活,并且在出现不一致的社会性信息,个体需要对他人的特质进行更新时,大脑负责探测和解决冲突信息的脑区pmFC和Lateral PFC也会被激活。此外,人类\"社会性大脑\"在对社会性信息进行推断时也有不同的分工,TPJ主要负责对他人行为的理解,而mPFC主要对他人的特质进行识别和判断。进一步的研究利用fMRI adaptation的实验范式还证明了特质概念在大脑中前额叶的表征,这一结果为mPFC在社会认知中作用的研究提供了全新角度。 马宁博士简介:",
+      "abstract": "特质推断一直是社会认知研究的重要主题。近年来,随着社会认知神经科学的快速发展,很多研究开始探讨特质推断的神经机制。 fMRI研究表明在特质推断的任务中,人类的\"社会性大脑\"中前额叶(mPFC)和颞顶联合区(TPJ)被广泛激活,并且在出现不一致的社会性信息,个体需要对他人的特质进行更新时,大脑负责探测和解决冲突信息的脑区pmFC和Lateral PFC也会被激活。此外,人类\"社会性大脑\"在对社会性信息进行推断时也有不同的分工,TPJ主要负责对他人行为的理解,而mPFC主要对他人的特质进行识别和判断。进一步的研究利用fMRI adaptation的实验范式还证明了特质概念在大脑中前额叶的表征,这一结果为mPFC在社会认知中作用的研究提供了全新角度。",
       "speakerBio": "马宁,博士毕业于比利时布鲁塞尔自由大学,主要从事社会推断的神经机制研究。现在美国宾夕法尼亚大学进行博士后研究,主要方向为睡眠剥夺的神经机制。其主要科研成果已在 Social Cognitive & Affective Neuroscience, Social Neuroscience等高水平国际社会神经科学期刊上发表10余篇,并于2011年获国家优秀自费留学生奖学金。同时,还担任Social Cognitive & Affective Neuroscience, Neuroscience & Biobehavioral Reviews, PLOS One等国际期刊审稿人。",
       "qaRepaired": "2026-09-10.2",
-      "qaGate": "abstract"
+      "qaGate": "speakerBio|abstract"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20130829/197.html",
