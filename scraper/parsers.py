@@ -5877,6 +5877,11 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         '上一篇|下一篇|附件下载|附件[:：]|附宣传海报|相关链接|网友评论|分享|标签|相关推荐|'
         '通知公告|最新公告|站内搜索|快速导航'
     )
+    # 摘要专用噪声词：裸「分享/标签」在讲座正文里是正当用词（「通过分享…经验」
+    # 「可视化标签系统」「标注标签」），只在按钮/栏目标签形态下才作噪声截断。
+    # 由 NOISE_MARKERS 派生（仅替换分享/标签相关项），B 类根因修复。
+    ABS_NOISE = NOISE_MARKERS.replace(
+        '分享|标签|', '分享到|分享[:：]|微信分享|标签[:：]|相关标签|标签云|')
 
     # bio 专属终止符：简介正文在遇到这些结构标记时应截断（避免把「二、报名方式」
     # 「三、时间地点」「联系方式」「面向对象」等后续章节整段吸进主讲人简介）。
@@ -5908,8 +5913,8 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
     # 闭合的 ] 不在 [\s:：]* 内，会残留在 bio 值开头（经管 45 条实测病根）。
     # ⭐ 标签词无法穷举（如「该校简介」不在词表、裸标签只吃到「简介」二字），
     # 故把 ] 并入标签后的分隔符字符类（[\s\]:：]*），任何标签形态下都吞掉闭合括号。
-    bio_pat = (rf'(?:\[\s*(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介)\s*\]'
-               rf'|(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<!内容)简介)'
+    bio_pat = (rf'(?:\[\s*(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<![内容告座题程训坊动议坛龙列])简介)\s*\]'
+               rf'|(?:报告人简介|主讲人简介|主讲人简历|主讲介绍|主讲人介绍|简历|(?<![内容告座题程训坊动议坛龙列])简介)'
                rf'|(?<![A-Za-z])Bio(?![A-Za-z])'
                # 「报告人：姓名，男，…教授，…」式履历段（2026-10-24 新增）。
                # 经管 6966 实测：页面把履历写在「报告人：」标签后（而非「主讲人简介：」），
@@ -5988,8 +5993,8 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
     m = re.search(
         rf'{abs_pat}'
         r'([\s\S]+?)'
-        rf'(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|'
-        r'主讲人|报告人|讲座人|主讲|主持人|邀请人|'
+        rf'(?=\s*(?:{SUMMARY_LABELS}|{ABS_NOISE}|'
+        r'主讲人\s*[:：\]]|\[\s*主讲人|报告人\s*[:：\]|讲座人\s*[:：\]|主持人\s*[:：\]|邀请人\s*[:：\]|'
         r'报告时间|报告地点|报告题目|报告内容|'
         r'时间|地点|题目[：:]|主题[：:]|'
         r'(?:组织单位|主办单位|承办单位|协办单位|支持单位|指导单位|单位)[：:]|'
@@ -6001,7 +6006,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         abstract = re.sub(_COPYRIGHT_TAIL_RE, '', abstract).strip()
         abstract = re.sub(r'\s*(//[\w./-]+\.(jpg|jpeg|png|gif))\s*', '', abstract).strip()
         # 截断页面噪声/侧边栏
-        abstract = re.split(rf'(?:{NOISE_MARKERS})', abstract)[0].strip()
+        abstract = re.split(rf'(?:{ABS_NOISE})', abstract)[0].strip()
         if len(abstract) > 5:
             # 去掉尾部时间/地点/报名等元信息（io 源正文常把"时间:... 地点:..."粘到摘要末尾）
             abstract = re.sub(r'\s*(?:时间|时闻)\s*[:：\s].*$', '', abstract).strip()

@@ -106,6 +106,7 @@ GROUPS = [
                'tests/test_bio_speaker_prefix_20261024.py',
                'tests/test_vlm_topic_reconcile_20261025.py',
                'tests/test_abstract_provenance.py',
+               'tests/test_p0_abstract_fix.py',
                'tests/test_env_flags.py']},
     # 抓取主流程 / 水位 / 台账 / 缓存 / sources.yaml
     {'name': 'crawl', 'pats': ['scraper/scraper.py', 'scraper/sources.yaml',
