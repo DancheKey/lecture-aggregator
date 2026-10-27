@@ -43,6 +43,9 @@ const app = createApp({
     } else {
       this._loadStaticLatest();
     }
+    // 深链直开带搜索词（?q=…）：data() 里解析的初始 query 不走 watch，
+    // 这里补一次触发，避免首屏只在 latest 50 条里搜（2026-10-27 调度改造）。
+    if (this.query) this._ensureLongTextAll();
     // 隐藏初始 loading 占位，避免 Vue 挂载前显示原始模板
     // （v-cloak 已替代，无需手动隐藏 page-loading）
     // 监听滚动，下滑超过阈值时显示「回到顶部」按钮

@@ -5,10 +5,13 @@
 //   ① 首屏 50 条之外，卡片上的「简介/摘要」整块不显示，直到搜索或逐条展开才补；
 //   ② 搜索时先渲染未含长文本的部分结果，桶到达后条数跳变、摘要逐条冒出。
 //
-// 现行策略（2026-09-30 用户定）：
-//   · 首屏一渲染即在后台静默预取全部长文本（不等任何交互）—— 见 app.data._loadStaticLatest；
+// 现行策略（2026-10-27 调度改造后，决策 1）：
+//   · 列表分片（chunks）先加载完，长文本桶再走 requestIdleCallback 空闲预取 ——
+//     见 app.data._loadStaticLatest 的 then → _ensureLongTextIdle；
+//     改前两条并发起跑，桶体积是 chunks 的 3.7 倍，把列表挤成「一页一页地加载」。
 //   · 搜索【永不】等待长文本：未就绪时直接用已到数据出结果，桶到达后 _longText 变更
 //     触发响应式自动补全（先出结果、到齐静默补全）。原 searchPending 等待提示已删除。
+//   · 交互（搜索词/字段/翻页/聚焦/滚动）、深链带 query、展开单条仍立即拉桶（_ensureLongTextAll）。
 //
 // 本门禁用真实分片 + fetch 桩覆盖上述策略的全部关键分支，纯 node、无浏览器、无网络。
 // 用法：node tests/js/app_longtext_flow.js
@@ -57,6 +60,10 @@ const ctx = {
 };
 ctx.window = ctx;
 ctx.document = { addEventListener() {}, querySelectorAll() { return []; } };
+// requestIdleCallback 垫片：node 无原生实现，浏览器里由 Chrome 调度。
+// 测试等价为「下一轮宏任务」，避免每个用例都等满 1200ms 的 setTimeout 兜底分支。
+// 2026-10-27 调度改造：长文本桶改为 chunks 完成后空闲预取，见 app.data._ensureLongTextIdle。
+ctx.requestIdleCallback = (cb) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 0 }), 0);
 ctx.Vue = { createApp: () => ({}) };
 vm.createContext(ctx);
 
@@ -88,16 +95,42 @@ function check(label, got, want) {
 }
 
 (async () => {
-  console.log('--- 1) 首屏加载完 latest 后自动后台预取（不等任何交互）---');
+  console.log('--- 1) 首屏：列表分片先完成，长文本桶再空闲预取（决定 1）---');
   const s0 = newFake({});
   s0._applyLectureData = () => {};   // 桩：不吸收首屏数据
-  s0._loadStaticFull = () => {};     // 桩：不触发分片加载
+  let resolveFull;
+  s0._loadStaticFull = () => new Promise(r => { resolveFull = r; });  // 桩：分片加载挂起，由用例放行
   s0.bumpCount = () => {};
   let autoFired = 0;
+  let idleFired = 0;
+  const realIdle = s0._ensureLongTextIdle;
+  s0._ensureLongTextIdle = function () { idleFired++; return realIdle.call(this); };
   s0._ensureLongTextAll = () => { autoFired++; };
   s0._loadStaticLatest();
   await settle(40);
-  check('首屏流程自动触发预取 1 次', autoFired, 1);
+  check('分片未完成时不预取（不再抢带宽）', autoFired, 0);
+  check('分片未完成时也不调度空闲预取', idleFired, 0);
+  resolveFull();                     // 列表数据到齐
+  await settle(40);
+  check('分片完成后调度空闲预取 1 次', idleFired, 1);
+  check('空闲回执后真正预取 1 次（仍自动，不等用户交互）', autoFired, 1);
+
+  console.log('\n--- 1b) 无 requestIdleCallback（Safari）：走 1200ms 兜底仍会预取 ---');
+  {
+    const s = newFake({});
+    s._loadStaticFull = () => Promise.resolve();
+    let auto = 0;
+    s._ensureLongTextAll = () => { auto++; };
+    const keepIdle = ctx.requestIdleCallback;
+    delete ctx.requestIdleCallback;   // 模拟 Safari 等不支持该 API 的浏览器
+    s._ensureLongTextIdle();
+    check('已排入兜底定时器', s._ltIdleScheduled, true);
+    check('兜底未到期前不触发', auto, 0);
+    await settle(1300);
+    check('兜底到期后预取 1 次', auto, 1);
+    check('触发后调度标记复位', s._ltIdleScheduled, false);
+    ctx.requestIdleCallback = keepIdle;
+  }
 
   console.log('\n--- 2) 搜索永不等待长文本（未就绪即用已到数据出结果）---');
   const fq = newFake({
@@ -185,7 +218,7 @@ function check(label, got, want) {
     s._applyLectureData = () => {};
     s.bumpCount = () => {};
     const fullArgs = [];   // 记录 _loadStaticFull 参数：[] = 正常路径，[true] = 降级路径
-    s._loadStaticFull = (...a) => { fullArgs.push(a); };
+    s._loadStaticFull = (...a) => { fullArgs.push(a); return Promise.resolve(); };
     let auto = 0;
     s._ensureLongTextAll = () => { auto++; };
     failLatestTimes = 2;   // 前两次 503
@@ -208,7 +241,7 @@ function check(label, got, want) {
     s._loadStaticLatest();
     await settle(3600);    // 两次退避 2400ms + 降级加载 + 余量
     check('走了降级路径（请求了 lectures.json）', fetchLog.filter(u => String(u).includes('lectures.json')).length >= 1, true);
-    check('降级路径也触发长文本预取', auto, 1);
+    check('降级路径也触发长文本预取（经 chunks→idle 链）', auto, 1);
   }
 
   console.log('\n' + (fail ? '[FAIL] ' + fail + ' 项未通过' : '[PASS] 长文本加载流程全部用例通过'));

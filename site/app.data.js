@@ -81,13 +81,12 @@ Object.assign(APP_METHODS, {
             this.loading = false;
             this.bumpCount();          // 数字跳到 50（首屏已加载真实条数；阶梯跳变无动画）
             // 后台继续分片加载完整数据（启用完整筛选翻页）
-            this._loadStaticFull();
-            // 首屏一渲染即在后台静默预取全部长文本（简介/摘要，16 桶 gzip 约 1.6MB）——
-            // 2026-09-30 用户定：原策略是「交互（滚动/聚焦/翻页）才预取」，导致「打开页面就
-            // 立即搜索」时桶还没下完、搜索被迫等待并弹「正在加载完整内容」提示。改为首屏即拉，
-            // 用户开始搜索时通常已就绪；即便未就绪，搜索也不再阻塞（先出已到结果、到齐静默补全），
-            // 见 computed.filtered 与 index.html 时间线分支。
-            this._ensureLongTextAll();
+            // 2026-10-27 调度改造（决定 1）：chunks 先跑完，长文本桶再空闲预取。
+            // 原实现两条都立即起跑（chunks 4 路 + 桶 4 路），桶体积是 chunks 的 3.7 倍，
+            // 把 0.46MB 的列表数据挤在后面——用户感知就是「列表一页一页地加载」。
+            // 交互触发（搜索/字段/翻页/聚焦/滚动）仍立即拉桶，搜索语义不变；
+            // 见 _ensureLongTextIdle。
+            this._loadStaticFull().then(() => this._ensureLongTextIdle());
           })
           .catch((e) => {
             // 2026-10-02：补原始错误。同文件 :167-174 的 catch 已是 console.error(e) 口径，
@@ -99,7 +98,7 @@ Object.assign(APP_METHODS, {
               return;
             }
             console.error('[load] latest.json 重试后仍失败，回退整文件 lectures.json', e);
-            this._loadStaticFull(true);
+            this._loadStaticFull(true).then(() => this._ensureLongTextIdle());
           });
       };
       attempt(1);
@@ -107,8 +106,9 @@ Object.assign(APP_METHODS, {
 
     _loadStaticFull(fallbackToOriginal = false) {
       // 分片加载（更小请求、逐片重试、数字渐进滚动）；fallbackToOriginal 时回退整文件。
+      // 返回 Promise：调用方据此把「长文本桶预取」排到列表数据之后（2026-10-27 调度改造）。
       if (fallbackToOriginal) return this._loadFullSingle();
-      this._loadChunks();
+      return this._loadChunks();
     },
 
     async _loadChunks() {
@@ -193,17 +193,17 @@ Object.assign(APP_METHODS, {
     },
 
     _loadFullSingle() {
-      fetch('lectures.json', { cache: 'no-store' })
+      // 返回 Promise：供 _loadStaticFull 的调用方串接（2026-10-27 调度改造）。
+      return fetch('lectures.json', { cache: 'no-store' })
         .then(r => r.json())
         .then(resp => {
           this._applyLectureData(resp);
           this.dataStage = 'full';
           this.loading = false;
-          // 2026-10-13：降级路径也自动预取长文本——lectures.json 无简介/摘要，
-          // 不预取则首屏停在「最简版」且要等用户滚动/搜索才补（onScroll 才触发
-          // _ensureLongTextAll）。正常路径 _loadStaticLatest 首屏即拉，此前两条
-          // 路径不对称；本行使降级体验与正常路径对齐（几秒后自动补齐）。
-          this._ensureLongTextAll();
+          // 2026-10-27 调度改造：删掉此处的「二次预拉」。
+          // 降级路径（分片不可用时才走到）本身已是 8MB 整文件，再并拉 1.7MB 桶只会更慢；
+          // 交互触发（搜索/字段/翻页/聚焦/滚动/展开）都在，够用。正常路径由
+          // _loadStaticLatest 的 then 在 chunks 完成后调用 _ensureLongTextIdle。
         })
         .catch(e => {
           console.error('加载完整讲座数据失败', e);
@@ -322,15 +322,26 @@ Object.assign(APP_METHODS, {
     // 模板入口：聚焦搜索框即预热（模板不宜直接调用下划线开头的内部方法）
     warmLongText() { this._ensureLongTextAll(); },
 
-    // 首屏即预取（2026-09-30 用户定，**取代**原先的「交互才预取」）：
-    // latest.json 一到就无条件拉全部 16 桶，调用点见本文件 _loadStaticLatest 的 then；
-    // 滚动 / 聚焦搜索框 / 翻页 / 展开某条只是**补充触发**，不是唯一入口。
-    // ⚠ 旧注释曾写「交互即预取：滚动/聚焦/翻页任一发生才拉」，与代码不符——
-    // 2026-10-22 复核时连外部审阅都被它误导成「16 桶不会自动拉、6.7MB 是上界」，
-    // 实际每次进首页必然拉满，勿再改回该表述。
-    // 起因：长文本被剥离后，只有首屏 50 条带简介与摘要，其余卡片要等搜索或展开才补 ——
-    // 表现为「搜索出的卡片先没有简介/摘要，过一会儿整块冒出来」，体验差。
-    // 幂等：已全量就绪 / 正在预取 / 已判定不可用 时直接返回，故可挂在任何高频事件上。
+    // 长文本预取有两个入口（2026-10-27 调度改造后）：
+    //  ① _ensureLongTextIdle：chunks 加载完成后空闲调度（首屏正常路径，见 _loadStaticLatest 的 then）；
+    //  ② _ensureLongTextAll：交互触发（搜索词/字段/翻页/聚焦/滚动）、深链带 query、展开单条时立即拉。
+    // 改造前是「latest 一到就无条件并拉 16 桶」，与 0.46MB 的列表分片抢同一条带宽，
+    // 表现为「列表一页一页地加载」；现在桶排在列表数据之后，搜索语义不变。
+    // 幂等：已全量就绪 / 正在预取 / 已判定不可用 / 已调度空闲 时直接返回。
+    _ensureLongTextIdle() {
+      if (this._ltIdleScheduled || this._ltUnavailable || this._ltSearching || this._ltAllLoaded) return;
+      this._ltIdleScheduled = true;
+      const run = () => {
+        this._ltIdleScheduled = false;
+        this._ensureLongTextAll();
+      };
+      if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(run, { timeout: 3000 });
+      } else {
+        setTimeout(run, 1200);
+      }
+    },
+
     _ensureLongTextAll() {
       if (this._ltUnavailable || this._ltSearching) return;
       if (this._ltAllLoaded && !this._ltIncomplete) return;
