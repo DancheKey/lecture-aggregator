@@ -4009,6 +4009,12 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         if _r.get('speakerBio') and _is_org_intro_bio(_r['speakerBio']):
             _r['speakerBio'] = ''
         _mark_time_unknown(_r)
+    # 共享简介按主讲人切分（2026-10-27）：一页多场时，VLM 常把海报上几个人的简介
+    # 连着拼成一段写进每条记录。必须放在上面 speaker 清洗之后（切分靠姓名锚定，
+    # 姓名带「孙开佳 青年」这类职称尾巴会锚不到），放在出口终检之前（终检会剔除
+    # 事后发布记录，切分只对留下的记录做一次）。详见 _split_shared_speaker_bio。
+    if len(_out_recs) >= 2:
+        _split_shared_speaker_bio(_out_recs)
     # 出口终检（2026-10-22）：必须放在 _mark_time_unknown 之后——is_news_record 的
     # 占位时刻判定依赖 timeUnknown 已定型；放在 apply_exit_gate 之后——确保看到的是
     # 清洗后的终值。详见 _post_publish_final_check 的说明。
@@ -9351,6 +9357,66 @@ def _extract_bio_map(full_text, speakers=None):
         if len(bio) >= 10:
             bio_map[sp] = bio
     return bio_map
+
+
+def _split_shared_speaker_bio(recs):
+    """一页多场共享同一段「多人并列简介」时，按主讲人姓名切成各自的一段（2026-10-27）。
+
+    背景（swc/collaborative/2021/1026/28）：海报页被拆成 3 场，但 speakerBio 只有一份——
+    海报上三个人连着写「莫逊男:…胡小勇:…潘家辉:…」，VLM 原样拼接后写进 base 记录，
+    split_record_by_sessions 又把它整段复制给 3 条记录。结果三张卡片显示同一段把三个人
+    混在一起的简介（用户 2026-10-27 截图反馈：点开任何一场都看到别人的履历）。
+
+    为什么不用 R7（`_extract_bio_map`）：R7 靠正文里的「简介：」标签划区，而这条记录的
+    简介来自海报 OCR/VLM，正文（swc 页正文只有「姓名《题目》」三行）根本没有标签，
+    走不到那条路。所以在**出口**（parse_detail）补一层，与简介来源无关。
+
+    判据（宁缺毋滥，任一条不满足就整段原样不动）：
+      · ≥2 条记录，speakerBio 完全一致且非空（≥20 字）；
+      · 每条记录 speaker 非空且两两不同（同一人多场不切）；
+      · 每个姓名在 bio 里**恰好出现 1 次**且紧跟冒号（「莫逊男:」/「莫逊男：」）——
+        出现多次说明只是正文里提到该人（「与胡小勇合作」），切了会张冠李戴；
+      · 切出的每段都 ≥10 字（不足说明是误锚，整段放弃）。
+
+    真实库 3845 条全量扫描：仅本组命中，其余零改动。
+    """
+    if not isinstance(recs, list) or len(recs) < 2:
+        return recs
+    bios = {(r.get('speakerBio') or '').strip() for r in recs if isinstance(r, dict)}
+    if len(bios) != 1:
+        return recs
+    bio = bios.pop()
+    if len(bio) < 20:
+        return recs
+    names = [(r.get('speaker') or '').strip() for r in recs]
+    if any(not n for n in names) or len(set(names)) != len(names):
+        return recs
+    marks = {}
+    for n in names:
+        if bio.count(n) != 1:
+            return recs
+        m = re.search(re.escape(n) + r'\s*[：:]', bio)
+        if not m:
+            return recs
+        marks[n] = (m.start(), m.end())
+    order = sorted(names, key=lambda n: marks[n][0])
+    parts = {}
+    for i, n in enumerate(order):
+        end = marks[order[i + 1]][0] if i + 1 < len(order) else len(bio)
+        seg = bio[marks[n][1]:end].strip(' \u3000,，;；、')
+        if len(seg) < 10:
+            return recs
+        parts[n] = seg
+    changed = 0
+    for r in recs:
+        seg = parts.get((r.get('speaker') or '').strip())
+        if seg and seg != r.get('speakerBio'):
+            r['speakerBio'] = seg
+            changed += 1
+    if changed:
+        print('[BIO-SPLIT] %s 共享简介按主讲人切成 %d 段'
+              % (recs[0].get('sourceUrl') or '?', changed), file=sys.stderr)
+    return recs
 
 
 def split_record_by_sessions(base, sessions, full_text=''):

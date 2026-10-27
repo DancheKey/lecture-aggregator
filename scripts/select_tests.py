@@ -89,6 +89,7 @@ GROUPS = [
                                 'scraper/env_flags.py'],
      'tests': ['tests/test_bio_bracket.py', 'tests/test_bio_stop_words.py',
                'tests/test_vlm_abstract_guard.py',
+               'tests/test_shared_bio_split.py',
                'tests/test_location_prefix.py', 'tests/test_meta_time_conflict_20261016.py',
                'tests/test_multi_session_split.py', 'tests/test_parser_golden.py',
                'tests/test_parser_snapshot.py', 'tests/test_speaker_aff_glue_20261014.py',
