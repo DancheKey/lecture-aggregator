@@ -43,6 +43,10 @@ FIXTURES = [
     ('psy961.html', 'http://psy.scnu.edu.cn/a/20160113/961.html'),
     ('psy1323.html', 'http://psy.scnu.edu.cn/a/20170626/1323.html'),
     ('psy1179.html', 'http://psy.scnu.edu.cn/a/20161130/1179.html'),
+    # 2026-10-27 VLM 垃圾摘要守卫回归（test_vlm_abstract_guard.py）：
+    # 海报落款被 OCR 成「O O 华南年彩大学教师发展中心 O」当摘要，同时正文
+    # 「主讲人简介：」整段没提取。
+    ('ctld4021.html', 'http://ctld.scnu.edu.cn/a/20220607/4021.html'),
     ('psy127.html', 'http://psy.scnu.edu.cn/a/20130301/127.html'),
 ]
 

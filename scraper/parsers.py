@@ -1429,7 +1429,7 @@ VLM_PROMPT = """你是一个学术讲座海报信息提取助手。下面是一�
 - lectureStart: 讲座开始时间，格式 "YYYY-MM-DD HH:MM"（若只有日期无钟点，钟点用 00:00）
 - lectureEnd: 讲座结束时间，格式同上，若无则留空字符串
 - location: 讲座地点（具体到楼栋+房间号，如 理1栋一楼讲学厅、教学楼102）
-- abstract: 讲座内容摘要（若海报只有主讲人简介而无独立摘要，则留空字符串）
+- abstract: 讲座内容摘要（若海报只有主讲人简介而无独立摘要，则留空字符串）。只填海报上对讲座内容的介绍（研究背景、报告要点、课程内容等）；主办/承办单位落款、联系方式、二维码说明、装饰性文字（圆圈、边框、印章、logo 文字）一律不算摘要，宁缺毋滥
 - speakerBio: 主讲人简介（海报上的个人介绍文字）
 
 输出规则：
@@ -1800,6 +1800,46 @@ def _reconcile_vlm_topic_with_title(topic, title, page_text):
     return ''.join(chars), corrected, need_review
 
 
+def _vlm_abstract_ok(v, result):
+    """VLM 从海报读出的 abstract 是否为「真摘要」，而非主办单位落款/印章噪声。
+
+    病根（ctld/4021，2026-10-27 用户截图）：海报上的主办单位落款 + 装饰圆圈被
+    OCR 成「O O 华南年彩大学教师发展中心 O」——12 个汉字全是主办方名称（「年彩」
+    还是「师范」的错字），整串不含任何讲座内容，却被当摘要回填，前端卡片直接
+    显示成一串乱码。VLM 的 abstract 在合并时是**无条件回填**（只要正文没抓到
+    摘要就填），不像 speakerBio 有「未识别到主讲人则跳过」的守卫。
+
+    判据（三条同时满足才算垃圾）：把摘要只留汉字后——
+      ① 汉字数 ≥ 8（太短的交给英文摘要，不管）；
+      ② 汉字占有效字符 ≥ 0.6（真中文摘要；英文摘要里零星几个汉字不在此列）；
+      ③ 这些汉字**几乎都能在「主办/承办/主讲人单位/本校名」里找到**（≥0.8），
+         说明它只是把单位名复述了一遍，没有新增信息。
+    「华南师范大学」硬编码：本站只收录华南师大各院系讲座，落款必含校名，
+    而 OCR 常把它读错（师→年彩），故用校名兜住错字那部分的覆盖率。
+
+    为什么不用更简单的判据（都实测过，全部误杀）：
+      · 长度阈值 —— 库里 41 条合法摘要短到 5~19 字（多为正文截断，如「睡眠占据
+        我们一生大约三分之一的」），长度卡大面积误杀；
+      · 无标点 —— 截断句本身就没有句读标点，26 条命中里 25 条是合法摘要；
+      · 孤立单字母 —— 英文摘要里「I」「a」全是孤立单字母，全库误杀 880 条。
+    本判据在真实库 3845 条上只命中 ctld/4021 这一条，零误杀。
+    """
+    han = ''.join(re.findall(r'[\u4e00-\u9fff]', v or ''))
+    if len(han) < 8:
+        return True
+    eff = len(re.findall(r'[\u4e00-\u9fffA-Za-z0-9]', re.sub(r'\s+', '', v)))
+    if not eff or len(han) / eff < 0.6:
+        return True
+    unit = ''.join(re.findall(
+        r'[\u4e00-\u9fff]',
+        (result.get('organizer') or '') + (result.get('college') or '')
+        + (result.get('speakerAffiliation') or '') + '华南师范大学'))
+    if not unit:
+        return True
+    cover = sum(1 for ch in han if ch in unit) / len(han)
+    return cover < 0.8
+
+
 def _parse_vlm_json(text):
     """从模型返回文本中提取 JSON 对象（或数组，支持多场讲座）。容错：去 ```json 围栏、整体解析、截取兜底。"""
     if not text:
@@ -2088,6 +2128,13 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
         # VLM 未识别到主讲人时，其 speakerTitle/speakerAffiliation/speakerBio 常为
         # 「教授」等幻觉碎片（如 psy 2941），不可信，跳过。
         if dst in ('speakerTitle', 'speakerAffiliation', 'speakerBio') and not _vlm_speaker_valid:
+            continue
+        # 摘要质量守卫（2026-10-27 ctld/4021）：abstract 是无条件回填的——正文没
+        # 抓到摘要就把 VLM 的读图结果填进去，于是海报落款/印章噪声也会进来。
+        # 详见 _vlm_abstract_ok 的 docstring（含三条被否掉的简单判据及误杀数据）。
+        if dst == 'abstract' and v and not _vlm_abstract_ok(v, result):
+            print('[VLM-ABS-DROP] %s | %r' % (result.get('sourceUrl', ''), v[:60]),
+                  file=sys.stderr)
             continue
         if v and not result.get(dst):
             result[dst] = v
@@ -5912,7 +5959,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         # （含 主讲人介绍|报告人简介|主讲人简历|主讲人简介 等）保持同一词表。
         r'演讲人简介|主讲人简介|报告人简介|主讲人简历|主讲人介绍|报告人介绍|'
         r'专家简介|专家介绍|个人简介|'
-        r'报名方式|报名截止|联系方式|面向对象|参与方式|注意事项|交通指引|温馨提示|'
+        r'报名方式|报名截止|联系方式|面向对象|参与方式|参与形式|注意事项|交通指引|温馨提示|'
         r'会议时间|会议地点|'
         r'报名(?=[：:方式请联链])|咨询(?=[：:电话方式邮箱微信Q链])'
     )

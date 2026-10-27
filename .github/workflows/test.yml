@@ -83,6 +83,12 @@ jobs:
         run: python tests/test_bio_bracket.py
       - name: Run bio-stop-words tests
         run: python tests/test_bio_stop_words.py
+      # 2026-10-27 纳入：VLM 把海报落款当摘要 + 正文「主讲人简介」漏提取。
+      # 摘要原是无条件回填（不像 speakerBio 有守卫），海报装饰圈 + 单位落款
+      # 被 OCR 成「O O 华南年彩大学教师发展中心 O」就直接进了卡片摘要。
+      # 症状是「摘要显示乱码」，不报错、快照也抓不到，故单独锁一条。
+      - name: Run VLM abstract guard tests
+        run: python tests/test_vlm_abstract_guard.py
       - name: Run location-prefix tests
         run: python tests/test_location_prefix.py
       - name: Run frontend schema guard tests
