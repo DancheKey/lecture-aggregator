@@ -9378,6 +9378,9 @@ def _split_shared_speaker_bio(recs):
         出现多次说明只是正文里提到该人（「与胡小勇合作」），切了会张冠李戴；
       · 切出的每段都 ≥10 字（不足说明是误锚，整段放弃）。
 
+    切完还会剥掉每段开头的讲座题目（海报是「题目 / 姓名: 简介」连排，题目会粘在
+    第一句简介头上，见 `_strip_leading_topic`）。
+
     真实库 3845 条全量扫描：仅本组命中，其余零改动。
     """
     if not isinstance(recs, list) or len(recs) < 2:
@@ -9409,7 +9412,11 @@ def _split_shared_speaker_bio(recs):
         parts[n] = seg
     changed = 0
     for r in recs:
-        seg = parts.get((r.get('speaker') or '').strip())
+        name = (r.get('speaker') or '').strip()
+        seg = parts.get(name)
+        if not seg:
+            continue
+        seg = _strip_leading_topic(seg, r.get('topic') or '', r.get('title') or '')
         if seg and seg != r.get('speakerBio'):
             r['speakerBio'] = seg
             changed += 1
@@ -9417,6 +9424,48 @@ def _split_shared_speaker_bio(recs):
         print('[BIO-SPLIT] %s 共享简介按主讲人切成 %d 段'
               % (recs[0].get('sourceUrl') or '?', changed), file=sys.stderr)
     return recs
+
+
+def _topic_prefix_candidates(topic, title=''):
+    """题目串的几种可能写法，按长度降序（先试长的，避免短前缀先剥掉留下残片）。
+
+    海报上常见「题目（补充说明）」而正文/记录里只有「题目」，或反之。
+    """
+    out = []
+    for t in ((topic or '').strip(), (title or '').strip()):
+        if not t:
+            continue
+        out.append(t)
+        # 去掉括号补充：本科教学研究与改革(项目管理) → 本科教学研究与改革
+        bare = re.sub(r'[\(（\[【][^\)）\]】]*[\)）\]】]', '', t).strip()
+        if bare and bare != t:
+            out.append(bare)
+        # 括号里的部分也单独算一种（少数海报只写副标题）
+        for inner in re.findall(r'[\(（\[【]([^\)）\]】]{2,})[\)）\]】]', t):
+            out.append(inner.strip())
+    return sorted({c for c in out if len(c) >= 4}, key=len, reverse=True)
+
+
+def _strip_leading_topic(seg, topic, title=''):
+    """剥掉简介开头的讲座题目（2026-10-27，用户反馈「三人的简介里都混入了讲座题目」）。
+
+    海报排版是「题目 / 姓名: 简介」连排，VLM 拼接后题目就粘在了第一句简介头上，
+    切分按「姓名：」锚点切，题目自然留在每段开头：
+        本科教学研究与改革教务处副处长分管业务:…      ← 题目「本科教学研究与改革」
+        一流课程建设教授、博导,…                      ← 题目「一流课程建设」
+    剥掉后才是正常的履历开头（「教务处副处长…」「教授、博导…」）。
+
+    只在**前缀逐字命中题目**时才剥；剥完不足 8 字就放弃（说明题目本身就是正文，
+    或记录里的 topic 只是个碰巧相同的前缀词），宁可不剥也不切掉真内容。
+    """
+    if not seg:
+        return seg
+    for cand in _topic_prefix_candidates(topic, title):
+        if seg.startswith(cand):
+            rest = seg[len(cand):].lstrip(' \u3000:：,，、;；-—·')
+            if len(rest) >= 8:
+                return rest
+    return seg
 
 
 def split_record_by_sessions(base, sessions, full_text=''):

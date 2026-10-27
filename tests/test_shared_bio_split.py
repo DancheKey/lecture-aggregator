@@ -53,9 +53,15 @@ SHARED_BIO = (
 SPEAKERS = ['莫逊男', '胡小勇', '潘家辉']
 
 
+TOPICS = {'莫逊男': '本科教学研究与改革(项目管理)',
+          '胡小勇': '一流课程建设',
+          '潘家辉': '课程思政改革建设'}
+
+
 def _recs(names=SPEAKERS, bio=SHARED_BIO):
     return [{'sourceUrl': 'https://swc.scnu.edu.cn/collaborative/2021/1026/28.html',
-             'speaker': n, 'speakerBio': bio, 'lectureIndex': i + 1}
+             'speaker': n, 'speakerBio': bio, 'topic': TOPICS.get(n, ''),
+             'lectureIndex': i + 1}
             for i, n in enumerate(names)]
 
 
@@ -72,12 +78,19 @@ class SharedBioSplitTest(unittest.TestCase):
                 self.assertNotIn(o, r['speakerBio'],
                                  '%s 的简介里出现了 %s（切分串味）' % (r['speaker'], o))
 
-    def test_02_每段以自己的履历开头(self):
+    def test_02_每段以自己的履历开头且不残留讲座题目(self):
+        """第二轮反馈：切完每段开头还粘着讲座题目（「本科教学研究与改革教务处副处长…」）。"""
         recs = P._split_shared_speaker_bio(_recs())
         by = {r['speaker']: r['speakerBio'] for r in recs}
-        self.assertTrue(by['莫逊男'].startswith('本科教学研究与改革'), by['莫逊男'][:20])
-        self.assertTrue(by['胡小勇'].startswith('一流课程建设'), by['胡小勇'][:20])
-        self.assertTrue(by['潘家辉'].startswith('课程思政改革建设'), by['潘家辉'][:20])
+        self.assertTrue(by['莫逊男'].startswith('教务处副处长'), by['莫逊男'][:20])
+        self.assertTrue(by['胡小勇'].startswith('教授、博导'), by['胡小勇'][:20])
+        self.assertTrue(by['潘家辉'].startswith('教授,'), by['潘家辉'][:20])
+        # 题目前缀必须彻底消失（含括号补充写法）
+        for r in recs:
+            topic = r['topic']
+            for cand in (topic, topic.split('(')[0]):
+                self.assertFalse(r['speakerBio'].startswith(cand),
+                                 '%s 的简介仍以题目「%s」开头' % (r['speaker'], cand))
         # 三人简介长度应与原文占比一致（不是均分）
         self.assertLess(len(by['莫逊男']), len(by['胡小勇']))
         self.assertLess(len(by['胡小勇']), len(by['潘家辉']))
@@ -86,8 +99,9 @@ class SharedBioSplitTest(unittest.TestCase):
         recs = P._split_shared_speaker_bio(_recs())
         total = sum(len(r['speakerBio']) for r in recs)
         self.assertLessEqual(total, len(SHARED_BIO), '切分后字数反而变多，说明拼接出错了')
-        # 丢掉的只能是「页级题目前缀 9 字 + 3 个姓名 9 字 + 3 个冒号 + 空白」，约 22 字
-        self.assertGreaterEqual(total, len(SHARED_BIO) - 40, '切分丢字过多')
+        # 丢掉的只能是「页级题目前缀 9 字 + 3 个姓名 9 字 + 3 个冒号 + 3 处单场题目
+        # 9+6+8 字 + 空白」，约 45 字
+        self.assertGreaterEqual(total, len(SHARED_BIO) - 60, '切分丢字过多')
 
 
 class SharedBioGuardTest(unittest.TestCase):
@@ -156,6 +170,44 @@ class SharedBioWiringTest(unittest.TestCase):
         self.assertLess(body.index('_strip_speaker_title_tail'),
                         body.index('_split_shared_speaker_bio'),
                         '切分跑在姓名清洗之前，带职称尾巴的姓名会锚不到')
+
+
+class LeadingTopicStripTest(unittest.TestCase):
+    """④ 题目前缀剥离：只剥逐字命中的前缀，剥完太短就放弃。"""
+
+    def test_30_括号补充写法也能剥(self):
+        seg = '本科教学研究与改革教务处副处长分管业务:教学研究、教学质量保障'
+        out = P._strip_leading_topic(seg, '本科教学研究与改革(项目管理)')
+        self.assertEqual(out, '教务处副处长分管业务:教学研究、教学质量保障')
+
+    def test_31_剥掉后连带分隔符一起清(self):
+        out = P._strip_leading_topic('一流课程建设：教授、博导，华南师范大学…', '一流课程建设')
+        self.assertEqual(out, '教授、博导，华南师范大学…')
+
+    def test_32_题目不在开头则不动(self):
+        seg = '教授、博导,华南师范大学教育信息技术学院副院长'
+        self.assertEqual(P._strip_leading_topic(seg, '一流课程建设'), seg)
+
+    def test_33_剥完不足八字则放弃(self):
+        """topic 只是碰巧相同的前缀词时，别把真内容切没。"""
+        seg = '一流课程建设教授'
+        self.assertEqual(P._strip_leading_topic(seg, '一流课程建设'), seg)
+
+    def test_34_无题目时原样返回(self):
+        seg = '教授,华南师范大学软件学院副院长'
+        self.assertEqual(P._strip_leading_topic(seg, ''), seg)
+        self.assertEqual(P._strip_leading_topic(seg, None), seg)
+
+    def test_35_title也能当候选(self):
+        seg = '【扬帆教学论坛】教学研究与课程建设讲座教务处副处长分管业务'
+        out = P._strip_leading_topic(seg, '', '【扬帆教学论坛】教学研究与课程建设讲座')
+        self.assertEqual(out, '教务处副处长分管业务')
+
+    def test_36_候选串按长度降序(self):
+        """先试长的，避免短前缀先命中留下「(项目管理)…」这种残片。"""
+        cands = P._topic_prefix_candidates('本科教学研究与改革(项目管理)')
+        self.assertEqual(cands[0], '本科教学研究与改革(项目管理)')
+        self.assertGreater(len(cands[0]), len(cands[-1]))
 
 
 if __name__ == '__main__':
