@@ -488,13 +488,13 @@
     },
     {
       "date": "2026-10-27",
-      "capturedAt": "2026-10-27T13:11:40+08:00",
-      "site_pv": 1922,
+      "capturedAt": "2026-10-27T18:35:54+08:00",
+      "site_pv": 1925,
       "site_uv": null,
       "page_pv": null,
       "page_uv": null,
       "uv_delta": null,
-      "pv_delta": 7,
+      "pv_delta": 10,
       "note": ""
     }
   ]
