@@ -105,6 +105,8 @@ jobs:
         run: python tests/test_parser_snapshot.py
       - name: Run p0 abstract-fix regression tests
         run: python tests/test_p0_abstract_fix.py
+      - name: Run bio/abstract cross guard tests
+        run: python tests/test_bio_abs_cross_guard.py
       - name: Run mother-record guard tests
         run: python tests/test_mother_record_guard.py
       - name: Run stage function variable leak check

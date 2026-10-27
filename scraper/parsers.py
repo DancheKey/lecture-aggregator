@@ -5899,7 +5899,19 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
     #   不受影响。
     BIO_STOP = (
         r'[一二三四五六七八九十百零]+[、.．]|(?<!\d)\d{1,2}[、.．](?!\d)|'
-        r'[\[【]\s*(?:题目|主题|标题|主讲人|报告人|讲座人|主持人|邀请人|时间|地点|摘要|作者|嘉宾)\s*[\]】][:：\s]*|'
+        # 括号标签词表 2026-10-27 补全复合简介标签（em/9551 实测病根）：
+        # 「[主讲人简介]」中括号内是复合词，旧词表只有「主讲人」，\s*[\]】] 要求
+        # 主讲人后紧跟闭括号 → 不匹配 → bio 从摘要散文「简历」锚点起一直吞掉
+        # 【主讲人简介】标签和简介全文（517 字），下游 trim 后只剩摘要后半段。
+        # 长复合词放交替最前，避免词表语义歧义。
+        r'[\[【]\s*(?:主讲人简介|报告人简介|主讲人简历|主讲人介绍|报告人介绍|'
+        r'专家简介|专家介绍|个人简介|'
+        r'题目|主题|标题|主讲人|报告人|讲座人|主持人|邀请人|时间|地点|摘要|作者|嘉宾)\s*[\]】][:：\s]*|'
+        # 裸词形态（2026-10-27 em/9551）：body_text 构建时【】括号已被剥离，
+        # 「主讲人简介：李嘉楠…」是裸词+冒号形态——与 abstract 终止边界
+        # （含 主讲人介绍|报告人简介|主讲人简历|主讲人简介 等）保持同一词表。
+        r'主讲人简介|报告人简介|主讲人简历|主讲人介绍|报告人介绍|'
+        r'专家简介|专家介绍|个人简介|'
         r'报名方式|报名截止|联系方式|面向对象|参与方式|注意事项|交通指引|温馨提示|'
         r'会议时间|会议地点|'
         r'报名(?=[：:方式请联链])|咨询(?=[：:电话方式邮箱微信Q链])'
@@ -5927,10 +5939,14 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
                # 姓名+博士共 5 字，旧判据 {2,4}+逗号不匹配致 bio 漏抓；纯姓名短标签
                # 仍不匹配（无逗号），「报告人：李明教授，计算机学院…」履历段正常命中。
                rf'|报告人(?=[：:]\s*[\u4e00-\u9fff]{{2,4}}(?:' + _fv.TAIL_TITLE_ANY_RE.pattern
-               + r')?\s*[，,]))[\s\]:：]*')
-    m = re.search(rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|{BIO_STOP}|$))', _st.body_text)
-    if m:
-        bio = m.group(1).strip()
+                + r')?\s*[，,]))[\s\]:：]*')
+    # 提取正则与清理链抽为局部定义（2026-10-27）：abstract 提取完成后要做
+    # 「bio ⊂ abstract」交叉卫生检查，重叠时需回退遍历全部锚点候选重试，
+    # 主路径与重试共用同一正则和清理链（见 9551 实测病根注释）。
+    _bio_rx = rf'{bio_pat}([\s\S]+?)(?=\s*(?:{SUMMARY_LABELS}|{NOISE_MARKERS}|{BIO_STOP}|$))'
+
+    def _clean_bio_candidate(mobj):
+        bio = mobj.group(1).strip()
         # 清理版权声明等尾部噪声
         bio = re.sub(_COPYRIGHT_TAIL_RE, '', bio).strip()
         # 清理图片路径等残留
@@ -5942,7 +5958,11 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         # 清后得「2011年」）。与地点系统级清理（6121 行）同一函数、同一语义。
         # ⚠ 副作用：bio 与 body_text 不再逐字一致，依赖「bio 是 narrative abstract
         # 子串」的判据必须归一化比较（见 6007 行 _flat_cmp，physics807 实测回归）。
-        bio = _despace_cjk_digits(bio)
+        return _despace_cjk_digits(bio)
+
+    m = re.search(_bio_rx, _st.body_text)
+    if m:
+        bio = _clean_bio_candidate(m)
         if len(bio) > 10:
             result['speakerBio'] = bio
 
@@ -6015,6 +6035,33 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
             # 邀请类尾部清理（词表统一，含 欢迎老师/欢迎同学/欢迎有兴趣 等变体）
             abstract = _fv.INVITATION_TAIL_RE.sub('', abstract).strip()
             result['abstract'] = abstract
+
+    # bio/abstract 交叉卫生检查（2026-10-27，em/9551 实测病根）：
+    # bio_pat 的裸「简历/简介」锚点可能落在摘要散文内部——9551 摘要正文
+    # 「…13101位精英简历数据，涉及科研教育…」中「简历」出现位置早于真正的
+    # 【主讲人简介】标签，re.search 取首个匹配即把摘要后半段误当 bio。
+    # 产出特征明确：归一化（去空白+全半角标点统一，同 6146 行 _flat_cmp 思想）
+    # 后 bio 是 abstract 的子串。此时不可采纳：回退 finditer 遍历全部锚点候选，
+    # 取第一个不与 abstract 重叠的（真正的【主讲人简介】标签）；无合格候选则
+    # 清空 bio（宁缺勿脏，避免把摘要片段当简介展示）。
+    _bio_now = result.get('speakerBio')
+    if _bio_now and result.get('abstract'):
+        _flat = lambda s: re.sub(r'\s+', '', (s or '')
+                                 .replace('（', '(').replace('）', ')')
+                                 .replace('：', ':').replace('，', ',')
+                                 .replace('“', '"').replace('”', '"'))
+        _fb, _fa = _flat(_bio_now), _flat(result['abstract'])
+        if _fb and _fa and _fb in _fa:
+            _bio_fix = ''
+            for _m2 in re.finditer(_bio_rx, _st.body_text):
+                _cand = _clean_bio_candidate(_m2)
+                if len(_cand) > 10 and _flat(_cand) not in _fa:
+                    _bio_fix = _cand
+                    break
+            if _bio_fix:
+                result['speakerBio'] = _bio_fix
+            else:
+                result.pop('speakerBio', None)
 
     # 兜底：若正文来自图片 OCR 且没有明确「摘要」标签，把 OCR 文本清理后作为摘要
     if _st.ocr_text and not result.get('abstract'):
