@@ -75,6 +75,7 @@ jobs:
             tests/test_frontend_schema.py
             tests/test_site_assets.py
             tests/test_parser_snapshot.py
+            tests/test_p0_abstract_fix.py
             tests/test_stage_var_leak.py
             tests/test_ledger.py
             tests/test_listdate.py
