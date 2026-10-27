@@ -71,7 +71,10 @@ GROUPS = [
     # 与 site/ 产物同组——改任何一个页面或生成器都要连它一起跑。
     {'name': 'frontend', 'pats': ['site/', 'scripts/generate_frontend_data.py',
                                   'scripts/frontend_fields.py', 'scripts/tailwind-input.css',
-                                  'scripts/tailwind.config.js'],
+                                  'scripts/tailwind.config.js',
+                                  # 2026-10-27：繁简映射表生成器，产物是 site/app.core.js
+                                  # 的两个常量，改它必须连前端 schema/一致性一起验。
+                                  'scripts/gen_search_t2s.py'],
      'tests': ['tests/test_frontend_schema.py', 'tests/test_frontend_consistency.py',
                'tests/test_module_compile.py', 'tests/test_env_flags.py',
                'tests/test_site_assets.py']},
