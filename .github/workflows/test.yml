@@ -433,6 +433,10 @@ jobs:
       #  ⑦ stats_wants（2026-10-19）：统计页「想听数」——矩阵/年度合计/行合计三处
       #     都要累加 wants（漏判会让「只想听」的记录被当空记录跳过），显示模式与
       #     排序链路和 visits/likes 同构。
+      #  ⑧ app_search_normalize（2026-10-27）：搜索归一化——全角→半角 / 繁→简 /
+      #     按空白分词 AND。原先裸 includes 对字形差异敏感，「ＡＩ」「講座」零召回，
+      #     症状是「搜了没结果」而非报错，快照与解析器测试都抓不到。同时校验映射表
+      #     本身（等长 / 繁简不同形 / 繁体键唯一），防止后续手改表映射错字。
       - name: Run frontend data-flow behavior tests
         run: |
           node tests/js/app_ltkey_consistency.js
@@ -444,6 +448,7 @@ jobs:
           node tests/js/count_key_migration.js
           node tests/js/liked_filter_keys.js
           node tests/js/stats_wants.js
+          node tests/js/app_search_normalize.js
           python tests/test_main_water_gate.py
           # 入库时间门按源水位（2026-10-22）：与列表页侧 min 口径对齐，
           # 防止源中断恢复后中断期讲座被 [SKIP-OLD] 全丢 + 台账锁 180 天。

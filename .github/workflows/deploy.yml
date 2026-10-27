@@ -118,6 +118,7 @@ jobs:
             tests/js/count_key_uniqueness.js
             tests/js/count_key_migration.js
             tests/js/liked_filter_keys.js
+            tests/js/app_search_normalize.js
             tests/js/stats_wants.js
             tests/js/cloud_stats.js
             tests/js/cloud_pagination.js

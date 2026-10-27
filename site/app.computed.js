@@ -221,7 +221,18 @@ const APP_COMPUTED = {
               this.absRaw(l)]
               .filter(Boolean).join(' ').toLowerCase();
           }
-          if (!hay.includes(q)) return false;
+          // 快路径：原样子串匹配（简体、无空格输入的绝大多数情况走这里，零额外开销）。
+          // 未命中时再走慢路径：字形归一（全角→半角 / 繁→简 / 小写）+ 按空白分词 AND，
+          // 修掉「ＡＩ」「講座」「张三 讲座」这类因字形差异而漏召回的问题（见 app.core.js
+          // 「搜索归一化」注释）。hay 已 toLowerCase，归一化对它是幂等的。
+          if (!hay.includes(q)) {
+            const tokens = searchTokens(this.query);
+            if (!tokens.length) return false;
+            const nhay = normalizeSearchText(hay);
+            for (let i = 0; i < tokens.length; i++) {
+              if (nhay.indexOf(tokens[i]) < 0) return false;
+            }
+          }
         }
         return true;
       });

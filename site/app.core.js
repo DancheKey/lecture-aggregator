@@ -83,6 +83,65 @@ const URL_SEARCH_FIELDS = ['college', 'location', 'topic', 'abstract'];  // sear
 // 真正的越界钳位由 watch.totalPages 按实际数据完成（见 app.js）。
 const MAX_URL_PAGE = 1000;
 
+/* ---------- 搜索归一化（2026-10-27） ----------
+ * 问题：搜索原先是 `hay.includes(q)` 裸比较，对**空格、全半角、繁简**三种差异敏感：
+ *   「AI 讲座」搜不到「AI讲座」、「ＡＩ」搜不到「AI」、「講座」搜不到「讲座」。
+ *   （实测库里全简体，繁体输入几乎零召回；全角多来自用户中文输入法。）
+ * 做法：只做**字形层面**的等价归一，不改语义——
+ *   ① 全角 ASCII（U+FF01-FF5E）→ 半角，全角空格 U+3000 → 半角空格；
+ *   ② 繁体 → 简体（查表，只收高置信度常用字，见 SEARCH_T2S_*）；
+ *   ③ 统一小写。
+ *   **不去空白**：空白当作分词边界，多词按 AND 匹配（「张三 讲座」= 张三 AND 讲座），
+ *   比把整串去空格后当子串更符合直觉，也不会漏掉跨字段的组合查询。
+ * 性能：filtered() 里走「快路径 → 慢路径」——先按原样 includes，未命中才归一化重试。
+ *   简体无空格输入（绝大多数）完全走老路径，零额外开销。
+ * 映射表由 tmp/_gen_t2s.py 生成并校验（每对两字、均为 CJK、繁简不同形、繁体键唯一）。
+ */
+const SEARCH_T2S_SIMP =
+  '学术讲题师范会议实验数据统计论报专业课硕毕礼试绩笔记义纲书馆档资库览导项经费评审员组织构机国际华侨台湾历艺体养济贸产农渔矿电医药卫环筑规划设区块链节点线网络云软备讯园门楼栋号厅场车飞广营销财务税贷银债价购传闻访说读写杂编辑纸张页词汇译优质标准则条践应发发创识别处图语习练测证结归纳绎间后现于还从进过开关这们为与周钟头举办参注册录闭启动暂继续载帐码输选择确认详寻筛幂响风雾边远达运连递迁适兴乐欢庆贺愿梦长团队众亲爱兰势县变吓吗呜咏哑唤啰啸喷嘱马龙凤伟军强荣贵宾贤辉锋钢铁铜钱钧铭锦镇东陈刘杨赵黄吴郑冯韩邓叶罗谭萧顾龚庞庄欧阳韦龟个么几样话请谢对错问只里里面干干系系表台才秋丑斗谷尽荐卷累蒙蒙蒙弥弥蔑宁千曲舍尸升松坛涂洼咸向须旋佣涌游余御郁吁扎占折征致制种朱冢时两见听让给带买卖岁万亿鸟鱼鸡丽丰亚仅伤侧儿党冲决况减刚剧劳勋协单厂压双围圆圣坚担拟拥挂挥损换职联声胜脑苏获蓝虑虽补装观视讨训诗谁调谈负责货赛赞转轮释邮阅陆随难静齐灯频献辞奖摄竞紧缩';
+const SEARCH_T2S_TRAD =
+  '學術講題師範會議實驗數據統計論報專業課碩畢禮試績筆記義綱書館檔資庫覽導項經費評審員組織構機國際華僑臺灣歷藝體養濟貿產農漁礦電醫藥衛環築規劃設區塊鏈節點線網絡雲軟備訊園門樓棟號廳場車飛廣營銷財務稅貸銀債價購傳聞訪說讀寫雜編輯紙張頁詞匯譯優質標準則條踐應發髮創識別處圖語習練測證結歸納繹間後現於還從進過開關這們為與週鐘頭舉辦參註冊錄閉啟動暫繼續載帳碼輸選擇確認詳尋篩冪響風霧邊遠達運連遞遷適興樂歡慶賀願夢長團隊眾親愛蘭勢縣變嚇嗎嗚詠啞喚囉嘯噴囑馬龍鳳偉軍強榮貴賓賢輝鋒鋼鐵銅錢鈞銘錦鎮東陳劉楊趙黃吳鄭馮韓鄧葉羅譚蕭顧龔龐莊歐陽韋龜個麼幾樣話請謝對錯問隻裡裏麵乾幹係繫錶檯纔鞦醜鬥穀盡薦捲纍矇濛懞瀰彌衊寧韆麯捨屍昇鬆壇塗窪鹹嚮須鏇傭湧遊餘禦鬱籲紮佔摺徵緻製種硃塚時兩見聽讓給帶買賣歲萬億鳥魚雞麗豐亞僅傷側兒黨衝決況減剛劇勞勳協單廠壓雙圍圓聖堅擔擬擁掛揮損換職聯聲勝腦蘇獲藍慮雖補裝觀視討訓詩誰調談負責貨賽讚轉輪釋郵閱陸隨難靜齊燈頻獻辭獎攝競緊縮';
+
+// 繁体字 → 简体字（惰性构建一次；键是繁体，故「发←發/髮」这类一简对多繁不冲突）
+let _SEARCH_T2S_MAP = null;
+function _searchT2SMap() {
+  if (!_SEARCH_T2S_MAP) {
+    _SEARCH_T2S_MAP = Object.create(null);
+    for (let i = 0; i < SEARCH_T2S_TRAD.length; i++) {
+      _SEARCH_T2S_MAP[SEARCH_T2S_TRAD.charAt(i)] = SEARCH_T2S_SIMP.charAt(i);
+    }
+  }
+  return _SEARCH_T2S_MAP;
+}
+
+// 字形归一（保留空白）：全角→半角、繁→简、小写。对已归一化的串再调用结果不变。
+function normalizeSearchText(s) {
+  if (!s) return '';
+  s = String(s);
+  const map = _searchT2SMap();
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    let c = s.charAt(i);
+    const code = s.charCodeAt(i);
+    if (code >= 0xFF01 && code <= 0xFF5E) c = String.fromCharCode(code - 0xFEE0);
+    else if (code === 0x3000) c = ' ';
+    const mapped = map[c];
+    if (mapped) c = mapped;
+    out += c.toLowerCase();
+  }
+  return out;
+}
+
+// 查询串 → 归一化后的词元数组（空白切分、丢空词元）。空查询返回 []。
+function searchTokens(q) {
+  const n = normalizeSearchText(q);
+  if (!n) return [];
+  const parts = n.split(/\s+/);
+  const out = [];
+  for (let i = 0; i < parts.length; i++) if (parts[i]) out.push(parts[i]);
+  return out;
+}
+
 // 解析 location.search → 原始覆盖对象（只含 URL 里实际出现且格式合法的键）。
 // format 校验在此做（year 四位数、field 枚举）；取值白名单校验（campus）在
 // normalizeUrlFilters 里做（其依赖的 campusList 属组件 state）。
