@@ -619,7 +619,7 @@ def main():
   <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。 本页只统计<b>页面访问次数</b>。
 </div>
 
-<footer class="foot-site border-t border-slate-200 text-center text-12pt text-slate-400 py-6 bg-white">
+<footer class="border-t border-slate-200 text-center text-12pt text-slate-400 py-6 bg-white">
   数据来源于 Supabase，仅供参考。
   <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
     · 本站总访问量 <span id="site_pv_value">—</span> 次
