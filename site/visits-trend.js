@@ -285,3 +285,17 @@ fetch('visits-trend-data.json', { cache: 'no-store' })
     renderTable();
   })
   .catch(function (e) { showLoadError(e && e.message ? e.message : String(e)); });
+
+// 底部总访问量（2026-10-28）：读 visits.json（本脚本 main() 出片，取台账
+// 最新快照 site_pv），填充 footer 占位符。失败静默——footer 保持「—」，
+// 不影响主图与明细表。放在本外链文件内而非内联 <script>：本页 CSP
+// script-src 仅 'self'，内联脚本会被 visits_trend_render 门禁拦下。
+fetch('visits.json', { cache: 'no-store' })
+  .then(function (r) { if (!r.ok) return; return r.json(); })
+  .then(function (d) {
+    if (d && d.site_pv) {
+      var el = document.getElementById('site_pv_value');
+      if (el) el.textContent = Number(d.site_pv).toLocaleString('en-US');
+    }
+  })
+  .catch(function () { /* 静默降级 */ });

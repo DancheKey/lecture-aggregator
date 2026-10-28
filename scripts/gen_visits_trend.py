@@ -136,6 +136,14 @@ tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#FCFCFB}
 .foot{margin-top:28px;color:#888780;font-size:13.5px;line-height:1.8}
 .foot b{color:#5F5E5A;font-weight:600}
+/* 底部信息栏（2026-10-28）：与 stats.html footer 同形式——全宽一条、居中、
+   16px（= stats 的 text-12pt）、slate-400(#94a3b8) 文字。footer 标签上的
+   Tailwind 类名在本页无效（不加载 Tailwind），仅作 theme-scnu.css 钩子；
+   默认主题的真实样式全靠本规则。VI 模式由 theme-scnu.css 的
+   footer.bg-white 覆盖为深藏青底白字。 */
+.site-foot{
+  border-top:1px solid #E8E6E0;background:#fff;text-align:center;
+  font-size:16px;line-height:1.7;color:#94a3b8;padding:24px 16px}
 """
 
 # 2026-10-02：JS 不再内联数据（META/SNAPS 改由 fetch 载入同目录的
@@ -427,6 +435,20 @@ fetch('visits-trend-data.json', { cache: 'no-store' })
     renderTable();
   })
   .catch(function (e) { showLoadError(e && e.message ? e.message : String(e)); });
+
+// 底部总访问量（2026-10-28）：读 visits.json（本脚本 main() 出片，取台账
+// 最新快照 site_pv），填充 footer 占位符。失败静默——footer 保持「—」，
+// 不影响主图与明细表。放在本外链文件内而非内联 <script>：本页 CSP
+// script-src 仅 'self'，内联脚本会被 visits_trend_render 门禁拦下。
+fetch('visits.json', { cache: 'no-store' })
+  .then(function (r) { if (!r.ok) return; return r.json(); })
+  .then(function (d) {
+    if (d && d.site_pv) {
+      var el = document.getElementById('site_pv_value');
+      if (el) el.textContent = Number(d.site_pv).toLocaleString('en-US');
+    }
+  })
+  .catch(function () { /* 静默降级 */ });
 """
 
 
@@ -619,29 +641,21 @@ def main():
   <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。 本页只统计<b>页面访问次数</b>。
 </div>
 
-<footer class="border-t border-slate-200 text-center text-12pt text-slate-400 py-6 bg-white">
+<p id="load-err" class="empty" hidden></p>
+</div><!-- /.wrap（2026-10-28 补闭合：此前模板漏写，footer 被困在 1000px 容器内不铺满） -->
+
+<!-- 底部信息栏：与 stats.html footer 同形式（全宽、居中、16px、slate-400）。
+     Tailwind 类名保留仅作 theme-scnu.css 的命中钩子（footer.bg-white /
+     .text-slate-400，VI 模式染深藏青白字）；真实样式由本页 .site-foot 提供
+     （本页不加载 Tailwind，2026-10-28 教训）。 -->
+<footer class="site-foot border-t border-slate-200 text-center text-12pt text-slate-400 py-6 bg-white">
   数据来源于 Supabase，仅供参考。
   <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
     · 本站总访问量 <span id="site_pv_value">—</span> 次
   </span>
 </footer>
 
-<p id="load-err" class="empty" hidden></p>
 <script src="visits-trend.js" defer></script>
-<script>
-// 加载总访问量并写入页脚（visits.json 由 generate_frontend_data.py 生成）
-(function() {{
-  fetch('visits.json', {{'cache': 'no-store'}})
-    .then(function (r) {{ if (!r.ok) return; return r.json(); }})
-    .then(function (d) {{
-      if (d && d.site_pv) {{
-        var el = document.getElementById('site_pv_value');
-        if (el) el.textContent = Number(d.site_pv).toLocaleString('en-US');
-      }}
-    }})
-    .catch(function () {{ /* 静默失败 */ }});
-}})();
-</script>
 </body></html>
 """
 
@@ -663,6 +677,14 @@ def main():
            json.dumps(payload, ensure_ascii=False, separators=(',', ':')))
     css = os.path.join(OUT_DIR, CSS_NAME)
     _write(css, CSS)
+    # 底部总访问量数据（2026-10-28）：footer 的 site_pv_value 由
+    # visits-trend.js 异步读本文件填充。由本脚本出片（取台账最新快照），
+    # 保证 daily.yml 每日重跑时总访问量随最新数据同步更新。
+    _write(os.path.join(OUT_DIR, 'visits.json'), json.dumps({
+        'date': last.get('date', ''),
+        'capturedAt': last.get('capturedAt', ''),
+        'site_pv': int(last.get('site_pv') or 0),
+    }, ensure_ascii=False))
     # 缓存戳（2026-10-10，由**产物所有者**在写入后立即打）。
     # ⚠ 为什么必须在这里打、而不是依赖 generate_frontend_data.py：
     #   daily.yml 的顺序是「generate_frontend_data（打戳）→ gen_visits_trend

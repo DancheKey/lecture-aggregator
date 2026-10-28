@@ -75,3 +75,11 @@ tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:#FCFCFB}
 .foot{margin-top:28px;color:#888780;font-size:13.5px;line-height:1.8}
 .foot b{color:#5F5E5A;font-weight:600}
+/* 底部信息栏（2026-10-28）：与 stats.html footer 同形式——全宽一条、居中、
+   16px（= stats 的 text-12pt）、slate-400(#94a3b8) 文字。footer 标签上的
+   Tailwind 类名在本页无效（不加载 Tailwind），仅作 theme-scnu.css 钩子；
+   默认主题的真实样式全靠本规则。VI 模式由 theme-scnu.css 的
+   footer.bg-white 覆盖为深藏青底白字。 */
+.site-foot{
+  border-top:1px solid #E8E6E0;background:#fff;text-align:center;
+  font-size:16px;line-height:1.7;color:#94a3b8;padding:24px 16px}
