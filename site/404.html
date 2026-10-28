@@ -7,7 +7,7 @@
      该路径下的任何未命中 URL 都会渲染本页。刻意做成零脚本、零外部样式表：
      用户走到这里往往已经是一次失败请求，再拉 100KB+ 的 tailwind 只会更慢。
      故样式全部内联，CSP 相应放行 style-src 'unsafe-inline'（无脚本，风险为零）。 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; object-src 'none'; base-uri 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline' 'self'; object-src 'none'; base-uri 'self'">
 <title>页面不存在 · 木铎金声</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="scnu-emblem.svg" type="image/svg+xml">
@@ -36,6 +36,8 @@
   a.ghost:hover { border-color: #94a3b8; }
   .hint { margin-top: 30px; font-size: 12px; color: #94a3b8; line-height: 1.7; }
 </style>
+  <!-- 华南师范大学 VI 主题（错误页零脚本，无条件挂 VI 风格） -->
+  <link id="vi-theme" rel="stylesheet" href="theme-scnu.css?v=fc448b3d51">
 </head>
 <body>
   <div class="box">

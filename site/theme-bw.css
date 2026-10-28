@@ -1,0 +1,12 @@
+/* 黑白哀悼模式：整个页面置为灰度。重大事件（如领导人逝世）期间启用。
+ * 由 theme-loader.js 在 _theme.json 的 mode="bw" 时自动注入，无需手工改 HTML。
+ *
+ * 调整说明：
+ *   - 灰度强度改下面的百分比：100% = 完全黑白，0% = 原色（如想保留一丝暖色可设 90%）。
+ *   - filter 加在 html 上，可覆盖全站含 fixed 悬浮按钮与弹窗，且不影响 fixed 定位。
+ *   - 若要更“灰”而非纯黑白，可改用 grayscale(100%) brightness(0.95) 等组合。
+ */
+html {
+  filter: grayscale(100%) !important;
+  -webkit-filter: grayscale(100%) !important;
+}

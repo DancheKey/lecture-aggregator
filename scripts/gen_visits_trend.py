@@ -543,6 +543,9 @@ def main():
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="description" content="木铎金声站点每日访问量与累计访问次数趋势（数据来自自建计数快照）。">
 <link rel="stylesheet" href="visits-trend.css">
+  <!-- 讲座站点风格备选项（VI / 黑白 / 原版，由 site/_theme.json 后台切换，页面无 UI） -->
+  <link id="vi-theme" rel="stylesheet" href="theme-scnu.css">
+  <script src="theme-loader.js"></script>
 </head>
 <body>
 

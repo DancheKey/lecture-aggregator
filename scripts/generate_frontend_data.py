@@ -925,6 +925,14 @@ def main():
     #   导航改落生成脚本模板——都是「清单漏一处、零告警」。）
     stamp_script_version('visits-trend.html', 'visits-trend.js')
     stamp_script_version('visits-trend.html', 'visits-trend.css')
+    # 华南师范大学 VI 主题 + 黑白哀悼模式（2026-10-28）。备选项由 site/_theme.json 后台切换，
+    # 页面无 UI；下列资源须打戳，否则回访用户缓存旧版且零告警（test_frontend_schema test_98/99）。
+    for _page in ('index.html', 'stats.html', 'visits-trend.html'):
+        stamp_script_version(_page, 'theme-loader.js')
+        stamp_script_version(_page, 'theme-scnu.css')
+        stamp_script_version(_page, 'theme-bw.css')
+    # 404 页零脚本，仅无条件挂 VI 风格（不带 loader/bw 切换），故只打 vi 主题戳。
+    stamp_script_version('404.html', 'theme-scnu.css')
 
     # sitemap 与订阅源只依赖数据本身，放在最后：所有前端产物落盘后再写，即使这里
     # 出错也不影响首页/统计页可用（SEO 与订阅是附属物，不是功能件）。

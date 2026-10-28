@@ -1,0 +1,156 @@
+/* =====================================================================
+ * 华南师范大学 VI 主题（试验备选项）
+ * ---------------------------------------------------------------------
+ * 配色取自 scnu.edu.cn 首页实测：
+ *   校徽深藏青 #002d54（官网导航条主色，出现 8 次）
+ *   校徽红     #a51421（官网点缀色）
+ *   页面米白   #f7f5f4（同学校官网内容区）
+ *
+ * 本文件是所有页面的「统一皮肤」：把首页(index)、统计(stats)、
+ * 访问量趋势(visits-trend)、404 的顶栏与品牌色，从各自默认配色
+ * 统一为「深藏青顶栏 + 米白内容 + 校徽红点缀」。
+ *
+ * 设计铁律：
+ *   1) 全部规则带 !important，压过 vendor/tailwind.css 与页面内联类；
+ *   2) 仅改「皮肤」颜色，不动布局、不动数据、不动逻辑；
+ *   3) 回退 = 删除各页 <link id="vi-theme">（theme-loader.js 也会按
+ *      _theme.json 的 mode 字段自动移除），本文件不被引用即完全失效。
+ * ===================================================================== */
+
+/* ---------- 蓝色阶映射（校徽蓝派生） ---------- */
+.bg-blue-50  { background-color: #eef3f7 !important; }
+.text-blue-50 { color: #eef3f7 !important; }
+.border-blue-50 { border-color: #eef3f7 !important; }
+.bg-blue-100 { background-color: #d6e2ec !important; }
+.text-blue-100 { color: #d6e2ec !important; }
+.bg-blue-200 { background-color: #aec8dc !important; }
+.text-blue-200 { color: #aec8dc !important; }
+.bg-blue-300 { background-color: #7ea7c6 !important; }
+.text-blue-300 { color: #7ea7c6 !important; }
+.bg-blue-400 { background-color: #4a7fab !important; }
+.text-blue-400 { color: #4a7fab !important; }
+.bg-blue-500 { background-color: #2f6390 !important; }
+.text-blue-500 { color: #2f6390 !important; }
+.bg-blue-600 { background-color: #1f4d75 !important; }
+.text-blue-600 { color: #1f4d75 !important; }
+.bg-blue-700 { background-color: #143d61 !important; }
+.text-blue-700 { color: #143d61 !important; }
+.bg-blue-800 { background-color: #0c2c49 !important; }
+.text-blue-800 { color: #0c2c49 !important; }
+.bg-blue-900 { background-color: #002d54 !important; }
+.text-blue-900 { color: #002d54 !important; }
+
+/* 蓝阶的 hover / focus / ring 变体：同步压成校徽蓝派生 */
+.hover\:bg-blue-50:hover  { background-color: #eef3f7 !important; }
+.hover\:bg-blue-100:hover { background-color: #d6e2ec !important; }
+.hover\:bg-blue-600:hover { background-color: #1f4d75 !important; }
+.hover\:bg-blue-700:hover { background-color: #143d61 !important; }
+.hover\:text-blue-600:hover { color: #1f4d75 !important; }
+.hover\:text-blue-700:hover { color: #143d61 !important; }
+.focus\:ring-blue-400 { --tw-ring-color: #4a7fab !important; }
+.ring-blue-400 { --tw-ring-color: #4a7fab !important; }
+.focus\:border-blue-400 { border-color: #4a7fab !important; }
+
+/* ---------- 页面底色（官网米白 #f7f5f4） ---------- */
+body { background-color: #f7f5f4 !important; }
+/* 个别页面用任意值类 bg-[#f7f8fa]，特异相同，用同名类压过 */
+.bg-\[\#f7f8fa\] { background-color: #f7f5f4 !important; }
+
+/* =====================================================================
+ * 顶部栏统一：深藏青底
+ * 覆盖两套实现 ——
+ *   · 首页/统计：Tailwind 类 .bg-white/95
+ *   · 访问量趋势：自定义类 .sitebar（visits-trend.css）
+ * ===================================================================== */
+.bg-white\/95,
+.sitebar {
+  background-color: #002d54 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* 顶栏内的文字 / 导航 / 按钮：在深底上改为浅色，保证可读 */
+.bg-white\/95 .text-slate-500,
+.sitebar .text-slate-500,
+.bg-white\/95 .text-slate-600,
+.sitebar .text-slate-600 { color: rgba(255, 255, 255, 0.78) !important; }
+
+.bg-white\/95 .text-slate-900,
+.sitebar .text-slate-900 { color: #ffffff !important; }
+
+.bg-white\/95 .text-slate-800,
+.sitebar .text-slate-800 { color: #ffffff !important; }
+
+/* 顶栏内的浅灰胶囊（校区筛选 / 导航）：在深底上用半透明白底 */
+.bg-white\/95 .bg-slate-100,
+.sitebar .bg-slate-100 { background-color: rgba(255, 255, 255, 0.16) !important; }
+.bg-white\/95 .hover\:bg-slate-100:hover,
+.sitebar .hover\:bg-slate-100:hover { background-color: rgba(255, 255, 255, 0.24) !important; }
+
+/* 顶栏纯文字链接（返回首页 / 访问量趋势 / 讲座统计） */
+.bg-white\/95 a.text-slate-600:hover,
+.sitebar .topnav a:hover { color: #ffffff !important; }
+
+/* visits-trend 顶部导航链接 */
+.sitebar .topnav a { color: rgba(255, 255, 255, 0.82) !important; text-decoration: none; }
+.sitebar .topnav a:hover { color: #ffffff !important; }
+
+/* =====================================================================
+ * 品牌图：仅深蓝顶栏内的书法标题（黑字）反白为纯白；
+ * 404 页的 logo 在浅色背景上，不做反白（保持黑字可读）。
+ * ===================================================================== */
+header img[src="site-title.png"],
+.sitebar .brand .wordmark {
+  filter: brightness(0) invert(1);
+}
+
+/* 校徽：去掉容器白底卡，直接自然融入深蓝顶栏（不加描边/投影，避免生硬框感）。 */
+header img[alt="华南师范大学"],
+.brand .emblem {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* =====================================================================
+ * 主操作色统一：把 slate-800（深色主按钮）换成校徽蓝，强化品牌感
+ * 影响：统计页排序/激活按钮、首页激活态等。数据表的浅灰底色不动。
+ * ===================================================================== */
+.bg-slate-800 { background-color: #002d54 !important; }
+.hover\:bg-slate-800:hover { background-color: #002d54 !important; }
+button.bg-slate-800 { color: #ffffff !important; }
+
+/* visits-trend 时间范围选中按钮 */
+.ranges button.on {
+  background-color: #002d54 !important;
+  color: #ffffff !important;
+  border-color: #002d54 !important;
+}
+
+/* =====================================================================
+ * 签名点缀：分组装饰竖条 = 校徽红（全站唯一 w-1 h-5 圆头竖条）
+ * ===================================================================== */
+.bg-\[\#a51421\] { background-color: #a51421 !important; }
+
+/* =====================================================================
+ * 404 页：零脚本内联样式页，仅对齐品牌强调色（不引入顶栏）
+ * ===================================================================== */
+a.primary { background-color: #002d54 !important; }
+a.primary:hover { background-color: #0c2c49 !important; }
+
+/* =====================================================================
+ * 修正：三点菜单下拉浮层「空白选择栏」回归
+ * ---------------------------------------------------------------------
+ * 上方反白规则 `.bg-white/95 .text-slate-*` 是后代选择器，会误伤「溢出顶栏、
+ * 但仍在 DOM 内的白底浮层」——把菜单项的 text-slate-600 反白成白色，叠在
+ * 白底浮层上 = 白字白底 = 看不见 = 空白选择栏。
+ * 此处用更精确的选择器把下拉浮层（.absolute.top-full 白底弹出层）内的文字
+ * 还原为深色（slate-600 原色 #475569），不影响顶栏主体反白。
+ * 仅 VI 主题内生效；default 模式不加载本文件，无影响。
+ * ===================================================================== */
+.bg-white\/95 div.absolute.top-full .text-slate-600 { color: #475569 !important; }
+
+/* 移动端校区胶囊（未选中态 .bg-slate-100.text-slate-500）：同根因——
+ * 背景被上方规则改为半透明白，文字若不处理会反白成白色、在半透明白底上难辨。
+ * 深蓝顶栏上改用浅白字保证可读。 */
+.bg-white\/95 .bg-slate-100.text-slate-500 { color: rgba(255, 255, 255, 0.88) !important; }
