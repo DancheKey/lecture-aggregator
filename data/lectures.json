@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-27 14:28:34",
+  "updatedAt": "2026-10-28T13:47:56+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261106/8874.html",
@@ -154,6 +154,34 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "updatedAt": "2026-10-23 10:27:18"
+    },
+    {
+      "sourceUrl": "https://physics.scnu.edu.cn/a/20261028/13414.html",
+      "images": [],
+      "college": "物理学院",
+      "campus": "大学城",
+      "title": "物理学院学术报告（第58期）哈尔滨工业大学宋清海教授",
+      "topic": "微纳激光及其辐射场的调控",
+      "lectureStart": "2026-10-29 14:00:00",
+      "lectureEnd": null,
+      "location": "理8栋118",
+      "speaker": "宋清海",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "哈尔滨工业大学",
+      "inviter": "颜辉 报告内容: 激光( LASER",
+      "speakerBio": "宋清海,哈尔滨工业大学教授。国家青年科学基金 A 类及延续获得者,美国光学学会会士,中国光学学会会士。主要研究方向为集成微腔光子学、微纳激光、高精度光学传感及成像、光学超表面等。以第一或通讯作者在 Science ( 3篇)、 Nature 、 Nat. Mater. 、 Nat. Nanotechnol. 、 PNAS 、 Phys. Rev. Lett.等期刊发表学术论文60余篇。曾获科学探索奖、黑龙江省自然科学奖一等奖、中国光学学会自然科学奖一等奖、深圳市自然科学奖一等奖。 4项成果入选中国光学十大进展, 1项成果入选美国光学\"全球年度光学重要成果\"、 1项成果入选国家自然科学基金委年度优秀资助成果。",
+      "organizer": "物理学院",
+      "publishTime": "2026-10-28 09:22:00",
+      "publishTimeSource": "companion",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "激光( LASER )作为 20 世纪最伟大的发明之一,在现代科技与工业领域发挥着不可替代的关键作用。其应用范围极为广泛,从基础科研到前沿产业,涵盖光通信、精密测量、医学成像、材料加工乃至可控核聚变等众多重要领域。传统教科书通常强调激光的单色性、高亮度、方向性等基本特性,以及受限于光学腔体结构而产生的特定偏振态和受 Q 值制约的调制速度。然而,随着新型激光技术的快速发展,当代激光的物理特性和形态已远远超越了传统教科书描述的范畴,展现出更为丰富多样的技术特征和应用潜力。本报告将以纳米激光为主题向大家介绍我们课题组近年来的主要研究进展,内容包括如下三个方面:( 1 )手性激光与手性辐射;( 2 )融合超构表面和纳米激光,获得辐射场可精确定制的元激光;( 3 )实现随机偏振的新范式激光。",
+      "llmTextEnhanced": false,
+      "llmVerdict": null,
+      "llmSpeakerSource": null,
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026年10月29日 物理学院学术报告（第58期）哈尔滨工业大学宋清海教授"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20261029/11214.html",

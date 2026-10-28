@@ -5,7 +5,7 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 27 Oct 2026 14:28:34 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 28 Oct 2026 13:47:56 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
       <title>第十九届“勷勤论坛”之历史文化学院分论坛｜十七年史学关于历史人物的评价讨论</title>
@@ -39,6 +39,17 @@
 主讲：林子豪（华南师范大学经济与管理学院）
 地点：大学城校园文2栋401室
 主办：经济与管理学院</description>
+    </item>
+    <item>
+      <title>物理学院学术报告（第58期）哈尔滨工业大学宋清海教授｜微纳激光及其辐射场的调控</title>
+      <link>https://physics.scnu.edu.cn/a/20261028/13414.html</link>
+      <guid isPermaLink="false">https://physics.scnu.edu.cn/a/20261028/13414.html</guid>
+      <pubDate>Thu, 29 Oct 2026 14:00:00 +0800</pubDate>
+      <category>物理学院</category>
+      <description>题目：微纳激光及其辐射场的调控
+主讲：宋清海（哈尔滨工业大学）
+地点：理8栋118
+主办：物理学院</description>
     </item>
     <item>
       <title>第十九届“勷勤论坛”之历史文化学院分论坛｜中国社会性质论战与中国马克思主义史学的形成</title>
