@@ -619,9 +619,29 @@ def main():
   <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。 本页只统计<b>页面访问次数</b>。
 </div>
 
+<footer class="foot-site border-t border-slate-200 text-center text-12pt text-slate-400 py-6 bg-white">
+  数据来源于 Supabase，仅供参考。
+  <span class="block sm:inline sm:ml-2 mt-1 sm:mt-0">
+    · 本站总访问量 <span id="site_pv_value">—</span> 次
+  </span>
+</footer>
+
 <p id="load-err" class="empty" hidden></p>
-</div>
 <script src="visits-trend.js" defer></script>
+<script>
+// 加载总访问量并写入页脚（visits.json 由 generate_frontend_data.py 生成）
+(function() {{
+  fetch('visits.json', {{'cache': 'no-store'}})
+    .then(function (r) {{ if (!r.ok) return; return r.json(); }})
+    .then(function (d) {{
+      if (d && d.site_pv) {{
+        var el = document.getElementById('site_pv_value');
+        if (el) el.textContent = Number(d.site_pv).toLocaleString('en-US');
+      }}
+    }})
+    .catch(function () {{ /* 静默失败 */ }});
+}})();
+</script>
 </body></html>
 """
 

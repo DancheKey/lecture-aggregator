@@ -452,6 +452,8 @@ class TestGeneratedArtifactsCovered(unittest.TestCase):
             # 华南师范大学 VI 主题 + 黑白哀悼模式（2026-10-28）。后台由 site/_theme.json 切换。
             'site/theme-scnu.css', 'site/theme-bw.css',
             'site/theme-loader.js', 'site/_theme.json',
+            # 总访问量数据（2026-10-28）。由 generate_frontend_data.py 生成，供 visits-trend.html 页脚使用。
+            'site/visits.json',
         }
         missing = [u for u in uncovered if u not in known_static]
         self.assertEqual(missing, [],

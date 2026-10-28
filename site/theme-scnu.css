@@ -154,3 +154,14 @@ a.primary:hover { background-color: #0c2c49 !important; }
  * 背景被上方规则改为半透明白，文字若不处理会反白成白色、在半透明白底上难辨。
  * 深蓝顶栏上改用浅白字保证可读。 */
 .bg-white\/95 .bg-slate-100.text-slate-500 { color: rgba(255, 255, 255, 0.88) !important; }
+
+/* =====================================================================
+ * 底部版权统一：VI 模式下底部使用深藏青，文字改为白色/浅灰
+ * 覆盖各页 footer bg-white，使其与顶栏统一
+ * ===================================================================== */
+footer.bg-white { background-color: #002d54 !important; }
+footer.bg-white .text-slate-400 { color: rgba(255, 255, 255, 0.8) !important; }
+footer.bg-white .text-slate-500 { color: #fff !important; }
+footer.bg-white .text-slate-600 { color: rgba(255, 255, 255, 0.7) !important; }
+footer.bg-white .text-slate-700 { color: #fff !important; }
+footer.bg-white .text-slate-800 { color: #fff !important; }
