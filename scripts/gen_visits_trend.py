@@ -545,6 +545,7 @@ def main():
 <link rel="stylesheet" href="visits-trend.css">
   <!-- 讲座站点风格备选项（VI / 黑白 / 原版，由 site/_theme.json 后台切换，页面无 UI） -->
   <link id="vi-theme" rel="stylesheet" href="theme-scnu.css">
+  <link id="bw-theme" rel="stylesheet" href="theme-bw.css" disabled>
   <script src="theme-loader.js"></script>
 </head>
 <body>
@@ -655,6 +656,14 @@ def main():
     from generate_frontend_data import stamp_script_version
     stamp_script_version(os.path.basename(OUT_PATH), JS_NAME)
     stamp_script_version(os.path.basename(OUT_PATH), CSS_NAME)
+    # 主题备选项资源（vi/bw/loader）同样由本脚本产出时打戳：模板里是裸引用
+    # （与上面 visits-trend.js/css 同源机制），否则 trend 页的主题资源无 ?v=，
+    # 会被 tests/test_frontend_schema.py::test_99 判为「未打戳」→ 门禁1 整班红
+    # （2026-10-28 实测：daily.yml 排程里本脚本在 generate 之后跑，会把
+    # generate 已打好的主题戳整体覆盖掉，趋势页只剩裸引用）。
+    stamp_script_version(os.path.basename(OUT_PATH), 'theme-loader.js')
+    stamp_script_version(os.path.basename(OUT_PATH), 'theme-scnu.css')
+    stamp_script_version(os.path.basename(OUT_PATH), 'theme-bw.css')
     for p in (OUT_PATH, JS_PATH, DATA_PATH, css):
         print(f'[done] {os.path.relpath(p, ROOT)}'
               f'（{os.path.getsize(p) / 1024:.1f} KB）')
