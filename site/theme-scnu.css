@@ -88,6 +88,13 @@ body { background-color: #f7f5f4 !important; }
 .bg-white\/95 .hover\:bg-slate-100:hover,
 .sitebar .hover\:bg-slate-100:hover { background-color: rgba(255, 255, 255, 0.24) !important; }
 
+/* 顶栏内的选中胶囊（移动端校区筛选 / 只看点赞，bg-slate-200）：
+   Tailwind 原生浅灰 #e2e8f0 实底，而 text-slate-900 被上方规则反白成白字
+   = 浅底白字对比仅 ~1.4:1，「全部」几乎看不见（桌面端选中用 bg-slate-100，无此问题）。
+   统一为比未选中(0.16)更亮的半透明白底：白字落深底清晰，选中/未选中仍有层次。 */
+.bg-white\/95 .bg-slate-200,
+.sitebar .bg-slate-200 { background-color: rgba(255, 255, 255, 0.30) !important; }
+
 /* 顶栏纯文字链接（返回首页 / 访问量趋势 / 讲座统计） */
 .bg-white\/95 a.text-slate-600:hover,
 .sitebar .topnav a:hover { color: #ffffff !important; }
