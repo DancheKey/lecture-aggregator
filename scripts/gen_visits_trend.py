@@ -114,6 +114,12 @@ h1{font-size:22px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
   border:1px solid #E1E0DA;background:#fff;color:#5F5E5A;cursor:pointer}
 .ranges button:hover{border-color:#C9C7BE}
 .ranges button.on{background:#E6F1FB;color:#185FA5;border-color:#B5D4F4}
+/* 移动端（2026-10-29）：浅蓝底+中蓝字在手机反光/小字号下对比度不足，
+   「全部」等选中标签文字发白看不清。仅在小屏把选中态改为实心深蓝底+白字加粗，
+   对比度拉满；桌面端保持原浅蓝风格不变。 */
+@media (max-width:640px){
+  .ranges button.on{background:#185FA5;color:#fff;border-color:#185FA5;font-weight:600}
+}
 .legend{margin-left:auto;display:flex;gap:16px;font-size:13.5px;color:#888780}
 .legend i{display:inline-block;vertical-align:middle;margin-right:6px}
 .sw-line{width:16px;height:2.5px;background:#185FA5;border-radius:2px}
