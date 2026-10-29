@@ -444,7 +444,7 @@ Object.assign(APP_METHODS, {
       if (this.showWantedOnly) this.showLikedOnly = false;
       this.campus = ''; this.college = '';
     },
-    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.showWantedOnly = false; this.speaker = ''; this.onlineOnly = false; this.upcomingOnly = false; this.currentPage = 1; },
+    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.showWantedOnly = false; this.speaker = ''; this.onlineOnly = false; this.upcomingOnly = false; this.ongoingOnly = false; this.currentPage = 1; },
     /* ---------- 分页 ---------- */
     gotoPage(p) {
       if (p < 1 || p > this.totalPages) return;
@@ -479,6 +479,14 @@ Object.assign(APP_METHODS, {
     // 入口方法自设页码（URL 同步由 app.js 的 upcomingOnly watch 负责）。
     toggleUpcoming() {
       this.upcomingOnly = !this.upcomingOnly;
+      this.currentPage = 1;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    // 进行中讲座筛选开关（2026-10-29 用户要求，复用待开始逻辑）：
+    // 点计数行「进行中 N 场」的数字进入，再点数字或筛选片 × 取消。与线上开关同款：
+    // 布尔开关、叠加于其他筛选、入口方法自设页码（URL 同步由 app.js 的 ongoingOnly watch 负责）。
+    toggleOngoing() {
+      this.ongoingOnly = !this.ongoingOnly;
       this.currentPage = 1;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },

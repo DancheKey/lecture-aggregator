@@ -113,6 +113,7 @@ const app = createApp({
     speaker() { this._scheduleUrlSync(true, 120); },
     onlineOnly() { this._scheduleUrlSync(true, 120); },
     upcomingOnly() { this._scheduleUrlSync(true, 120); },
+    ongoingOnly() { this._scheduleUrlSync(true, 120); },
     showLikedOnly() { this.currentPage = 1; },
     // 想听筛选（2026-10-19）：与点赞同为「本机数据」，同样不进 URL（分享无意义），只回第一页。
     showWantedOnly() { this.currentPage = 1; },

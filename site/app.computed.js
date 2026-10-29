@@ -123,7 +123,7 @@ const APP_COMPUTED = {
 
     // 是否有任何筛选条件激活（控制"清除"按钮显示）
     hasActiveFilter() {
-      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.showWantedOnly || this.speaker || this.onlineOnly || this.upcomingOnly);
+      return !!(this.campus || this.college || this.year || this.query || this.searchField || this.showLikedOnly || this.showWantedOnly || this.speaker || this.onlineOnly || this.upcomingOnly || this.ongoingOnly);
     },
 
     // 长文本（简介/摘要）不再阻塞搜索（2026-09-30 用户定）：
@@ -185,6 +185,8 @@ const APP_COMPUTED = {
         // 待开始筛选（2026-10-16 口径乙）：upcoming + 开始时间未到的时间待定；
         // 不含进行中（已开场）、不含日期已过/无日期的 tbd。与其他筛选叠加。
         if (this.upcomingOnly && !this.isNotStarted(l, nowMs)) return false;
+        // 进行中筛选（2026-10-29 复用待开始：仅留 statusOf==='ongoing' 的场，与其他筛选叠加）
+        if (this.ongoingOnly && !this.isOngoing(l, nowMs)) return false;
         // 合并讲座可能跨校区/学院，任一来源匹配即保留
         if (this.campus) {
           const campuses = new Set([l.campus, ...(l.sources || []).map(s => s.campus)].filter(Boolean));

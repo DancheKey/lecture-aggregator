@@ -407,15 +407,19 @@
                 <template v-else>
                   共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
                 </template>
-                <!-- 进行中内联段（2026-10-20 用户补充；2026-10-29 用户要求提到「待开始」之前）：
-                     有正在进行的讲座时紧跟总量后显示。数字用 bg-blue-100/text-blue-700，
-                     与卡片「进行中」徽章同色（待开始数字用 orange 对齐卡片「即将开始」橙）。
-                     纯展示、不可点筛选（用户仅要求显示数量）。仅 >0 时显示——绝大多数时段
+                <!-- 进行中内联段（2026-10-20 用户补充；2026-10-29 用户要求复用「待开始」可点筛选）：
+                     有正在进行的讲座时紧跟总量后显示。点数字叠加「进行中」筛选，再点数字或筛选片 ×
+                     取消；仅自身激活时本段 v-if 隐藏（避免与筛选片「进行中讲座」数字重复）；其余筛选态
+                     下仍显示。数字激活态 bg-blue-600/text-white 与卡片「进行中」徽章同蓝；非激活态
+                     text-blue-700 hover:bg-blue-100 与徽章底色同源。仅 >0 时显示——绝大多数时段
                      无进行中讲座，整段隐藏不占宽。 -->
-                <template v-if="ongoingCount > 0">
+                <template v-if="ongoingCount > 0 && !ongoingOnly">
                   <span class="text-slate-300">·</span>
                   进行中
-                  <span class="px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700">{{ ongoingCount }}</span>
+                  <button type="button" @click="toggleOngoing()"
+                    class="px-2 py-0.5 rounded-full font-semibold transition"
+                    :class="ongoingOnly ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-100'"
+                    :title="ongoingOnly ? '点击取消进行中筛选' : '只看正在进行的讲座'">{{ ongoingCount }}</button>
                   场
                 </template>
                 <!-- 待开始内联段（2026-10-16，A' 用户拍板；命名同日改「待开始」
@@ -504,6 +508,12 @@
               <span v-if="onlineOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
                 <span>线上讲座</span>
                 <button type="button" @click="toggleOnline()" aria-label="清除线上筛选"
+                  class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
+              </span>
+              <!-- 进行中筛选片（2026-10-29 用户要求，复用待开始）：点计数行数字进入，× 或再点数字取消 -->
+              <span v-if="ongoingOnly" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-white text-12pt">
+                <span>进行中讲座</span>
+                <button type="button" @click="toggleOngoing()" aria-label="清除进行中筛选"
                   class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
               </span>
               <!-- 待开始筛选片（2026-10-16）：点计数行数字进入，× 或再点数字取消 -->
@@ -955,16 +965,16 @@
 
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
-  <script defer src="app.core.js?v=275a9d84e1"></script>
-  <script defer src="app.state.js?v=96bb8747d0"></script>
-  <script defer src="app.computed.js?v=b7e60619f7"></script>
-  <script defer src="app.display.js?v=9a9d17612f"></script>
+  <script defer src="app.core.js?v=9883187470"></script>
+  <script defer src="app.state.js?v=2886a73639"></script>
+  <script defer src="app.computed.js?v=13ef9d7ba1"></script>
+  <script defer src="app.display.js?v=cce4180cc2"></script>
   <script defer src="app.cloud.js?v=48b48189e4"></script>
-  <script defer src="app.social.js?v=53c95b667e"></script>
+  <script defer src="app.social.js?v=35a58b9b4b"></script>
   <script defer src="app.calendar.js?v=3731053cf3"></script>
   <script defer src="app.data.js?v=9abd042366"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
-  <script defer src="app.js?v=83f60de35d"></script>
+  <script defer src="app.js?v=39a201e29b"></script>
   <!-- footer-counter.js：Supabase 云端计数 + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->

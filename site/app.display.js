@@ -206,6 +206,12 @@ Object.assign(APP_METHODS, {
       const ms = s ? new Date(String(s).replace(' ', 'T')).getTime() : 0;
       return !!ms && ms >= nowMs;
     },
+    // 「进行中」判定（2026-10-29 用户要求，复用待开始逻辑）：仅 statusOf === 'ongoing'。
+    // 与 isNotStarted 对称（同 (l, nowMs) 签名，nowMs 保留仅为接口一致；进行中只判
+    // 状态不比时间）。filtered 走函数入口固定的基准（不依赖 tick，保持排序不每秒空转）。
+    isOngoing(l, nowMs) {
+      return this.statusOf(l) === 'ongoing';
+    },
     // 状态徽章：label + 样式类（vendor 预编译 CSS 无绿色系，进行中用蓝 + 呼吸点）
     // labelShort：移动端（<640px）专用的紧凑文案。长倒计时「即将开始 · 还有 17 时 44 分 59 秒」
     // 在窄屏会把元信息行撑出卡片右缘，故移动端改用「还有 17:44:59」；两套文案由 CSS 切换显示
@@ -352,7 +358,7 @@ Object.assign(APP_METHODS, {
         this.all.length, this.dataStage, window.innerWidth,
         Object.keys(this._longText).length,
         JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio),
-        this.onlineOnly, this.farFutureOpen, toolbarGeo].join('|');
+        this.onlineOnly, this.ongoingOnly, this.farFutureOpen, toolbarGeo].join('|');
       if (sig === this._clampSig) return;
       this._clampSig = sig;
       const next = {};

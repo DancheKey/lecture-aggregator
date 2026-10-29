@@ -8,24 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:https://physics.scnu.edu.cn/a/20261028/13414.html@danchekey.github.io
-DTSTAMP:20261028T054756Z
-DTSTART:20261029T060000Z
-DTEND:20261029T070000Z
-SUMMARY:物理学院学术报告（第58期）哈尔滨工业大学宋清
- 海教授｜微纳激光及其辐射场的调控
-LOCATION:理8栋118
-DESCRIPTION:题目：微纳激光及其辐射场的调控\n主讲：宋清
- 海（哈尔滨工业大学）\n地点：理8栋118\n主办：物理学
- 院
-URL:https://physics.scnu.edu.cn/a/20261028/13414.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://lswh.scnu.edu.cn/a/20261022/86.html@danchekey.github.io
 DTSTAMP:20261028T054756Z
 DTSTART:20261029T070000Z

@@ -164,6 +164,7 @@ function parseUrlFilters() {
     if (URL_SEARCH_FIELDS.includes(field)) out.searchField = field;
     if (p.get('online') === '1') out.onlineOnly = true;
     if (p.get('upcoming') === '1') out.upcomingOnly = true;
+    if (p.get('ongoing') === '1') out.ongoingOnly = true;
     const page = parseInt(p.get('page'), 10);
     if (page >= 2 && page <= MAX_URL_PAGE) out.page = page;   // page=1 与缺省等价，不写
   } catch (e) { /* file:// 等受限环境：按无筛选处理 */ }
@@ -184,6 +185,7 @@ function normalizeUrlFilters(f, campusList) {
     searchField: f.searchField || '',
     onlineOnly: !!f.onlineOnly,
     upcomingOnly: !!f.upcomingOnly,
+    ongoingOnly: !!f.ongoingOnly,
     currentPage: (f.page >= 2 && f.page <= MAX_URL_PAGE) ? f.page : 1,
   };
 }
@@ -199,6 +201,7 @@ function serializeUrlFilters(vm) {
   if (vm.searchField) p.set('field', vm.searchField);
   if (vm.onlineOnly) p.set('online', '1');
   if (vm.upcomingOnly) p.set('upcoming', '1');
+  if (vm.ongoingOnly) p.set('ongoing', '1');
   if (vm.currentPage >= 2) p.set('page', String(vm.currentPage));
   return p.toString();
 }
@@ -224,6 +227,7 @@ Object.assign(APP_METHODS, {
     this.searchField = n.searchField;
     this.onlineOnly = n.onlineOnly;
     this.upcomingOnly = n.upcomingOnly;
+    this.ongoingOnly = n.ongoingOnly;
     this.currentPage = n.currentPage;   // 最后赋：前面各维度的既有 watch 会先重置页码
     this.$nextTick(() => { this._urlSyncSuppress = false; });
   },

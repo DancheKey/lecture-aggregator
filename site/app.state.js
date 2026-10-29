@@ -19,6 +19,7 @@ const APP_STATE = function () {
       showWantedOnly: false,
       onlineOnly: false,   // 仅显示线上讲座（点卡片「# 线上」标签进入，2026-10-13）
       upcomingOnly: false, // 仅显示待开始讲座（点计数行「待开始 N 场」进入，2026-10-16）
+      ongoingOnly: false, // 仅显示进行中讲座（点计数行「进行中 N 场」进入，2026-10-29 复用待开始逻辑）
       scraping: false,
       showMenu: false,    // 顶部栏更多操作下拉菜单
       showReport: false,  // 信息源报告弹窗显隐
