@@ -407,8 +407,19 @@
                 <template v-else>
                   共 <span class="font-semibold text-slate-800">{{ displayTotal }}</span> 场讲座
                 </template>
+                <!-- 进行中内联段（2026-10-20 用户补充；2026-10-29 用户要求提到「待开始」之前）：
+                     有正在进行的讲座时紧跟总量后显示。数字用 bg-blue-100/text-blue-700，
+                     与卡片「进行中」徽章同色（待开始数字用 orange 对齐卡片「即将开始」橙）。
+                     纯展示、不可点筛选（用户仅要求显示数量）。仅 >0 时显示——绝大多数时段
+                     无进行中讲座，整段隐藏不占宽。 -->
+                <template v-if="ongoingCount > 0">
+                  <span class="text-slate-300">·</span>
+                  进行中
+                  <span class="px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700">{{ ongoingCount }}</span>
+                  场
+                </template>
                 <!-- 待开始内联段（2026-10-16，A' 用户拍板；命名同日改「待开始」
-                     与徽章「进行中/已结束」对等）：紧跟总量后内联、不独占一行——
+                     与徽章「进行中/已结束」对等）：紧跟进行中后内联、不独占一行——
                      仅 upcoming 自身激活时本段 v-if 隐藏（避免与筛选片「待开始讲座」数字
                      重复）；其余筛选态（讲者/年份等）下仍显示，让第一行统计保持完整。
                      字号颜色继承父容器。点数字叠加「待开始」筛选，再点数字或筛选片 × 取消。 -->
@@ -419,16 +430,6 @@
                     class="px-2 py-0.5 rounded-full font-semibold transition"
                     :class="upcomingOnly ? 'bg-blue-600 text-white' : 'text-orange-600 hover:bg-orange-100'"
                     :title="upcomingOnly ? '点击取消待开始筛选' : '只看还没开始的讲座'">{{ upcomingCount }}</button>
-                  场
-                </template>
-                <!-- 进行中内联段（2026-10-20 用户补充）：有正在进行的讲座时紧跟待开始后显示。
-                     数字用 bg-blue-100/text-blue-700，与卡片「进行中」徽章同色（待开始数字
-                     用 orange 对齐卡片「即将开始」橙）。纯展示、不可点筛选（用户仅要求显示数量）。
-                     仅 >0 时显示——绝大多数时段无进行中讲座，整段隐藏不占宽。 -->
-                <template v-if="ongoingCount > 0">
-                  <span class="text-slate-300">·</span>
-                  进行中
-                  <span class="px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700">{{ ongoingCount }}</span>
                   场
                 </template>
 
