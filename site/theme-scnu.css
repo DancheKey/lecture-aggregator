@@ -59,18 +59,21 @@ body { background-color: #e3edf6 !important; }
 .bg-\[\#f7f8fa\] { background-color: #e3edf6 !important; }
 
 /* ---------- 内容区白色元素统一浅蓝（试验版） ----------
- * 白卡片/搜索框/浮层/未激活按钮等在浅蓝页面底上白块突兀，统一为页面底色同款浅蓝。
+ * 白卡片/搜索框/浮层/未激活按钮等在浅蓝页面底上白块突兀，统一改浅蓝。
+ * 卡片取 #eef4fa（比页面底 #e3edf6 浅一档）：保留「卡片浮起」的层次感，
+ * 若与背景同色则卡片边界全靠边框、观感糊成一片（2026-10-29 用户反馈）。
  * 顶栏与 footer 不受影响：顶栏用 bg-white/95（不同类名），footer.bg-white 特异性
- * (0,1,1) 更高保持深藏青；校徽图底(285行)变浅蓝在深顶栏上对比依然清晰。 */
-.bg-white { background-color: #e3edf6 !important; }
+ * (0,1,1) 更高保持深藏青；校徽图底变浅蓝在深顶栏上对比依然清晰。 */
+.bg-white { background-color: #eef4fa !important; }
 
-/* 两侧校训图淡化成「阴字」水印：multiply 混合使图片白底消失、直接融进
- * 浅蓝页面底，黑字透出如印在底色上；再降不透明度弱化字迹，去阴影去边界感 */
-.motto-side {
-  mix-blend-mode: multiply !important;
-  opacity: 0.55 !important;
-  box-shadow: none !important;
-}
+/* 日期/星期粘性条（bg-[#f7f8fa]/95，带斜杠类名，上方 :57 同名规则不命中）：
+ * 统一为卡片同款浅蓝的 95% 半透明，保持 sticky 毛玻璃质感 */
+.bg-\[\#f7f8fa\]\/95 { background-color: rgba(238, 244, 250, 0.95) !important; }
+
+/* 卡片底部 #标签 等 bg-slate-100（Tailwind 原生近白 #f1f5f9，在浅蓝卡上显白突兀）：
+ * 改校徽蓝 6% 透明度——叠在浅蓝卡上呈略深蓝灰，标签有底色且文字(slate-600)可读。
+ * 顶栏内的 bg-slate-100 不受影响：上方顶栏规则特异性 (0,2,0) 更高，仍半透明白。 */
+.bg-slate-100 { background-color: rgba(0, 45, 84, 0.06) !important; }
 
 /* =====================================================================
  * 顶部栏统一：深藏青底

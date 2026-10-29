@@ -249,6 +249,15 @@
     .back-top-btn:hover { transform: translateY(-2px) scale(1.08); color: #2563eb; box-shadow: 0 10px 24px -6px rgba(15,23,42,0.22); }
     /* 两侧校训图：默认隐藏；仅视口宽度 ≥1700px（侧边能完整放下图片而不侵入内容区）时显示，避免窄窗/高缩放下遮挡讲座卡片 */
     .motto-side { display: none; }
+    /* 校训淡化成模糊水印（2026-10-29，三模式通用故放内联：default 不加载主题、
+       黑白走 theme-bw，只有内联全生效）。multiply 使位图白底融进页面底色，
+       opacity+blur 让字迹模糊退为背景装饰，不再与内容抢视线。 */
+    .motto-side {
+      mix-blend-mode: multiply;
+      opacity: 0.3;
+      filter: blur(1px);
+      box-shadow: none;
+    }
     @media (min-width: 1700px) {
       .motto-side { display: block; }
     }
@@ -270,7 +279,7 @@
     .data-hint__btn:hover { background: #b45309; }
   </style>
   <!-- 华南师范大学 VI 主题（含黑白哀悼备选项）。由 site/_theme.json 后台切换，页面无 UI -->
-  <link id="vi-theme" rel="stylesheet" href="theme-scnu.css?v=dfb868814e">
+  <link id="vi-theme" rel="stylesheet" href="theme-scnu.css?v=9b743dea9e">
   <link id="bw-theme" rel="stylesheet" href="theme-bw.css?v=d61b02f793" disabled>
   <script src="theme-loader.js?v=ed56679365"></script>
 </head>
