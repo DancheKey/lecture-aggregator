@@ -4,7 +4,7 @@
  * 配色取自 scnu.edu.cn 首页实测：
  *   校徽深藏青 #002d54（官网导航条主色，出现 8 次）
  *   校徽红     #a51421（官网点缀色）
- *   页面米白   #f7f5f4（同学校官网内容区）
+ *   页面底色   #e3edf6（校徽浅蓝试验版，原官网米白 #f7f5f4）
  *
  * 本文件是所有页面的「统一皮肤」：把首页(index)、统计(stats)、
  * 访问量趋势(visits-trend)、404 的顶栏与品牌色，从各自默认配色
@@ -51,10 +51,12 @@
 .ring-blue-400 { --tw-ring-color: #4a7fab !important; }
 .focus\:border-blue-400 { border-color: #4a7fab !important; }
 
-/* ---------- 页面底色（官网米白 #f7f5f4） ---------- */
-body { background-color: #f7f5f4 !important; }
+/* ---------- 页面底色（校徽浅蓝试验版，原官网米白 #f7f5f4） ----------
+ * 取值介于 blue-50 #eef3f7 与 blue-100 #d6e2ec 之间：
+ * 比 blue-50 深一档（浅蓝感明显），比 blue-100 浅一档（不与标签/选中胶囊同色隐入背景）。 */
+body { background-color: #e3edf6 !important; }
 /* 个别页面用任意值类 bg-[#f7f8fa]，特异相同，用同名类压过 */
-.bg-\[\#f7f8fa\] { background-color: #f7f5f4 !important; }
+.bg-\[\#f7f8fa\] { background-color: #e3edf6 !important; }
 
 /* =====================================================================
  * 顶部栏统一：深藏青底
