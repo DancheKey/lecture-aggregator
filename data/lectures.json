@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-28T13:47:56+08:00",
+  "updatedAt": "2026-10-29T19:34:54+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261106/8874.html",
@@ -29,6 +29,33 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-田国梁"
+    },
+    {
+      "sourceUrl": "http://mks.scnu.edu.cn/a/20261029/21.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/mks/2026/1029/1793264700637275.jpg"
+      ],
+      "college": "马克思主义学院",
+      "campus": "石牌",
+      "title": "在“生活史”视野下理解1920年代的中国革命",
+      "topic": "在“生活史”视野下理解1920年代的中国革命",
+      "lectureStart": "2026-11-06 15:00:00",
+      "lectureEnd": "2026-11-06 17:00:00",
+      "location": "马克思主义学院（桃李园唯实厅",
+      "speaker": "瞿骏",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "华东师范大学",
+      "inviter": "",
+      "speakerBio": "瞿骏，现任华东师范大学历史学系党委书记、社会主义历史与文献研究院副院长、中国现代思想文化研究所研究员、教授、博士生导师，兼任上海市社会科学界联合会副主席。入选中组部国家级青年人才、中国历史研究院兰台青年学者、上海市领军人才，主要从事中国近现代思想文化史、中共党史研究，主持国家社科基金重大项目，著有《天下为学说裂：清末民初的思想革命与文化运动》《大凤起兮：地方视野和政治变迁中的“五四”》《辛亥革命与上海城市公共空间》等著作，在《历史研究》《近代史研究》《中共党史研究》发表论文若干。",
+      "organizer": "马克思主义学院",
+      "publishTime": "2026-10-29 17:04:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "在“生活史”视野下理解1920年代的中国革命"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8857.html",
@@ -119,6 +146,35 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-蒋枭"
+    },
+    {
+      "sourceUrl": "http://maths.scnu.edu.cn/a/20261030/8875.html",
+      "images": [],
+      "college": "数学科学学院",
+      "campus": "石牌",
+      "title": "勷勤数学•专家报告-应文俊",
+      "topic": "融合神经网络的可压缩流数值方法",
+      "lectureStart": "2026-10-30 11:00:00",
+      "lectureEnd": "2026-10-30 12:00:00",
+      "location": "数科院西楼二楼会议室",
+      "speaker": "应文俊",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "暨南大学",
+      "inviter": "钟柳强",
+      "speakerBio": "2005年美国杜克大学数学系博士毕业,2011年入选国家级青年人才,2024年入选国家级高层次人才,现为暨南大学数学学院教授,任第八届、第九届中国工业与应用数学学会副秘书长。近期主要致力于面向自由边界问题、移动界面问题和多物理场耦合问题的直角网格方法,CAD、CAE一体化工业软件与相关通过深度学习求解偏微分与积分方程的高精度快速高效算法。",
+      "organizer": "数学科学学院",
+      "publishTime": "2026-10-30 08:10:00",
+      "publishTimeSource": "label",
+      "timeConfidence": "high",
+      "timeNote": "same-day-normal",
+      "abstract": "我们将介绍可压缩流体计算的两个基于神经网络的数值方法。一个通过神经网络实现高分辨率低耗散重构,另外一个建立了物理信息与数据融合的空化模型(状态方程)。低耗散重构根据归一化的数据自动识别当前单元该选择MUSCL格式重构还是用THINC格式重构,保证格式的边界变差不增性质,最大程度避免数值振荡与降低数值耗散。融合物理信息与数据的空化模型通过对神经网络的输入和输出端分别使用对数函数与指数函数消除系统刚性,实现状态方程压力输出的保正性。在报告中我们将给出空间二维、三维区域上的一些典型可压缩流计算算例,展示两个基于神经网络的方法的有效性和可靠性。",
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "勷勤数学•专家报告-应文俊"
     },
     {
       "sourceUrl": "http://lswh.scnu.edu.cn/a/20261022/86.html",
