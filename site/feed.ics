@@ -8,24 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://em.scnu.edu.cn/a/20261029/11214.html@danchekey.github.io
-DTSTAMP:20261028T054756Z
-DTSTART:20261029T043000Z
-DTEND:20261029T053000Z
-SUMMARY:华师经英Seminar第63期｜词元市场:一个人工智能时
- 代的竞争经济学
-LOCATION:大学城校园文2栋401室
-DESCRIPTION:题目：词元市场:一个人工智能时代的竞争经济
- 学\n主讲：林子豪（华南师范大学经济与管理学院）\n地
- 点：大学城校园文2栋401室\n主办：经济与管理学院
-URL:http://em.scnu.edu.cn/a/20261029/11214.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261028/13414.html@danchekey.github.io
 DTSTAMP:20261028T054756Z
 DTSTART:20261029T060000Z
