@@ -58,6 +58,20 @@ body { background-color: #e3edf6 !important; }
 /* 个别页面用任意值类 bg-[#f7f8fa]，特异相同，用同名类压过 */
 .bg-\[\#f7f8fa\] { background-color: #e3edf6 !important; }
 
+/* ---------- 内容区白色元素统一浅蓝（试验版） ----------
+ * 白卡片/搜索框/浮层/未激活按钮等在浅蓝页面底上白块突兀，统一为页面底色同款浅蓝。
+ * 顶栏与 footer 不受影响：顶栏用 bg-white/95（不同类名），footer.bg-white 特异性
+ * (0,1,1) 更高保持深藏青；校徽图底(285行)变浅蓝在深顶栏上对比依然清晰。 */
+.bg-white { background-color: #e3edf6 !important; }
+
+/* 两侧校训图淡化成「阴字」水印：multiply 混合使图片白底消失、直接融进
+ * 浅蓝页面底，黑字透出如印在底色上；再降不透明度弱化字迹，去阴影去边界感 */
+.motto-side {
+  mix-blend-mode: multiply !important;
+  opacity: 0.55 !important;
+  box-shadow: none !important;
+}
+
 /* =====================================================================
  * 顶部栏统一：深藏青底
  * 覆盖两套实现 ——
