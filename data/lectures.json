@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-29T19:34:54+08:00",
+  "updatedAt": "2026-10-30T13:54:16+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261106/8874.html",
@@ -31,6 +31,36 @@
       "listTitle": "勷勤数学•专家报告-田国梁"
     },
     {
+      "sourceUrl": "http://em.scnu.edu.cn/a/20261106/11228.html",
+      "images": [],
+      "college": "经济与管理学院",
+      "campus": "大学城",
+      "title": "华师经管学术讲座第552期（经济）",
+      "topic": "预算统筹管理与地方债务风险防控:来自融资平台异常购地的证据",
+      "lectureStart": "2026-11-06 16:00:00",
+      "lectureEnd": null,
+      "location": "大学城校园文二栋536国际学术报告厅",
+      "speaker": "赵仁杰",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "西北大学",
+      "inviter": "",
+      "speakerBio": "赵仁杰,西北大学经济管理学院教授、博士生导师、副院长,主要研究方向为公共经济学、中国特色社会主义政治经济学。入选国家级青年人才计划、陕西省高层次人才引进计划,主持国家自然科学基金面上、青年项目、陕西高校青年创新团队、陕西省社科基金等多项课题,在《经济研究》《管理世界》《经济学季刊》《世界经济》以及Regional Science and Urban Economics, Economic Inquiry, Leadership Quarterly等期刊发表论文30余篇,兼任西安市决策咨询委员会委员,研究报告获国家领导人批示。研究成果获陕西省第十六次、第十七次、上海市第十七届哲学社会科学优秀成果一等奖,主持陕西省本科教学改革重点项目、教学成果获多项陕西省高等教育教学成果特等奖、一等奖。",
+      "organizer": "经济与管理学院",
+      "publishTime": null,
+      "publishTimeSource": "url_proxy",
+      "timeConfidence": "high",
+      "timeNote": "same-day-normal",
+      "abstract": "通过政府性基金向一般公共预算调入资金是实施预算统筹管理、提升地方财政稳健性的重要举措,但在房地产市场调整期这一预算统筹会诱发地方融资平台异常购地和债务风险。 基于手动整理的2017—2024年地级市一般公共预算调入资金变量和微观土地交易数据,研究发现:年初一般公共预算调入资金预算任务会显著提高融资平台购地规模,且主要表现在第4季度,对前3季度、异地购地和民营企业购地无显著影响,前3季度政府性基金预算执行进度会降低调入预算对第4季度购地的影响,融资平台通过年底\"突击购地\"配合地方政府预算统筹。地方财政对跨预算调节、政府性基金依赖度越高和对转移支付预期越弱,这一效应越明显,受本地政府控股、土地开发业务越多和信用基础越好的融资平台在一般预算统筹下突击购地越多。进一步地,由于异常购地并非源于融资平台真实土地开发需求,地方政府会利用土储专项债回购融资平台土地缓解异常购地对其造成的财务压力,随着2019年土储专项债停发融资平台异常购地虽有所下降,但显著增加了地方政府向异常购地融资平台的延期付款,会加剧融资平台债务风险。本文不仅为理解土地出让收入锐减背景下地方预算统筹的实现机制提供新的视角,也为通过健全预算管理确保2027年融资平台市场化转型退出后政府债务风险防控提供政策启示。",
+      "newsFilterBypass": true,
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle|speakerAffiliation",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "● 华师经管学术讲座第552期（经济）"
+    },
+    {
       "sourceUrl": "http://mks.scnu.edu.cn/a/20261029/21.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/mks/2026/1029/1793264700637275.jpg"
@@ -56,6 +86,36 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "在“生活史”视野下理解1920年代的中国革命"
+    },
+    {
+      "sourceUrl": "http://em.scnu.edu.cn/a/20261105/11227.html",
+      "images": [],
+      "college": "经济与管理学院",
+      "campus": "大学城",
+      "title": "华师经管学术讲座第551期（经济）",
+      "topic": "纵向监督下的公共服务均等化",
+      "lectureStart": "2026-11-06 14:00:00",
+      "lectureEnd": null,
+      "location": "大学城校园文二栋536国际学术报告厅",
+      "speaker": "梁超",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "山东大学",
+      "inviter": "",
+      "speakerBio": "梁超,山东大学经济研究院研究员,博士生导师,入选山东省泰山学者工程青年专家、山东大学齐鲁青年学者。从事发展经济学、劳动经济学等领域研究,成果发表于《经济研究》《管理世界》等期刊,主持国自科面上和青年项目、省重点研发计划重大项目等多项课题,曾获山东省社会科学优秀成果奖、上海青年经济学者优秀成果奖、普华永道PWC3535论坛最佳论文等,并担任《经济研究》等期刊审稿专家及国自科和社科基金通讯评审专家。",
+      "organizer": "经济与管理学院",
+      "publishTime": "2026-11-05 14:00",
+      "publishTimeSource": "companion",
+      "timeConfidence": "high",
+      "timeNote": "same-year",
+      "abstract": "在地方承担公共服务供给责任的分权体制下,中央监督如何兼顾统一标准与地方执行条件,是政府间权责配置的重要问题。本文以县域义务教育均衡发展督导问责为例,研究教育督导对教育公共服务均等化的影响。研究发现,义务教育分权供给责任下的中央监督既可以约束地方行为,也会影响地方的公共服务投入策略,这为完善纵向监督制度、促进公共服务均等化提供了政策启示。",
+      "newsFilterBypass": true,
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle|speakerAffiliation",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "● 华师经管学术讲座第551期（经济）"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261031/8857.html",

@@ -9,7 +9,7 @@ X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261031/8868.html@danchekey.github.io
-DTSTAMP:20261029T113454Z
+DTSTAMP:20261030T055416Z
 DTSTART:20261031T020000Z
 DTEND:20261031T030000Z
 SUMMARY:勷勤数学•专家报告-蒋枭｜两类局部零和问题
@@ -25,7 +25,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261031/8871.html@danchekey.github.io
-DTSTAMP:20261029T113454Z
+DTSTAMP:20261030T055416Z
 DTSTART:20261031T030000Z
 DTEND:20261031T040000Z
 SUMMARY:勷勤数学•专家报告-高维东｜Some open problems in zero
@@ -43,7 +43,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261031/8857.html@danchekey.github.io
-DTSTAMP:20261029T113454Z
+DTSTAMP:20261030T055416Z
 DTSTART:20261031T060000Z
 DTEND:20261031T070000Z
 SUMMARY:勷勤数学•专家报告-陈天翔｜从医学视觉到多模
@@ -60,8 +60,26 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://em.scnu.edu.cn/a/20261105/11227.html@danchekey.github.io
+DTSTAMP:20261030T055416Z
+DTSTART:20261106T060000Z
+DTEND:20261106T070000Z
+SUMMARY:华师经管学术讲座第551期（经济）｜纵向监督下的
+ 公共服务均等化
+LOCATION:大学城校园文二栋536国际学术报告厅
+DESCRIPTION:题目：纵向监督下的公共服务均等化\n主讲：梁
+ 超（山东大学）\n地点：大学城校园文二栋536国际学术
+ 报告厅\n主办：经济与管理学院
+URL:http://em.scnu.edu.cn/a/20261105/11227.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://mks.scnu.edu.cn/a/20261029/21.html@danchekey.github.io
-DTSTAMP:20261029T113454Z
+DTSTAMP:20261030T055416Z
 DTSTART:20261106T070000Z
 DTEND:20261106T090000Z
 SUMMARY:在“生活史”视野下理解1920年代的中国革命
@@ -78,7 +96,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261106/8874.html@danchekey.github.io
-DTSTAMP:20261029T113454Z
+DTSTAMP:20261030T055416Z
 DTSTART:20261106T080000Z
 DTEND:20261106T090000Z
 SUMMARY:勷勤数学•专家报告-田国梁｜A class of new symmetric d
@@ -90,6 +108,25 @@ DESCRIPTION:题目：A class of new symmetric distributions based on scale
   and US algorithms\n主讲：田国梁（南方科技大学）\n地点：
  数科院西楼二楼会议室\n主办：数学科学学院
 URL:http://maths.scnu.edu.cn/a/20261106/8874.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:http://em.scnu.edu.cn/a/20261106/11228.html@danchekey.github.io
+DTSTAMP:20261030T055416Z
+DTSTART:20261106T080000Z
+DTEND:20261106T090000Z
+SUMMARY:华师经管学术讲座第552期（经济）｜预算统筹管理
+ 与地方债务风险防控:来自融资平台异常购地的证据
+LOCATION:大学城校园文二栋536国际学术报告厅
+DESCRIPTION:题目：预算统筹管理与地方债务风险防控:来自
+ 融资平台异常购地的证据\n主讲：赵仁杰（西北大学）\n
+ 地点：大学城校园文二栋536国际学术报告厅\n主办：经
+ 济与管理学院
+URL:http://em.scnu.edu.cn/a/20261106/11228.html
 BEGIN:VALARM
 TRIGGER:-PT30M
 ACTION:DISPLAY
