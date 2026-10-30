@@ -8,24 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261030/8875.html@danchekey.github.io
-DTSTAMP:20261029T113454Z
-DTSTART:20261030T030000Z
-DTEND:20261030T040000Z
-SUMMARY:勷勤数学•专家报告-应文俊｜融合神经网络的可
- 压缩流数值方法
-LOCATION:数科院西楼二楼会议室
-DESCRIPTION:题目：融合神经网络的可压缩流数值方法\n主讲
- ：应文俊（暨南大学）\n地点：数科院西楼二楼会议室\n
- 主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261030/8875.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261031/8868.html@danchekey.github.io
 DTSTAMP:20261029T113454Z
 DTSTART:20261031T020000Z
@@ -83,10 +65,10 @@ DTSTAMP:20261029T113454Z
 DTSTART:20261106T070000Z
 DTEND:20261106T090000Z
 SUMMARY:在“生活史”视野下理解1920年代的中国革命
-LOCATION:马克思主义学院（桃李园唯实厅
+LOCATION:马克思主义学院（桃李园唯实厅）
 DESCRIPTION:题目：在“生活史”视野下理解1920年代的中国
  革命\n主讲：瞿骏（华东师范大学）\n地点：马克思主义
- 学院（桃李园唯实厅\n主办：马克思主义学院
+ 学院（桃李园唯实厅）\n主办：马克思主义学院
 URL:http://mks.scnu.edu.cn/a/20261029/21.html
 BEGIN:VALARM
 TRIGGER:-PT30M

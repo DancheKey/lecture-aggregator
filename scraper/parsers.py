@@ -980,6 +980,44 @@ def _strip_college_name(loc):
     return loc[:m.start(1)] + rest
 
 
+def _balance_location_brackets(loc):
+    """补齐/清理不成对的括号（2026-10-30）。
+
+    VLM 读海报时偶发漏标点：mks/20261029/21 的海报原文是「马克思主义学院（桃李园
+    唯实厅）」，VLM 输出丢了右括号；同一张图本地 RapidOCR 识别完整。全库 3783 条
+    地点仅此 1 条不配对，属模型偶发漏标点，不是清洗规则的系统性缺陷——_clean_location
+    全链已逐条验证不剥右括号（含「去尾部装饰字符」那条正则，只在括号前有空格时误伤，
+    而该图 OCR 无空格）。
+
+    规则（宁缺毋滥，只处理明显残缺）：
+      · 左多右少：最后一个未闭合的左括号后有 ≥2 字实质内容 → 补右括号；
+        否则（空括号）删掉那个左括号。
+      · 右多左少：删掉最前面的孤立右括号（真实地点不会以右括号开头）。
+    半角括号同理，两种括号各自独立计数（「（A)」这种混用不做处理，避免猜配对意图）。
+    """
+    for op, cl in (('（', '）'), ('(', ')')):
+        n_op, n_cl = loc.count(op), loc.count(cl)
+        if n_op == n_cl:
+            continue
+        if n_op > n_cl:
+            for _ in range(n_op - n_cl):
+                last = loc.rfind(op)
+                if last < 0:
+                    break
+                tail = loc[last + 1:]
+                if len(re.sub(r'[\s%s]' % re.escape(op + cl), '', tail)) >= 2:
+                    loc += cl
+                else:
+                    loc = loc[:last] + tail
+        else:
+            for _ in range(n_cl - n_op):
+                idx = loc.find(cl)
+                if idx < 0:
+                    break
+                loc = loc[:idx] + loc[idx + 1:]
+    return loc
+
+
 def _clean_location(loc, title=None):
     if not loc:
         return ''
@@ -1173,6 +1211,9 @@ def _clean_location(loc, title=None):
         if re.search(r'(腾讯会议|线上|会议号|会议 ?ID|网络会议|直播|Tencent ?Meeting)', orig):
             return '线上'
         return ''
+    # 括号配对兜底（2026-10-30）：上面各截断步骤都可能在括号中间切一刀，
+    # 且 VLM 路径的 location 是直接赋值、不经清洗。放在所有截断之后、出口之前。
+    loc = _balance_location_brackets(loc)
     if meeting:
         # 物理地点 + 线上会议信息并存（混合讲座）：物理地点在前，会议信息括注在后。
         # 幂等守卫（2026-09-23）：_clean_location 在正文路径与出口闸门会被多次调用，

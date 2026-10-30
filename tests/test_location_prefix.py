@@ -112,5 +112,42 @@ class CollegePrefixTest(unittest.TestCase):
             '生命科学学院102会议室')
 
 
+class BracketBalanceTest(unittest.TestCase):
+    """括号配对兜底（2026-10-30）。
+
+    真实案例 mks/20261029/21：海报原文「马克思主义学院（桃李园唯实厅）」，
+    VLM 输出丢了右括号；同一张图本地 RapidOCR 识别完整。全库 3783 条地点
+    仅此 1 条不配对，属模型偶发漏标点，不是清洗规则的系统性缺陷。
+    """
+
+    def test_missing_right_bracket_filled(self):
+        """有实质内容时补右括号——本轮用户报的那条"""
+        self.assertEqual(
+            P._clean_location('马克思主义学院（桃李园唯实厅',
+                              '在“生活史”视野下理解1920年代的中国革命'),
+            '马克思主义学院（桃李园唯实厅）')
+
+    def test_balanced_value_untouched(self):
+        """已配对的不得改动（幂等）"""
+        for src in ('马克思主义学院（桃李园唯实厅）',
+                    '理8栋（东侧）301会议室',
+                    '第二教学楼(研究生院)210会议厅'):
+            self.assertEqual(P._balance_location_brackets(src), src, src)
+
+    def test_empty_bracket_dropped(self):
+        """括号内无内容：删括号而不是补成「（）」"""
+        self.assertEqual(P._balance_location_brackets('桃李园（'), '桃李园')
+        self.assertEqual(P._balance_location_brackets('桃李园）'), '桃李园')
+
+    def test_halfwidth_bracket(self):
+        """半角括号同理，且不误伤成对值"""
+        self.assertEqual(P._balance_location_brackets('A栋(B区'), 'A栋(B区)')
+        self.assertEqual(P._balance_location_brackets('A栋(B区)'), 'A栋(B区)')
+
+    def test_no_bracket_untouched(self):
+        for src in ('文2栋301会议室', '线上', ''):
+            self.assertEqual(P._balance_location_brackets(src), src, src)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
