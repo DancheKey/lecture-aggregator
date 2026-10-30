@@ -184,7 +184,11 @@ function normalizeUrlFilters(f, campusList) {
     query: f.query || '',
     searchField: f.searchField || '',
     onlineOnly: !!f.onlineOnly,
-    upcomingOnly: !!f.upcomingOnly,
+    // 互斥归一（2026-10-30）：statusOf 是互斥枚举，两个筛选同真 → filtered 的两条
+    // 条件都要求满足 → 必然空集。手拼 ?ongoing=1&upcoming=1、或历史链接残留，
+    // 用户会直接看到「暂无结果」且没有任何解释。归一化层负责把矛盾输入收敛成
+    // 合法状态（与 campus 不在白名单就清空同一性质），保留 ongoing：语义更窄、更新。
+    upcomingOnly: !!f.upcomingOnly && !f.ongoingOnly,
     ongoingOnly: !!f.ongoingOnly,
     currentPage: (f.page >= 2 && f.page <= MAX_URL_PAGE) ? f.page : 1,
   };

@@ -396,6 +396,13 @@ jobs:
       - name: Run ongoing filter tests
         run: node tests/js/app_ongoing_filter.js
 
+      # 主题开关门禁（2026-10-30）：theme-loader.js 是后台切主题的唯一执行者，
+      # 此前只有「文件存在 + HTML 引用一致」的静态检查，行为零覆盖。锁 BOM 剥离
+      # （PowerShell 写 BOM → JSON.parse 抛错 → 静默回落 vi，表现为改了配置没反应）、
+      # JSONC 注释、三模式启用组合、坏 JSON 必须 warn、缺文件静默降级。
+      - name: Run theme loader tests
+        run: node tests/js/theme_loader_bom.js
+
       # 访问量趋势报告渲染门禁（2026-10-02）：该页此前用 innerHTML 拼接渲染，
       # 而快照 note 是唯一来自台账的自由文本（经 json.dumps 内嵌进内联脚本），
       # 含 </script> 或 <img onerror=…> 即构成存储型 XSS。现已全部改为

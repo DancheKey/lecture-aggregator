@@ -479,6 +479,10 @@ Object.assign(APP_METHODS, {
     // 入口方法自设页码（URL 同步由 app.js 的 upcomingOnly watch 负责）。
     toggleUpcoming() {
       this.upcomingOnly = !this.upcomingOnly;
+      // 与「进行中」互斥（2026-10-30）：statusOf 是互斥枚举，两个筛选同时为真时
+      // filtered 里两条条件都要求满足，结果必然空集。URL 残留（?ongoing=1&upcoming=1）
+      // 或将来新增入口都可能凑出这个组合，故在开关处直接清掉对方。
+      if (this.upcomingOnly) this.ongoingOnly = false;
       this.currentPage = 1;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
@@ -487,6 +491,8 @@ Object.assign(APP_METHODS, {
     // 布尔开关、叠加于其他筛选、入口方法自设页码（URL 同步由 app.js 的 ongoingOnly watch 负责）。
     toggleOngoing() {
       this.ongoingOnly = !this.ongoingOnly;
+      // 与「待开始」互斥，理由同 toggleUpcoming（两者判定互斥，同开必空集）。
+      if (this.ongoingOnly) this.upcomingOnly = false;
       this.currentPage = 1;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },

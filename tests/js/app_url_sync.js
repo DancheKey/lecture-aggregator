@@ -14,6 +14,8 @@
 //   T8 页码上界 + watch.totalPages 钳位（P1-5：?page=99999 与失效旧深链接）
 //   T9 upcoming 参数（2026-10-16 待开始筛选）：serialize 只在激活时带 upcoming=1、
 //      parse 回放归一化为 upcomingOnly，且 watch.upcomingOnly 已接线
+//   T10 ongoing 参数（2026-10-30 补）：同上三条链路 + 与 upcoming 同真时归一化层
+//      保留 ongoing（互斥枚举，同真必空集）
 //
 // 运行：node tests/js/app_url_sync.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -260,6 +262,41 @@ setUrl('');
   const w = appOpts && appOpts.watch;
   ok(!!w && typeof w.upcomingOnly === 'function',
      'T9 watch.upcomingOnly 未接线（URL 同步缺失）');
+}
+
+// ---- T10 ongoing 参数（2026-10-29 进行中筛选进 URL；2026-10-30 补测）----
+// 该功能上线时只补了筛选逻辑的测试（app_ongoing_filter.js T1-T5），URL 三条链路
+// （parse / serialize / watch）一个断言都没有——现在好使，回归会无声无息。
+{
+  // ① serialize：只在激活时带 ongoing=1
+  const qsOn = vm.runInContext('serializeUrlFilters', ctx)({
+    campus: '', college: '', year: '', speaker: '', query: '',
+    searchField: '', onlineOnly: false, upcomingOnly: false, ongoingOnly: true, currentPage: 1,
+  });
+  ok(qsOn === 'ongoing=1', `T10 激活时 serialize 应=ongoing=1: "${qsOn}"`);
+
+  const qsOff = vm.runInContext('serializeUrlFilters', ctx)({
+    campus: '', college: '', year: '', speaker: '', query: '',
+    searchField: '', onlineOnly: false, upcomingOnly: false, ongoingOnly: false, currentPage: 1,
+  });
+  ok(qsOff === '', `T10 未激活时不应带 ongoing: "${qsOff}"`);
+
+  // ② parse → normalize
+  setUrl('?ongoing=1');
+  const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(n.ongoingOnly === true, `T10 parse ongoing=1 → ongoingOnly=true: ${n.ongoingOnly}`);
+
+  // ③ 矛盾输入归一：两个同真时保留 ongoing、清 upcoming（否则 filtered 必空集）
+  setUrl('?ongoing=1&upcoming=1');
+  const both = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(both.ongoingOnly === true && both.upcomingOnly === false,
+     `T10 矛盾输入应归一到 ongoing：ongoing=${both.ongoingOnly} upcoming=${both.upcomingOnly}`);
+
+  // ④ watch 接线
+  setUrl('');
+  const w = appOpts && appOpts.watch;
+  ok(!!w && typeof w.ongoingOnly === 'function',
+     'T10 watch.ongoingOnly 未接线（URL 同步缺失）');
 }
 
 console.log('');

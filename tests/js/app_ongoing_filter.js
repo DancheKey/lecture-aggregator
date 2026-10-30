@@ -14,6 +14,8 @@
 //   T3 与其他筛选叠加（campus，用户拍板：点击数字不清掉既有筛选）
 //   T4 toggleOngoing 开关 + 页码重置 + hasActiveFilter + clearFilters 复原
 //   T5 模板接线静态断言：计数行 v-if / toggleOngoing 绑定 / 筛选片 v-if / 文案「进行中讲座」
+//   T6 filtered 读 tick 建依赖（激活时必读、默认态不读）—— 讲座结束实时移除
+//   T7 与「待开始」互斥（同开必空集，开关处清对方）
 //
 // 运行：node tests/js/app_ongoing_filter.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -179,10 +181,59 @@ const count = cm => computed.ongoingCount.call(cm);
   ok(INDEX_HTML.includes('进行中讲座'), 'T5 筛选片文案「进行中讲座」存在');
 }
 
+// ---------- T6：filtered 必须读 tick（讲座结束实时移除） ----------
+// 2026-10-30 修：statusOf 读的是 Date.now()，不是响应式依赖，filtered 不读 tick
+// 就永不重算 —— 「进行中讲座」筛选片下会一直挂着已结束的卡（徽章读 tick 已变灰，
+// 列表成员却冻结不动），自相矛盾。
+{
+  // ① 激活时必读：用 getter 计数，验证依赖真的建立了（不是靠行为"碰巧对"）
+  let reads = 0;
+  const on = makeCtx({ ongoingOnly: true });
+  Object.defineProperty(on, 'tick', {
+    get() { reads++; return FIXED_MS; }, configurable: true });
+  void on.filtered;
+  ok(reads > 0,
+     'T6 ongoingOnly 激活时 filtered 必须读 this.tick（否则讲座结束不会从列表移除）');
+
+  // ② 未激活时不读：默认态每秒一次 O(n) 空转必须避免
+  let idle = 0;
+  const off = makeCtx({ ongoingOnly: false });
+  Object.defineProperty(off, 'tick', {
+    get() { idle++; return FIXED_MS; }, configurable: true });
+  void off.filtered;
+  ok(idle === 0,
+     `T6 未激活 ongoingOnly 时 filtered 不应读 tick（实读 ${idle} 次，会让默认态每秒重算）`);
+}
+// ---------- T7：与「待开始」互斥 ----------
+// statusOf 是互斥枚举，两个筛选同真 → filtered 两条条件都要求满足 → 必空集。
+// 开关处清掉对方，防 URL 残留（?ongoing=1&upcoming=1）凑出一个空列表。
+{
+  const a = makeCtx({ upcomingOnly: true });
+  a.toggleOngoing();
+  ok(a.ongoingOnly === true && a.upcomingOnly === false,
+     `T7 开「进行中」应清掉「待开始」：ongoing=${a.ongoingOnly} upcoming=${a.upcomingOnly}`);
+
+  const b = makeCtx({ ongoingOnly: true });
+  b.toggleUpcoming();
+  ok(b.upcomingOnly === true && b.ongoingOnly === false,
+     `T7 开「待开始」应清掉「进行中」：upcoming=${b.upcomingOnly} ongoing=${b.ongoingOnly}`);
+
+  // 关掉自己时不该误动对方（false 分支不参与互斥）
+  const c = makeCtx({ ongoingOnly: true });
+  c.toggleOngoing();
+  ok(c.ongoingOnly === false && c.upcomingOnly === false,
+     'T7 关闭自身不应改动对方');
+
+  // 互斥后列表不再为空集
+  const d = makeCtx({ upcomingOnly: true });
+  d.toggleOngoing();
+  ok(titles(d) === ONGOING, `T7 互斥后应得进行中条，实际=${titles(d)}`);
+}
+
 // ---------- 汇总 ----------
 if (errs.length) {
   console.log(`[FAIL] ${errs.length} 项`);
   errs.forEach(e => console.log(' - ' + e));
   process.exit(1);
 }
-console.log('[PASS] 进行中计数口径/筛选叠加/开关清除/模板接线全部通过');
+console.log('[PASS] 进行中计数口径/筛选叠加/开关清除/模板接线/tick 依赖/待开始互斥 全部通过');

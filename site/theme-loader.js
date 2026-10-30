@@ -63,11 +63,20 @@
       xhr.open('GET', '_theme.json', false); // 同步：确保首帧前完成判定
       xhr.send();
       if (xhr.status === 200) {
-        var cfg = JSON.parse(stripJsonc(xhr.responseText || '{}'));
+        // 剥 UTF-8 BOM：PowerShell 的 Out-File / Set-Content 默认写 BOM，
+        // 而 JSON.parse 遇 \uFEFF 直接抛错 → 被 catch 吞掉 → 静默回落 vi，
+        // 表现为「改了配置刷新毫无反应」（2026-10-30 实测踩到）。
+        var text = (xhr.responseText || '{}').replace(/^\uFEFF/, '');
+        var cfg = JSON.parse(stripJsonc(text));
         if (cfg && typeof cfg.mode === 'string') return cfg.mode;
       }
     } catch (e) {
-      /* 读不到配置 → 维持默认 VI */
+      // 不能静默：解析失败与「配置本来就没改」在页面上表现完全一样，
+      // 不留痕就无从诊断。只 warn 不抛，维持「读不到就用 vi」的降级语义。
+      if (window.console && console.warn) {
+        console.warn('[theme-loader] _theme.json 读取或解析失败，回落 vi：',
+          (e && e.message) || e);
+      }
     }
     return 'vi';
   }

@@ -4,10 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 404 页（2026-10-20 批次 A）。GitHub Pages 项目页支持 /lecture-aggregator/404.html，
-     该路径下的任何未命中 URL 都会渲染本页。刻意做成零脚本、零外部样式表：
+     该路径下的任何未命中 URL 都会渲染本页。刻意做成零脚本、样式全部内联：
      用户走到这里往往已经是一次失败请求，再拉 100KB+ 的 tailwind 只会更慢。
-     故样式全部内联，CSP 相应放行 style-src 'unsafe-inline'（无脚本，风险为零）。 -->
+     CSP 相应放行 style-src 'unsafe-inline'（无脚本，风险为零）。
+     唯一的外部资源是 theme-scnu.css（VI 风格，见文件末尾），不是遗漏。
+     ⚠ 2026-10-30：本页有 6 处相对引用（favicon×2、theme-scnu.css、site-title.png、
+     ./、stats.html）。GitHub Pages 对任意深度的未命中路径都回吐本页，相对路径会按
+     请求路径解析——/a/b/c 下全部 404，主题与 logo 一起丢失。故下面必须有 <base>。 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline' 'self'; object-src 'none'; base-uri 'self'">
+<!-- 基准路径：必须是第一个 URL 引用之前。硬编码项目页子路径——将来若换自定义域名
+     （部署到根目录），这里要同步改成 "/"，否则本页所有相对引用全部落空。 -->
+<base href="/lecture-aggregator/">
 <title>页面不存在 · 木铎金声</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="scnu-emblem.svg" type="image/svg+xml">
@@ -36,7 +43,11 @@
   a.ghost:hover { border-color: #94a3b8; }
   .hint { margin-top: 30px; font-size: 12px; color: #94a3b8; line-height: 1.7; }
 </style>
-  <!-- 华南师范大学 VI 主题（错误页零脚本，无条件挂 VI 风格） -->
+  <!-- 主题：只无条件挂 vi 表，**刻意不跟随** _theme.json（2026-10-30 复核确认）。
+       走到 404 的请求往往已经失败一次，本页不加载任何脚本——这是 tests/
+       test_site_assets.py::test_404页面存在且零脚本 锁定的设计约束，不是遗漏。
+       代价：站内切到 bw（哀悼模式）时，本页仍是彩色。若将来要跟随，须同时
+       放宽那条守卫并接受错误页多一个同步 XHR。 -->
   <link id="vi-theme" rel="stylesheet" href="theme-scnu.css?v=9b743dea9e">
 </head>
 <body>

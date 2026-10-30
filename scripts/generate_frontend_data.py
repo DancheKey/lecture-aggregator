@@ -666,6 +666,27 @@ def _parse_cst(s):
         return None
 
 
+def _feed_pub_dt(rec, built):
+    """RSS 条目的 pubDate：源站发布时间，缺失/异常一律回退 built。
+
+    pubDate 的语义是「条目发布时间」，不是讲座发生时间（2026-10-30 修正）。
+    原先用 lectureStart：阅读器会把条目排到未来，且 lastBuildDate 早于自己的
+    pubDate，违反 RSS 规范的一致性要求（频道声称的构建时间早于条目发布时间）。
+
+    · 源站 publishTime 有两种精度（秒 2429 条 / 分钟 767 条），都要认；
+    · 晚于 built 的直接回退（真实数据有 4 条：源站定时发布或时钟异常），
+      否则 feed 里会出现未来时间。
+    """
+    raw = str(rec.get('publishTime') or '').strip()
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'):
+        try:
+            dt = datetime.strptime(raw[:19], fmt).replace(tzinfo=CST)
+            return dt if dt <= built else built
+        except ValueError:
+            continue
+    return built
+
+
 def _rfc822(dt):
     """RFC 822 日期（RSS 的 pubDate）。
 
@@ -782,7 +803,8 @@ def write_feeds(data, updated_at):
 
     # ---- RSS 2.0 ----
     items = []
-    for start, _end, rec in rows:
+    # start 在这里不用（pubDate 改走源站发布时间，见 _feed_pub_dt）；ICS 段仍用。
+    for _start, _end, rec in rows:
         link = rec.get('sourceUrl') or base
         guid = rec.get('ck') or link
         items.append('\n'.join([
@@ -790,7 +812,7 @@ def write_feeds(data, updated_at):
             f'      <title>{_xml_esc(_feed_title(rec))}</title>',
             f'      <link>{_xml_esc(link)}</link>',
             f'      <guid isPermaLink="false">{_xml_esc(guid)}</guid>',
-            f'      <pubDate>{_rfc822(start)}</pubDate>',
+            f'      <pubDate>{_rfc822(_feed_pub_dt(rec, built))}</pubDate>',
             f'      <category>{_xml_esc(rec.get("college") or "")}</category>',
             f'      <description>{_xml_esc(_feed_desc(rec))}</description>',
             '    </item>',
@@ -931,8 +953,14 @@ def main():
         stamp_script_version(_page, 'theme-loader.js')
         stamp_script_version(_page, 'theme-scnu.css')
         stamp_script_version(_page, 'theme-bw.css')
-    # 404 页零脚本，仅无条件挂 VI 风格（不带 loader/bw 切换），故只打 vi 主题戳。
+    # 404 页零脚本（tests/test_site_assets.py::test_404页面存在且零脚本 锁定的设计），
+    # 故只打 vi 主题戳、不挂 loader —— 即「404 不跟随 _theme.json 的 bw 模式」。
+    # 这是刻意取舍（失败页不再拉资源），已在 404.html 注释与 _theme.json 里写明。
     stamp_script_version('404.html', 'theme-scnu.css')
+    # 校训图（2026-10-30）：index.html 里两处 motto.webp 一直是手工 ?v=2，
+    # 换图忘 bump 用户就看到旧图。stamp_script_version 本就支持 src=（:140），
+    # 只是从没调用过——补上调用即可，不必改机制。
+    stamp_script_version('index.html', 'motto.webp')
 
     # sitemap 与订阅源只依赖数据本身，放在最后：所有前端产物落盘后再写，即使这里
     # 出错也不影响首页/统计页可用（SEO 与订阅是附属物，不是功能件）。
