@@ -149,5 +149,103 @@ class BracketBalanceTest(unittest.TestCase):
             self.assertEqual(P._balance_location_brackets(src), src, src)
 
 
+class LocationTailRuleTest(unittest.TestCase):
+    """_clean_location 尾部/中段规则的误伤回归（2026-10-30 全库重清洗评估）。
+
+    背景：全库 3848 条地点过一遍 _clean_location，有 66 条会变。逐条 trace 后
+    发现其中几条是规则过宽造成的**丢信息**，不是「存量没跟上新规则」：
+
+      · 章节序号规则把房间号列表当章节标题：「南教学楼102、南教学楼101」→「南教学楼」
+      · 章节序号规则把图片文件名当序号：「理六栋525未标题-2.jpg」→「理六栋525未标题-」
+      · 人名判据把地点续写当人名：「第一课室大楼，东102」→「第一课室」
+      · 标签残片剥离把「在线讲座」剥成「在线」
+
+    以上全部按「宁可少截，不可丢信息」收紧；真正的章节标题/人名残留仍照旧截断
+    （见本类末尾的正面用例），否则会重新引入 BS4 把换行压成空格导致的整段吞并。
+    """
+
+    def test_room_number_list_not_cut_as_section(self):
+        """房间号列表里的「N、」不是章节序号"""
+        for src in ('南教学楼102、南教学楼101',
+                    '理六栋201、202、203',
+                    '第一教学楼101,102,103'):
+            self.assertEqual(P._clean_location(src), src, src)
+
+    def test_image_filename_not_cut_as_section(self):
+        """图片文件名残留（「未标题-2.jpg」）不是章节序号"""
+        self.assertEqual(
+            P._clean_location('理六栋525未标题-2.jpg'), '理六栋525未标题-2.jpg')
+
+    def test_section_heading_still_cut(self):
+        """正面：真正的章节标题仍截断（BS4 把换行压成空格后的典型吞并）"""
+        cases = {
+            '文学院会议室 二、参与方式': '文学院会议室',
+            '理8栋118报告厅 一、工作坊安排': '理8栋118报告厅',
+            '第一课室 1. 报名': '第一课室',
+            '教学楼301 10、议程安排': '教学楼301',
+            '心理学院5楼报告厅二、座谈会': '心理学院5楼报告厅二、座谈会',
+        }
+        for src, want in cases.items():
+            self.assertEqual(P._clean_location(src), want, src)
+
+    def test_location_continuation_not_cut_as_person_name(self):
+        """残留开头以地点词收尾 → 是地点续写，不是「人名,」"""
+        cases = {
+            '第一课室大楼，东102': '第一课室大楼，东102',
+            '周一至周四 一楼大会议室，周五 二楼会议室':
+                '周一至周四一楼大会议室，周五二楼会议室',
+        }
+        for src, want in cases.items():
+            self.assertEqual(P._clean_location(src), want, src)
+
+    def test_person_name_tail_still_cut(self):
+        """正面：真正的「人名,履历」残留仍截断（em 5104 场景）"""
+        cases = {
+            '文三栋MBA中心501课室姜树广,浙江财经大学杰出青年学者,深圳证券交易所博士后':
+                '文三栋MBA中心501课室',
+            '大学城文2栋301室李程骅教授': '大学城文2栋301室',
+            '本部行政楼七楼第六会议室周立群教授': '本部行政楼七楼第六会议室',
+        }
+        for src, want in cases.items():
+            self.assertEqual(P._clean_location(src), want, src)
+
+    def test_pure_english_location_keeps_spaces(self):
+        """纯英文场馆名保留词间空格（地点无空格约定只适用于含中文的值）"""
+        for src in ('Room 536, Wen II Building',
+                    'Room 201, School of Psychology',
+                    'Lecture Hall on the 5th floor of School of Psychology'):
+            self.assertEqual(P._clean_location(src), src, src)
+
+    def test_chinese_location_spaces_collapsed(self):
+        """含中文的地点仍按「无内部空格」约定折叠"""
+        cases = {
+            '理 6 栋 302': '理6栋302',
+            '国际文化学院 B503 会议室': '国际文化学院B503会议室',
+            '石牌校区文科楼二层 211 讲堂': '石牌校区文科楼二层211讲堂',
+            '第二教学楼(研究生院) 210 会议厅': '第二教学楼(研究生院)210会议厅',
+        }
+        for src, want in cases.items():
+            self.assertEqual(P._clean_location(src), want, src)
+
+    def test_online_lecture_keeps_lecture_word(self):
+        """「在线讲座」的「讲座」是地点语义，不是被吸入的字段标签"""
+        self.assertEqual(P._clean_location('在线讲座（腾讯会议 895-309-857）'),
+                         '在线讲座（腾讯会议 895-309-857）')
+        # 正面：真正的标签残片仍剥
+        self.assertEqual(P._clean_location('理8栋118报告厅讲座'), '理8栋118报告厅')
+
+    def test_tail_noise_re_keeps_closing_bracket(self):
+        """去尾部装饰字符的负向断言：右括号及其前空格不得被当噪声剥掉"""
+        # 唯实厅 ）：右括号前多一个空格时，原正则会把「 ）」整段当噪声剥掉
+        self.assertEqual(
+            P._OCR_TAIL_NOISE_RE.sub('', '马克思主义学院（桃李园唯实厅 ）'),
+            '马克思主义学院（桃李园唯实厅 ）')
+        # 装饰符照剥（原意保留）
+        self.assertEqual(P._OCR_TAIL_NOISE_RE.sub('', '文2栋301会议室 ·'),
+                         '文2栋301会议室')
+        self.assertEqual(P._OCR_TAIL_NOISE_RE.sub('', '文2栋301会议室 ※'),
+                         '文2栋301会议室')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

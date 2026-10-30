@@ -155,6 +155,15 @@ def _n1e_normalize(t):
     return t
 
 
+# OCR 尾部噪声清理（2026-10-30 收紧）。原字符类「任何非中文、非字母数字」把合法
+# 收尾标点也当噪声：地点值「马克思主义学院（桃李园唯实厅 ）」括号前多一个空格时，
+# 右括号会被连空格一起剥掉，留下不配对的左括号（mks/20261029/21 实测，该图 OCR
+# 确实多识别了一个空格）。这里用负向断言排除右半边配对符号——它们只会成对出现，
+# 剥掉必然破坏结构；引号 / · / ※ / 曷 / 号 等仍照剥。
+_OCR_TAIL_NOISE_RE = re.compile(
+    r'\s+(?![）】」』》\)\]\}])[^\u4e00-\u9fffa-zA-Z0-9]{1,2}\s*$')
+
+
 def _clean_ocr_text(ocr_text):
     """清理图片 OCR 后常见的海报抬头、Logo、边框乱码等噪声。
 
@@ -193,7 +202,7 @@ def _clean_ocr_text(ocr_text):
     # 去除尾部常见边框乱码或装饰字符（如「曷」「号」孤立出现）
     t = re.sub(r'[\s]*[曷号]+$\s*', '', t).strip()
     # 去除孤立单个非中文字符（常见 OCR 噪声）
-    t = re.sub(r'\s+[^\u4e00-\u9fffa-zA-Z0-9]{1,2}\s*$', '', t).strip()
+    t = _OCR_TAIL_NOISE_RE.sub('', t).strip()
     return t
 
 
@@ -940,7 +949,12 @@ def _strip_location_label_tail(loc):
     if not isinstance(loc, str) or not loc:
         return loc
     for _ in range(3):
-        nt = re.sub(r'(?:学术报告|讲座|报告|摘要|简介|时间|地点|题目|专家|主讲人|报告人|组织单位)$', '', loc).strip()
+        # 「讲座」前的「在线/线上/网络」是地点语义的一部分（「在线讲座」= 线上会场），
+        # 不是被吸入的字段标签，不能剥（2026-10-30：在线讲座（腾讯会议 …）被剥成
+        # 「在线」，白丢「讲座」二字）。其余标签词照旧。
+        nt = re.sub(
+            r'(?:学术报告|(?<!在线)(?<!线上)(?<!网络)讲座|报告|摘要|简介|时间|地点|'
+            r'题目|专家|主讲人|报告人|组织单位)$', '', loc).strip()
         if nt == loc or len(nt) < 2:
             break
         loc = nt
@@ -1088,12 +1102,20 @@ def _clean_location(loc, title=None):
     # 截到该特征词为止。「行政楼A座201」这类「特征词后跟编号」不受影响（残留不以人名+逗号开头）。
     # ⚠ 必须从**第一个**满足条件的特征词处截断，不能取最后一个匹配：简介本身常含
     # 「中心/学院」等词（「…法国国家科研中心…」），取最后一个会把截断点推到简介末尾。
+    # ⚠ 2026-10-30 补：残留开头的「2~4 字中文 + 逗号」本身可能就是**地点续写**
+    # （「第一课室大楼，东102」→「大楼，东102」；「一楼大会议室，周五 二楼会议室」
+    #  →「大会议室，周五…」），被人名判据误伤。真人名不会以地点词收尾，故残留
+    # 开头若以楼/室/厅/馆等地点词结尾则不算人名。
+    _LOC_TAIL_WORD = re.compile(r'(?:楼|室|厅|馆|栋|幢|中心|广场|校区|校园|课室|教室)$')
     for _mm in re.finditer(
             r'(?:课室|会议室|教室|报告厅|学术厅|礼堂|大楼|楼|室|厅|馆|中心|广场|校区|校园)', loc):
         _rest_loc = loc[_mm.end():]
         if not _rest_loc:
             break
-        if (re.match(r'^[\u4e00-\u9fff]{2,4}[,，]', _rest_loc)
+        _m_person = re.match(r'^([\u4e00-\u9fff]{2,4})[,，]', _rest_loc)
+        if _m_person and _LOC_TAIL_WORD.search(_m_person.group(1)):
+            _m_person = None  # 「大楼，」「大会议室，」是地点续写，不是人名
+        if (_m_person
                 or re.match(r'^[\u4e00-\u9fff]{2,4}(?:博士|教授|研究员|学者|院士)', _rest_loc)):
             loc = loc[:_mm.end()].strip()
             break
@@ -1110,7 +1132,10 @@ def _clean_location(loc, title=None):
         r'be|have|has|will|would|can|could)\b)'
     )
     m5 = _loc_en_leak.search(loc)
-    if m5 and m5.start() > 3:
+    # 整串无中文 = 本身就是英文场馆名，不是「中文地点后粘英文摘要」，不能截
+    # （2026-10-30：「Lecture Hall on the 5th floor of School of Psychology」
+    #  被截成「Lecture Hall on the 5」）。
+    if m5 and m5.start() > 3 and re.search(r'[\u4e00-\u9fff]', loc):
         loc = loc[:m5.start()].strip()
     # location 后吸入内容类标签（报告摘要/报告内容/讲座内容/摘要/参与方式…）：
     # BS4 把换行变空格后「地点：X会议室 报告摘要The talk…」「地点：X 参与方式：…」
@@ -1133,7 +1158,17 @@ def _clean_location(loc, title=None):
     # 章节序号标题泄漏（「一、工作坊安排 / 二、参与方式 / 1. 报名」等）：
     # BS4 把换行变空格后「地点：X室 二、参与方式」被粘进地点值。真实地点不含「序号+顿号/点」
     # （「一楼/三楼」是「楼」不是顿号，不受影响）。匹配即截到序号起点。
-    _loc_section = re.compile(r'(?:[一二三四五六七八九十百零0-9]+|[0-9]+)\s*[、.．]')
+    # ⚠ 2026-10-30 收紧（原正则 (?:[一二三四五六七八九十百零0-9]+|[0-9]+)\s*[、.．] 过宽）：
+    #   · 序号前必须是边界（串首/空白/中文标点）。否则「南教学楼102、南教学楼101」
+    #     里的「102、」被当章节号，两个房间被砍成一个楼名（实测丢信息）。
+    #   · 数字序号限 1~2 位。房间号普遍 3 位以上（102 / 301 / 525）。
+    #   · 点号分支要求其后为空白或中文。「理六栋525未标题-2.jpg」里的「2.」是图片
+    #     文件名，后面是拉丁字母，不能当章节号。
+    _loc_section = re.compile(
+        r'(?:^|(?<=[\s，,。；;：:（(]))'
+        r'(?:[一二三四五六七八九十百零]+|[0-9]{1,2})'
+        r'(?:\s*[、．]\s*|\.(?=\s|[\u4e00-\u9fff]|$))'
+    )
     msec = _loc_section.search(loc)
     if msec and msec.start() > 3:
         loc = loc[:msec.start()].strip()
@@ -1179,8 +1214,14 @@ def _clean_location(loc, title=None):
     loc = re.sub(r'([\u4e00-\u9fff])(\d)\s+(\d+)(?=[\u4e00-\u9fff]|$)',
                  lambda x: x.group(1) + x.group(2) + x.group(3), loc)
     loc = re.sub(r'(\d)\s+(\d)(?=[\u4e00-\u9fff]|$)', r'\1\2', loc)
-    # 数据集地点约定无内部空格，统一去除（同时清掉残留 CJK 间空格）
-    loc = re.sub(r'\s+', '', loc)
+    # 数据集地点约定无内部空格，统一去除（同时清掉残留 CJK 间空格）。
+    # ⚠ 2026-10-30 修：原实现是无条件 re.sub(r'\s+', '', loc)，纯英文场馆名会被压成
+    # 不可读的一串——「Room 536, Wen II Building」→「Room536,WenIIBuilding」、
+    # 「Lecture Hall on the 5th floor of School of Psychology」→「LectureHallonthe5」。
+    # 改为按「整串是否含中文」分流：含中文的沿用无空格约定（行政楼 B 区 → 行政楼B区），
+    # 纯英文/纯符号的整串保留原样（英文词间空格是语义的一部分，不能删）。
+    if re.search(r'[\u4e00-\u9fff]', loc):
+        loc = re.sub(r'\s+', '', loc)
     # 清理腾讯会议等截断后残留的后缀标点/连接词（『（』『：#』『+线上』『;三』等）
     for _ in range(3):
         new = re.sub(r'[（(：:；;，,+、#]+\s*$', '', loc)
@@ -3374,7 +3415,7 @@ def _split_location_time(loc):
     # 截掉时间及其后的「主办单位…」等 OCR 噪声，仅保留地点本体
     clean = loc[:m.start()].strip()
     clean = re.sub(r'[\s]*[曷号]+$\s*', '', clean).strip()
-    clean = re.sub(r'\s+[^\u4e00-\u9fffa-zA-Z0-9]{1,2}\s*$', '', clean).strip()
+    clean = _OCR_TAIL_NOISE_RE.sub('', clean).strip()
     return clean or loc, (h0, m0, h1, m1)
 
 
@@ -4940,7 +4981,7 @@ def _extract_topic_location(_st, result, title, loc_times):
             loc = re.split(r'[。，;；\n]', loc)[0].strip()
         # 去除 OCR 尾部常见乱码或装饰字符（如「曷」「号」）
         loc = re.sub(r'[\s]*[曷号]+$\s*', '', loc).strip()
-        loc = re.sub(r'\s+[^\u4e00-\u9fffa-zA-Z0-9]{1,2}\s*$', '', loc).strip()
+        loc = _OCR_TAIL_NOISE_RE.sub('', loc).strip()
         # 折叠 CMS 把地点拆成单字/单数字造成的空格（如「理 6 栋 302」→「理6栋302」），
         # 仅合并「中文-中文/中文-数字/数字-中文」间的空格，保留英文单词与纯数字间的空格。
         loc = re.sub(r'(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff\d])|(?<=\d)\s+(?=[\u4e00-\u9fff])', '', loc).strip()
@@ -6221,7 +6262,7 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         clean = re.sub(r'\s*20\d{2}年\d{1,2}月\d{1,2}日.*$', '', clean).strip()
         # 再次清理尾部乱码
         clean = re.sub(r'[\s]*[曷号]+$\s*', '', clean).strip()
-        clean = re.sub(r'\s+[^\u4e00-\u9fffa-zA-Z0-9]{1,2}\s*$', '', clean).strip()
+        clean = _OCR_TAIL_NOISE_RE.sub('', clean).strip()
         if len(clean) > 10:
             result['abstract'] = clean
 
