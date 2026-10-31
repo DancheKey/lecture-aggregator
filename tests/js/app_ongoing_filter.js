@@ -29,8 +29,12 @@ const PARTS = (INDEX_HTML.match(/<script[^>]*\ssrc=["'](app[^"']*?\.js)(?:\?[^"'
 
 const noop = () => {};
 const store = {};
-// 固定「现在」= 2026-10-16 10:30（本地时区）：当天 15:00 场 upcoming、09:00-11:30 场 ongoing
-const FIXED_MS = new Date(2026, 9, 16, 10, 30, 0).getTime();
+// 固定「现在」= 2026-10-16 10:30 **北京时间**：当天 15:00 场 upcoming、09:00-11:30 场 ongoing
+// ⚠ 必须用 Date.UTC(..., 小时-8) 构造（2026-10-31）：业务代码把 'YYYY-MM-DD HH:MM:SS'
+// 当**北京时间字面量**解析（app.core.js::_bjMs）。若这里用 `new Date(2026,9,16,10,30)`
+// （本地时区），本地 UTC+8 恰好自洽、CI（TZ=UTC）下则整体偏移 8 小时 → 15:00 场被
+// 判成已结束，7 项断言全错。CI 实测就是在这里红的。
+const FIXED_MS = Date.UTC(2026, 9, 16, 10 - 8, 30, 0);
 class FakeDate extends Date {
   constructor(...args) {
     if (args.length === 0) super(FIXED_MS);

@@ -33,7 +33,14 @@ const store = {};
 // 确定性时钟（2026-10-13 用户规则要求边界可测）：vm 内所有 Date.now()/new Date()
 // 都走 FakeDate，基准固定为 2026-10-13 12:30（对应用户截图时刻）。
 // ⚠ iso()/FIXED 相关计算在宿主的真实 Date 上做，只有 sandbox.Date 被替换。
-let FIXED_MS = new Date(2026, 9, 13, 12, 30, 0).getTime();
+//
+// ⚠ 时区口径（2026-10-31）：业务代码把 'YYYY-MM-DD HH:MM:SS' 当**北京时间字面量**
+// 解析（app.core.js::_bjMs）。本测试原先用本地时区构造 FIXED_MS、用 getHours()
+// 格式化 iso()，在本地 UTC+8 下恰好自洽，CI（TZ=UTC）下则整体偏移 8 小时 ——
+// test_11 的 18:00 场被判成已结束、活组消失，labels[2] undefined 直接崩。
+// 现统一按北京时间：bjMs 构造基准、iso 用 getUTC* + 8h 反解。
+const bjMs = (y, mo, d, h, mi, s) => Date.UTC(y, mo - 1, d, h - 8, mi || 0, s || 0);
+let FIXED_MS = bjMs(2026, 10, 13, 12, 30, 0);
 class FakeDate extends Date {
   constructor(...args) {
     if (args.length === 0) super(FIXED_MS);
@@ -92,9 +99,10 @@ const ok = (cond, msg) => { if (!cond) errs.push(msg); };
 // ---------- 测试数据（时刻基于 FIXED_MS，与运行时刻/时区无关） ----------
 const DAY = 86400000;
 function iso(msOffset) {
-  const d = new Date(FIXED_MS + msOffset);
+  // 反解成**北京时间字面量**：+8h 后取 getUTC*，与 bjMs / _bjMs 互逆。
+  const d = new Date(FIXED_MS + msOffset + 8 * 3600000);
   const p2 = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}:00`;
+  return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}:00`;
 }
 // 一场「待开始」讲座：off=距 FIXED 的毫秒数；day 用于生成不同的 sourceUrl（避免同日折叠）
 function future(off, day, title) {
@@ -302,7 +310,7 @@ function makeCtx(allData, over) {
 {
   const st = l => methods.statusOf.call(makeCtx([l]), l);
   const atFIXED = ms => { FIXED_MS = ms; };
-  const restore = new Date(2026, 9, 13, 12, 30, 0).getTime();
+  const restore = bjMs(2026, 10, 13, 12, 30, 0);
   try {
     // ① 只有开始时间：+2h 越过 12:00 → 12:00 结束（用户截图场景：10:30 场 12:00 散场）
     ok(st(at('2026-10-13 10:30:00', 1)) === 'ended', 'test_10 10:30 无结束时间应按 12:00 边界判 ended');
@@ -311,19 +319,19 @@ function makeCtx(allData, over) {
     ok(st(at('2026-10-13 12:00:00', 3)) === 'ongoing', 'test_10 12:00 起默认 2 小时，12:30 应 ongoing');
     ok(st(at('2026-10-13 14:00:00', 4)) === 'upcoming', 'test_10 14:00 起应 upcoming');
     // ③ 下午边界：临时把 now 移到 18:30，16:30 场 +2h=18:30 越过 18:00 → 18:00 结束
-    atFIXED(new Date(2026, 9, 13, 18, 30, 0).getTime());
+    atFIXED(bjMs(2026, 10, 13, 18, 30, 0));
     ok(st(at('2026-10-13 16:30:00', 5)) === 'ended', 'test_10 16:30 无结束时间应按 18:00 边界判 ended');
     // ④ 晚间边界：now 22:30，21:00 场 +2h=23:00 越过 22:00 → 22:00 结束
-    atFIXED(new Date(2026, 9, 13, 22, 30, 0).getTime());
+    atFIXED(bjMs(2026, 10, 13, 22, 30, 0));
     ok(st(at('2026-10-13 21:00:00', 6)) === 'ended', 'test_10 21:00 无结束时间应按 22:00 边界判 ended');
     // ⑤ 夜场 23:00 不适用任何边界（start 晚于全部边界）→ 仍按 +2h
-    atFIXED(new Date(2026, 9, 13, 23, 30, 0).getTime());
+    atFIXED(bjMs(2026, 10, 13, 23, 30, 0));
     ok(st(at('2026-10-13 23:00:00', 7)) === 'ongoing', 'test_10 23:00 夜场不截断，+2h 内 ongoing');
     // ⑥ 写明结束时间：按实际 end，不截断（16:30-19:30，now 19:00 仍 ongoing）
-    atFIXED(new Date(2026, 9, 13, 19, 0, 0).getTime());
+    atFIXED(bjMs(2026, 10, 13, 19, 0, 0));
     ok(st(at('2026-10-13 16:30:00', 8, '', '2026-10-13 19:30:00')) === 'ongoing',
        'test_10 写明 end 应按实际结束时间（19:30），不触发 18:00 截断');
-    atFIXED(new Date(2026, 9, 13, 20, 0, 0).getTime());
+    atFIXED(bjMs(2026, 10, 13, 20, 0, 0));
     ok(st(at('2026-10-13 16:30:00', 9, '', '2026-10-13 19:30:00')) === 'ended',
        'test_10 写明 end 后 now>end 判 ended');
   } finally {
@@ -362,7 +370,7 @@ function makeCtx(allData, over) {
   // 旧口径（裸 start>=now 判段）会把 A 也算已结束 → 全死段倒序 [B, A]；
   // 新口径 A 归活段 → [A, B]。⚠ A 的 start 必须早于 B，否则旧口径靠倒序巧合同序。
   const save = FIXED_MS;
-  FIXED_MS = new Date(2026, 9, 13, 15, 0, 0).getTime();
+  FIXED_MS = bjMs(2026, 10, 13, 15, 0, 0);
   try {
     const data = [
       at('2026-10-13 10:00:00', 1, '正在进行', '2026-10-13 16:00:00'),
@@ -400,7 +408,7 @@ function makeCtx(allData, over) {
   // 00:00 占位在倒序里恰好落末尾是巧合；08:00 占位会排到 07:00 真实场之前，
   // 专门放一条 08:00 占位防「靠巧合通过」。
   const save = FIXED_MS;
-  FIXED_MS = new Date(2026, 9, 15, 12, 0, 0).getTime();
+  FIXED_MS = bjMs(2026, 10, 15, 12, 0, 0);
   try {
     const data = [
       at('2026-10-14 00:00:00', 1, '昨日·待定'),
