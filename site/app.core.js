@@ -211,6 +211,41 @@ function serializeUrlFilters(vm) {
 }
 
 Object.assign(APP_METHODS, {
+  /* ---------- 时间解析：北京时间字面量 → 绝对毫秒（2026-10-31） ----------
+   * 数据里 lectureStart / lectureEnd 是「北京时间字面量」（'2026-10-31 14:00:00'），
+   * 不带时区偏移。**绝不能**写成 new Date(s) —— 那按**浏览器本地时区**解析：
+   * 纽约用户会把北京 14:00 当成自己的 14:00，状态/倒计时/排序全错。
+   *
+   * 实测（2026-10-31，CDP Emulation.setTimezoneOverride，同一时刻同一份数据）：
+   *   Asia/Shanghai     待开始 5 / 进行中 1，「最近一场」14:00，倒计时 2 时 47 分
+   *   America/New_York  待开始 7 / 进行中 0，「最近一场」10:00，倒计时 10 时 47 分
+   * 纽约用户看到的「下一场」其实已开始 1 小时 13 分。
+   *
+   * 口径与 app.calendar.js::_calUtcMs **同源**（那里是日历导出的先例，注释见其
+   * 文件头 ①，早已写明这条铁律；显示侧当时漏改，本次补齐）。calendar 侧现改为
+   * 委托本方法，避免两份逻辑漂移。
+   *
+   * 返回 NaN（不是 null）：调用方沿用 `if (!s || isNaN(s))` 的既有写法，
+   * 与原先 `new Date().getTime()` 的失败形态一致，改动面最小。
+   */
+  _bjMs(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(s || ''));
+    if (!m) return NaN;
+    // 小时减 8 后按 UTC 组装 = 北京时间的绝对时刻
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 8, +m[5], +(m[6] || 0));
+  },
+
+  // 绝对毫秒 → 北京时间的各分量（年月日时分 + 星期）。
+  // 显示侧必须走这里：只改解析不改显示的话，纽约用户会看到「10月30日 周五 22:00」。
+  // 实现是「+8h 后取 UTC 分量」——与 _bjMs 互为逆运算，不依赖浏览器时区。
+  _bjParts(ms) {
+    const d = new Date(ms + 8 * 3600000);
+    return {
+      y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, day: d.getUTCDate(),
+      hh: d.getUTCHours(), mm: d.getUTCMinutes(), wd: d.getUTCDay(),
+    };
+  },
+
   // 从当前 URL 回放筛选（popstate）。同步赋值后用 $nextTick 恢复写回：
   // Vue3 watch 回调在 nextTick 之前 flush，期间 _urlSyncSuppress 保持 true，
   // 各维度 watch 触发的 _scheduleUrlSync 全部被抑制——不会把回放又写回 history。

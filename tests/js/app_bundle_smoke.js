@@ -128,8 +128,15 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   137 → 138）
 // （2026-10-29：进行中筛选（复用待开始逻辑）—— isOngoing（进行中状态判定，app.display.js）/
 //   toggleOngoing（计数行数字/筛选片开关），138 → 140）
+// （2026-10-31：时区修复 —— _bjMs（北京时间字面量→绝对毫秒，app.core.js）/
+//   _bjParts（绝对毫秒→北京时间分量，app.display.js 与 computed 共用），140 → 142）
+// （2026-10-31：搜索性能 —— _hayOf（两段式 haystack 缓存，app.data.js），142 → 143）
+// （2026-10-31：搜索性能二修 —— _hayNormOf（归一化结果缓存，慢路径真凶是
+//   normalizeSearchText 的逐字符拼接），143 → 144）
+// （2026-10-31：搜索缓存维护 —— _invalidateHay（长文本变化只作废 t/nt 段）/
+//   _warmHayCache（空闲分批预建静态段，消除首搜 326ms）/ _idle（空闲调度），144 → 147）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 140) errs.push(`方法数 ${nMethods} != 140`);
+if (nMethods !== 147) errs.push(`方法数 ${nMethods} != 147`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');

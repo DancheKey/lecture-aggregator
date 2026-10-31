@@ -460,6 +460,14 @@ jobs:
       #     按空白分词 AND。原先裸 includes 对字形差异敏感，「ＡＩ」「講座」零召回，
       #     症状是「搜了没结果」而非报错，快照与解析器测试都抓不到。同时校验映射表
       #     本身（等长 / 繁简不同形 / 繁体键唯一），防止后续手改表映射错字。
+      #  ⑨ app_timezone（2026-10-31）：时间口径必须按**北京时间**解释。
+      #     lectureStart/lectureEnd 是 'YYYY-MM-DD HH:MM:SS' 字面量，`new Date(s)`
+      #     按**浏览器本地时区**解析——海外访客的状态/倒计时/排序全错（实测纽约下
+      #     「下一场」其实已开始 1 小时 13 分）。本套件在 5 个时区（含 UTC、纽约、
+      #     东京）下逐项断言 _bjMs/_bjParts/fmtDateTime/dayKey/statusOf/isNotStarted/
+      #     statusInfo，并比对日历模块 _calUtcMs 与本模块口径不分叉。
+      #     ⚠ 首组是**反例自检**：若 process.env.TZ 切换未生效，先报「测试自身失效」，
+      #     否则回归会伪装成绿灯（UTC+8 下 new Date 与正确值恰好同值）。
       - name: Run frontend data-flow behavior tests
         run: |
           node tests/js/app_ltkey_consistency.js
@@ -472,6 +480,7 @@ jobs:
           node tests/js/liked_filter_keys.js
           node tests/js/stats_wants.js
           node tests/js/app_search_normalize.js
+          node tests/js/app_timezone.js
           python tests/test_main_water_gate.py
           # 入库时间门按源水位（2026-10-22）：与列表页侧 min 口径对齐，
           # 防止源中断恢复后中断期讲座被 [SKIP-OLD] 全丢 + 台账锁 180 天。

@@ -91,6 +91,8 @@ const APP_STATE = function () {
       _ltSearching: false,  // 后台预取进行中（交互触发或搜索触发）
       _ltUnavailable: false, // 清单拿不到等整体失败：搜索不再等待，退化为「就绪多少显示多少」
       _ltIncomplete: false, // 首轮有桶失败：允许后续交互补拉（不影响搜索放行）
-      _ltRetry: 0           // 补拉轮次，超过上限即放弃，避免反复空跑
+      _ltRetry: 0,          // 补拉轮次，超过上限即放弃，避免反复空跑
+      // 搜索 haystack 预建是否已启动（2026-10-31）。见 app.data.js::_warmHayCache。
+      _hayWarmStarted: false
     };
 };

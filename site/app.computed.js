@@ -215,6 +215,10 @@ const APP_COMPUTED = {
         }
         if (q) {
           let hay;
+          // 默认分支的 haystack 分两段（2026-10-31）：静态字段 + 长文本。
+          // 分开是为了「静态段命中即止」——搜「物理」时 564 条标题直接命中，
+          // 不必碰 3354 条平均数百字的简介/摘要。hayT 为 null 表示该分支无第二段。
+          let hayT = null;
           if (this.searchField === 'location') {
             // 地点：仅按讲座地点匹配（多来源取各自地点）；空地点记为「待公布」，可筛
             hay = [l.location || '待公布', ...(l.sources || []).map(s => s.location)]
@@ -230,22 +234,32 @@ const APP_COMPUTED = {
             hay = [l.college, ...(l.sources || []).map(s => s.college)]
               .filter(Boolean).join(' ').toLowerCase();
           } else {
-            // 全部（默认）：在所有常见字段中匹配
-            hay = [l.title, l.topic, l.speaker, l.speakerAffiliation,
-              this.bioRaw(l), l.listTitle, l.college, l.location, l.campus, l.organizer,
-              this.absRaw(l)]
-              .filter(Boolean).join(' ').toLowerCase();
+            // 全部（默认）：走缓存的两段 haystack（见 app.data.js::_hayOf）
+            const h = this._hayOf(l);
+            hay = h.s;
+            hayT = h.t;
           }
           // 快路径：原样子串匹配（简体、无空格输入的绝大多数情况走这里，零额外开销）。
           // 未命中时再走慢路径：字形归一（全角→半角 / 繁→简 / 小写）+ 按空白分词 AND，
           // 修掉「ＡＩ」「講座」「张三 讲座」这类因字形差异而漏召回的问题（见 app.core.js
           // 「搜索归一化」注释）。hay 已 toLowerCase，归一化对它是幂等的。
-          if (!hay.includes(q)) {
+          if (!hay.includes(q) && !(hayT && hayT.includes(q))) {
             const tokens = searchTokens(this.query);
             if (!tokens.length) return false;
-            const nhay = normalizeSearchText(hay);
-            for (let i = 0; i < tokens.length; i++) {
-              if (nhay.indexOf(tokens[i]) < 0) return false;
+            if (hayT !== null) {
+              // 默认分支：两段归一化结果都已缓存（见 app.data.js::_hayNormOf）。
+              // 任一 token 在任一段命中即可 —— 与改造前「单一 hay 串」的 AND 语义等价
+              // （token 不会跨字段边界，两段间本就有空格分隔）。
+              const nh = this._hayNormOf(l);
+              for (let i = 0; i < tokens.length; i++) {
+                if (nh.ns.indexOf(tokens[i]) < 0 && nh.nt.indexOf(tokens[i]) < 0) return false;
+              }
+            } else {
+              // 其它维度（地点/题目/摘要/单位）：字段短，现算即可
+              const nhay = normalizeSearchText(hay);
+              for (let i = 0; i < tokens.length; i++) {
+                if (nhay.indexOf(tokens[i]) < 0) return false;
+              }
             }
           }
         }
@@ -278,8 +292,10 @@ const APP_COMPUTED = {
         const s = l.lectureStart || '';
         // tbd（时间待定）保持原口径：占位日期在未来 → 活段；已过 → 死段
         // （其徽章本就是灰的「时间待定」，不该混进「即将开始」的时间线）
+        // 2026-10-31：tbd 分支的「占位日期在未来」判定同样要走北京时间口径
+        // （原先 new Date(s) 按浏览器本地时区解析，海外用户会把已过期的 tbd 当未来）。
         isLive.set(l, st === 'upcoming' || st === 'ongoing'
-          || (st === 'tbd' && !!s && new Date(s.replace(' ', 'T')).getTime() >= nowMs));
+          || (st === 'tbd' && !!s && this._bjMs(s) >= nowMs));
       });
       list.sort((a, b) => {
         const ta = a.lectureStart || '', tb = b.lectureStart || '';
@@ -437,7 +453,9 @@ const APP_COMPUTED = {
       };
       this.units.forEach(u => {
         const s = (u.type === 'forum' ? u.head.lectureStart : u.recs[0].lectureStart) || '';
-        const ms = s ? new Date(s.replace(' ', 'T')).getTime() : 0;
+        // 2026-10-31：北京时间口径（_bjMs）。NaN 与原先的 0 同为 falsy，
+        // 走下方 else 分支（原样吐出，不折叠）。
+        const ms = s ? this._bjMs(s) : 0;
         if (ms && ms > cutoff) {
           far.push(u);
         } else {

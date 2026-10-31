@@ -66,8 +66,10 @@ const M = vm.runInContext('APP_METHODS', ctx);
 const errs = [];
 const ok = (cond, msg) => { if (!cond) errs.push(msg); };
 
-// 造一个够用的实例：_mergeChunk 会调用 _absorbLongText，后者再调 _ltKey，
-// 所以三个都要给**真实函数体**（给桩就等于绕开了被测链路）。
+// 造一个够用的实例：_mergeChunk 会调用 _absorbLongText，后者再调 _ltKey
+// 与 _invalidateHay（2026-10-31 搜索缓存失效）；_loadChunks 收尾会调
+// _warmHayCache（搜索缓存空闲预建）。这些都接**真实函数体**——
+// 给桩就等于绕开了被测链路。all 为空时 _warmHayCache 直接返回，不会真跑预建。
 function newState() {
   return {
     all: [],
@@ -76,8 +78,12 @@ function newState() {
     _ltPending: {},
     _ltLoaded: {},
     _absorbLongText: M._absorbLongText,
+    _invalidateHay: M._invalidateHay,
     _mergeChunk: M._mergeChunk,
     _ltKey: M._ltKey,
+    _hayOf: M._hayOf,
+    _warmHayCache: M._warmHayCache,
+    _idle: M._idle,
   };
 }
 

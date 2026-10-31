@@ -1,5 +1,24 @@
 // 数据层：latest → chunks 渐进加载、长文本（简介/摘要）按需取桶。
 // 本地与公网的形态分叉由 tests/test_frontend_consistency.py 锁死，勿顺手统一。
+
+/* ---------- 搜索 haystack 缓存（2026-10-31 性能优化） ----------
+ * 背景：默认搜索（searchField=''）原先对每条记录现拼
+ *   [title, topic, speaker, affiliation, bio, listTitle, college, location,
+ *    campus, organizer, abstract].filter(Boolean).join(' ').toLowerCase()
+ * 3850 条 × 含长文本（3354 条有 bio/abs，平均数百字）→ 每次按键约 160 万字的
+ * join + toLowerCase。CDP 实测 filtered() 单次 **312ms**（翻页 32ms、筛选 32ms，
+ * 只有搜索卡）。用户每敲一个字等 300ms+。
+ *
+ * 方案：按 _ltKey 缓存**已小写**的两段 haystack——
+ *   s：静态字段（一次建好，永不失效；chunk 覆盖同 key 时内容相同）
+ *   t：长文本段（惰性；桶到达/全文覆盖时 delete 该 key，下次搜索重建）
+ * 搜索时先 s.includes（绝大多数命中止步于此），未命中再看 t。
+ *
+ * 为什么用模块级 Map 而不是 data()：纯缓存，不该进响应式系统（Proxy 读写有开销，
+ * 且 3850 个 key 的深层代理很贵）。失效由 _absorbLongText/_absorbDetailRows 显式触发。
+ */
+const _hayCache = new Map();
+
 Object.assign(APP_METHODS, {
     /* ---------- 数据加载（增量 / 渐进式） ----------
      * 本地与公网统一走静态分片路径：latest.json（约 105KB 首屏秒开）→ chunks
@@ -189,6 +208,8 @@ Object.assign(APP_METHODS, {
         console.warn(`共 ${failed.length} 个分片加载失败（可重试）：`, failed);
       } else {
         this.dataStage = 'full';
+        // 搜索缓存空闲预建（2026-10-31）：不预建则用户敲第一个字要等 326ms 建缓存
+        this._warmHayCache();
       }
     },
 
@@ -199,6 +220,7 @@ Object.assign(APP_METHODS, {
         .then(resp => {
           this._applyLectureData(resp);
           this.dataStage = 'full';
+          this._warmHayCache();   // 降级路径同样预建（见 _loadChunks 的同名调用）
           this.loading = false;
           // 2026-10-27 调度改造：删掉此处的「二次预拉」。
           // 降级路径（分片不可用时才走到）本身已是 8MB 整文件，再并拉 1.7MB 桶只会更慢；
@@ -247,6 +269,73 @@ Object.assign(APP_METHODS, {
       return (l.sourceUrl || '') + '#' + (l.lectureIndex != null ? l.lectureIndex : '');
     },
     _ltOf(l) { return this._longText[this._ltKey(l)] || null; },
+
+    /* 默认搜索用的 haystack（两段，均已小写）。见文件头「搜索 haystack 缓存」。
+     * 返回对象本身**不要改**（缓存共享）：调用方只读 s / t。 */
+    _hayOf(l) {
+      const k = this._ltKey(l);
+      let h = _hayCache.get(k);
+      if (!h) {
+        h = {
+          s: [l.title, l.topic, l.speaker, l.speakerAffiliation, l.listTitle,
+            l.college, l.location, l.campus, l.organizer]
+            .filter(Boolean).join(' ').toLowerCase(),
+          t: null,        // null = 尚未算（与「算过但没有长文本」的空串区分）
+          ns: undefined,  // 归一化后的 s（惰性，仅慢路径需要）
+          nt: undefined,  // 归一化后的 t
+        };
+        _hayCache.set(k, h);
+      }
+      if (h.t === null) {
+        const t = this._ltOf(l);
+        h.t = t ? ((t.speakerBio || '') + ' ' + (t.abstract || '')).toLowerCase() : '';
+      }
+      return h;
+    },
+
+    /* 归一化后的两段（2026-10-31 二次优化）。
+     * 为什么必须缓存：normalizeSearchText 是**逐字符** for 循环 + 字符串拼接
+     * （全角转半角 / 繁转简 / 小写），一条 800 字记录就是 800 次拼接。快路径
+     * 未命中时（搜「物理」有 3026 条未命中）每条都归一化一次 → 实测 223ms，
+     * 这才是搜索卡顿的真凶（不是字符串拼接，那是第一次优化的错误方向）。
+     * 缓存后慢路径退化为两次 indexOf。 */
+    _hayNormOf(l) {
+      const h = this._hayOf(l);
+      // 两段分别判 undefined：_warmHayCache 预建时只设 ns（长文本桶还没到齐），
+      // 若合并成一个 if 判 ns，nt 会永远停在 undefined → 慢路径 indexOf 崩。
+      if (h.ns === undefined) h.ns = normalizeSearchText(h.s);
+      if (h.nt === undefined) h.nt = h.t ? normalizeSearchText(h.t) : '';
+      return h;
+    },
+
+    /* 空闲预建静态段缓存（2026-10-31）。目的：消除「第一次搜索 326ms」——
+     * 用户敲第一个字时才建 3850 条缓存，那一击明显卡；预建后首字也是 41ms。
+     * 只建 s/ns（静态字段），不建 t/nt：长文本桶尚未到齐，建了也会被
+     * _invalidateHay 作废。分片执行（每批 200 条）避免阻塞首屏交互。 */
+    _warmHayCache() {
+      if (this._hayWarmStarted) return;
+      this._hayWarmStarted = true;
+      const rows = this.all;
+      if (!rows.length) { this._hayWarmStarted = false; return; }
+      let i = 0;
+      const BATCH = 200;
+      const step = () => {
+        const end = Math.min(i + BATCH, rows.length);
+        for (; i < end; i++) {
+          const h = this._hayOf(rows[i]);
+          if (h.ns === undefined) h.ns = normalizeSearchText(h.s);
+        }
+        if (i < rows.length) this._idle(step);
+      };
+      this._idle(step);
+    },
+    _idle(fn) {
+      if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(fn, { timeout: 2000 });
+      } else {
+        setTimeout(fn, 50);
+      }
+    },
     // 条目自身已不含长文本，模板/搜索统一走这里取
     hasBio(l) { const t = this._ltOf(l); return !!(t && t.speakerBio); },
     bioRaw(l) { const t = this._ltOf(l); return (t && t.speakerBio) || ''; },
@@ -259,6 +348,7 @@ Object.assign(APP_METHODS, {
       if (bio || abs) {
         const k = this._ltKey(l);
         this._longText = { ...this._longText, [k]: { speakerBio: bio || '', abstract: abs || '' } };
+        this._invalidateHay(k);
       }
     },
     _absorbDetailRows(rows) {
@@ -267,8 +357,19 @@ Object.assign(APP_METHODS, {
       for (const r of rows) {
         patch[r.key] = { speakerBio: r.speakerBio || '', abstract: r.abstract || '' };
         this._ltFull = { ...this._ltFull, [r.key]: true };
+        this._invalidateHay(r.key);
       }
       this._longText = { ...this._longText, ...patch };
+    },
+
+    /* 长文本变化 → 只作废 haystack 的**长文本段**（2026-10-31）。
+     * 整条删除会把静态段与归一化段（空闲预建的主要产物）一起丢掉，
+     * 等于每次桶到达都让预建白做——故只重置 t/nt，保留 s/ns。 */
+    _invalidateHay(k) {
+      const h = _hayCache.get(k);
+      if (!h) return;
+      h.t = null;
+      h.nt = undefined;
     },
 
     async _ltManifestJson() {

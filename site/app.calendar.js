@@ -23,6 +23,10 @@ Object.assign(APP_METHODS, {
 
   // 北京时间字面量 → UTC 毫秒。非法/空 → null。
   // 用 Date.UTC 而不是 Date 构造器：后者受浏览器时区影响（见文件头 ①）。
+  // ⚠ 与 app.core.js::_bjMs **同口径**（2026-10-31 抽到 core 供显示层复用，
+  //   那边返回 NaN 而非 null）。本模块刻意不委托它——calendar_ics.js 只单独
+  //   加载本文件做隔离测试，依赖 core 会破坏该隔离。两者一致性由
+  //   tests/js/app_timezone.js 逐样本比对守护，改任一侧即红。
   _calUtcMs(s) {
     const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(s || ''));
     if (!m) return null;

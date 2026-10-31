@@ -110,10 +110,12 @@ Object.assign(APP_METHODS, {
       if (l.timeUnknown === false) return false;
       const iso = l.lectureStart;
       if (!iso || typeof iso !== 'string') return true;
-      const d = new Date(iso.replace(' ', 'T'));
-      if (isNaN(d)) return true;
-      const hh = d.getHours(), mm = d.getMinutes();
-      return (hh === 8 || hh === 0) && mm === 0;
+      // 2026-10-31：走 _bjMs（北京时间的绝对毫秒），不用 new Date(iso)——
+      // 后者按浏览器本地时区解析，海外用户会把北京 08:00 判成别的钟点。
+      const ms = this._bjMs(iso);
+      if (isNaN(ms)) return true;
+      const p = this._bjParts(ms);
+      return (p.hh === 8 || p.hh === 0) && p.mm === 0;
     },
     // 时间置信度角标（2026-10-04 方案 A 第 5 步）。
     //
@@ -132,22 +134,26 @@ Object.assign(APP_METHODS, {
       if (!l) return '待定';
       const iso = l.lectureStart;
       if (!iso || typeof iso !== 'string') return '待定';
-      const d = new Date(iso.replace(' ', 'T'));
-      if (isNaN(d)) return '待定';
-      const wk = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
-      const hh = d.getHours(), mm = d.getMinutes();
-      const clock = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+      // 2026-10-31：解析与显示都走北京时间口径。原先 new Date(iso) + d.getHours()
+      // 之所以"看着对"，是解析与显示同用浏览器本地时区、误差互相抵消——一旦只修
+      // 其中一侧就会显示成「10月30日 周五 22:00」。两侧必须同时是北京时间。
+      const ms = this._bjMs(iso);
+      if (isNaN(ms)) return '待定';
+      const p = this._bjParts(ms);
+      const wk = ['日', '一', '二', '三', '四', '五', '六'][p.wd];
+      const clock = `${String(p.hh).padStart(2, '0')}:${String(p.mm).padStart(2, '0')}`;
       if (this.isTimeTBD(l)) {
-        return `${d.getMonth() + 1}月${d.getDate()}日 周${wk} 时间待定`;
+        return `${p.mo}月${p.day}日 周${wk} 时间待定`;
       }
-      return `${d.getMonth() + 1}月${d.getDate()}日 周${wk} ${clock}`;
+      return `${p.mo}月${p.day}日 周${wk} ${clock}`;
     },
     dayKey(iso) {
       if (!iso || typeof iso !== 'string') return '时间待定';
-      const d = new Date(iso.replace(' ', 'T'));
-      if (isNaN(d)) return '时间待定';
-      const wk = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} 周${wk}`;
+      const ms = this._bjMs(iso);
+      if (isNaN(ms)) return '时间待定';
+      const p = this._bjParts(ms);
+      const wk = ['日', '一', '二', '三', '四', '五', '六'][p.wd];
+      return `${p.y}-${String(p.mo).padStart(2, '0')}-${String(p.day).padStart(2, '0')} 周${wk}`;
     },
     // 状态判定（徽章展示与后续状态筛选共用）：
     //   tbd      时间待定 / 无有效开始时间
@@ -164,9 +170,12 @@ Object.assign(APP_METHODS, {
     //      不适用任何边界，仍按 +2h）。
     statusOf(l) {
       if (this.isTimeTBD(l)) return 'tbd';
-      const s = new Date(String(l.lectureStart || '').replace(' ', 'T')).getTime();
+      // 2026-10-31：_bjMs 返回北京时间的绝对毫秒（与 Date.now() 同一坐标轴）。
+      // 原先 new Date(...) 按浏览器本地时区解析，海外用户的 upcoming/ongoing/ended
+      // 整体偏移一个时区（实测纽约：ongoing 从 1 场变 0 场）。
+      const s = this._bjMs(l.lectureStart);
       if (!s || isNaN(s)) return 'tbd';
-      const endRaw = l.lectureEnd ? new Date(String(l.lectureEnd).replace(' ', 'T')).getTime() : 0;
+      const endRaw = l.lectureEnd ? this._bjMs(l.lectureEnd) : 0;
       let e;
       if (endRaw && endRaw > s) {
         e = endRaw;
@@ -181,10 +190,12 @@ Object.assign(APP_METHODS, {
             l.lectureStart, '→', l.lectureEnd, l.sourceUrl || '');
         }
         e = s + 2 * 3600 * 1000;
-        // 半日边界截断：start+2h 越过 12:00 / 18:00 / 22:00 中最早的适用边界即止
-        const sd = new Date(s);
+        // 半日边界截断：start+2h 越过 12:00 / 18:00 / 22:00 中最早的适用边界即止。
+        // 边界必须按**北京时间的年月日**算（原先 new Date(sd.getFullYear(), ...)
+        // 用的是浏览器本地年月日，海外会跨日）。
+        const p = this._bjParts(s);
         for (const h of [12, 18, 22]) {
-          const b = new Date(sd.getFullYear(), sd.getMonth(), sd.getDate(), h, 0, 0).getTime();
+          const b = Date.UTC(p.y, p.mo - 1, p.day, h - 8, 0, 0);
           if (s < b && e > b) { e = b; break; }
         }
       }
@@ -203,7 +214,9 @@ Object.assign(APP_METHODS, {
       if (st === 'upcoming') return true;
       if (st !== 'tbd') return false;
       const s = l.lectureStart || '';
-      const ms = s ? new Date(String(s).replace(' ', 'T')).getTime() : 0;
+      // 2026-10-31：_bjMs（北京时间绝对毫秒）与 nowMs（Date.now()）同一坐标轴。
+      // 返回 NaN 时 !!NaN === false，与原先 new Date().getTime() 的失败形态一致。
+      const ms = s ? this._bjMs(s) : 0;
       return !!ms && ms >= nowMs;
     },
     // 「进行中」判定（2026-10-29 用户要求，复用待开始逻辑）：仅 statusOf === 'ongoing'。
@@ -224,7 +237,7 @@ Object.assign(APP_METHODS, {
       // upcoming：依赖 this.tick 触发响应式（mounted 里 setInterval 每秒更新）
       // 混合判定：剩余不足 24 小时 → 秒级滚动（时分秒，实时跳变）；
       // 满 24 小时 → 按「日历日差」显示整天天数（符合「本周六/星期二间隔几天」语义）
-      const s = new Date(String(l.lectureStart || '').replace(' ', 'T')).getTime();
+      const s = this._bjMs(l.lectureStart);
       const diffMs = s - this.tick;
       const DAY = 86400000;
       let countdown, countdownShort;
@@ -242,11 +255,12 @@ Object.assign(APP_METHODS, {
           countdownShort = `${m}:${p2(sec)}`;
         }
       } else {
-        // 满 24 小时：按日历日差（自然日边界，非剩余时长取整）
-        const sd = new Date(s), td = new Date(this.tick);
+        // 满 24 小时：按日历日差（自然日边界，非剩余时长取整）。
+        // 2026-10-31：日历日必须按**北京时间的年月日**算——原先用浏览器本地
+        // 年月日，海外用户在跨日时段会多算/少算一天。
+        const ps = this._bjParts(s), pt = this._bjParts(this.tick);
         const dayGap = Math.round(
-          (Date.UTC(sd.getFullYear(), sd.getMonth(), sd.getDate()) -
-           Date.UTC(td.getFullYear(), td.getMonth(), td.getDate())) / DAY
+          (Date.UTC(ps.y, ps.mo - 1, ps.day) - Date.UTC(pt.y, pt.mo - 1, pt.day)) / DAY
         );
         countdown = `还有 ${dayGap} 天`;
         countdownShort = `${dayGap} 天`;
