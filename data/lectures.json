@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-02T14:12:15+08:00",
+  "updatedAt": "2026-11-02T21:32:03+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261124/8882.html",
@@ -573,6 +573,31 @@
       "listTitle": "● 华师经英Seminar第63期"
     },
     {
+      "sourceUrl": "http://xz.scnu.edu.cn/a/20261026/367.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/xingzhi/2026/1102/1793605680186043.png"
+      ],
+      "college": "行知书院",
+      "campus": "汕尾",
+      "title": "还好这世界到处都是充电站",
+      "topic": "还好这世界到处都是充电站",
+      "lectureStart": "2026-10-29 00:00:00",
+      "lectureEnd": null,
+      "location": "",
+      "speaker": "",
+      "speakerTitle": "",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "行知书院",
+      "publishTime": "2026-10-26 15:00:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "timeUnknownSource": "auto",
+      "timeUnknown": true,
+      "listTitle": "20261029 还好这世界到处都是充电站"
+    },
+    {
       "sourceUrl": "http://mks.scnu.edu.cn/a/20261020/20.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/mks/2026/1020/1792466877886204.jpg"
@@ -831,6 +856,31 @@
       "listTitle": "● 华师经英seminar第62期"
     },
     {
+      "sourceUrl": "http://xz.scnu.edu.cn/a/20261019/368.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/xingzhi/2026/1102/1793605726326987.jpg"
+      ],
+      "college": "行知书院",
+      "campus": "汕尾",
+      "title": "科学提分安全护航 大学生体质健康测试提升与急救知识专题讲座",
+      "topic": "科学提分安全护航 大学生体质健康测试提升与急救知识专题",
+      "lectureStart": "2026-10-22 00:00:00",
+      "lectureEnd": null,
+      "location": "",
+      "speaker": "",
+      "speakerTitle": "",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "行知书院",
+      "publishTime": "2026-10-19 15:00:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "timeUnknownSource": "auto",
+      "timeUnknown": true,
+      "listTitle": "20261022 科学提分安全护航 大学生体质健康测试提升与急救知识专题讲座"
+    },
+    {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261020/8869.html",
       "images": [],
       "college": "数学科学学院",
@@ -858,6 +908,31 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-周勇"
+    },
+    {
+      "sourceUrl": "http://xz.scnu.edu.cn/a/20261015/369.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/xingzhi/2026/1102/1793605772265696.jpg"
+      ],
+      "college": "行知书院",
+      "campus": "汕尾",
+      "title": "教育类研究的选题设计与学术写作经验分享",
+      "topic": "教育类研究的选题设计与学术写作经验分享",
+      "lectureStart": "2026-10-20 00:00:00",
+      "lectureEnd": null,
+      "location": "",
+      "speaker": "",
+      "speakerTitle": "",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "行知书院",
+      "publishTime": "2026-10-15 15:00:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "timeUnknownSource": "auto",
+      "timeUnknown": true,
+      "listTitle": "20261020 教育类研究的选题设计与学术写作经验分享"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20261019/11186.html",
@@ -1144,6 +1219,31 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-程泽涛"
+    },
+    {
+      "sourceUrl": "http://xz.scnu.edu.cn/a/20261012/370.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/xingzhi/2026/1102/1793605860883104.png"
+      ],
+      "college": "行知书院",
+      "campus": "汕尾",
+      "title": "大学规划·从心出发",
+      "topic": "大学规划·从心出发",
+      "lectureStart": "2026-10-15 00:00:00",
+      "lectureEnd": null,
+      "location": "",
+      "speaker": "",
+      "speakerTitle": "",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "行知书院",
+      "publishTime": "2026-10-12 15:00:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "timeUnknownSource": "auto",
+      "timeUnknown": true,
+      "listTitle": "20261015 大学规划·从心出发"
     },
     {
       "sourceUrl": "https://yjsy.scnu.edu.cn/a/20261012/10265.html",
