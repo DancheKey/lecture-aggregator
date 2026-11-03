@@ -573,6 +573,17 @@
       "uv_delta": null,
       "pv_delta": 4,
       "note": ""
+    },
+    {
+      "date": "2026-11-04",
+      "capturedAt": "2026-11-04T05:49:14+08:00",
+      "site_pv": 2019,
+      "site_uv": null,
+      "page_pv": null,
+      "page_uv": null,
+      "uv_delta": null,
+      "pv_delta": 1,
+      "note": ""
     }
   ]
 }
