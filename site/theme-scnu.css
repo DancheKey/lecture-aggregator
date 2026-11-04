@@ -164,6 +164,49 @@ button.bg-slate-800 { color: #ffffff !important; }
 }
 
 /* =====================================================================
+ * 访问量趋势页（visits-trend）内容区浅蓝化（2026-11-04）
+ * 背景：VI 浅蓝化首轮只覆盖了该页 body 背景与顶栏，内容区仍是 default
+ * 模式的米白色系 —— 用户反馈三点：① 图表卡纯白与浅蓝页背景差距大；
+ * ② 明细表头米白突兀；③ 表格行线/边框为米灰色系，在浅蓝上几乎隐形。
+ * 首页白卡当时已统一为 #eef4fa，此处对齐同一套语言（rgba(0,45,84,x) 蓝系）。
+ * 仅 VI 模式生效：default 不加载本文件、黑白模式 grayscale 滤镜自动灰化。
+ * ===================================================================== */
+
+/* ① 图表卡 / 通用卡：纯白 → 与首页白卡统一的浅蓝 */
+.card {
+  background-color: #eef4fa !important;
+  border-color: rgba(0, 45, 84, 0.10) !important;
+}
+
+/* KPI 四块：米灰 #F1F0EC → 比卡片深半档的蓝灰，与浅蓝背景和谐且保持层次 */
+.kpi {
+  background-color: rgba(0, 45, 84, 0.055) !important;
+  border: 1px solid rgba(0, 45, 84, 0.08) !important;
+}
+
+/* ② 明细表头：米白 → 实底蓝灰（sticky 表头必须实底，半透明会让滚动行透出） */
+th {
+  background-color: #dfe9f4 !important;
+  color: #002d54 !important;
+  border-bottom: 1px solid rgba(0, 45, 84, 0.16) !important;
+}
+
+/* ③ 表格可辨识度：容器边框 / 行分隔线加深为可见的蓝灰，补斑马纹与 hover */
+.tbl { border-color: rgba(0, 45, 84, 0.16) !important; }
+td { border-bottom-color: rgba(0, 45, 84, 0.10) !important; }
+tbody tr:nth-child(even) td { background-color: rgba(0, 45, 84, 0.028) !important; }
+tbody tr:hover td { background-color: rgba(0, 45, 84, 0.06) !important; }
+
+/* 卡内范围切换 / 明细展开按钮：白底改半透明融入浅蓝卡，选中态规则在上不受影响 */
+.ranges button,
+.tb-head button {
+  background-color: rgba(255, 255, 255, 0.62) !important;
+  border-color: rgba(0, 45, 84, 0.16) !important;
+}
+.ranges button:hover,
+.tb-head button:hover { background-color: rgba(255, 255, 255, 0.92) !important; }
+
+/* =====================================================================
  * 签名点缀：分组装饰竖条 = 校徽红（全站唯一 w-1 h-5 圆头竖条）
  * ===================================================================== */
 .bg-\[\#a51421\] { background-color: #a51421 !important; }
