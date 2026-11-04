@@ -439,22 +439,50 @@ fetch('visits-trend-data.json', { cache: 'no-store' })
     if (!SNAPS.length) throw new Error('数据为空');
     renderChart();
     renderTable();
+    // 实时校正先于数据文件到达时，applyLivePv 只缓存了 _livePv 未生效——
+    // 此处补挂一次（竞态收口的另一半，见 applyLivePv 注释）。
+    if (_livePv) {
+      var pending = _livePv;
+      _livePv = null;
+      applyLivePv(pending);
+    }
   })
   .catch(function (e) { showLoadError(e && e.message ? e.message : String(e)); });
 
-// 底部总访问量（2026-10-28）：读 visits.json（本脚本 main() 出片，取台账
-// 最新快照 site_pv），填充 footer 占位符。失败静默——footer 保持「—」，
-// 不影响主图与明细表。放在本外链文件内而非内联 <script>：本页 CSP
-// script-src 仅 'self'，内联脚本会被 visits_trend_render 门禁拦下。
-fetch('visits.json', { cache: 'no-store' })
-  .then(function (r) { if (!r.ok) return; return r.json(); })
-  .then(function (d) {
-    if (d && d.site_pv) {
-      var el = document.getElementById('site_pv_value');
-      if (el) el.textContent = Number(d.site_pv).toLocaleString('en-US');
-    }
-  })
-  .catch(function () { /* 静默降级 */ });
+// KPI 实时校正（2026-11-04）：台账快照每日一次（今天 05:49 抓的值挂一整天），
+// 而首页/统计页页脚是实时值，三页数字不一致（用户实测 2027 vs 2019）。本段
+// 经 LectureCloud.fetchSitePv 只读云端 __site__ 行，拿到实时权威值后同步更新
+// 三处：KPI 卡、图表今日点位、明细表最后一行——历史往日的快照原样不动。
+// ⚠ 只读不计数：页面打开的 +1 统一归 footer-counter.js 的全站 5 分钟防刷
+// bump（与首页/统计页同一缓存键），趋势页不单独计数。
+// 失败 / 云端禁用 / 本机 vm 门禁沙箱（无 LectureCloud）→ 静默保留快照值，
+// 页面行为与未接实时链路时完全一致。
+// ⚠ 竞态收口：fetchSitePv 与数据文件 fetch 各自独立，谁先到都可能——
+// 若实时值先到而 SNAPS 还是空数组，直接 apply 会白做（快照测试曾抓到：
+// 校正静默跳过，KPI 停在旧值）。故实时值先到时先缓存 _livePv，数据文件
+// 加载完成后由 then 补挂一次；两条到达顺序任意都能收口。
+var _livePv = null;
+function applyLivePv(n) {
+  if (!n) return;
+  if (!SNAPS.length) { _livePv = n; return; }
+  var last = SNAPS[SNAPS.length - 1];
+  var snapPv = Number(last.site_pv) || 0;
+  if (n <= snapPv) return;   // 快照已是最新（或异常回退值），不动
+  var prev = SNAPS.length > 1 ? (Number(SNAPS[SNAPS.length - 2].site_pv) || 0) : 0;
+  last.site_pv = n;
+  last.pv_delta = n - prev;
+  var kv = document.getElementById('kpi_pv_value');
+  if (kv) kv.textContent = fmt(n);
+  var kd = document.getElementById('kpi_pv_delta');
+  if (kd) kd.textContent = '较前次快照 +' + (n - prev).toLocaleString('en-US')
+    + ' · 实时';
+  renderChart();
+  renderTable();
+}
+if (typeof LectureCloud !== 'undefined' && LectureCloud &&
+    typeof LectureCloud.fetchSitePv === 'function') {
+  LectureCloud.fetchSitePv().then(applyLivePv).catch(function () {});
+}
 """
 
 
@@ -506,10 +534,14 @@ def build_kpis(snaps):
          f'快照 {len(snaps)} 条' + (
              f'，缺 {span_days + 1 - len(snaps)} 天' if span_days + 1 > len(snaps) else '')),
     ]
+    # 首卡（累计访问次数）的值/副文案带 id：visits-trend.js 的实时校正
+    # （applyLivePv）把云端权威值写进这两处，保证与首页/统计页 footer 一致。
     return ''.join(
         f'<div class="kpi"><div class="kpi-k">{k}</div>'
-        f'<div class="kpi-v">{v}</div><div class="kpi-d">{d}</div></div>'
-        for k, v, d in cards)
+        f'<div class="kpi-v"{idv}>{v}</div><div class="kpi-d"{idd}>{d}</div></div>'
+        for i, (k, v, d) in enumerate(cards)
+        for (idv, idd) in (
+            (' id="kpi_pv_value"', ' id="kpi_pv_delta"') if i == 0 else ('', ''),))
 
 
 def main():
@@ -566,9 +598,13 @@ def main():
        ① 全部 innerHTML 拼接改为 createElement/textContent（渲染不再解析任何文本标记）；
        ② 脚本拆为独立 visits-trend.js、数据拆为 visits-trend-data.json（本次）。
      故 script-src 与 style-src 均只需 'self'（style 走外链 visits-trend.css）。
+     2026-11-04 补：connect-src 放行 https://*.supabase.co —— KPI 实时校正
+     （visits-trend.js 经 LectureCloud.fetchSitePv 只读 __site__ 行）与页脚
+     footer-counter.js 云端计数都需要连 Supabase REST，与 index/stats 两页
+     同一域名白名单口径。
      遗留代价：页面不再支持 file:// 直接打开（fetch 受同源限制），
      本地预览请用 start_local.bat 起本地 server。 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <title>站点访问量趋势 · 木铎金声</title>
 <!-- 图标与分享卡片（2026-10-20）：与 index.html 同一套。本页是模板，改动会随
      每次 CI 重新生成进 site/visits-trend.html；直接改产物次日会被覆盖。 -->
@@ -668,6 +704,15 @@ def main():
   </span>
 </footer>
 
+<!-- 云端计数接线（2026-11-04）：与 index.html / stats.html 同一套——
+     app.cloud.js 提供 LectureCloud（fetchSitePv 只读全站 PV），footer-counter.js
+     负责页脚「本站总访问量」的云端计数（全站共享 5 分钟 localStorage 防刷，
+     同一浏览器 5 分钟内无论开哪个页面只计 1 次）。挂上后趋势页不再单独
+     出片 visits.json 填页脚（旧链路已删），三页页脚数字永远同源一致。
+     ⚠ defer 顺序不可乱：footer-counter 与 visits-trend 都依赖 LectureCloud
+     先定义。裸引用（无 ?v=）是待打戳源形态，main() 里 stamp_script_version。 -->
+<script src="app.cloud.js" defer></script>
+<script src="footer-counter.js" defer></script>
 <script src="visits-trend.js" defer></script>
 </body></html>
 """
@@ -690,9 +735,10 @@ def main():
            json.dumps(payload, ensure_ascii=False, separators=(',', ':')))
     css = os.path.join(OUT_DIR, CSS_NAME)
     _write(css, CSS)
-    # 底部总访问量数据（2026-10-28）：footer 的 site_pv_value 由
-    # visits-trend.js 异步读本文件填充。由本脚本出片（取台账最新快照），
-    # 保证 daily.yml 每日重跑时总访问量随最新数据同步更新。
+    # 底部总访问量数据（2026-10-28 出片；2026-11-04 起页脚改由 footer-counter.js
+    # 实时计数接管，visits-trend.js 不再 fetch 本文件——保留出片仅为
+    # test_frontend_consistency 的 known_static 登记与潜在降级用途，
+    # 数据仍随台账每日刷新。
     _write(os.path.join(OUT_DIR, 'visits.json'), json.dumps({
         'date': last.get('date', ''),
         'capturedAt': last.get('capturedAt', ''),
@@ -719,6 +765,11 @@ def main():
     stamp_script_version(os.path.basename(OUT_PATH), 'theme-loader.js')
     stamp_script_version(os.path.basename(OUT_PATH), 'theme-scnu.css')
     stamp_script_version(os.path.basename(OUT_PATH), 'theme-bw.css')
+    # 云端计数接线（2026-11-04）：模板挂载的 app.cloud.js / footer-counter.js
+    # 同样由本脚本出片时打戳（test_frontend_schema::test_99 反向断言要求
+    # 页面引用的本地资源全部带正确 ?v=，漏打即门禁红）。
+    stamp_script_version(os.path.basename(OUT_PATH), 'app.cloud.js')
+    stamp_script_version(os.path.basename(OUT_PATH), 'footer-counter.js')
     for p in (OUT_PATH, JS_PATH, DATA_PATH, css):
         print(f'[done] {os.path.relpath(p, ROOT)}'
               f'（{os.path.getsize(p) / 1024:.1f} KB）')

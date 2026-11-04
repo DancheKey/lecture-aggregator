@@ -23,9 +23,13 @@
        ① 全部 innerHTML 拼接改为 createElement/textContent（渲染不再解析任何文本标记）；
        ② 脚本拆为独立 visits-trend.js、数据拆为 visits-trend-data.json（本次）。
      故 script-src 与 style-src 均只需 'self'（style 走外链 visits-trend.css）。
+     2026-11-04 补：connect-src 放行 https://*.supabase.co —— KPI 实时校正
+     （visits-trend.js 经 LectureCloud.fetchSitePv 只读 __site__ 行）与页脚
+     footer-counter.js 云端计数都需要连 Supabase REST，与 index/stats 两页
+     同一域名白名单口径。
      遗留代价：页面不再支持 file:// 直接打开（fetch 受同源限制），
      本地预览请用 start_local.bat 起本地 server。 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <title>站点访问量趋势 · 木铎金声</title>
 <!-- 图标与分享卡片（2026-10-20）：与 index.html 同一套。本页是模板，改动会随
      每次 CI 重新生成进 site/visits-trend.html；直接改产物次日会被覆盖。 -->
@@ -125,5 +129,14 @@
   </span>
 </footer>
 
-<script src="visits-trend.js?v=56bc87fdf9" defer></script>
+<!-- 云端计数接线（2026-11-04）：与 index.html / stats.html 同一套——
+     app.cloud.js 提供 LectureCloud（fetchSitePv 只读全站 PV），footer-counter.js
+     负责页脚「本站总访问量」的云端计数（全站共享 5 分钟 localStorage 防刷，
+     同一浏览器 5 分钟内无论开哪个页面只计 1 次）。挂上后趋势页不再单独
+     出片 visits.json 填页脚（旧链路已删），三页页脚数字永远同源一致。
+     ⚠ defer 顺序不可乱：footer-counter 与 visits-trend 都依赖 LectureCloud
+     先定义。裸引用（无 ?v=）是待打戳源形态，main() 里 stamp_script_version。 -->
+<script src="app.cloud.js?v=50a42c8d32" defer></script>
+<script src="footer-counter.js?v=0136248cd2" defer></script>
+<script src="visits-trend.js?v=0b7d0fca1c" defer></script>
 </body></html>

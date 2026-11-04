@@ -114,6 +114,7 @@ jobs:
             tests/js/theme_loader_bom.js
             tests/js/app_url_sync.js
             tests/js/visits_trend_render.js
+            tests/js/visits_trend_live_pv.js
             tests/js/app_topic_session.js
             tests/js/app_ltkey_consistency.js
             tests/js/app_merge_chunk.js
