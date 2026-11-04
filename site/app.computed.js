@@ -145,19 +145,13 @@ const APP_COMPUTED = {
       // 排序里的 statusOf 都走 statusOf 内部的 Date.now()，故「固定基准保证全序」
       // 只是近似——实际靠 O(n) 单次遍历在微秒级完成，跨不过状态切换点。
       const nowMs = Date.now();
-      // 日期范围筛选的「今天零点」基准（2026-11-04 用户要求）：按**北京时间自然日**
-      // 切分，不是滚动 24 小时窗口。理由：列表本身就按自然日分组（「2026-11-05 周四」），
-      // 滚动窗口会让「7天内」在午夜前后给出不同结果（23:59 覆盖到第 8 天下午、
-      // 00:01 只到第 8 天凌晨），与用户的日历直觉冲突；自然日口径下「N天内」恒等于
-      // 「今天起 N 个日历日」，与页面日期分组标题一一对应。
-      // 惰性计算：仅「待开始 + 选了范围」时取（默认态零开销）。
-      let rangeDay0 = 0;
+      // 日期范围筛选（2026-11-04 用户要求）：「N天内」= 距现在不足 N×24 小时。
+      // 口径必须与卡片倒计时（statusInfo 的「还有 X 时 Y 分」）一致——首版按北京时间
+      // 自然日切分（今天=第 0 天），结果明天 12:30 的场次卡片写着「还有 23 时 54 分」
+      // 却被归到「2天内」，用户实测当场指出（2026-11-04 同日修正）。
+      // 代价是边界随时间滑动（午夜前后同一场次可能换档），但那是重算时机的问题，
+      // 不是口径问题——「不到 24 小时就是一天内」这个直觉优先级更高。
       const rangeOn = this.upcomingOnly && this.upcomingRange;
-      if (rangeOn) {
-        const bp = this._bjParts(nowMs);
-        // 北京时间当日 00:00 的绝对毫秒 = 该日 UTC 零点 − 8h
-        rangeDay0 = Date.UTC(bp.y, bp.mo - 1, bp.day) - 8 * 3600000;
-      }
       const q = this.query.trim().toLowerCase();
       // 只看有点赞 / 只看有想听（2026-10-19 B3 + 同日二次修正；2026-10-19 晚改全站口径）：
       // 点赞/想听写入的都是计数键 ck（多场拆分 = url~N），而合并卡的赞/想听记在
@@ -206,16 +200,17 @@ const APP_COMPUTED = {
         // 待开始筛选（2026-10-16 口径乙）：upcoming + 开始时间未到的时间待定；
         // 不含进行中（已开场）、不含日期已过/无日期的 tbd。与其他筛选叠加。
         if (this.upcomingOnly && !this.isNotStarted(l, nowMs)) return false;
-        // 待开始视图的日期范围（2026-11-04 用户要求）：off = 开始日距「今天」的日历天数
-        // （今天=0、明天=1）。「N天内」= off < N —— 所以「1天内」就是今天剩余场次；
-        // 「7天外」= off >= 7。只在本视图生效，故不与 year 筛选叠加（两者互斥，
-        // 由 toggleUpcoming / normalizeUrlFilters 保证不会同时有值）。
+        // 待开始视图的日期范围（2026-11-04 用户要求）：「N天内」= 距现在 < N×24 小时，
+        // 「7天外」= ≥ 7×24 小时。用绝对时刻差而不是日历天数，与卡片倒计时同口径：
+        // 卡片写「还有 23 时 54 分」的场次必然落在「1天内」。
+        // 只在本视图生效，故不与 year 筛选叠加（两者互斥，由 toggleUpcoming /
+        // normalizeUrlFilters 保证不会同时有值）。
         if (rangeOn) {
           const ms = this._bjMs(l.lectureStart);
           if (!(ms >= 0)) return false;   // 无/坏时间不属任何档（isNotStarted 已排除大部分）
-          const off = Math.floor((ms - rangeDay0) / 86400000);
-          if (this.upcomingRange === '7+') { if (off < 7) return false; }
-          else if (off >= +this.upcomingRange) return false;
+          const ahead = ms - nowMs;
+          if (this.upcomingRange === '7+') { if (ahead < 7 * 86400000) return false; }
+          else if (ahead >= +this.upcomingRange * 86400000) return false;
         }
         // 进行中筛选（2026-10-29 复用待开始：仅留 statusOf==='ongoing' 的场，与其他筛选叠加）
         if (this.ongoingOnly && !this.isOngoing(l, nowMs)) return false;
