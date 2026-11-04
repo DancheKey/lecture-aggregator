@@ -67,7 +67,8 @@ const APP_METHODS = {};
 /* ---------- 筛选状态 ↔ URL 同步（2026-10-23 第三批） ----------
  * 进 URL 的内容维度（可分享/可回放）：campus / college / year / speaker /
  *   q（= query 搜索词）/ field（= searchField 搜索维度）/ online（= onlineOnly）/
- *   upcoming（= upcomingOnly，2026-10-16 加）/ page。
+ *   upcoming（= upcomingOnly，2026-10-16 加）/ range（= upcomingRange，2026-11-04 加）/
+ *   page。
  * 不进 URL 的本机偏好：showLikedOnly（点赞是本机数据，分享给他人无意义）、
  *   farFutureOpen 与各类展开态（同为 localStorage 本机偏好，已有独立持久化）。
  * 写入约定：
@@ -78,6 +79,9 @@ const APP_METHODS = {};
  */
 const CAMPUS_LIST = ['石牌', '大学城', '佛山', '汕尾', '校级'];
 const URL_SEARCH_FIELDS = ['college', 'location', 'topic', 'abstract'];  // searchField 合法枚举
+// 待开始视图的日期范围档位（2026-11-04）：'1'..'7' = N天内（北京时间自然日），
+// '7+' = 7天外。单一事实源，同时供 URL 校验与下拉选项使用。
+const UPCOMING_RANGES = ['1', '2', '3', '4', '5', '6', '7', '7+'];
 // URL page 参数静态上界（2026-10-14 评审 P1-5）：全库 3831 条 / 每页 25 满打满算
 // 154 页，1000 留足余量，只防「?page=99999」天文数字与数据增减后失效的旧深链接。
 // 真正的越界钳位由 watch.totalPages 按实际数据完成（见 app.js）。
@@ -164,6 +168,8 @@ function parseUrlFilters() {
     if (URL_SEARCH_FIELDS.includes(field)) out.searchField = field;
     if (p.get('online') === '1') out.onlineOnly = true;
     if (p.get('upcoming') === '1') out.upcomingOnly = true;
+    const range = get('range');
+    if (UPCOMING_RANGES.includes(range)) out.range = range;
     if (p.get('ongoing') === '1') out.ongoingOnly = true;
     const page = parseInt(p.get('page'), 10);
     if (page >= 2 && page <= MAX_URL_PAGE) out.page = page;   // page=1 与缺省等价，不写
@@ -176,20 +182,28 @@ function parseUrlFilters() {
 // 共用，保证两条路径对同一 URL 给出同一状态。
 function normalizeUrlFilters(f, campusList) {
   const wl = campusList || CAMPUS_LIST;
+  // 互斥归一（2026-10-30）：statusOf 是互斥枚举，两个筛选同真 → filtered 的两条
+  // 条件都要求满足 → 必然空集。手拼 ?ongoing=1&upcoming=1、或历史链接残留，
+  // 用户会直接看到「暂无结果」且没有任何解释。归一化层负责把矛盾输入收敛成
+  // 合法状态（与 campus 不在白名单就清空同一性质），保留 ongoing：语义更窄、更新。
+  // year / range 的清理都依赖归一后的结果（而非原始 f.upcomingOnly），否则
+  // ?ongoing=1&upcoming=1 这种输入会按「待开始」口径清 year，而实际状态是进行中。
+  const upcomingOnly = !!f.upcomingOnly && !f.ongoingOnly;
   return {
     campus: (f.campus && wl.includes(f.campus)) ? f.campus : '',
     college: f.college || '',
-    year: f.year || '',
+    // 待开始视图下年份下拉被替换成「N天内」（2026-11-04），残留 year 会变成
+    // 「看不见却生效」的筛选，用户只会看到一个空列表。进行中视图仍渲染年份下拉，
+    // 故不在此清理——它可见、可控，留不留都不影响可解释性。
+    year: upcomingOnly ? '' : (f.year || ''),
     speaker: f.speaker || '',
     query: f.query || '',
     searchField: f.searchField || '',
     onlineOnly: !!f.onlineOnly,
-    // 互斥归一（2026-10-30）：statusOf 是互斥枚举，两个筛选同真 → filtered 的两条
-    // 条件都要求满足 → 必然空集。手拼 ?ongoing=1&upcoming=1、或历史链接残留，
-    // 用户会直接看到「暂无结果」且没有任何解释。归一化层负责把矛盾输入收敛成
-    // 合法状态（与 campus 不在白名单就清空同一性质），保留 ongoing：语义更窄、更新。
-    upcomingOnly: !!f.upcomingOnly && !f.ongoingOnly,
+    upcomingOnly,
     ongoingOnly: !!f.ongoingOnly,
+    // 日期范围只在待开始视图有意义：?range=5 无 upcoming 属无主参数，丢弃。
+    upcomingRange: (upcomingOnly && UPCOMING_RANGES.includes(f.range)) ? f.range : '',
     currentPage: (f.page >= 2 && f.page <= MAX_URL_PAGE) ? f.page : 1,
   };
 }
@@ -205,6 +219,8 @@ function serializeUrlFilters(vm) {
   if (vm.searchField) p.set('field', vm.searchField);
   if (vm.onlineOnly) p.set('online', '1');
   if (vm.upcomingOnly) p.set('upcoming', '1');
+  // 范围档位依附于待开始视图（未激活时不写，避免产生 ?range=3 这类无主参数）
+  if (vm.upcomingOnly && vm.upcomingRange) p.set('range', vm.upcomingRange);
   if (vm.ongoingOnly) p.set('ongoing', '1');
   if (vm.currentPage >= 2) p.set('page', String(vm.currentPage));
   return p.toString();

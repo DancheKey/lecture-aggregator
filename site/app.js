@@ -113,6 +113,8 @@ const app = createApp({
     speaker() { this._scheduleUrlSync(true, 120); },
     onlineOnly() { this._scheduleUrlSync(true, 120); },
     upcomingOnly() { this._scheduleUrlSync(true, 120); },
+    // 待开始视图的日期范围（2026-11-04）：纯内容维度，进 URL（可分享「最近 3 天」）。
+    upcomingRange() { this.currentPage = 1; this._scheduleUrlSync(true, 120); },
     ongoingOnly() { this._scheduleUrlSync(true, 120); },
     showLikedOnly() { this.currentPage = 1; },
     // 想听筛选（2026-10-19）：与点赞同为「本机数据」，同样不进 URL（分享无意义），只回第一页。
@@ -134,7 +136,7 @@ const app = createApp({
       this.migrateCountKeys();
       if (newVal === 'full') this.bumpCount();
       if (oldVal === 'partial' && newVal === 'full') {
-        if (!this.query && !this.campus && !this.college && !this.year && !this.showLikedOnly && !this.showWantedOnly) {
+        if (!this.query && !this.campus && !this.college && !this.year && !this.upcomingRange && !this.showLikedOnly && !this.showWantedOnly) {
           // 无筛选时，full 数据已包含当前 50 条，保持页面不跳变
           return;
         }

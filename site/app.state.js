@@ -19,6 +19,11 @@ const APP_STATE = function () {
       showWantedOnly: false,
       onlineOnly: false,   // 仅显示线上讲座（点卡片「# 线上」标签进入，2026-10-13）
       upcomingOnly: false, // 仅显示待开始讲座（点计数行「待开始 N 场」进入，2026-10-16）
+      // 待开始视图下的「日期范围」筛选（2026-11-04 用户要求）：''=不限 | '1'..'7'=N天内 | '7+'=7天外。
+      // 仅 upcomingOnly 时生效、且此时年份下拉被替换成它——待开始的场次都在未来，
+      // 年份恒为当前年（跨年场景用「N天内」这种相对口径反而更准），年份筛选无意义。
+      // 口径见 app.computed.js::filtered（按北京时间自然日切分，非滚动 24 小时）。
+      upcomingRange: '',
       ongoingOnly: false, // 仅显示进行中讲座（点计数行「进行中 N 场」进入，2026-10-29 复用待开始逻辑）
       scraping: false,
       showMenu: false,    // 顶部栏更多操作下拉菜单

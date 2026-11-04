@@ -89,17 +89,36 @@ const setUrl = (search) => {
 const fireTimers = () => { const due = timers; timers = []; due.forEach(t => t.fn()); };
 
 // ---- T1 parse + normalize ----
-setUrl('?campus=大学城&year=2024&q=%E9%87%8F%E5%AD%90&online=1&upcoming=1&page=3');
+setUrl('?campus=大学城&year=2024&q=%E9%87%8F%E5%AD%90&online=1&page=3');
 {
   const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
   ok(n.campus === '大学城', `T1 campus 解析: ${n.campus}`);
   ok(n.year === '2024', `T1 year 解析: ${n.year}`);
   ok(n.query === '量子', `T1 q 解析(解码): ${n.query}`);
   ok(n.onlineOnly === true, `T1 online 解析: ${n.onlineOnly}`);
-  ok(n.upcomingOnly === true, `T1 upcoming 解析: ${n.upcomingOnly}`);
   ok(n.currentPage === 3, `T1 page 解析: ${n.currentPage}`);
-  ok(n.college === '' && n.speaker === '' && n.searchField === '',
+  ok(n.college === '' && n.speaker === '' && n.searchField === '' && n.upcomingRange === '',
      `T1 缺省键回落空值: ${JSON.stringify(n)}`);
+}
+setUrl('?upcoming=1&range=3');
+{
+  const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(n.upcomingOnly === true && n.upcomingRange === '3',
+     `T1 range 解析: upcoming=${n.upcomingOnly} range=${n.upcomingRange}`);
+}
+// 待开始视图下年份下拉被替换成「N天内」，残留 year 会变成看不见却生效的条件 → 归一化丢弃
+setUrl('?upcoming=1&year=2024&range=2');
+{
+  const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(n.year === '', `T1 待开始视图应丢弃 year: ${n.year}`);
+  ok(n.upcomingRange === '2', `T1 待开始视图保留 range: ${n.upcomingRange}`);
+}
+// 无 upcoming 时 range 是无主参数，丢弃
+setUrl('?range=5');
+{
+  const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(n.upcomingOnly === false && n.upcomingRange === '',
+     `T1 无待开始视图应丢弃 range: ${n.upcomingRange}`);
 }
 
 // ---- T2 非法值回落 ----
@@ -124,17 +143,35 @@ setUrl('?field=topic');
   const state = {
     campus: '汕尾', college: '文学院', year: '2023', speaker: '张三',
     query: ' 人工智慧 ', searchField: 'topic', onlineOnly: true,
-    upcomingOnly: true, currentPage: 7,
+    upcomingOnly: false, currentPage: 7,
   };
   const qs = vm.runInContext('serializeUrlFilters', ctx)(state);
   setUrl('?' + qs);
   const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
   ok(n.campus === '汕尾' && n.college === '文学院' && n.year === '2023'
      && n.speaker === '张三' && n.query === '人工智慧' && n.searchField === 'topic'
-     && n.onlineOnly === true && n.upcomingOnly === true && n.currentPage === 7,
+     && n.onlineOnly === true && n.upcomingOnly === false && n.currentPage === 7,
      `T3 往返一致: qs=${qs} n=${JSON.stringify(n)}`);
-  ok(!/(^|&)q=$/.test(qs) && qs.includes('page=7') && qs.includes('upcoming=1'),
+  ok(!/(^|&)q=$/.test(qs) && qs.includes('page=7') && qs.includes('year=2023'),
      `T3 只含非默认值: qs=${qs}`);
+}
+// 待开始 + 日期范围的往返（2026-11-04）：range 依附 upcoming，year 不同存
+{
+  const state = {
+    campus: '', college: '', year: '', speaker: '', query: '',
+    searchField: '', onlineOnly: false, upcomingOnly: true, upcomingRange: '3',
+    currentPage: 1,
+  };
+  const qs = vm.runInContext('serializeUrlFilters', ctx)(state);
+  ok(qs === 'upcoming=1&range=3', `T3b 范围往返查询串: "${qs}"`);
+  setUrl('?' + qs);
+  const n = vm.runInContext('normalizeUrlFilters(parseUrlFilters(), CAMPUS_LIST)', ctx);
+  ok(n.upcomingOnly === true && n.upcomingRange === '3' && n.year === '',
+     `T3b 范围往返一致: ${JSON.stringify(n)}`);
+  // 未激活待开始时 range 不写 URL（避免无主参数）
+  const qs2 = vm.runInContext('serializeUrlFilters', ctx)(
+    Object.assign({}, state, { upcomingOnly: false }));
+  ok(!qs2.includes('range'), `T3b 非待开始视图不应写 range: "${qs2}"`);
 }
 
 // ---- T4 空态 serialize → 空串 ----

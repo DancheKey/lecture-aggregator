@@ -16,6 +16,8 @@
 //   T4 toggleUpcoming 开关 + 页码重置 + hasActiveFilter + clearFilters 复原
 //   T5 foldedUnits：默认折远期，筛选激活时放平（用户拍板：自动展开）
 //   T6 模板接线静态断言：计数行 v-if / toggleUpcoming 绑定 / 筛选片 v-if
+//   T7 日期范围（2026-11-04 用户要求）：待开始视图下年份下拉换成「N天内 / 7天外」，
+//      按**北京时间自然日**切分（今天=0）。含跨午夜边界、与 year 互斥、模板接线。
 //
 // 运行：node tests/js/app_upcoming_filter.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -197,6 +199,67 @@ const count = cm => computed.upcomingCount.call(cm);
   ok(/v-if="upcomingOnly"/.test(INDEX_HTML),
      'T6 筛选片应有 v-if="upcomingOnly"');
   ok(INDEX_HTML.includes('待开始'), 'T6 计数行文案「待开始」存在');
+}
+
+// ---------- T7：日期范围（2026-11-04） ----------
+{
+  // T7a 基准日 2026-10-16 10:30：off = 开始日距今天的天数（今天=0）
+  //   U1/U9 今天(0)、U2 10-20(4)、U5 10-25(9)。「N天内」= off < N，
+  //   即第 0..N-1 天共 N 个自然日（「1天内」就是今天）。
+  const at = r => titles(makeCtx({ upcomingOnly: true, upcomingRange: r }));
+  ok(at('1') === 'U1,U9', `T7a 「1天内」应只含今天（U1,U9），实际=${at('1')}`);
+  ok(at('4') === 'U1,U9', `T7a 「4天内」不应含第 4 天的 U2，实际=${at('4')}`);
+  ok(at('5') === 'U1,U2,U9', `T7a 「5天内」应含 10-20 的 U2，实际=${at('5')}`);
+  ok(at('7') === 'U1,U2,U9', `T7a 「7天内」不应含 10-25 的 U5，实际=${at('7')}`);
+  ok(at('7+') === 'U5', `T7a 「7天外」应只含 U5，实际=${at('7+')}`);
+  ok(at('') === NOT_STARTED, 'T7a 未选范围时等同于无范围筛选');
+  // 未激活待开始时，range 残留不生效（防 URL/状态残留误伤全量列表）
+  ok(titles(makeCtx({ upcomingRange: '1' })) === 'U1,U2,U3,U4,U5,U6,U7,U8,U9',
+     'T7a range 在非待开始视图下不生效');
+
+  // T7b 自然日 vs 滚动 24 小时的口径锁。E3 是第 7 天 00:01，距「现在」仅 6 天 13.5 小时：
+  //     滚动 24h 口径会把它算进「7天内」，自然日口径必须归「7天外」——这条断言就是
+  //     防有人把实现改成 (ms - nowMs) / 86400000。E1 今天 23:59(off=0)、E2 明天 00:01(off=1)、
+  //     E4 第 6 天 23:59(off=6，应仍在 7天内)。
+  const EDGE = [
+    rec('E1', { lectureStart: '2026-10-16 23:59:00' }),
+    rec('E2', { lectureStart: '2026-10-17 00:01:00' }),
+    rec('E3', { lectureStart: '2026-10-23 00:01:00' }),
+    rec('E4', { lectureStart: '2026-10-22 23:59:00' }),
+  ];
+  const edge = r => titles(makeCtx({ all: EDGE, upcomingOnly: true, upcomingRange: r }));
+  ok(edge('1') === 'E1', `T7b 「1天内」应含今天 23:59 的 E1，实际=${edge('1')}`);
+  ok(edge('2') === 'E1,E2', `T7b 「2天内」应含明天 00:01 的 E2，实际=${edge('2')}`);
+  ok(edge('7') === 'E1,E2,E4',
+     `T7b 「7天内」应含第 6 天 23:59 的 E4，实际=${edge('7')}`);
+  ok(edge('7+') === 'E3',
+     `T7b 第 7 天 00:01 的 E3 应归「7天外」（自然日口径，非滚动 24h），实际=${edge('7+')}`);
+
+  // T7c 与 year 互斥：进入待开始清年份，退出清范围
+  {
+    const cm = makeCtx({ year: '2025' });
+    methods.toggleUpcoming.call(cm);
+    ok(cm.year === '' && cm.upcomingOnly === true,
+       'T7c 进入待开始应清空 year（否则空列表且界面上看不到该条件）');
+    cm.upcomingRange = '3';
+    methods.toggleUpcoming.call(cm);
+    ok(cm.upcomingRange === '' && cm.upcomingOnly === false,
+       'T7c 退出待开始应清空 upcomingRange');
+  }
+  // T7d hasActiveFilter / clearFilters 覆盖范围档位
+  {
+    const cm = makeCtx({ upcomingOnly: true, upcomingRange: '2' });
+    ok(cm.hasActiveFilter === true, 'T7d 仅选范围时 hasActiveFilter=true');
+    methods.clearFilters.call(cm);
+    ok(cm.upcomingRange === '' && cm.hasActiveFilter === false,
+       'T7d clearFilters 应清掉范围档位');
+  }
+  // T7e 模板接线：待开始视图渲染范围下拉，否则渲染年份下拉
+  ok(/v-if="upcomingOnly" v-model="upcomingRange"/.test(INDEX_HTML),
+     'T7e 待开始视图应渲染 upcomingRange 下拉');
+  ok(/v-else v-model="year"/.test(INDEX_HTML), 'T7e 非待开始视图应渲染 year 下拉');
+  ok(INDEX_HTML.includes('7天外') && /v-for="n in 7"/.test(INDEX_HTML),
+     'T7e 下拉应含「N天内」循环与「7天外」档');
 }
 
 // ---------- 汇总 ----------

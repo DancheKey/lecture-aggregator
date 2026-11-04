@@ -90,6 +90,10 @@
        （2026-10-20 三按钮统一：移除 min-w-badge 固定占宽，计数徽标改用 v-if——
          数字为 0 时不渲染 span，按钮塌成与日历一致的图标宽，点击后才展开。） */
     .min-w-page { min-width: 36px; }
+    /* 年份 / 日期范围下拉的固定宽度（2026-11-04）：两者在待开始视图下互相替换，
+       内容宽度不同（「年份」vs「7天外」）会让搜索框随之伸缩、控件跳动。
+       取两者较宽者，切换时版式不动。 */
+    .sel-fixed { min-width: 5.5rem; }
     .max-w-college { max-width: 45%; }
     /* 触控目标下限（WCAG 2.5.8 AA 要求 ≥24×24 CSS px）：
        「展开简介 / 展开摘要」是纯文字按钮，text-11pt 行高实测仅 22px 高，
@@ -502,8 +506,17 @@
                 <option value="topic">题目</option>
                 <option value="abstract">摘要</option>
               </select>
-              <select v-model="year" aria-label="按年份筛选"
-                class="flex-none w-auto text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+              <!-- 年份 ⇄ 日期范围（2026-11-04 用户要求）：待开始的场次都在未来，年份恒为
+                   当前年（跨年场景用相对口径更准），年份筛选在该视图下无意义，故替换为
+                   「N天内 / 7天外」。两者互斥由 toggleUpcoming 与 URL 归一化保证。 -->
+              <select v-if="upcomingOnly" v-model="upcomingRange" aria-label="按开始日期筛选"
+                class="flex-none w-auto sel-fixed text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
+                <option value="">日期</option>
+                <option v-for="n in 7" :key="n" :value="String(n)">{{ n }}天内</option>
+                <option value="7+">7天外</option>
+              </select>
+              <select v-else v-model="year" aria-label="按年份筛选"
+                class="flex-none w-auto sel-fixed text-12pt rounded-lg border border-slate-200 px-1 sm:px-2 py-1.5 bg-white focus:border-blue-500 focus:outline-none">
                 <option value="">年份</option>
                 <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
               </select>
@@ -988,16 +1001,16 @@
 
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
-  <script defer src="app.core.js?v=80053c7e7b"></script>
-  <script defer src="app.state.js?v=3b77d264ad"></script>
-  <script defer src="app.computed.js?v=f44ac84574"></script>
+  <script defer src="app.core.js?v=d467390856"></script>
+  <script defer src="app.state.js?v=e7b076adfd"></script>
+  <script defer src="app.computed.js?v=1595ac7adb"></script>
   <script defer src="app.display.js?v=ec1bb21b72"></script>
   <script defer src="app.cloud.js?v=48b48189e4"></script>
-  <script defer src="app.social.js?v=fbcf9d863d"></script>
+  <script defer src="app.social.js?v=70b92390ed"></script>
   <script defer src="app.calendar.js?v=10018aacb3"></script>
   <script defer src="app.data.js?v=5b7081111e"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
-  <script defer src="app.js?v=39a201e29b"></script>
+  <script defer src="app.js?v=305e058183"></script>
   <!-- footer-counter.js：Supabase 云端计数 + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->

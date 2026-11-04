@@ -444,7 +444,7 @@ Object.assign(APP_METHODS, {
       if (this.showWantedOnly) this.showLikedOnly = false;
       this.campus = ''; this.college = '';
     },
-    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.showWantedOnly = false; this.speaker = ''; this.onlineOnly = false; this.upcomingOnly = false; this.ongoingOnly = false; this.currentPage = 1; },
+    clearFilters() { this.campus = ''; this.college = ''; this.year = ''; this.upcomingRange = ''; this.query = ''; this.searchField = ''; this.showLikedOnly = false; this.showWantedOnly = false; this.speaker = ''; this.onlineOnly = false; this.upcomingOnly = false; this.ongoingOnly = false; this.currentPage = 1; },
     /* ---------- 分页 ---------- */
     gotoPage(p) {
       if (p < 1 || p > this.totalPages) return;
@@ -483,6 +483,11 @@ Object.assign(APP_METHODS, {
       // filtered 里两条条件都要求满足，结果必然空集。URL 残留（?ongoing=1&upcoming=1）
       // 或将来新增入口都可能凑出这个组合，故在开关处直接清掉对方。
       if (this.upcomingOnly) this.ongoingOnly = false;
+      // 年份 ⇄ 日期范围互斥（2026-11-04）：待开始视图下年份下拉被替换成「N天内」，
+      // 若带着既有年份进入（如先选 2025 年再点「待开始」），会得到一个空列表且
+      // 界面上看不到那个年份条件——故进入时清 year，退出时清 range。
+      if (this.upcomingOnly) this.year = '';
+      else this.upcomingRange = '';
       this.currentPage = 1;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
@@ -492,7 +497,9 @@ Object.assign(APP_METHODS, {
     toggleOngoing() {
       this.ongoingOnly = !this.ongoingOnly;
       // 与「待开始」互斥，理由同 toggleUpcoming（两者判定互斥，同开必空集）。
-      if (this.ongoingOnly) this.upcomingOnly = false;
+      // 关闭待开始视图时一并清掉它的日期范围，否则 range 会变成无主的残留状态
+      // （下拉已不渲染，却仍算进 hasActiveFilter，让「✕ 清除」亮着）。
+      if (this.ongoingOnly) { this.upcomingOnly = false; this.upcomingRange = ''; }
       this.currentPage = 1;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
