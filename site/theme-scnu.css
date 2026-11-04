@@ -226,6 +226,26 @@ tbody tr:hover td { background-color: rgba(0, 45, 84, 0.06) !important; }
 /* 首页/统计页 hover 反馈：米白 → 蓝灰半透明，与浅蓝主题同语言 */
 .hover\:bg-slate-50:hover { background-color: rgba(0, 45, 84, 0.06) !important; }
 
+/* ③ 移动端统计表（sm:hidden 块）行分隔（2026-11-04 用户反馈）：
+   移动端不是 <table> 而是 #m-scrollx 内的 flex div 行，上面给趋势页表格写的
+   td/tbody 规则命中不了它；div 行自带的 border-slate-100（极浅灰）在浅蓝
+   容器 #eef4fa 上几乎隐形 → 整片同色，「每个学院一条」的感觉消失。
+   对齐桌面观感：行线加深为蓝灰 + 斑马纹 + 列竖线蓝灰。
+   注：斑马纹用 :not(:nth-last-child(1)) 排除容器最后一个 div（合计行），
+   合计行保持 .bg-slate-50→#dfe9f4 的突出底色；sticky 学院列
+   （.mobile-sticky-left，bg-white→#eef4fa 不透明）必须与偶数行同步染色，
+   否则行背景被列盖住出现色差。 */
+#m-scrollx > .flex { border-bottom-color: rgba(0, 45, 84, 0.16) !important; }
+#m-scrollx > .flex:nth-child(even):not(:nth-last-child(1)) {
+  background-color: rgba(0, 45, 84, 0.028) !important;
+}
+#m-scrollx > .flex:nth-child(even):not(:nth-last-child(1)) .mobile-sticky-left {
+  background-color: rgba(0, 45, 84, 0.028) !important;
+}
+#m-scrollx [class*="border-r"] {
+  border-right-color: rgba(0, 45, 84, 0.10) !important;
+}
+
 /* =====================================================================
  * 签名点缀：分组装饰竖条 = 校徽红（全站唯一 w-1 h-5 圆头竖条）
  * ===================================================================== */
