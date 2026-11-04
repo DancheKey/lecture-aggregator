@@ -520,7 +520,14 @@ def main():
 
     os.makedirs(OUT_DIR, exist_ok=True)
     first, last = snaps[0], snaps[-1]
-    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    # 2026-11-04 修：now 必须钉死东八区。原 datetime.datetime.now() 是 naive
+    # 时间、取机器本地时区——本地跑是北京时间，CI runner（UTC）跑出来比北京
+    # 早 8 小时，出现「生成于 2026-11-03 21:49 · 覆盖至 2026-11-04」的假矛盾
+    # （实为北京 11-04 05:49）。快照 date/capturedAt 均为北京时间，生成时刻
+    # 与之同区才自洽。
+    now = datetime.datetime.now(
+        datetime.timezone(datetime.timedelta(hours=8))
+    ).strftime('%Y-%m-%d %H:%M')
 
     # 2026-10-02：数据与脚本各自出片为独立文件，页面只留外链引用。
     # 这样做的直接收益是 CSP 的 script-src 可从 "'self' 'unsafe-inline'"
