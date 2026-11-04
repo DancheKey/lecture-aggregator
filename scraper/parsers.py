@@ -910,13 +910,22 @@ def format_meeting_location(plat, num):
     用户口径：线上讲座不再用独立的「会议号」字段展示，一律并入 location，
     显示为「地点 <平台> <号码>」。腾讯会议 9 位纯数字归一为 xxx-xxx-xxx；
     Zoom 等其它平台号码去除空格后原样保留。
+    2026-11-04 用户拍板：Zoom 与「腾讯会议」对等——显示名带「会议」二字
+    （Zoom → Zoom会议），11 位号码归一为 3-4-4 分组（964-5290-9618 式）。
     """
     num = re.sub(r'[\s-]+', '', str(num or ''))
+    if plat == 'Zoom会议':
+        plat = 'Zoom'  # 内部单一语义：显示名由下方 disp 统一转「Zoom会议」（幂等入口）
+    disp = 'Zoom会议' if plat == 'Zoom' else plat
     if not num:
-        return plat or ''
+        return disp or ''
     if plat == '腾讯会议' and re.fullmatch(r'\d{9}', num):
         num = f'{num[:3]}-{num[3:6]}-{num[6:]}'
-    return f'{plat} {num}'.strip() if plat else num
+    elif plat == 'Zoom' and re.fullmatch(r'\d{11}', num):
+        num = f'{num[:3]}-{num[3:7]}-{num[7:]}'
+    elif plat == 'Zoom' and re.fullmatch(r'\d{9}', num):
+        num = f'{num[:3]}-{num[3:6]}-{num[6:]}'  # 旧版 9 位 Zoom 号，同腾讯惯例 3-3-3
+    return f'{disp} {num}'.strip() if plat else num
 
 
 _MEETING_PLAT_RE = re.compile(r'腾讯会议|Zoom|zoom|Webex|webex|钉钉|飞书|腾讯课堂')
@@ -1039,11 +1048,12 @@ def _clean_location(loc, title=None):
     # 纯线上会议值（平台 + 号码）直接规范化返回（2026-09-23）：避免下方「统一清空格」
     # 把「平台 号码」之间的空格粘连（如 Zoom 87397841982 → Zoom87397841982）。
     _mp_pure = re.fullmatch(
-        r'\s*(腾讯会议|Zoom|Webex|钉钉|飞书|腾讯课堂)\s*[:：]?\s*'
+        r'\s*(腾讯会议|Zoom会议|Zoom|Webex|钉钉|飞书|腾讯课堂)\s*[:：]?\s*'
         r'(\d{3}[\s-]?\d{3}[\s-]?\d{3}|\d{3}[\s-]\d{4}[\s-]\d{4}|\d{9,12})\s*',
         loc, re.I)
     if _mp_pure:
-        _p = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp_pure.group(1), _mp_pure.group(1))
+        _p = {'zoom': 'Zoom', 'zoom会议': 'Zoom', 'webex': 'Webex'}.get(
+            _mp_pure.group(1).lower(), _mp_pure.group(1))
         return format_meeting_location(_p, _mp_pure.group(2))
     meeting = _extract_meeting_info(orig)  # 线上会议平台+会议号（如"腾讯会议 123-456-789"），无则空串
     loc = loc.strip()

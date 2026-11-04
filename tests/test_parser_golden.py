@@ -307,7 +307,8 @@ CASES = [
     # （11 位 Zoom 号、3-4-4 分组）。旧 FB3 ② 抽取正则①平台词大小写敏感（只列 Zoom|zoom，
     # 失配全大写 ZOOM）②会议号只认 3-3-3 / 9-11 连写，漏掉 3-4-4 分组 → location 空、
     # 未识别为线上。修复：平台词加 re.I + 会议号补 3-4-4 + 平台名归一（ZOOM→Zoom）
-    # + is_online_lecture 判据加 re.I。锁 location='Zoom 97015264436' 且派生 isOnline=True。
+    # + is_online_lecture 判据加 re.I。2026-11-04 二次拍板：Zoom 显示名带「会议」且
+    # 11 位号归一 3-4-4 分组（与腾讯会议对等），锁 location='Zoom会议 970-1526-4436'。
     {'url': 'http://maths.scnu.edu.cn/a/20220513/7332.html', 'fixture': 'maths7332.html',
      'count': 1, 'speakers': ['徐洪国'], 'topic_sub': ['QR algorithm']},
 ]
@@ -437,8 +438,11 @@ class GoldenTest(_GoldenCacheMixin):
     def test_maths7332_zoom_online_location(self):
         """maths7332：全大写「ZOOM会议：970 1526 4436」须识别为线上会议地点。
 
-        锁 2026-11-04 修复（FB3 ② 大小写敏感 + 缺 3-4-4 会议号分组）：
-        - location 须抽出 'Zoom 97015264436'（平台名归一成规范 Zoom，号码去空格）；
+        锁 2026-11-04 修复（FB3 ② 大小写敏感 + 缺 3-4-4 会议号分组）；
+        同日二次拍板：Zoom 与腾讯会议对等——显示名带「会议」、11 位号归一
+        3-4-4 分组，且 _clean_location 快速路径须认「Zoom会议」平台词
+        （否则通用路径「含中文去空格」会把空格粘连回连写）：
+        - location 须为 'Zoom会议 970-1526-4436'；
         - 派生 isOnline 判据（is_online_lecture）须为 True。
         此前 location 为空、isOnline 漏判。"""
         html = load_html({'fixture': 'maths7332.html',
@@ -448,7 +452,7 @@ class GoldenTest(_GoldenCacheMixin):
         recs = recs if isinstance(recs, list) else [recs]
         self.assertEqual(len(recs), 1)
         r = recs[0]
-        self.assertEqual(r.get('location'), 'Zoom 97015264436')
+        self.assertEqual(r.get('location'), 'Zoom会议 970-1526-4436')
         self.assertTrue(_fv.is_online_lecture(r),
                         'location 含 Zoom 会议号，应派生 isOnline=True')
 
