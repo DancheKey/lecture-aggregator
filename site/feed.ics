@@ -8,24 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://iqm.scnu.edu.cn/a/20261103/569.html@danchekey.github.io
-DTSTAMP:20261103T125151Z
-DTSTART:20261104T020000Z
-DTEND:20261104T030000Z
-SUMMARY:Tao Xu——Stars and Black Holes as Astrophysical Particle Factor
- ies
-LOCATION:理8栋230会议室
-DESCRIPTION:题目：Stars and Black Holes as Astrophysical Particle Facto
- ries\n主讲：Tao Xu（Hong Kong University of Science and Technology）
- \n地点：理8栋230会议室\n主办：量子物质研究院
-URL:http://iqm.scnu.edu.cn/a/20261103/569.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://em.scnu.edu.cn/a/20261105/11230.html@danchekey.github.io
 DTSTAMP:20261103T125151Z
 DTSTART:20261105T043000Z
