@@ -5071,12 +5071,19 @@ def _extract_topic_location(_st, result, title, loc_times):
                 _loc_fb = format_meeting_location(_plat, _mid.group(1))
             # ② 平台关键词紧邻号码（原 FB3，兜底①未命中的写法）
             if not _loc_fb:
+                # ② 平台关键词紧邻号码（原 FB3，兜底①未命中的写法）。
+                # ⚠ 平台词须 re.I：源页常写全大写「ZOOM会议：…」，若只列 Zoom|zoom
+                # 会大小写失配、整条抽不到（7332 即此坑）。同时会议号补 3-4-4 分组——
+                # Zoom 11 位号通用 3-4-4 展示（如「970 1526 4436」），原 3-3-3/9-11 连写口径漏掉。
                 _mp = re.search(
                     r'(腾\s*讯\s*会\s*议|Zoom|zoom|钉钉|飞书|腾讯课堂|Webex|webex|瞩目)'
                     r'[^\d\n]{0,10}?'
-                    r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{9,11})', _t)
+                    r'(\d{3}[-\s]?\d{3}[-\s]?\d{3}|\d{3}[-\s]?\d{4}[-\s]?\d{4}|\d{9,11})', _t, re.I)
                 if _mp:
-                    _p2 = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp.group(1), _mp.group(1))
+                    # 平台名归一成规范大小写（Zoom/Webex）；源页常写全大写「ZOOM」，
+                    # 须按 .lower() 取键才能命中映射，否则 location 残留「ZOOM」会让
+                    # is_online_lecture 的大小写敏感判据失配（7332 即此坑）。
+                    _p2 = {'zoom': 'Zoom', 'webex': 'Webex'}.get(_mp.group(1).lower(), _mp.group(1))
                     _loc_fb = format_meeting_location(_p2, _mp.group(2))
         # FB4：议程括号内会场（ggy5326「会议签到（文3栋一楼108门前）」「（一楼第二演讲厅）」）。
         # 正文无「地点：」标签、页脚地址被 FB1 正确拒绝时，从议程/正文括号内取第一个

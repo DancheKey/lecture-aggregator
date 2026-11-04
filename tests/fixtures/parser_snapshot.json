@@ -1292,6 +1292,36 @@
         }
       ],
       "url": "http://psy.scnu.edu.cn/a/20130301/127.html"
+    },
+    {
+      "fixture": "maths7332.html",
+      "records": [
+        {
+          "abstract": "We introduce the two-sided Rayleigh quotient shift for the QR algorithm for non-Hermitian matrices. The explicit form of the singly shifted QR iteration is employed so that the approximated right eigenvectors can be generated in an economic manner. A modified version of the shift strategy is proposed, where the approximated right eigenvectors are computed by using the current upper Hessenberg matrix only.We also introduce the same type of double shift strategies. We show that the QR algorithm equipped with these shifts normally has a cubic local convergence rate.",
+          "campus": "",
+          "college": "",
+          "images": [],
+          "inviter": "陈小山",
+          "lectureEnd": "2022-05-14 10:00:00",
+          "lectureStart": "2022-05-14 09:00:00",
+          "location": "Zoom 97015264436",
+          "organizer": "",
+          "publishTime": "2022-05-13 14:25:52",
+          "publishTimeSource": "label",
+          "sourceUrl": "http://maths.scnu.edu.cn/a/20220513/7332.html",
+          "speaker": "徐洪国",
+          "speakerAffiliation": "美国Kansas大学",
+          "speakerBio": "徐洪国教授主要从事数值代数研究工作。博士毕业于复旦大学,师从蒋尔雄教授,博士毕业后获洪堡基金资助,获得Householder奖。现美国Kansas大学任教。在控制论、结构矩阵(Hamilton矩阵与Symplectic矩阵)、奇异值分解和极分解等数值代数各个领域做了许多很好科研工作。在期刊《Numerishe Mathematik》,《SIAM J Matrix Anal Appl》,《BIT Numer Math》,《Mathematics of Computation》和《Automatic》等发表论文40多篇。",
+          "speakerTitle": "",
+          "timeConfidence": "high",
+          "timeNote": "authoritative-label",
+          "timeUnknown": false,
+          "timeUnknownSource": "auto",
+          "title": "学术报告-徐洪国",
+          "topic": "QR algorithm with two-sided Rayleigh quotient shifts"
+        }
+      ],
+      "url": "http://maths.scnu.edu.cn/a/20220513/7332.html"
     }
   ]
 }

@@ -715,7 +715,8 @@ def actual_campus(item):
 # 而非实体地点。存量量化：腾讯会议 247 / 线上 9 / Zoom 6，共 262 条、
 # 无误伤样例。「会议号」单独列出——有的源只写「会议号：xxx」不写平台名。
 _ONLINE_LOCATION_PAT = re.compile(
-    r'腾讯会议|Zoom|Meeting ID|会议号|直播链接|网络直播|观看方式|线上'
+    r'腾讯会议|Zoom|Meeting ID|会议号|直播链接|网络直播|观看方式|线上',
+    re.I,
 )
 
 

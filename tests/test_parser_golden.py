@@ -64,6 +64,7 @@ os.environ.setdefault('SCNU_LLM_TEXT', '0')
 os.environ.setdefault('SCNU_LLM_RICH', '0')
 
 import parsers as P
+import field_vocab as _fv  # noqa: E402  # is_online_lecture 派生判据（maths7332 线上地点回归）
 
 # VLM 密封化：provider 配置打桩为「存在但不可达」（.invalid 为 RFC 6761 保留、永不解析）。
 # 配合缓存夹具：命中缓存直接返回（真实路径），缓存未命中才会请求该地址并快速失败。
@@ -302,6 +303,13 @@ CASES = [
     # 直播已下线(404)且无本地副本：唯一保留 skip 语义的 case（文档化例外）。
     {'url': 'http://ctld.scnu.edu.cn/a/20250310/4409.html', 'fixture': 'ctld4409.html',
      'count': 2, 'speakers': ['卢晓中', '赵淦森'], 'topic_sub': [], 'may_404': True},
+    # 2026-11-04 线上会议地点识别修复回归：源页写全大写「ZOOM会议：970 1526 4436」
+    # （11 位 Zoom 号、3-4-4 分组）。旧 FB3 ② 抽取正则①平台词大小写敏感（只列 Zoom|zoom，
+    # 失配全大写 ZOOM）②会议号只认 3-3-3 / 9-11 连写，漏掉 3-4-4 分组 → location 空、
+    # 未识别为线上。修复：平台词加 re.I + 会议号补 3-4-4 + 平台名归一（ZOOM→Zoom）
+    # + is_online_lecture 判据加 re.I。锁 location='Zoom 97015264436' 且派生 isOnline=True。
+    {'url': 'http://maths.scnu.edu.cn/a/20220513/7332.html', 'fixture': 'maths7332.html',
+     'count': 1, 'speakers': ['徐洪国'], 'topic_sub': ['QR algorithm']},
 ]
 
 
@@ -424,6 +432,25 @@ class GoldenTest(_GoldenCacheMixin):
         self.assertEqual(r.get('speakerTitle'), '网络中心主任')
         # 2026-09-09 规则增强：倒装职务推导机构名（无法补校名，取职务机构）
         self.assertEqual(r.get('speakerAffiliation'), '网络中心')
+
+
+    def test_maths7332_zoom_online_location(self):
+        """maths7332：全大写「ZOOM会议：970 1526 4436」须识别为线上会议地点。
+
+        锁 2026-11-04 修复（FB3 ② 大小写敏感 + 缺 3-4-4 会议号分组）：
+        - location 须抽出 'Zoom 97015264436'（平台名归一成规范 Zoom，号码去空格）；
+        - 派生 isOnline 判据（is_online_lecture）须为 True。
+        此前 location 为空、isOnline 漏判。"""
+        html = load_html({'fixture': 'maths7332.html',
+                          'url': 'http://maths.scnu.edu.cn/a/20220513/7332.html'})
+        recs = P.parse_detail(html, 'http://maths.scnu.edu.cn/a/20220513/7332.html',
+                              '', '', default_year=None)
+        recs = recs if isinstance(recs, list) else [recs]
+        self.assertEqual(len(recs), 1)
+        r = recs[0]
+        self.assertEqual(r.get('location'), 'Zoom 97015264436')
+        self.assertTrue(_fv.is_online_lecture(r),
+                        'location 含 Zoom 会议号，应派生 isOnline=True')
 
 
 # 单例超时与慢例观测（2026-10-14 P2-7）：ctld4299/4410 等含外链图的用例，

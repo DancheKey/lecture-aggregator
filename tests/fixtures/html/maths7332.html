@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<!-- ========== Meta Tags ========== -->
+<meta charset="utf-8">
+<meta name="renderer" content="webkit">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="keywords" content="" />
+<meta name="description" content="学术报告题   目：QR algorithm with two-sided Rayleigh quotient shifts 报 告 人：徐洪国 教授 (邀请人：陈小山 )      " />
+<meta property="og:title" content="学术报告-徐洪国 - 学术交流 - 华南师范大学数学科学学院"/>
+<meta property="og:description" content="学术报告题   目：QR algorithm with two-sided Rayleigh quotient shifts 报 告 人：徐洪国 教授 (邀请人：陈小山 )      "/>
+<meta property="og:image" content="//statics.scnu.edu.cn/statics/images/scnu/scnu_logo_single.png"/>
+<!-- ========== Page Title ========== -->
+<title>学术报告-徐洪国 - 学术交流 - 华南师范大学数学科学学院</title>
+<!-- ========== Favicon Icon ========== -->
+<link rel="shortcut icon" href="//statics.scnu.edu.cn/statics/images/favicon.ico" type="image/x-icon">
+<!-- ========== Start Stylesheet ========== -->
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/bootstrap.min.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/font-awesome.min.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/flaticon-set.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/magnific-popup.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/owl.carousel.min.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/owl.theme.default.min.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/animate.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/bootsnav.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/style.css" rel="stylesheet">
+<link href="//statics.scnu.edu.cn/statics/files/examin/css/responsive.css" rel="stylesheet" />
+<link href="//statics.scnu.edu.cn/statics/css/maths/customer.css?ver=b1UqSp" rel="stylesheet" />
+<!-- ========== End Stylesheet ========== -->
+<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+<!--[if lt IE 9]>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/html5/html5shiv.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/html5/respond.min.js"></script>
+<![endif]-->
+<!-- ========== Google Fonts ========== -->
+<link href="//statics.scnu.edu.cn/statics/css/fonts/opensans.css" rel="stylesheet">
+<link href="//statics.scnu.edu.cn/statics/css/fonts/poppins-400-500-600-700-800.css" rel="stylesheet">
+<!-- jQuery Frameworks
+============================================= -->
+<script src="//statics.scnu.edu.cn/statics/files/examin/js/jquery-1.12.4.min.js"></script>
+</head>
+
+<body>
+	<!-- Preloader Start -->
+	<div class="se-pre-con">
+		<div class="loading"></div>
+	</div>
+	<!-- Preloader Ends -->
+
+	<!-- Header
+	============================================= -->
+	<header id="home" class="index-header position-z inner-header">
+		<!-- Start Header Top
+		============================================= -->
+		<div class="top-bar-area address-two-lines bg-dark text-light position-z">
+			<div class="container">
+				<div class="row">
+					<div class="col-md-6 address-info">
+						<div class="info box">
+							<ul>
+								<li><a href="//www.scnu.edu.cn" target="_blank"><i class="fas fa-home"></i> 华南师范大学首页</a></li>
+								<li><a href="//sso.scnu.edu.cn" target="_blank"><i class="fas fa-university"></i> 综合服务平台</a></li>
+								<li><a href="https://zshs.cbpt.cnki.net/WKD/WebPublication/index.aspx?mid=ZSHS" target="_blank"><i class="fas fa-upload"></i> 《中学数学研究》投稿</a></li>
+								<li><a href="https://reservation.scnu.edu.cn/v2/reserve/hallView?id=21" target="_blank"><i class="fas fa-warehouse"></i> 数科院场地借用</a></li>
+							</ul>
+						</div>
+					</div>
+					<div class="text-right col-md-6 address-info">
+						<div class="usercontrol">
+							<ul>
+								<li><span id="realname"></span></li>
+								<li class="dropdown">
+									<a href="javascript:" class="dropdown-toggle" data-toggle="dropdown" data-hover="dropdown">用户中心</a>
+									<ul class="dropdown-menu">
+										<li><a href="https://module.scnu.edu.cn/lists-8828-1-54.html">学院文件</a></li>
+										<li><a href="https://user.scnu.edu.cn/member/index/account_manage_info.html?sitename=maths">修改简历</a></li>
+										<!-- <li><a href="https://user.scnu.edu.cn/index.php?m=member&c=home&a=account_manage_index&t=1">修改简历</a></li> -->
+										<li class="viewresume"></li>
+									</ul>
+								</li>
+								<li class="logout-text"></li>
+							</ul>
+						</div>
+						<div class="userlogin"><ul><li class="login-text"></li></ul></div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- End Header Top -->
+		<!-- Start Navigation -->
+		<nav class="navbar navbar-defaultnavbar-transparent white pad-top bootsnav">
+
+			<!-- Start Header Navigation -->
+			<div class="navbar-header">
+				<div class="container">
+					<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-menu">
+						<i class="fa fa-bars"></i>
+					</button>
+					<a class="navbar-brand" href="http://maths.scnu.edu.cn" title="华南师范大学数学科学学院">
+						<img src="//statics.scnu.edu.cn/pics/maths/2023/0920/20230920045155804.png" class="logo logo-display" alt="Logo">
+					</a>
+					<div class="top-search pull-right">
+																														<a href="javascript:;" onclick="setmodel(489, $(this));" style="display:none" hidefocus="true"  class="on" >新闻信息</a>																		<form action="https://module.scnu.edu.cn/index.php" method="GET" target="_blank">
+							<input type="hidden" name="m" value="search" />
+							<input type="hidden" name="c" value="index" />
+							<input type="hidden" name="a" value="init" />
+							<input type="hidden" name="typeid" value="489" id="typeid" />
+							<input type="hidden" name="siteid" value="54" id="siteid" />
+							<input type="text" name="q" class="form-control" placeholder="搜索全站">
+							<button type="submit" name="submit">
+								<i class="fas fa-search"></i>
+							</button>
+						</form>
+					</div>
+				</div>
+			</div>
+			<!-- End Header Navigation -->
+
+			<!-- Collect the nav links, forms, and other content for toggling -->
+			<div class="collapse navbar-collapse" id="navbar-menu">
+				<div class="container">
+					<ul class="nav navbar-nav" data-in="#" data-out="#">
+						<li><a href="http://maths.scnu.edu.cn">首页</a></li>
+																								<li class="dropdown">
+							<a href="http://maths.scnu.edu.cn/xueyuangaikuang/" class="dropdown-toggle" data-toggle="dropdown">学院概况</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/xueyuangaikuang/xueyuanjieshao/"> 学院简介</a></li>
+																<li><a href="http://maths.scnu.edu.cn/xueyuangaikuang/lingdaojigou/">党政领导</a></li>
+																<li><a href="http://maths.scnu.edu.cn/xueyuangaikuang/zzjg/"> 组织机构</a></li>
+																							</ul>
+													</li>
+																		<li class="dropdown">
+							<a href="http://maths.scnu.edu.cn/shizhi/" class="dropdown-toggle" data-toggle="dropdown">师资队伍</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/shizhi/quanyuan/">专任教师</a></li>
+																<li><a href="http://maths.scnu.edu.cn/shizhi/xsxds/">学术型学位导师</a></li>
+																<li><a href="http://maths.scnu.edu.cn/shizhi/zhuanyexuewei/">专业型学位导师</a></li>
+																<li><a href="http://maths.scnu.edu.cn/shizhi/tuixiu3/">退休人员</a></li>
+																							</ul>
+													</li>
+																		<li class="active dropdown" class="active" class="dropdown">
+							<a href="http://maths.scnu.edu.cn/kexueyanjiu/" class="dropdown-toggle" data-toggle="dropdown">科学研究</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/kexueyanjiu/keyanjijin/"> 科研项目</a></li>
+																<li><a href="http://maths.scnu.edu.cn/kexueyanjiu/xueshujiaoliu/">学术交流</a></li>
+																<li><a href="http://maths.scnu.edu.cn/kexueyanjiu/keyanlunwen/">科研论文</a></li>
+																							</ul>
+													</li>
+																		<li class="dropdown">
+							<a href="http://maths.scnu.edu.cn/benkesheng/" class="dropdown-toggle" data-toggle="dropdown">本科生教育</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/benkesheng/benkeshengpeiyang/">本科生培养方案与大纲</a></li>
+																<li><a href="http://maths.scnu.edu.cn/benkesheng/kcyjcjs/">课程与教材建设</a></li>
+																<li><a href="http://maths.scnu.edu.cn/benkesheng/jxcgyjxjl/">教学成果与教学奖励</a></li>
+																							</ul>
+													</li>
+																		<li class="dropdown">
+							<a href="http://maths.scnu.edu.cn/yanjiusheng/" class="dropdown-toggle" data-toggle="dropdown">研究生教育</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/yanjiusheng/zhuanyeshuoshipeiyang/">专业型硕士培养方案</a></li>
+																<li><a href="http://maths.scnu.edu.cn/yanjiusheng/sspy/">学术型硕士培养方案</a></li>
+																<li><a href="http://maths.scnu.edu.cn/yanjiusheng/boshipeiyang/"> 博士培养方案</a></li>
+																<li><a href="http://maths.scnu.edu.cn/yanjiusheng/jiaoyushuoshi/">教育硕士“一生一优课”</a></li>
+																<li><a href="http://maths.scnu.edu.cn/yanjiusheng/zhuanyeshuoshiluntan/">专业硕士论坛</a></li>
+																							</ul>
+													</li>
+																		<li class="dropdown">
+							<a href="http://maths.scnu.edu.cn/zybps/" class="dropdown-toggle" data-toggle="dropdown">专业白皮书</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/zybps/sxyyysx/">数学与应用数学（师范）专业白皮书</a></li>
+																<li><a href="http://maths.scnu.edu.cn/zybps/xxyjskx/">信息与计算科学专业白皮书</a></li>
+																<li><a href="http://maths.scnu.edu.cn/zybps/jrsx/">金融数学专业白皮书</a></li>
+																<li><a href="http://maths.scnu.edu.cn/zybps/yytjx/">应用统计学专业白皮书</a></li>
+																							</ul>
+													</li>
+																		<li class="dropdown">
+							<a href="http://maths.scnu.edu.cn/yuanyou/" class="dropdown-toggle" data-toggle="dropdown">院友工作</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/yuanyou/yuanyouminglu/">院友名录（录入中）</a></li>
+																<li><a href="http://maths.scnu.edu.cn/yuanyou/gongzuodongtai/">工作动态</a></li>
+																<li><a href="http://maths.scnu.edu.cn/yuanyou/xiaoyoufengcai/">校友风采</a></li>
+																							</ul>
+													</li>
+																		<li class="dropdown">
+							<a href="http://maths.scnu.edu.cn/rencaiyinjin/" class="dropdown-toggle" data-toggle="dropdown">人才招聘</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/rencaiyinjin/lxwm2/">联系我们</a></li>
+																<li><a href="http://maths.scnu.edu.cn/rencaiyinjin/zpqsx/">招聘启事</a></li>
+																							</ul>
+													</li>
+																		<li class="dropdown">
+							<a href="http://maths.scnu.edu.cn/shehuifuwu2/" class="dropdown-toggle" data-toggle="dropdown">社会服务</a>
+														<ul class="dropdown-menu">
+																								<li><a href="http://maths.scnu.edu.cn/shehuifuwu2/tongzhi/">最新通知</a></li>
+																<li><a href="http://maths.scnu.edu.cn/shehuifuwu2/jiaofazhongxin/">教发中心</a></li>
+																<li><a href="http://maths.scnu.edu.cn/shehuifuwu2/lianmeng/">中小学联盟</a></li>
+																							</ul>
+													</li>
+																	</ul>
+				</div>
+			</div><!-- /.navbar-collapse -->
+		</nav>
+		<!-- End Navigation -->
+	</header>
+	<!-- End Header -->
+	<!-- Start Breadcrumb
+	============================================= -->
+	<div class="sitenav">
+		<div class="container">
+			<div class="row">
+				<div class="col-md-12">
+					<ul class="breadcrumb">
+						<li><a href="http://maths.scnu.edu.cn/"><i class="fas fa-home"></i> 主页</a></li>
+						<li><a href="http://maths.scnu.edu.cn/kexueyanjiu/xueshujiaoliu/">学术交流</a></li>
+						<li class="active">正文</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- End Breadcrumb -->
+
+	<!-- Start Article
+	============================================= -->
+	<div class="blog-area full-blog standard single-blog full-blog article-area pb-40">
+		<div class="container">
+			<div class="row">
+				<div class="blog-items">
+					<div class="blog-content col-md-12">
+						<div class="item-box">
+							<div class="item">
+								<div class="info">
+									<h3>学术报告-徐洪国</h3>
+									<div class="meta">
+										<ul>
+											<li><a href="#"><i class="fas fa-user"></i> 华南师范大学数学科学学院</a></li>
+											<li><a href="#"><i class="fas fa-time"></i> 2022-05-13 14:25:52</a></li>
+											<li><span>点击：<span id="hits"></span></span></li>
+										</ul>
+									</div>
+									<div class="article-content">
+										<p><br/></p><p style="white-space: normal; text-align: center; line-height: 20px;"><strong><span style="color: #6D5881; font-family: 宋体; font-size: 19px;">学术报告</span></strong></p><p style="white-space: normal; text-indent: 37px; background-color: white;"><br/></p><p style="white-space: normal; text-indent: 37px; background-color: white;"><span style="color: #6D5881; font-family: 宋体; font-size: 19px;">题 &nbsp; &nbsp; &nbsp;目：</span>&nbsp;QR algorithm with two-sided Rayleigh quotient shifts <br/><br/><span style="color: #6D5881; font-family: 宋体; font-size: 19px;"></span></p><p style="white-space: normal; text-indent: 37px; background-color: white;"><span style="color: #6D5881; font-family: 宋体; font-size: 19px;"><br/></span></p><p style="white-space: normal; text-indent: 37px; background-color: white;"><span style="color: #6D5881; font-family: 宋体; font-size: 19px;">报 &nbsp;告 &nbsp;人：<span style="left: 141.328px; top: 158.394px; font-size: 16.8527px; font-family: sans-serif; transform: scaleX(0.999912);">徐洪国</span><span style="left: 175.034px; top: 158.394px; font-size: 16.8527px; font-family: sans-serif;">&nbsp; </span></span>教授<span style="font-family: 宋体; font-size: 19px;">&nbsp; (邀请人：陈小山 </span><span style="font-family: 宋体; font-size: 19px;">)</span><br/></p><p style="white-space: normal;">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;&nbsp; 美国Kansas大学</p><p style="white-space: normal;"><br/></p><p style="white-space: normal; text-indent: 37px;"><span style="color: #6D5881; font-family: 宋体; font-size: 19px;">时 &nbsp; &nbsp; &nbsp;间：</span><span style="font-family: 宋体; font-size: 19px;">2022-05-14&nbsp; 09：00-10：00</span></p><p style="white-space: normal; text-indent: 37px;"><br/></p><p style="white-space: normal; text-indent: 37px;"><span style="color: #6D5881; font-family: 宋体; font-size: 19px;">ZOOM会议：970 1526 4436&nbsp; 密码：312715</span></p><p style="white-space: normal; text-indent: 37px;"><br/></p><p style="white-space: normal; text-indent: 37px;"><span style="color: #6D5881; font-family: 宋体; font-size: 19px;">报告人简介:</span></p><p style="white-space: normal;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+徐洪国教授主要从事数值代数研究工作。博士毕业于复旦大学，师从蒋尔雄教授，博士毕业后获洪堡基金资助，获得Householder奖。现美国Kansas大学任教。在控制论、结构矩阵（Hamilton矩阵与Symplectic矩阵）、奇异值分解和极分解等数值代数各个领域做了许多很好科研工作。在期刊《Numerishe Mathematik》,《SIAM J Matrix Anal Appl》，《BIT Numer Math》,《Mathematics of Computation》和《Automatic》等发表论文40多篇。<br/><br/><span style="color: #6D5881; font-family: 宋体; font-size: 19px;"></span></p><p style="white-space: normal; text-indent: 37px;"><span style="color: #6D5881; font-family: 宋体; font-size: 19px;">摘 &nbsp; &nbsp; &nbsp;要：</span></p><p>&nbsp;&nbsp;&nbsp;
+ &nbsp;&nbsp;&nbsp;We introduce the two-sided Rayleigh quotient shift for the QR algorithm for non-Hermitian matrices.&nbsp; The explicit form of the singly shifted QR iteration is employed so that the&nbsp; approximated&nbsp; right eigenvectors can be generated in an economic manner. A modified version of the shift strategy is proposed, where the&nbsp; approximated right eigenvectors are computed by using the current upper Hessenberg matrix only.We also introduce the same type of double shift strategies. We show that the QR algorithm equipped with these shifts normally&nbsp; has a cubic local convergence rate.<br/><br/></p><p><br/><br/></p><p><br/><br/></p><p><br/></p><p><br/><br/></p><p><br/><br/></p><p><br/><br/></p><p><br/></p>									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- End Article -->
+	<script src="https://module.scnu.edu.cn/api.php?op=count&id=7332&modelid=458"></script>
+	<script src="//statics.scnu.edu.cn/statics/js/jquery.sgallery.js"></script>
+	<script>
+	$(function(){
+		$('.article-content img').LoadImage(true, 550, 660,'//statics.scnu.edu.cn/statics/images/s_nopic.gif');
+	})
+	</script>
+
+<!-- Start Footer
+	============================================= -->
+	<footer class="bg-fixed shadow dark-hard default-padding-top text-light" style="background-image: url(https://statics.scnu.edu.cn/statics/images/maths/2023/0426/20230426052815700.jpg); background-size:cover;">
+		<div class="container">
+			<div class="row">
+				<div class="f-items mb-40">
+					<div class="col-md-4 item">
+						<div class="f-item f-logo fix">
+							<div class="f-logo-img">
+								<img src="//statics.scnu.edu.cn/statics/images/maths/logo_footer.png">
+								<p>联系地址：广东省广州市天河区中山大道西55号</p>
+								<p>联系电话：020-85213482</p>
+								<p>邮政编码：510631</p>
+							</div>
+						</div>
+					</div>
+					<div class="col-md-3 col-sm-6 item">
+						<div class="f-item link">
+							<h4 class="pb-15">相关链接</h4>
+							<ul>
+																								<li><a href="http://maths.scnu.edu.cn/shehuifuwu2/tongzhi/" title="" target="_blank"></a></li>
+																<li><a href="http://maths.scnu.edu.cn/shehuifuwu2/jiaofazhongxin/" title="" target="_blank"></a></li>
+																<li><a href="http://maths.scnu.edu.cn/shehuifuwu2/lianmeng/" title="" target="_blank"></a></li>
+																							</ul>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- Start Footer Bottom -->
+		<div class="footer-bottom">
+			<div class="container">
+				<div class="row">
+					<div class="col-md-12 text-center">
+						<p>华南师范大学 版权所有 <a href="http://beian.miit.gov.cn/" target="_blank">粤ICP备05008875号</a> | Copyright &copy; 2026 South China Normal University. All Rights Reserved</p>
+						<p style="display:none"><script>
+  var _paq = window._paq = window._paq || [];
+  /* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+  _paq.push(['trackPageView']);
+  _paq.push(['enableLinkTracking']);
+  (function() {
+    var u="https://piwik.scnu.edu.cn/";
+    _paq.push(['setTrackerUrl', u+'matomo.php']);
+    _paq.push(['setSiteId', '44']);
+    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+    g.async=true; g.src=u+'matomo.js'; s.parentNode.insertBefore(g,s);
+  })();
+</script></p>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- End Footer Bottom -->
+	</footer>
+	<!-- End Footer -->
+
+	<!-- jQuery Frameworks
+	============================================= -->
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/bootstrap.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/equal-height.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/jquery.appear.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/jquery.easing.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/jquery.magnific-popup.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/modernizr.custom.13711.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/owl.carousel.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/wow.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/isotope.pkgd.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/imagesloaded.pkgd.min.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/count-to.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/bootsnav.js"></script>
+	<script src="//statics.scnu.edu.cn/statics/files/examin/js/main.js"></script>
+	<script src="https://res.wx.qq.com/open/js/jweixin-1.2.0.js"></script>
+	<script>
+	var wxshare = {
+		title: "学术报告-徐洪国 - 学术交流 - 华南师范大学数学科学学院",
+		desc: "学术报告题   目：QR algorithm with two-sided Rayleigh quotient shifts 报 告 人：徐洪国 教授 (邀请人：陈小山 )      ",
+		url: location.href,
+		img: "https://statics.scnu.edu.cn/statics/images/scnu/scnu_logo_single.png"
+	};
+
+	$.ajax({
+		type: "GET",
+		url: "https://module.scnu.edu.cn/content/mwechat/share.html?url="+wxshare.url,
+		dataType: "jsonp",
+		jsonp: "callback",
+		jsonpCallback: "success_jsonpCallback",
+		success: function(data){
+			wx.config({
+				debug: false,
+				appId: data.appId,
+				timestamp: data.timestamp,
+				nonceStr: data.nonceStr,
+				signature: data.signature,
+				jsApiList: [
+					'onMenuShareTimeline',
+					'onMenuShareAppMessage',
+					'onMenuShareQQ',
+					'onMenuShareWeibo',
+					'onMenuShareQZone'
+				]
+			});
+		},
+		error:function(data) {
+			console.log("connect failed");
+		}
+	});
+
+	wx.ready(function() {
+		var shareData = {
+			title: wxshare.title,
+			desc: wxshare.desc,
+			link: wxshare.url,
+			imgUrl: wxshare.img
+		};
+		wx.onMenuShareAppMessage(shareData);
+		wx.onMenuShareTimeline(shareData);
+		wx.onMenuShareQQ(shareData);
+		wx.onMenuShareQZone(shareData);
+	});
+	wx.error(function(res) {
+		console.log(res.errMsg);
+	});
+
+	$(".login-text").html("<a href=\"https://sso.scnu.edu.cn/AccountService/openapi/auth?client_id=dfb1eeea12a77f7529b7aaeaf7f5cb69&redirect_url=https://user.scnu.edu.cn/index.php?m=member%26c=index%26a=public_scnu_login%26forward="+ encodeURIComponent(location.href) +"&response_type=code\" target=\"_top\">登录</a>");
+	$(".logout-text").html("<a href=\"https://user.scnu.edu.cn/index.php?m=member&c=index&a=logout&forward="+ encodeURIComponent(location.href) +"\" target=\"_top\">退出</a>");
+	$.getJSON("https://user.scnu.edu.cn/index.php?m=member&c=index&a=public_get_login_status&jsoncallback=?", function (data) {
+		if(data.userid) {
+			$(".userlogin").hide();
+			$(".usercontrol").show();
+			$("#realname").html(data.nickname);
+			$(".viewresume").html("<a href=\"https://user.scnu.edu.cn/profile/index/user.html?site=maths&uid="+ data.userid +"\" target=\"_blank\">查看简历</a>");
+		} else {
+			$(".usercontrol").hide();
+			$(".userlogin").show();
+		}
+	})
+
+	//Change dropdown to hover on dekstop
+	;(function($, window, undefined) {
+		var $allDropdowns = $();
+		$.fn.dropdownHover = function(options) {
+			$allDropdowns = $allDropdowns.add(this.parent());
+			return this.each(function() {
+				var $this = $(this).parent(),
+				defaults = {
+					delay: 100,
+					instantlyCloseOthers: true
+				},
+				data = {
+					delay: $(this).data('delay'),
+					instantlyCloseOthers: $(this).data('close-others')
+				},
+				options = $.extend(true, {}, defaults, options, data),
+				timeout;
+
+				$this.hover(function() {
+				if(options.instantlyCloseOthers === true)
+					$allDropdowns.removeClass('open');
+
+				window.clearTimeout(timeout);
+				$(this).addClass('open');
+				}, function() {
+					timeout = window.setTimeout(function() {
+						$this.removeClass('open');
+					}, options.delay);
+				});
+			});
+		};
+
+			$('[data-hover="dropdown"]').dropdownHover();
+	})(jQuery, this);
+	</script>
+
+</body>
+</html>
