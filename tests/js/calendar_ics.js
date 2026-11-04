@@ -74,11 +74,13 @@ const cal = loadCal();
 }
 
 // ---------- test_04：canAddCal 挡掉时间未知 ----------
+// 日期用远期 2099（与 test_10 一致）：canAddCal 会挡「已结束」，固定近月日期
+// 会随时间推移过期、测试变成时间炸弹（2026-11-04 实测：10-31 在 11-04 过期踩响）。
 {
-  ok(cal.canAddCal({ lectureStart: '2026-10-31 14:00:00' }) === true,
+  ok(cal.canAddCal({ lectureStart: '2099-01-01 14:00:00' }) === true,
     'test_04 有开始时间应可加');
   // timeUnknown 在数据里是字符串 'True'，不是布尔——按布尔判断会漏掉 50 条
-  ok(cal.canAddCal({ lectureStart: '2026-10-31 14:00:00', timeUnknown: 'True' }) === false,
+  ok(cal.canAddCal({ lectureStart: '2099-01-01 14:00:00', timeUnknown: 'True' }) === false,
     'test_04b timeUnknown="True"（字符串）必须挡住');
   ok(cal.canAddCal({ lectureStart: '', timeUnknown: 'False' }) === false,
     'test_04c 缺开始时间必须挡住');
