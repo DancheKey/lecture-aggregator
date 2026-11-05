@@ -2012,6 +2012,29 @@ _USE_LLM_TEXT = _text_llm_flag('SCNU_LLM_TEXT', '1')
 # 仅填空补全。SCNU_LLM_RICH=0 可手动关闭本子开关（纯规则零成本）。
 _USE_LLM_RICH = _text_llm_flag('SCNU_LLM_RICH', '1')
 
+# 2026-11-05（评审 #34 / P2-9）：上面两个常量是 import 时求值的快照，模块导入之后
+# 再改 os.environ 不生效——历史症状是所有脚本都得在 import parsers 之前设 0。
+# 生产进程的 env 本就在启动前设好、值恒定；此处补一条运行时求值路径，让「先 import
+# 后设开关」的脚本/Notebook 也能生效。
+# 判定口径（刻意用「env 是否变化」而非「常量是否被改写」）：
+#   · env 未变 → 返回模块常量本身。测试桩 _force_pure_rules() 直接把常量写成
+#     False 来锁纯规则，此时即便「改写后的值恰好等于导入时的值」也必须生效；
+#     靠值差异去猜「是否被改写」会在这种情形误判（已实测踩过，见 test_32b）。
+#   · env 变了 → 说明有人在 import 之后重设了配置，以当前 env 为准。
+_LLM_FLAGS_INITIAL = (_USE_LLM_TEXT, _USE_LLM_RICH)
+
+
+def _llm_flags_runtime():
+    """返回当前生效的 (text, rich) 开关。
+
+    _text_llm_flag 只做 os.environ.get + 已缓存的 .env 查表，逐条解析调用无 I/O 开销。
+    """
+    env_now = (_text_llm_flag('SCNU_LLM_TEXT', '1'),
+               _text_llm_flag('SCNU_LLM_RICH', '1'))
+    if env_now == _LLM_FLAGS_INITIAL:
+        return (_USE_LLM_TEXT, _USE_LLM_RICH)
+    return env_now
+
 
 def _vlm_extract_fields(img_urls, cfgs):
     """按优先级遍历 provider 调用 VLM 提取海报结构化字段。返回 dict 或 None（无 key / 失败 / 限流耗尽）。
@@ -6819,7 +6842,10 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     # parse_detail 内已先行算出，本块异常或模型失效都只回落规则，绝不空库/阻塞。
     # 海报页不走此路径（VLM 路线独立，见 _vlm_extract_fields）。
     # 触发条件：总开关（全字段）或 rich 子开关（仅摘要/简介）开启，且非海报页、正文足够长、文本模型可用。
-    if (_USE_LLM_TEXT or _USE_LLM_RICH) and not poster_only and len(_st.body_text) >= 80:
+    # 2026-11-05（评审 #34）：改走运行时求值，import 之后设 env 也生效；既有测试桩
+    # 直接改写常量的路径由 _llm_flags_runtime 内部保持兼容。
+    _llm_text_on, _llm_rich_on = _llm_flags_runtime()
+    if (_llm_text_on or _llm_rich_on) and not poster_only and len(_st.body_text) >= 80:
         try:
             from llm_provider import get_text_provider, get_judge_provider
             from hybrid import apply_llm_text_hybrid
@@ -6832,7 +6858,7 @@ def _finalize_record(soup, url, title, list_title, _st, result,
                 _pre_llm_bio = result.get('speakerBio')
                 apply_llm_text_hybrid(result, _st.body_text, url, _provider, _judge,
                                       default_year, publish_time, title_year, url_year,
-                                      rich_only=not _USE_LLM_TEXT,
+                                      rich_only=not _llm_text_on,
                                       llm_text=_st.body_text_llm,
                                       title_text=' '.join(
                                           x for x in (list_title or '', title or '')

@@ -429,8 +429,22 @@ Object.assign(APP_METHODS, {
     // 改造前是「latest 一到就无条件并拉 16 桶」，与 0.46MB 的列表分片抢同一条带宽，
     // 表现为「列表一页一页地加载」；现在桶排在列表数据之后，搜索语义不变。
     // 幂等：已全量就绪 / 正在预取 / 已判定不可用 / 已调度空闲 时直接返回。
+    // 省流量 / 弱网判定（2026-11-05 评审 #35）：只用于「空闲全量预取」这条自动路径。
+    // 用户主动搜索/展开走 _ensureLongTextAll → 按需取桶，不受此判定影响；首屏 50 条
+    // 内联长文本（LATEST_PREVIEW_LEN=0）也不受影响，故裁剪的不是首屏可见内容。
+    _isSaveDataOrSlowNetwork() {
+      try {
+        const c = (typeof navigator !== 'undefined') ? navigator.connection : null;
+        if (!c) return false;
+        if (c.saveData === true) return true;
+        const t = String(c.effectiveType || '').toLowerCase();
+        return t === 'slow-2g' || t === '2g' || t === '3g';
+      } catch (e) { return false; }
+    },
+
     _ensureLongTextIdle() {
       if (this._ltIdleScheduled || this._ltUnavailable || this._ltSearching || this._ltAllLoaded) return;
+      if (this._isSaveDataOrSlowNetwork()) return;
       this._ltIdleScheduled = true;
       const run = () => {
         this._ltIdleScheduled = false;

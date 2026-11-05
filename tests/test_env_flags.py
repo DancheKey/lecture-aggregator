@@ -201,5 +201,82 @@ class NoDuplicateJudgementTest(unittest.TestCase):
             self.assertIsInstance(getattr(p, name), bool, name)
 
 
+class RuntimeEnvFlagTest(unittest.TestCase):
+    """评审 #34 / P2-9：LLM 开关不得只在 import 时求值一次。"""
+
+    def test_30_runtime_recompute_after_import(self):
+        p = _load('parsers_runtime', 'parsers.py')
+        saved = {k: os.environ.get(k) for k in ('SCNU_LLM_TEXT', 'SCNU_LLM_RICH')}
+        try:
+            os.environ['SCNU_LLM_TEXT'] = '0' if p._USE_LLM_TEXT else '1'
+            os.environ['SCNU_LLM_RICH'] = '0' if p._USE_LLM_RICH else '1'
+            text, rich = p._llm_flags_runtime()
+            self.assertNotEqual(text, p._USE_LLM_TEXT,
+                                'import 后改 SCNU_LLM_TEXT 未生效（仍是模块级快照）')
+            self.assertNotEqual(rich, p._USE_LLM_RICH,
+                                'import 后改 SCNU_LLM_RICH 未生效（仍是模块级快照）')
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    def test_31_unchanged_env_keeps_import_values(self):
+        """生产路径零影响：env 未变时运行时值必须等于导入时常量。"""
+        p = _load('parsers_unchanged', 'parsers.py')
+        self.assertEqual(p._llm_flags_runtime(),
+                         (p._USE_LLM_TEXT, p._USE_LLM_RICH))
+
+    def test_32_explicit_constant_override_wins(self):
+        """测试桩 _force_pure_rules() 直接改写常量、且配置未变时必须生效。"""
+        p = _load('parsers_override', 'parsers.py')
+        saved = {k: os.environ.get(k) for k in ('SCNU_LLM_TEXT', 'SCNU_LLM_RICH')}
+        try:
+            # 把 env 固定成导入时快照，隔离「配置变化」路径，只测桩本身
+            os.environ['SCNU_LLM_TEXT'] = '1' if p._USE_LLM_TEXT else '0'
+            os.environ['SCNU_LLM_RICH'] = '1' if p._USE_LLM_RICH else '0'
+            p._USE_LLM_TEXT = False
+            p._USE_LLM_RICH = False
+            self.assertEqual(p._llm_flags_runtime(), (False, False),
+                             '显式常量覆盖未生效，纯规则测试桩会失效')
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    def test_32b_override_when_imported_as_false(self):
+        """回归：导入时本就是纯规则（env=0），改写常量仍须生效。
+
+        早期实现用「常量值是否与导入快照不同」判断是否被显式改写；在 CI 纯规则
+        态下 initial 就是 (False, False)，桩再写 False 被误判为「没改过」，于是
+        回落到 env 重算，把纯规则锁冲掉。本用例直接钉死这个假绿。
+        """
+        saved = {k: os.environ.get(k) for k in ('SCNU_LLM_TEXT', 'SCNU_LLM_RICH')}
+        try:
+            os.environ['SCNU_LLM_TEXT'] = '0'
+            os.environ['SCNU_LLM_RICH'] = '0'
+            p = _load('parsers_override_false', 'parsers.py')
+            self.assertEqual(p._LLM_FLAGS_INITIAL, (False, False))
+            p._USE_LLM_TEXT = False
+            p._USE_LLM_RICH = False
+            self.assertEqual(p._llm_flags_runtime(), (False, False),
+                             'env=0 导入时纯规则桩被误判为「未改写」')
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    def test_33_parse_detail_uses_runtime_values(self):
+        """防回潮：使用点不得再直接绑模块级常量（断言自带信息边界）。"""
+        hits = _grep_lines('parsers.py', 'rich_only=not ')
+        self.assertIn('rich_only=not _llm_text_on', hits,
+                      'parse_detail 的 rich_only 仍绑在模块级快照上')
+
+
 if __name__ == '__main__':
     unittest.main()

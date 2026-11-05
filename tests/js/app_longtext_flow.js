@@ -244,6 +244,51 @@ function check(label, got, want) {
     check('降级路径也触发长文本预取（经 chunks→idle 链）', auto, 1);
   }
 
+  console.log('\n--- 12) 省流量/弱网跳过空闲预取，交互路径不受影响（2026-11-05 评审 #35）---');
+  {
+    const keepNav = ctx.navigator;
+    const keepIdle = ctx.requestIdleCallback;
+    ctx.requestIdleCallback = () => 0;   // 只登记不触发，隔离异步空闲回执
+    const cases = [
+      { label: 'saveData=true', conn: { saveData: true, effectiveType: '4g' }, wantSkip: true },
+      { label: 'effectiveType=slow-2g', conn: { saveData: false, effectiveType: 'slow-2g' }, wantSkip: true },
+      { label: 'effectiveType=2g', conn: { saveData: false, effectiveType: '2g' }, wantSkip: true },
+      { label: 'effectiveType=3g', conn: { saveData: false, effectiveType: '3g' }, wantSkip: true },
+      { label: 'normal 4g', conn: { saveData: false, effectiveType: '4g' }, wantSkip: false },
+      { label: '无 connection', conn: undefined, wantSkip: false },
+    ];
+    for (const c of cases) {
+      ctx.navigator = c.conn ? { connection: c.conn } : {};
+      const s = newFake({});
+      let auto = 0;
+      s._ensureLongTextAll = () => { auto++; };
+      s._ensureLongTextIdle();
+      check(c.label + ' → 空闲调度', !!s._ltIdleScheduled, !c.wantSkip);
+      check(c.label + ' → 空闲本身不预取', auto, 0);
+      s._ensureLongTextAll();     // 用户交互（搜索/展开）不受守卫影响
+      check(c.label + ' → 交互仍可预取', auto, 1);
+    }
+    delete ctx.navigator;         // 无 navigator 全局：typeof 判定必须安全
+    {
+      const s = newFake({});
+      s._ensureLongTextAll = () => {};
+      s._ensureLongTextIdle();
+      check('无 navigator 不跳过', !!s._ltIdleScheduled, true);
+    }
+    // 行为一致性：弱网下用户交互仍走真实逻辑拉齐全部桶，搜索语义不变。
+    ctx.navigator = { connection: { saveData: true, effectiveType: '2g' } };
+    {
+      const s = newFake({ query: '' });
+      fetchLog = [];
+      s._ensureLongTextAll();
+      await settle(80);
+      check('弱网下交互仍能拉齐 16 桶', countDetailCalls(), BUCKETS);
+      check('弱网下 _ltAllLoaded 仍置位', s._ltAllLoaded, true);
+    }
+    ctx.requestIdleCallback = keepIdle;
+    if (keepNav === undefined) delete ctx.navigator; else ctx.navigator = keepNav;
+  }
+
   console.log('\n' + (fail ? '[FAIL] ' + fail + ' 项未通过' : '[PASS] 长文本加载流程全部用例通过'));
   process.exit(fail ? 1 : 0);
 })();
