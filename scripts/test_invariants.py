@@ -25,6 +25,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timedelta, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data", "lectures.json")
@@ -163,7 +164,33 @@ def _write_baseline(base_path, doc):
             pass
 
 
-def check_source_reconciliation(recs, errors):
+def _alert_path():
+    """丢数告警文件（2026-11-05 评审 #5）：报警时基线冻结，另留一份可查痕迹。"""
+    return os.path.join(ROOT, 'data', 'reconcile_alert.json')
+
+
+def _write_alert(base_path, errors, cur_total):
+    doc = {}
+    if os.path.exists(base_path):
+        try:
+            doc = json.load(open(base_path, encoding='utf-8'))
+        except Exception:
+            doc = {}
+    payload = {
+        'at': datetime.now(timezone(timedelta(hours=8))).isoformat(timespec='seconds'),
+        'curTotal': cur_total,
+        'baselineTotal': doc.get('total'),
+        'errors': errors[:80],
+        'note': '基线已冻结（本轮未更新）。确认数据无丢数后重新运行本门禁，告警将自动解除。',
+    }
+    try:
+        with open(_alert_path(), 'w', encoding='utf-8', newline='\n') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+def check_source_reconciliation(recs, errors, pending):
     """按源对账（2026-10-10 改造 5a）：增量模式下每个 college 只增不减。
 
     为什么这道门禁是主力（而非总数对比）：
@@ -188,11 +215,11 @@ def check_source_reconciliation(recs, errors):
             doc = {}
     base = doc.get('sourceCounts') or {}
     if not base:
-        # 首个CI 轮次：只落基线，不比对（否则首次运行必然全量报警）
-        doc['version'] = 1
-        doc['sourceCounts'] = dict(cur)
-        _write_baseline(base_path, doc)
-        print(f'[BASELINE] 已写入按源对账基线（{len(cur)} 个源）→ {base_path}')
+        # 首个 CI 轮次：只生成待写入基线，不比对（否则首次运行必然全量报警）
+        # 2026-11-05：落盘统一交给 main() —— 只有整轮无报警才允许写基线。
+        pending['version'] = 1
+        pending['sourceCounts'] = dict(cur)
+        print(f'[BASELINE] 已生成按源对账基线（{len(cur)} 个源），待 main() 无报警后写入')
         return
 
     dropped = []
@@ -223,12 +250,11 @@ def check_source_reconciliation(recs, errors):
     for k, v in cur.items():
         merged[k] = max(merged.get(k, 0), v)
     if merged != base:
-        doc['version'] = 1
-        doc['sourceCounts'] = merged
-        _write_baseline(base_path, doc)
+        pending['version'] = 1
+        pending['sourceCounts'] = merged
 
 
-def check_total_reconciliation(recs, errors):
+def check_total_reconciliation(recs, errors, pending):
     """总量对账（2026-10-10 改造 5b）：与**上一次记录的总量**比，只拦塌方。
 
     ⚠ 不用「本轮 >= 上轮」：维护者会主动做拆分/去重清洗（git 历史里同一天
@@ -242,8 +268,8 @@ def check_total_reconciliation(recs, errors):
       这正是静默丢数的形态（一次抓取丢掉几千条），而对渐进的、有意为之的
       人工清理不敏感。
 
-    ⚠ 必须在 check_source_reconciliation **之前**读取 total：后者会重写
-      同一个基线文件并写入 total，读晚了就变成「自己跟自己比」，永远不报。
+    ⚠ 2026-11-05 起两个 check 都只把待写字段放进 pending，不再各自落盘，
+      「读取顺序」不再敏感；统一由 main() 在整轮无报警时写入一次。
     """
     base_path = _recon_baseline_path()
     try:
@@ -256,8 +282,9 @@ def check_total_reconciliation(recs, errors):
         errors.append(
             f'总量异常: {prev_total} → {cur_total} 条（跌 {100 - cur_total * 100 // prev_total}%）'
             '——相对上一次抓取跌幅超 3%，疑似静默丢数')
-    doc['total'] = cur_total        # 记录本次实际值（不取 max，见上文说明）
-    _write_baseline(base_path, doc)
+    # 只登记待写值：整轮有任何报警时基线必须冻结，否则一次丢数只红一轮，
+    # 下一轮 prev_total 已是缩水值，总量对账永久失效（评审 #5）。
+    pending['total'] = cur_total
 
 
 def main():
@@ -275,17 +302,36 @@ def main():
     check_skc_title_integrity(recs, errors)
     check_images_no_local_path(recs, errors)
     test_incremental_merge_unit(errors)
-    # ⚠ 顺序要紧：check_total_reconciliation 先跑（它要读 baseline 里的 total），
-    #   check_source_reconciliation 后跑（它会重写同一个基线文件）。
-    #   两者反序会让总量检查读到自己刚写的 total → 自我比较 → 永不报警。
-    check_total_reconciliation(recs, errors)
-    check_source_reconciliation(recs, errors)
+    # 2026-11-05：两个 check 都只读基线、把待写值放进 pending，不再各自落盘，
+    # 顺序不再影响判据；统一由下方在整轮无报警时写入一次（评审 #5）。
+    pending = {}
+    check_total_reconciliation(recs, errors, pending)
+    check_source_reconciliation(recs, errors, pending)
 
+    base_path = _recon_baseline_path()
     if errors:
+        _write_alert(base_path, errors, len(recs))   # 基线冻结，另留告警痕迹
         print(f"FAIL：{len(errors)} 处不变量违反（共 {len(recs)} 条记录）")
         for e in errors[:80]:
             print("  -", e)
         sys.exit(1)
+    # 仅整轮无报警才推进基线：total 与 sourceCounts 一次写入，避免两处各自
+    # 落盘互相覆盖，也彻底断开「报警 → 基线被洗白 → 只红一轮」的链路。
+    if pending:
+        doc = {}
+        if os.path.exists(base_path):
+            try:
+                doc = json.load(open(base_path, encoding='utf-8'))
+            except Exception:
+                doc = {}
+        doc.update(pending)
+        _write_baseline(base_path, doc)
+    ap = _alert_path()
+    if os.path.exists(ap):
+        try:
+            os.remove(ap)
+        except OSError:
+            pass
     print(f"PASS：数据不变量全部通过（共 {len(recs)} 条记录）")
     sys.exit(0)
 

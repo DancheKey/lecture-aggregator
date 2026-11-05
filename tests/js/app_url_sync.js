@@ -16,6 +16,8 @@
 //      parse 回放归一化为 upcomingOnly，且 watch.upcomingOnly 已接线
 //   T10 ongoing 参数（2026-10-30 补）：同上三条链路 + 与 upcoming 同真时归一化层
 //      保留 ongoing（互斥枚举，同真必空集）
+//   T11 popstate 回放恢复 upcomingRange（2026-11-05 评审 #3）：解析/序列化两条
+//      链路都有 range，唯独回放漏赋；URL 有 ?range=3 而 state 为空会展示全部待开始
 //
 // 运行：node tests/js/app_url_sync.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -334,6 +336,34 @@ setUrl('');
   const w = appOpts && appOpts.watch;
   ok(!!w && typeof w.ongoingOnly === 'function',
      'T10 watch.ongoingOnly 未接线（URL 同步缺失）');
+}
+
+// ---- T11 popstate 回放必须带上 upcomingRange（2026-11-05 评审 #3）----
+// 场景：选「3天内」→ 清除 → 后退，URL 有 ?upcoming=1&range=3 而 state 为空。
+// 修复前 _applyUrlFiltersFromUrl 漏赋 upcomingRange，筛选片亮着但下拉未选、
+// 列表展示全部待开始；刷新才恢复。解析/序列化两条链路本来就有 range，
+// 只漏了回放这一条，故本例专门锁 popstate round-trip。
+{
+  setUrl('?upcoming=1&range=3');
+  const vmThis = {
+    campus: '', college: '', year: '', speaker: '', query: '',
+    searchField: '', onlineOnly: false, upcomingOnly: false, ongoingOnly: false,
+    upcomingRange: '', currentPage: 1,
+    campusList: ['', '石牌', '大学城', '佛山', '汕尾', '校级'],
+    _urlSyncSuppress: false, _urlSyncPendingPush: false, _urlSyncTimer: 0,
+    _flushUrlSync: methods._flushUrlSync,
+    $nextTick: (fn) => fn(),
+  };
+  timers = [];
+  methods._applyUrlFiltersFromUrl.call(vmThis);
+  ok(vmThis.upcomingOnly === true && vmThis.upcomingRange === '3',
+     `T11 回放应恢复 range=3，实得 upcoming=${vmThis.upcomingOnly} range=${vmThis.upcomingRange}`);
+  // 反向：URL 无 range 时不得残留旧值（否则「后退到无范围」仍被旧筛选卡住）
+  setUrl('?upcoming=1');
+  vmThis.upcomingRange = '7';
+  methods._applyUrlFiltersFromUrl.call(vmThis);
+  ok(vmThis.upcomingRange === '',
+     `T11 无 range 的 URL 应清空残留范围，实得 "${vmThis.upcomingRange}"`);
 }
 
 console.log('');

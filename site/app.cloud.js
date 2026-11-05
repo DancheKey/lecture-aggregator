@@ -111,26 +111,8 @@ const LectureCloud = (function () {
                     .catch(() => null);
             });
         },
-        // 只读单行：全站 PV 专用行 __site__ 的 visits 值（number|null）。
-        // 2026-11-04 新增，供趋势页 KPI「累计访问次数」实时校正用。
-        // ⚠ 只读不计数：计数统一归 footer-counter.js 的全站 5 分钟防刷 bump，
-        // 两条链路各司其职——本方法语义是「展示当前权威值」，与首页/统计页
-        // footer 同源（同一 __site__ 行），保证三页数字一致。
-        // 任一环节失败返回 null，调用方静默保留快照值。
-        fetchSitePv() {
-            return loadConfig().then(cfg => {
-                if (!cfg) return null;
-                return fetch(cfg.url + '/rest/v1/lecture_stats'
-                    + '?url=eq.__site__&select=visits',
-                    { cache: 'no-store', headers: headers(cfg) })
-                    .then(r => {
-                        if (!r.ok) throw new Error('sitepv-' + r.status);
-                        return r.json();
-                    })
-                    .then(rows => (rows && rows.length
-                        && typeof rows[0].visits === 'number') ? rows[0].visits : null)
-                    .catch(() => null);
-            });
-        },
+        // 2026-11-05：原 fetchSitePv()（趋势页 KPI 单独只读云端）已删除。
+        // 页脚与 KPI 现共用 footer-counter.js 的 window.LectureSitePv.get()，
+        // 旧的两条独立链路会因请求时点不同而在同屏显示两个数字（评审 #1）。
     };
 })();

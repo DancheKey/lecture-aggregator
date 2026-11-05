@@ -449,19 +449,42 @@ fetch('visits-trend-data.json', { cache: 'no-store' })
   })
   .catch(function (e) { showLoadError(e && e.message ? e.message : String(e)); });
 
-// KPI 实时校正（2026-11-04）：台账快照每日一次（今天 05:49 抓的值挂一整天），
-// 而首页/统计页页脚是实时值，三页数字不一致（用户实测 2027 vs 2019）。本段
-// 经 LectureCloud.fetchSitePv 只读云端 __site__ 行，拿到实时权威值后同步更新
-// 三处：KPI 卡、图表今日点位、明细表最后一行——历史往日的快照原样不动。
-// ⚠ 只读不计数：页面打开的 +1 统一归 footer-counter.js 的全站 5 分钟防刷
-// bump（与首页/统计页同一缓存键），趋势页不单独计数。
-// 失败 / 云端禁用 / 本机 vm 门禁沙箱（无 LectureCloud）→ 静默保留快照值，
-// 页面行为与未接实时链路时完全一致。
-// ⚠ 竞态收口：fetchSitePv 与数据文件 fetch 各自独立，谁先到都可能——
-// 若实时值先到而 SNAPS 还是空数组，直接 apply 会白做（快照测试曾抓到：
-// 校正静默跳过，KPI 停在旧值）。故实时值先到时先缓存 _livePv，数据文件
-// 加载完成后由 then 补挂一次；两条到达顺序任意都能收口。
+// KPI 校正（2026-11-04 建链，2026-11-05 改为同源共用）：
+// 台账快照每日一次，页脚是实时值，三页数字曾不一致（用户实测 2027 vs 2019）。
+// 现在页脚与 KPI **共用 footer-counter.js 的 window.LectureSitePv.get()**：
+// 那是全页记忆化的同一个 Promise（缓存命中零请求 / 否则一次 bump / 失败降级
+// 静态快照），两处拿到的必然是同一个数字，不会因请求时点差分叉。
+// ⚠ 只读不计数：页面打开的 +1 统一归 footer-counter 的全站 5 分钟防刷 bump，
+// 趋势页不单独计数，也不再单独 fetch 云端。
+// 拿到值后同步：KPI 首卡 + 近 7 条/日均两张静态卡、图表今日点位、明细最新行；
+// 历史往日快照原样不动。失败 / 沙箱无 LectureSitePv → 静默保留快照值，
+// 页面行为与未接链路时完全一致。
+// ⚠ 竞态收口：共享 Promise 与数据文件 fetch 谁先到都可能——若值先到而
+// SNAPS 还是空数组，直接 apply 会白做（门禁曾抓到：校正静默跳过）。故先缓存
+// _livePv，数据加载完成后由 then 补挂一次；两条到达顺序任意都能收口。
 var _livePv = null;
+function recomputeKpis(n) {
+  // 与 scripts/gen_visits_trend.py 的 build_kpis 同口径，避免四张卡校正后互相矛盾。
+  var win = SNAPS.slice(-8);
+  var recent7 = 0;
+  for (var i = 1; i < win.length; i++) {
+    recent7 += Math.max(0, Number(win[i].pv_delta) || 0);
+  }
+  var r7 = document.getElementById('kpi_recent7_value');
+  if (r7) r7.textContent = recent7.toLocaleString('en-US');
+
+  var first = SNAPS[0], last = SNAPS[SNAPS.length - 1];
+  var d0 = Date.parse(first.date + 'T00:00:00Z');
+  var d1 = Date.parse(last.date + 'T00:00:00Z');
+  var span = (d1 - d0) / 86400000;
+  if (span > 0) {
+    var gain = Math.max(n - (Number(first.site_pv) || 0), 0);
+    // Python round 是银行家舍入、JS Math.round 四舍五入：边界 .5 差 1，
+    // 此处仅用于日均展示，量级极小且不会造成同屏数字打架，可接受。
+    var pd = document.getElementById('kpi_perday_value');
+    if (pd) pd.textContent = Math.round(gain / span).toLocaleString('en-US');
+  }
+}
 function applyLivePv(n) {
   if (!n) return;
   if (!SNAPS.length) { _livePv = n; return; }
@@ -470,18 +493,22 @@ function applyLivePv(n) {
   if (n <= snapPv) return;   // 快照已是最新（或异常回退值），不动
   var prev = SNAPS.length > 1 ? (Number(SNAPS[SNAPS.length - 2].site_pv) || 0) : 0;
   last.site_pv = n;
-  last.pv_delta = n - prev;
+  last.pv_delta = n - prev;   // 日新增：相对上一条（昨日）快照，供曲线/明细
   var kv = document.getElementById('kpi_pv_value');
   if (kv) kv.textContent = fmt(n);
   var kd = document.getElementById('kpi_pv_delta');
-  if (kd) kd.textContent = '较前次快照 +' + (n - prev).toLocaleString('en-US')
+  // #2：旧文案「较前次快照 +N」实际算的是 n − 上一条快照，字面与数值不符，
+  // 用户对照累计值 2027→2035 会发现 +17 对不上。改为相对「今日凌晨快照」，
+  // 字面与实际一致：n − snapPv。
+  if (kd) kd.textContent = '较今日快照 +' + (n - snapPv).toLocaleString('en-US')
     + ' · 实时';
+  recomputeKpis(n);          // 近 7 条 / 日均两张静态卡联动重算
   renderChart();
   renderTable();
 }
-if (typeof LectureCloud !== 'undefined' && LectureCloud &&
-    typeof LectureCloud.fetchSitePv === 'function') {
-  LectureCloud.fetchSitePv().then(applyLivePv).catch(function () {});
+if (typeof window !== 'undefined' && window.LectureSitePv &&
+    typeof window.LectureSitePv.get === 'function') {
+  window.LectureSitePv.get().then(applyLivePv).catch(function () {});
 }
 """
 
@@ -534,14 +561,21 @@ def build_kpis(snaps):
          f'快照 {len(snaps)} 条' + (
              f'，缺 {span_days + 1 - len(snaps)} 天' if span_days + 1 > len(snaps) else '')),
     ]
-    # 首卡（累计访问次数）的值/副文案带 id：visits-trend.js 的实时校正
-    # （applyLivePv）把云端权威值写进这两处，保证与首页/统计页 footer 一致。
+    # 首卡（累计访问次数）值/副文案带 id，供 visits-trend.js 校正；
+    # 第二/三卡的值也带 id（2026-11-05 #2）：实时值改写今日快照后，
+    # 「近 7 条快照新增」与「日均新增」必须同步重算，否则同屏自相矛盾。
+    # 第四卡「时间跨度」只与日期有关，不依赖 PV，无需 id。
+    ids = [
+        (' id="kpi_pv_value"', ' id="kpi_pv_delta"'),
+        (' id="kpi_recent7_value"', ''),
+        (' id="kpi_perday_value"', ''),
+        ('', ''),
+    ]
     return ''.join(
         f'<div class="kpi"><div class="kpi-k">{k}</div>'
-        f'<div class="kpi-v"{idv}>{v}</div><div class="kpi-d"{idd}>{d}</div></div>'
-        for i, (k, v, d) in enumerate(cards)
-        for (idv, idd) in (
-            (' id="kpi_pv_value"', ' id="kpi_pv_delta"') if i == 0 else ('', ''),))
+        f'<div class="kpi-v"{ids[i][0]}>{v}</div>'
+        f'<div class="kpi-d"{ids[i][1]}>{d}</div></div>'
+        for i, (k, v, d) in enumerate(cards))
 
 
 def main():
@@ -598,10 +632,10 @@ def main():
        ① 全部 innerHTML 拼接改为 createElement/textContent（渲染不再解析任何文本标记）；
        ② 脚本拆为独立 visits-trend.js、数据拆为 visits-trend-data.json（本次）。
      故 script-src 与 style-src 均只需 'self'（style 走外链 visits-trend.css）。
-     2026-11-04 补：connect-src 放行 https://*.supabase.co —— KPI 实时校正
-     （visits-trend.js 经 LectureCloud.fetchSitePv 只读 __site__ 行）与页脚
-     footer-counter.js 云端计数都需要连 Supabase REST，与 index/stats 两页
-     同一域名白名单口径。
+     2026-11-04 补、2026-11-05 更新：connect-src 放行 https://*.supabase.co
+     —— 页脚 footer-counter.js 的云端计数（bump）需要连 Supabase REST；
+     趋势页 KPI 不再单独 fetch，而是共用页脚那一次取值的结果。
+     与 index/stats 两页同一域名白名单口径。
      遗留代价：页面不再支持 file:// 直接打开（fetch 受同源限制），
      本地预览请用 start_local.bat 起本地 server。 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
@@ -704,13 +738,15 @@ def main():
   </span>
 </footer>
 
-<!-- 云端计数接线（2026-11-04）：与 index.html / stats.html 同一套——
-     app.cloud.js 提供 LectureCloud（fetchSitePv 只读全站 PV），footer-counter.js
+<!-- 云端计数接线（2026-11-04 建链，2026-11-05 同源改造）：与 index.html /
+     stats.html 同一套——app.cloud.js 提供 LectureCloud，footer-counter.js
      负责页脚「本站总访问量」的云端计数（全站共享 5 分钟 localStorage 防刷，
-     同一浏览器 5 分钟内无论开哪个页面只计 1 次）。挂上后趋势页不再单独
-     出片 visits.json 填页脚（旧链路已删），三页页脚数字永远同源一致。
-     ⚠ defer 顺序不可乱：footer-counter 与 visits-trend 都依赖 LectureCloud
-     先定义。裸引用（无 ?v=）是待打戳源形态，main() 里 stamp_script_version。 -->
+     同一浏览器 5 分钟内无论开哪个页面只计 1 次），并暴露
+     window.LectureSitePv.get()：全页记忆化的同一次取值。趋势页 KPI 订阅它，
+     不再单独读云端，页脚与 KPI 必然同值；三页页脚数字永远同源一致。
+     ⚠ defer 顺序不可乱：app.cloud → footer-counter → visits-trend，
+     后两者都依赖前者先定义。裸引用（无 ?v=）是待打戳源形态，
+     main() 里 stamp_script_version。 -->
 <script src="app.cloud.js" defer></script>
 <script src="footer-counter.js" defer></script>
 <script src="visits-trend.js" defer></script>

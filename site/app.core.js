@@ -283,6 +283,10 @@ Object.assign(APP_METHODS, {
     this.onlineOnly = n.onlineOnly;
     this.upcomingOnly = n.upcomingOnly;
     this.ongoingOnly = n.ongoingOnly;
+    // 2026-11-05（评审 #3）：normalizeUrlFilters 会算出 upcomingRange，
+    // 但回放路径此前漏赋——URL 有 ?range=3 而 state 为空，筛选片亮着、
+    // 下拉却未选、列表展示全部待开始；刷新才恢复。与解析/序列化对齐。
+    this.upcomingRange = n.upcomingRange;
     this.currentPage = n.currentPage;   // 最后赋：前面各维度的既有 watch 会先重置页码
     this.$nextTick(() => { this._urlSyncSuppress = false; });
   },

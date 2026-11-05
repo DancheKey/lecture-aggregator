@@ -219,6 +219,44 @@ class SourceReconciliationTest(unittest.TestCase):
         self.assertNotEqual(rc, 0, '总量跌超 3% 应报警')
         self.assertIn('总量', out, '报警信息应标明是总量问题')
 
+    def test_08_报警时基线必须冻结且留下告警文件(self):
+        """评审 #5：丢数报警后不得把缩水值写成下一轮基线（原实现只红一轮）。
+
+        旧实现「总量异常 append errors 之后仍无条件写 total」，叠加 daily.yml
+        兜底提交把基线推上 main，一次静默丢数只红一轮、下一轮判据被改写。
+        """
+        base = _base({'甲学院': 200})
+        self.sb.write(_rec('甲学院', 200), base)
+        rc, out = self.sb.run()
+        self.assertEqual(rc, 0, f'前置：基线与数据一致应通过：{out}')
+        bp = os.path.join(self.sb.tmp, 'data', 'reconcile_baseline.json')
+        before = io.open(bp, encoding='utf-8').read()
+
+        self.sb.write(_rec('甲学院', 100))     # 缩水 50%，不传 baseline 保留旧文件
+        rc, out = self.sb.run()
+        self.assertNotEqual(rc, 0, '单源缩水应报警')
+        after = io.open(bp, encoding='utf-8').read()
+        self.assertEqual(after, before,
+                         '报警时基线被改写 = 把丢数「洗白」，下一轮对账永久失效')
+        ap = os.path.join(self.sb.tmp, 'data', 'reconcile_alert.json')
+        self.assertTrue(os.path.exists(ap), '报警时应写独立告警文件')
+        alert = json.load(io.open(ap, encoding='utf-8'))
+        self.assertTrue(alert.get('errors'), '告警文件应含具体错误明细')
+        self.assertIn('baselineTotal', alert, '告警文件应记录被冻结时的基线总量')
+
+    def test_09_修复后告警自动解除且无报警轮次正常推进基线(self):
+        """无报警轮次必须清除残留告警，否则告警文件会永久挂在仓库里。"""
+        base = _base({'甲学院': 100})
+        self.sb.write(_rec('甲学院', 100), base)
+        rc, out = self.sb.run()
+        self.assertEqual(rc, 0, f'正常轮次应通过：{out}')
+        ap = os.path.join(self.sb.tmp, 'data', 'reconcile_alert.json')
+        with io.open(ap, 'w', encoding='utf-8') as f:
+            json.dump({'note': '残留告警'}, f, ensure_ascii=False)
+        rc, out = self.sb.run()
+        self.assertEqual(rc, 0, f'修复后重跑应通过：{out}')
+        self.assertFalse(os.path.exists(ap), '无报警轮次应删除残留告警文件')
+
 
 class RealDataSanityTest(unittest.TestCase):
     """用真实主库跑一次，确保新增门禁不误报真实数据。"""

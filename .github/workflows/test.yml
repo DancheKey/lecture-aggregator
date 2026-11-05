@@ -412,12 +412,19 @@ jobs:
       - name: Run visits-trend render tests
         run: node tests/js/visits_trend_render.js
 
-      # 趋势页 KPI 实时校正门禁（2026-11-04）：快照每日一抓，首页/统计页页脚
-      # 是实时值，三页数字须一致。锁四场景：实时>快照三处同步更新（KPI/今日
-      # 点位/明细首行）、≤快照与 null 静默保留快照、无 LectureCloud 不抛错、
-      # 实时先到数据后到的竞态收口（_livePv 缓存补挂）。全是零报错静默错。
+      # 趋势页 KPI 同源校正门禁（2026-11-04 建链，2026-11-05 改同源）：快照
+      # 每日一抓，页脚/KPI 共用 footer-counter 的一次取值。锁五场景：共享值>
+      # 快照时 KPI 四卡/今日点位/明细最新行同步、副文案增量口径（评审 #2）、
+      # ≤快照与 null 静默保留快照、无 LectureSitePv 不抛错、取值先到数据后到
+      # 的竞态收口（_livePv 缓存补挂）。全是零报错静默错。
       - name: Run visits-trend live pv tests
         run: node tests/js/visits_trend_live_pv.js
+
+      # 页脚与 KPI 共用一次取值门禁（2026-11-05，评审 #1）：锁「同 Promise /
+      # 同值 / 缓存命中零请求 / 云端失败降级不计数 / 无云端层不抛错」，
+      # 防止两条独立链路再次分叉成同屏两个数字。
+      - name: Run footer-counter shared pv tests
+        run: node tests/js/footer_counter_shared_pv.js
 
       # 模板卫生门禁（2026-10-12）：Vue 模板里禁止调用 _/$ 前缀方法。
       # 背景（2026-10-11 白屏事故）：Vue 3 对 _/$ 前缀方法静默跳过绑定（prod

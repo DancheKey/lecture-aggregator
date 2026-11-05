@@ -23,10 +23,10 @@
        ① 全部 innerHTML 拼接改为 createElement/textContent（渲染不再解析任何文本标记）；
        ② 脚本拆为独立 visits-trend.js、数据拆为 visits-trend-data.json（本次）。
      故 script-src 与 style-src 均只需 'self'（style 走外链 visits-trend.css）。
-     2026-11-04 补：connect-src 放行 https://*.supabase.co —— KPI 实时校正
-     （visits-trend.js 经 LectureCloud.fetchSitePv 只读 __site__ 行）与页脚
-     footer-counter.js 云端计数都需要连 Supabase REST，与 index/stats 两页
-     同一域名白名单口径。
+     2026-11-04 补、2026-11-05 更新：connect-src 放行 https://*.supabase.co
+     —— 页脚 footer-counter.js 的云端计数（bump）需要连 Supabase REST；
+     趋势页 KPI 不再单独 fetch，而是共用页脚那一次取值的结果。
+     与 index/stats 两页同一域名白名单口径。
      遗留代价：页面不再支持 file:// 直接打开（fetch 受同源限制），
      本地预览请用 start_local.bat 起本地 server。 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
@@ -77,11 +77,11 @@
 <header>
   <h1>站点访问量趋势</h1>
   <p class="sub">数据来源：自建 Supabase 每日快照（2026-10-17 前为 busuanzi）· 覆盖
-    2026-09-10 至 2026-11-05</p>
-  <p class="subline">生成于 2026-11-05 14:52 · 台账 data/visits_history.json</p>
+    2026-09-10 至 2026-11-04</p>
+  <p class="subline">生成于 2026-11-05 18:19 · 台账 data/visits_history.json</p>
 </header>
 
-<div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v" id="kpi_pv_value">2,036</div><div class="kpi-d" id="kpi_pv_delta">较前次 +6</div></div><div class="kpi"><div class="kpi-k">近 7 条快照新增</div><div class="kpi-v">52</div><div class="kpi-d">覆盖 2026-10-29 起共 7 次快照</div></div><div class="kpi"><div class="kpi-k">日均新增访问</div><div class="kpi-v">17</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">57 天</div><div class="kpi-d">快照 54 条，缺 3 天</div></div></div>
+<div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v" id="kpi_pv_value">2,027</div><div class="kpi-d" id="kpi_pv_delta">较前次 +9</div></div><div class="kpi"><div class="kpi-k">近 7 条快照新增</div><div class="kpi-v" id="kpi_recent7_value">88</div><div class="kpi-d">覆盖 2026-10-28 起共 7 次快照</div></div><div class="kpi"><div class="kpi-k">日均新增访问</div><div class="kpi-v" id="kpi_perday_value">17</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">56 天</div><div class="kpi-d">快照 53 条，缺 3 天</div></div></div>
 
 <div class="card">
   <div class="toolbar">
@@ -129,14 +129,16 @@
   </span>
 </footer>
 
-<!-- 云端计数接线（2026-11-04）：与 index.html / stats.html 同一套——
-     app.cloud.js 提供 LectureCloud（fetchSitePv 只读全站 PV），footer-counter.js
+<!-- 云端计数接线（2026-11-04 建链，2026-11-05 同源改造）：与 index.html /
+     stats.html 同一套——app.cloud.js 提供 LectureCloud，footer-counter.js
      负责页脚「本站总访问量」的云端计数（全站共享 5 分钟 localStorage 防刷，
-     同一浏览器 5 分钟内无论开哪个页面只计 1 次）。挂上后趋势页不再单独
-     出片 visits.json 填页脚（旧链路已删），三页页脚数字永远同源一致。
-     ⚠ defer 顺序不可乱：footer-counter 与 visits-trend 都依赖 LectureCloud
-     先定义。裸引用（无 ?v=）是待打戳源形态，main() 里 stamp_script_version。 -->
-<script src="app.cloud.js?v=50a42c8d32" defer></script>
-<script src="footer-counter.js?v=0136248cd2" defer></script>
-<script src="visits-trend.js?v=0b7d0fca1c" defer></script>
+     同一浏览器 5 分钟内无论开哪个页面只计 1 次），并暴露
+     window.LectureSitePv.get()：全页记忆化的同一次取值。趋势页 KPI 订阅它，
+     不再单独读云端，页脚与 KPI 必然同值；三页页脚数字永远同源一致。
+     ⚠ defer 顺序不可乱：app.cloud → footer-counter → visits-trend，
+     后两者都依赖前者先定义。裸引用（无 ?v=）是待打戳源形态，
+     main() 里 stamp_script_version。 -->
+<script src="app.cloud.js?v=e127563abf" defer></script>
+<script src="footer-counter.js?v=3e316d029b" defer></script>
+<script src="visits-trend.js?v=8c691f522b" defer></script>
 </body></html>
