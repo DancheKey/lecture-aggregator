@@ -74,7 +74,13 @@ def _validate_source_urls(base, list_urls):
                         f'（收到：{lu[:80]}）')
         elif isinstance(lu, dict):
             u = lu.get('url')
-            if u is not None and not _is_allowed_source_url(u):
+            # 2026-11-05（评审 #13）：dict 形态缺/空 url 必须拒。原先 `u is not None`
+            # 让缺键直接放行，抓取端 lu['url'] 随即 KeyError → 被记成源故障 →
+            # 全局水位冻结，一条坏配置就能让整轮每日抓取停摆。白名单校验本该
+            # 防「写坏配置」，在这一种形态上完全失效。
+            if not u:
+                return f'list_urls[{i}].url 不能为空（dict 形态必须带 url）'
+            if not _is_allowed_source_url(u):
                 return (f'list_urls[{i}].url 必须是 http(s)://*.scnu.edu.cn 下的地址'
                         f'（收到：{str(u)[:80]}）')
     return None

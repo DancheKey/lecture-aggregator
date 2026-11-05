@@ -11,7 +11,9 @@
       自建无法复现 → **本页已不再体现 UV**（页面文案、图表、明细表全部移除；
       台账里的历史 UV 字段保留作存档，但不再出片展示）。
       图表主轴为「累计访问次数」（台账历史 PV 数据完整，曲线全程连续无断点）。
-      种子 1730 = busuanzi 切换时刻实时值，两段口径无缝衔接。
+      种子 1724 = busuanzi 末次台账值（2026-10-17），与 fetch_visits_snapshot.py /
+      footer-counter.js 一致；两段口径同为「页面打开次数」，无缝衔接。
+      （2026-11-05 评审 #25：原写 1730，与另两处台账值打架，已统一为 1724。）
 
 与旧的 gen_visits_report.py 的区别（勿混淆）：
     gen_visits_report.py  ← data/visits.json（**本地 localhost** 访问，server.py 写的）

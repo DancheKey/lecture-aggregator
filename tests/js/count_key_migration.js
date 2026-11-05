@@ -11,8 +11,10 @@
 //       sourceUrl（可达路径）；无 URL 分支 sourceUrl 恒空，回退只保证
 //       键是字符串而非 undefined，不再写 l.sourceUrl（那是死代码）。
 //   B2（2026-10-19 用户实测反向缺陷）旧键展开范围过大——只有合并卡
-//      （同页同日 ≥3 场）才是「整页一个赞」，其余多场页的展开会伪造已赞：
-//      只赞 1 条却筛出 3 条，多出来的图标高亮、数字 0。
+//      （同页同日 ≥4 场，2026-10-27 起；此前是 3）才是「整页一个赞」，
+//      其余多场页的展开会伪造已赞：只赞 1 条却筛出 3 条，图标高亮、数字 0。
+//   B2f（2026-11-05 评审 #8）：social 层合并阈值一度残留 <3 硬编码，与
+//      computed 的 FORUM_MIN=4 分叉；同日恰好 3 场（当前库 13 组）会被误展开。
 //
 // 运行：node tests/js/count_key_migration.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -84,7 +86,7 @@ function loadApp(seed) {
 const errs = [];
 const ok = (cond, msg) => { if (!cond) errs.push(msg); };
 
-// ---------- 构造数据：多场页 A（3 场）+ 单场页 B ----------
+// ---------- 构造数据：多场页 A（同日 4 场 = 合并组）+ 单场页 B ----------
 const A = 'http://a.scnu.edu.cn/a/20261012/10265.html';   // 多场拆分源页
 const B = 'http://b.scnu.edu.cn/b/20261001/998.html';     // 单场源页
 function mkMulti(i) {
@@ -110,7 +112,7 @@ function mkSingle() {
     [WANTED_KEY]: JSON.stringify([A]),
   });
   const cm = Object.assign(app.state(), app.methods, {
-    all: [mkMulti(1), mkMulti(2), mkMulti(3), mkSingle()],
+    all: [mkMulti(1), mkMulti(2), mkMulti(3), mkMulti(4), mkSingle()],
   });
   cm.loadLikes();
   cm.loadWants();
@@ -121,12 +123,12 @@ function mkSingle() {
   cm.migrateCountKeys();
   const liked = [...cm.likedUrls].sort();
   const wanted = [...cm.wantedUrls].sort();
-  const wantLiked = [A, B, `${A}~1`, `${A}~2`, `${A}~3`].sort();
+  const wantLiked = [A, B, `${A}~1`, `${A}~2`, `${A}~3`, `${A}~4`].sort();
   ok(JSON.stringify(liked) === JSON.stringify(wantLiked),
-     'B1 迁移后 likedUrls 应为「旧键全保留 + A 页三场新键」，实得 ' + JSON.stringify(liked));
+     'B1 迁移后 likedUrls 应为「旧键全保留 + A 页四场新键」，实得 ' + JSON.stringify(liked));
   ok(liked.includes(A) && liked.includes(B),
      'B1 旧键必须保留（合并卡 ck = 无后缀 URL，页面级状态自洽；单场页 ck 逐字等于旧键）');
-  ok(JSON.stringify(wanted) === JSON.stringify([A, `${A}~1`, `${A}~2`, `${A}~3`].sort()),
+  ok(JSON.stringify(wanted) === JSON.stringify([A, `${A}~1`, `${A}~2`, `${A}~3`, `${A}~4`].sort()),
      'B1 wantedUrls 应同样展开，实得 ' + JSON.stringify(wanted));
   ok(!liked.includes(`${B}~1`),
      'B1 单场页不得被造出 ~1 键（无 lectureIndex 就没有场次维度）');
@@ -158,21 +160,22 @@ function mkSingle() {
 
 // ================= B1c：已含新键的集合不被重复展开 =================
 {
-  const app = loadApp({ [LIKED_KEY]: JSON.stringify([A, `${A}~1`, `${A}~2`, `${A}~3`]) });
+  const app = loadApp({ [LIKED_KEY]: JSON.stringify([A, `${A}~1`, `${A}~2`, `${A}~3`, `${A}~4`]) });
   const cm = Object.assign(app.state(), app.methods, {
-    all: [mkMulti(1), mkMulti(2), mkMulti(3)],
+    all: [mkMulti(1), mkMulti(2), mkMulti(3), mkMulti(4)],
   });
   cm.loadLikes();
   cm.migrateCountKeys();
-  ok(cm.likedUrls.size === 4,
-     `B1c 已迁移过的集合应保持 4 个键，实得 ${cm.likedUrls.size}`);
+  ok(cm.likedUrls.size === 5,
+     `B1c 已迁移过的集合应保持 5 个键，实得 ${cm.likedUrls.size}`);
 }
 
 // ================= B2：展开只作用于「合并组」，不得伪造已赞（2026-10-19 用户实测） =================
 // 现象：只点赞 1 条，「只看已赞」筛出 3 条；另外 2 条是同一源页拆出的讲座，
 // 图标变蓝但数字为 0。根因：旧迁移把页面级键展开到该页**全部**场次，而只有
-// 合并卡（同页同日 ≥3 场）才是「整页一个赞」的语义。全站 94 个多场页里只有
-// 30 组会渲染成合并卡，其余 64 页的展开都是伪造状态。
+// 合并卡（同页同日 ≥4 场）才是「整页一个赞」的语义。全站 94 个多场页里只有
+// 30 组会渲染成合并卡，其余 64 页的展开都是伪造状态（历史统计，当时阈值为 3；
+// 现行阈值 4 下合并组更少）。
 {
   // 非合并页 C：3 场分散在 3 天（每天 1 场 → 逐场单卡，无整页赞入口）
   const C = 'http://c.scnu.edu.cn/c/20261012/777.html';
@@ -210,21 +213,21 @@ function mkSingle() {
        `B2b 非合并页上计数为 0 的 url / url~N 键应全部清掉，实得 ${JSON.stringify([...cm.likedUrls])}`);
   }
 
-  // --- B2c：合并页（同日 3 场）的页面级键必须保留、且照旧展开 ---
+  // --- B2c：合并页（同日 4 场）的页面级键必须保留、且照旧展开 ---
   {
     const app = loadApp({ [LIKED_KEY]: JSON.stringify([A]) });
     const cm = Object.assign(app.state(), app.methods, {
-      all: [mkMulti(1), mkMulti(2), mkMulti(3)],
+      all: [mkMulti(1), mkMulti(2), mkMulti(3), mkMulti(4)],
       lectureStats: {},   // 合并卡计数记在裸 URL 上，这里刻意为空：prune 不得误删
     });
     cm.loadLikes();
     cm.migrateCountKeys();
     ok(cm.likedUrls.has(A), 'B2c 合并页的页面级键（合并卡 ck）不得被 prune 掉');
-    ok(cm.likedUrls.has(`${A}~1`) && cm.likedUrls.has(`${A}~3`),
+    ok(cm.likedUrls.has(`${A}~1`) && cm.likedUrls.has(`${A}~4`),
        'B2c 合并页的旧键仍须展开到组内场次（改造前「整页一个赞」= 整卡赞）');
   }
 
-  // --- B2d：混合页（同日 3 场 + 另一天 1 场）只展开合并组内的场次 ---
+  // --- B2d：混合页（同日 4 场 + 另一天 1 场）只展开合并组内的场次 ---
   {
     const D = 'http://d.scnu.edu.cn/d/20261012/888.html';
     const mkD = (i, day) => ({
@@ -234,14 +237,37 @@ function mkSingle() {
     });
     const app = loadApp({ [LIKED_KEY]: JSON.stringify([D]) });
     const cm = Object.assign(app.state(), app.methods, {
-      all: [mkD(1, '2026-05-01'), mkD(2, '2026-05-01'), mkD(3, '2026-05-01'), mkD(4, '2026-05-09')],
+      all: [mkD(1, '2026-05-01'), mkD(2, '2026-05-01'), mkD(3, '2026-05-01'), mkD(4, '2026-05-01'), mkD(5, '2026-05-09')],
     });
     cm.loadLikes();
     cm.migrateCountKeys();
-    ok(cm.likedUrls.has(`${D}~1`) && cm.likedUrls.has(`${D}~3`),
-       'B2d 合并组内（同日 3 场）的场次应被展开');
-    ok(!cm.likedUrls.has(`${D}~4`),
+    ok(cm.likedUrls.has(`${D}~1`) && cm.likedUrls.has(`${D}~4`),
+       'B2d 合并组内（同日 4 场）的场次应被展开');
+    ok(!cm.likedUrls.has(`${D}~5`),
        'B2d 同页另一天的零散场次是独立单卡，不得被整页赞波及');
+  }
+
+  // --- B2f（评审 #8）：同日恰好 3 场不得再被当成合并组 ---
+  // 用户 2026-10-27 把 FORUM_MIN 上调到 4 后，social 层残留的 <3 硬编码会让
+  // 当前库里 13 组「同日 3 场」页面展开出伪造的 ~N 键：刷新后 3 张卡同时亮
+  // 「已赞」但计数为 0。这条边界用例与 app_forum_and_clamp.js 的 B4 一起
+  // 把 computed / social 两侧的阈值锁死同源。
+  {
+    const E = 'http://e.scnu.edu.cn/e/20261012/999.html';
+    const mkE = (i) => ({
+      sourceUrl: E, title: `E讲座${i}`, lectureStart: '2026-05-01 14:00:00',
+      topic: '', location: '', speaker: `讲者${i}`, speakerKeys: [],
+      college: '文学院', campus: '石牌', lectureIndex: i, ck: `${E}~${i}`,
+    });
+    const app = loadApp({ [LIKED_KEY]: JSON.stringify([E]) });
+    const cm = Object.assign(app.state(), app.methods, {
+      all: [mkE(1), mkE(2), mkE(3)],
+      lectureStats: {},
+    });
+    cm.loadLikes();
+    cm.migrateCountKeys();
+    ok(cm.likedUrls.size === 1 && cm.likedUrls.has(E),
+       `B2f 同日恰好 3 场不是合并组，不得展开 ~N 键，实得 ${JSON.stringify([...cm.likedUrls])}`);
   }
 }
 

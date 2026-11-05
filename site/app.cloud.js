@@ -12,16 +12,19 @@
 const LectureCloud = (function () {
     let configPromise = null;
 
-    // 本地开发环境短路（2026-10-18）：本机（localhost / 127.0.0.1 / file:）默认不打云端，
-    // 防止本地反复刷新把公网真实计数刷虚高。短路时 loadConfig 直接 resolve(null)，
-    // 与「配置缺失 / 读取失败」完全同路——调用方照旧走 /api 与本机降级链，
-    // 行为与云端层上线前一致（见文件头注释）。
+    // 本地开发环境短路（2026-10-18）：本机（localhost / 127.0.0.1 / [::1] / ::1 / file:）
+    // 默认不打云端，防止本地反复刷新把公网真实计数刷虚高。短路时 loadConfig 直接
+    // resolve(null)，与「配置缺失 / 读取失败」完全同路——调用方照旧走 /api 与本机
+    // 降级链，行为与云端层上线前一致（见文件头注释）。
+    // 2026-11-05（评审 #9）：IPv6 回环补齐。列表页 app.js / server.py 早已认得
+    // [::1]，这里漏判 → 用 http://[::1]:8000 预览时列表走本地、计数却打真实
+    // Supabase，每刷新一次公网 PV 多 1。浏览器返回的 hostname 带方括号，两种写法都收。
     // 逃生门：localStorage.forceCloud === '1' 时强制走云端（验证真实写入效果用）。
     // 判据只认 hostname / 协议；公网域名（*.github.io 等）永不经此分支。
     function isLocalDev() {
         var local = typeof location !== 'undefined' &&
             (location.protocol === 'file:' ||
-             /^(localhost|127\.0\.0\.1)$/.test(location.hostname || ''));
+             /^(localhost|127\.0\.0\.1|::1|\[::1\])$/.test(location.hostname || ''));
         if (!local) return false;
         try { return localStorage.getItem('forceCloud') !== '1'; }
         catch (e) { return true; }   // 隐私模式等 localStorage 异常：保守短路，宁可少写也不污染云端

@@ -1,8 +1,8 @@
 // LectureCloud 本机开发环境短路门禁（2026-10-18 方案 B）。
 //
 // 背景：本地起 server.py 验证修改效果时，页面每次刷新都经 LectureCloud 实打实
-// 写 Supabase，把公网真实计数刷虚高。现实现：hostname 为 localhost / 127.0.0.1
-// 或 file: 协议时 loadConfig 直接 resolve(null)（=云端禁用），调用方照旧走
+// 写 Supabase，把公网真实计数刷虚高。现实现：hostname 为 localhost / 127.0.0.1 /
+// [::1] / ::1 或 file: 协议时 loadConfig 直接 resolve(null)（=云端禁用），调用方照旧走
 // /api 与本机降级链；localStorage.forceCloud === '1' 为逃生门（强制走云端）。
 //
 // 本套件锁死短路语义（cloud_pagination.js 只覆盖公网路径，本地分支在此覆盖）：
@@ -14,6 +14,7 @@
 //   L6 localStorage 异常（隐私模式）：保守短路，宁可少写也不污染云端
 //   L7 公网 fetchAll 不短路：照常拉全表进 map
 //   L8 localhost fetchAll 短路：null 且零 fetch
+//   L9/L10 IPv6 回环（[::1] / ::1）短路：同 L2（2026-11-05 评审 #9）
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
@@ -86,11 +87,16 @@ async function run() {
     console.log('L1 公网域名不短路（bump 打 rpc）  pass');
   }
 
-  // L2/L3/L4：本机三形态短路——bump 返 null 且零 fetch
+  // L2/L3/L4 + L9/L10：本机五形态短路——bump 返 null 且零 fetch
+  // L9/L10（2026-11-05 评审 #9）：IPv6 回环。浏览器给的 hostname 是带方括号的
+  // '[::1]'，裸 '::1' 一并覆盖。漏判时 http://[::1]:8000 预览列表走本地、
+  // 计数却打真实 Supabase，每刷新一次公网 PV 就多 1。
   for (const [name, env] of [
     ['L2 localhost', { hostname: 'localhost' }],
     ['L3 127.0.0.1', { hostname: '127.0.0.1' }],
     ['L4 file: 协议', { protocol: 'file:', hostname: '' }],
+    ['L9 IPv6 [::1]', { hostname: '[::1]' }],
+    ['L10 IPv6 ::1', { hostname: '::1' }],
   ]) {
     const { ctx, calls } = makeCtx(cloudFetch, env);
     const cloud = loadCloud(ctx);
@@ -145,7 +151,7 @@ async function run() {
     console.log('L8 localhost fetchAll 短路  pass');
   }
 
-  console.log('cloud_local_shortcircuit: 8/8 pass');
+  console.log('cloud_local_shortcircuit: 10/10 pass');
 }
 
 run().catch(e => { console.error(e); process.exit(1); });

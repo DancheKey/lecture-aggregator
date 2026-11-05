@@ -199,8 +199,15 @@ Object.assign(APP_METHODS, {
         arr.push(l.lectureIndex);
       });
       if (!multi.size) return;
+      // 2026-11-05（评审 #8）：阈值必须与 units() 的 FORUM_MIN 同源。
+      // 用户 2026-10-27 已把合并阈值 3 → 4（computed/filtered 两处都改了），
+      // 这里却残留 <3 的硬编码：同日恰好 3 场的页面（当前库 13 组）被误判成
+      // 合并组，会展开出 sourceUrl~N 伪造键——刷新后 3 张卡同时亮「已赞」
+      // 但计数为 0，「只看已赞」也不认。
+      // FORUM_MIN 是 app.computed.js 顶层 const；defer 脚本共享全局词法环境，
+      // 且 index.html 中 computed 排在 social 之前，可直接引用（勿再写数字）。
       dayIdx.forEach((idxs, gk) => {
-        if (idxs.length < 3) return;                  // 同日 <3 场：不折叠，逐场单卡
+        if (idxs.length < FORUM_MIN) return;         // 同日 <4 场：不折叠，逐场单卡
         const u = gk.slice(0, gk.lastIndexOf('|'));
         mergedUrls.add(u);
         let ms = mergedIdx.get(u);

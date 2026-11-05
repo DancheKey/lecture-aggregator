@@ -9,8 +9,11 @@
 两份清单一旦漂移，后果是隐蔽的：新增测试只加进 test.yml → gate 少跑一项，
 门禁形同虚设，且**没有任何报错**。故本测试把两份清单当作被测数据，逐项比对。
 
-三条断言：
+四条断言：
   ① deploy.yml 的 GATE_TESTS 覆盖 test.yml 里全部 `python tests/...` / `node tests/...` 步骤
+  ①b 反向（2026-11-05 评审 #17）：GATE_TESTS 也必须被 test.yml 覆盖。只登记到
+      部署门禁、漏了日常测试时，日常反馈少跑一项，要等部署才发现；① 与 ②
+      （游离判定取两侧并集）都抓不到这个方向。
   ② test.yml 里不存在「有测试文件但两个工作流都没引用」的游离测试
   ③ deploy.yml 的 deploy job 确实 `needs: gate`（否则门禁跑完也不拦）
 
@@ -96,6 +99,18 @@ class GateCoverageTest(unittest.TestCase):
         missing = [t for t in self.test_yml_refs if t not in self.gate_refs]
         self.assertEqual(missing, [],
                          f'deploy.yml 的 GATE_TESTS 漏了：{missing}')
+
+    def test_01b_日常测试覆盖gate全部条目(self):
+        """反向漂移（2026-11-05 评审 #17）：只登记到部署门禁、漏了 test.yml 也要抓。
+
+        test_01 只锁「test.yml ⊆ gate」，test_02 的游离判定取两侧并集——
+        新套件只写进 deploy.yml 时两条都绿，日常反馈却少跑一项，要等部署才发现。
+        两侧清单必须逐字相等；若将来确需 gate-only 条目，须在此显式登记白名单
+        并写明理由，不能直接放宽断言。
+        """
+        missing = [t for t in self.gate_refs if t not in self.test_yml_refs]
+        self.assertEqual(missing, [],
+                         f'test.yml 漏了这些门禁条目（只在 deploy gate 里跑）：{missing}')
 
     def test_02_无游离测试(self):
         """任何测试文件都必须被至少一个工作流引用（否则改了没人跑）。"""

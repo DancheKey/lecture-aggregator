@@ -56,8 +56,9 @@ def atomic_write_text(path, content):
 
     ⚠ `newline='\n'` 不可省（2026-10-10 Windows 实测）：文本模式下 Python
     在 Windows 会把 `\n` 转成 `\r\n`，写出的站点文件与 git 索引（LF）逐字节
-    不同 → `test_工作区与git换行一致` 当场变红，且 stamp 哈希工作区/索引两侧
-    口径分裂。CI（Linux）不复现，故此坑只在本地跑生成脚本时暴露。
+    不同 → `test_工作区与git换行一致` 当场变红，且版本戳按索引内容计算，
+    工作区字节对不上就是「改了没 add」的假绿形态。CI（Linux）不复现，
+    故此坑只在本地跑生成脚本时暴露。
     """
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
@@ -255,9 +256,13 @@ def build_stats(data, updated_at):
     # 来源通知总数：按**唯一来源 URL 集合**计（见 unique_source_urls 的口径说明）。
     # 早前是逐条累加 sourceCount，多场拆分页会因同一转发页被多次引用而虚高。
     seen_notice_urls = set()
-    # 学院 -> 年份 -> 来源通知数
+    # 学院 -> 年份 -> 讲座-单位计数（同一讲座跨 N 个归口单位即在 N 个学院各计 1 次）
     matrix = {}
-    # 年份 -> 来源通知数
+    # 年份 -> 讲座-单位计数（= matrix 各学院同年之和），**不是**「唯一来源通知数」。
+    # 评审 #26（2026-11-05）：原注释把它写成来源通知数，与实现和字段名都不符。
+    # 统计页 stats.js 自己从 matrix 重算同名 computed，不读本字段；保留它是给
+    # 外部消费者与 build_stats 回归用例用的（tests/test_cross_url_dup_20261024.py），
+    # 不可直接删除或改名。
     year_totals = {}
     # 最小讲座索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
     lectures = []
@@ -407,6 +412,7 @@ def build_stats(data, updated_at):
         'sourceNoticeCount': len(seen_notice_urls),
         'years': years,
         'matrix': matrix,
+        # 年份 -> 讲座-单位计数，口径见 build_stats 顶部注释（非唯一来源通知数）
         'yearTotals': year_totals,
         'lectures': lectures,
         'campusMap': campus_map,

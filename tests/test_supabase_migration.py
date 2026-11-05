@@ -24,8 +24,9 @@ p_delta=99999 即可把 likes/wants 刷爆（表级 RLS 挡得住直接 INSERT/U
      Supabase 默认 anon 有全表 ALL 权限，RLS 关着时 policy 形同虚设）；
   ⑧ 2026-10-18 复查补：p_url 前缀守卫（只限长度挡不住 'a'/'b'… 批量造行），
      并用 site/lectures.json 全量 ck 实测该规则零误伤；
-  ⑨ 2026-10-18 复查补：docs/supabase-patch-current.sql 必须由
+  ⑨ 2026-10-18 复查补：**仓库根** supabase-patch-current.sql 必须由
      scripts/gen_supabase_patch.py 同源产出（手拼补丁会静默过期）。
+     （docs/ 在 .gitignore，补丁不放那里，否则 CI 纯净检出必 skip。）
 
 只用标准库；读仓库内文件，无网络、无 key、无 Supabase 依赖。
 """
@@ -230,7 +231,7 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         norm = lambda s: s.replace('\r\n', '\n')
         self.assertEqual(
             norm(r.stdout), norm(self.patch),
-            'docs/supabase-patch-current.sql 与 gen_supabase_patch.py 产出不一致——'
+            '仓库根 supabase-patch-current.sql 与 gen_supabase_patch.py 产出不一致——'
             '请重新生成（python scripts/gen_supabase_patch.py）而非手改补丁')
 
     def test_02_check约束存在且上限合理(self):

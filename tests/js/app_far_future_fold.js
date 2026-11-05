@@ -209,9 +209,17 @@ function makeCtx(allData, over) {
   // 位置：fold 容器应紧跟在最后一个 ≤7 天未来单元之后（未来区末尾）
   const foldIdx = folded.findIndex(u => u.type === 'far-fold');
   const before = folded.slice(0, foldIdx);
+  // ⚠ 评审 #16（2026-11-05）：阈值必须来自确定性时钟，不能用真实 Date.now()。
+  // 左端数据固定在 FIXED_MS，右端若随真实时间增长，断言会一天天变成「怎么都成立」——
+  // 这道闸门自动失效且零报错。iso() 产出 'YYYY-MM-DD HH:MM:SS' 北京时间字面量，
+  // 与被测数据同格式，字典序即时间序，顺带避开 CI(UTC) 与本地(UTC+8) 的解析差异。
+  const cutoff = iso(7 * DAY);
+  // 断言自测：8 天外的单元必须落在阈值之外，否则上面的 every 恒真、等于没锁。
+  ok(iso(8 * DAY) > cutoff,
+     'test_04 折叠阈值必须卡在 7~8 天之间（防止阈值漂走后断言恒真）');
   ok(before.every(u => {
     const s = u.type === 'forum' ? u.head.lectureStart : u.recs[0].lectureStart;
-    return new Date(s.replace(' ', 'T')).getTime() <= Date.now() + 7 * DAY;
+    return s <= cutoff;
   }), 'test_04 fold 容器前的单元必须都 ≤7 天（容器落在未来区末尾）');
   // 无 >7 天 → 不产生容器
   const cm2 = makeCtx([past(1, 'a'), future(2 * DAY, 2, 'b')]);

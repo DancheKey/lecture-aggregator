@@ -1048,5 +1048,67 @@ class TestKnownLectureUrlsCountKey(unittest.TestCase):
         self.assertIn('http://c.scnu.edu.cn/3.html/~1'.rstrip('/'), urls)
 
 
+class TestSourceUrlValidation(unittest.TestCase):
+    """_validate_source_urls 的 dict 形态守卫（2026-11-05 评审 #13）。
+
+    背景：dict 形态的 list_urls 缺 url 时原先直接放行，抓取端 lu['url'] 随即
+    KeyError，被记成源故障 → 全局水位冻结。一条坏配置就能让整轮每日抓取停摆，
+    而白名单校验本该拦住的正是这种「写坏配置」。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.srv = _load_server()
+
+    def _err(self, list_urls, base=''):
+        return self.srv._validate_source_urls(base, list_urls)
+
+    def test_24_dict形态缺url必须拒绝(self):
+        e = self._err([{'collect_mode': 'auto'}])
+        self.assertIsNotNone(e, 'dict 缺 url 竟放行：抓取端会 KeyError')
+        self.assertIn('不能为空', e)
+
+    def test_25_dict形态空url必须拒绝(self):
+        for u in ('', '   ', None):
+            with self.subTest(u=u):
+                e = self._err([{'url': u, 'collect_mode': 'auto'}])
+                self.assertIsNotNone(e, f'url={u!r} 竟放行')
+
+    def test_26_dict形态非字符串url必须拒绝(self):
+        for u in (123, [], {}):
+            with self.subTest(u=u):
+                e = self._err([{'url': u}])
+                self.assertIsNotNone(e, f'url={u!r} 竟放行')
+
+    def test_27_dict形态校外域名必须拒绝(self):
+        e = self._err([{'url': 'https://evil.com/x.html'}])
+        self.assertIsNotNone(e)
+        self.assertIn('scnu.edu.cn', e)
+
+    def test_28_合法dict与字符串形态照常通过(self):
+        good = 'https://maths.scnu.edu.cn/a/1.html'
+        self.assertIsNone(self._err([good]))
+        self.assertIsNone(self._err([{'url': good, 'collect_mode': 'auto'}]))
+        self.assertIsNone(self._err([{'url': good}], base='https://maths.scnu.edu.cn/'))
+
+    def test_29_真配置全部条目仍通过(self):
+        """量化影响面：scraper/sources.yaml 现有 53 源不得被新校验误伤。"""
+        import yaml
+        p = os.path.join(ROOT, SOURCES_REL)
+        if not os.path.exists(p):
+            self.skipTest('sources.yaml 不存在（纯净检出）')
+        with open(p, encoding='utf-8') as f:
+            doc = yaml.safe_load(f) or {}
+        n = 0
+        for src in (doc.get('sources') or []):
+            if not isinstance(src, dict):
+                continue
+            n += 1
+            e = self.srv._validate_source_urls(src.get('base') or '',
+                                               src.get('list_urls') or [])
+            self.assertIsNone(e, f'真配置被新校验误伤：{src.get("name")} -> {e}')
+        self.assertGreater(n, 0, '真配置里没解析出任何信息源，用例失效')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

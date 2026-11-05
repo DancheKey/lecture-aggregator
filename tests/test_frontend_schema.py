@@ -230,16 +230,20 @@ class ScriptVersionStampTest(unittest.TestCase):
                     % (page, name, ver, real))
 
     def test_工作区与git换行一致(self):
-        """工作区与 Git 内容不应存在 CRLF/LF 差异。
+        """工作区与 Git 索引内容必须逐字一致（CRLF 差异 / 改了没 add 都要抓）。
 
-        这是版本戳对不上的**根因**：stamp 哈希工作区（CRLF）、Pages 发 Git（LF），
-        两者永远不同。凡是入库的 site/*.js 有此差异，缓存破坏即失效。
-        这里给出明确报错，而非让维护者去比对两个毫无关联的 hash。
+        评审 #19（2026-11-05）的「第二源」守卫：`stamp_script_version()` 打戳与
+        `test_版本戳与git内容一致` 验戳**都读 `git show :path`（索引）**，两边
+        必然自洽——若改了 site 资源却没先 `git add`，线上字节与戳不符也能判绿。
+        本测试拿工作区字节作第二源，把「改了没 add」变成红灯。
+
+        同时扩到 `*.css`：stamp 也给 `<link href>` 打戳，而原先只扫 `*.js` →
+        改了 theme-scnu.css / visits-trend.css 没 add 时门禁完全看不见（静默错）。
         """
         import subprocess
         diff = []
         for f in sorted(os.listdir(os.path.join(_ROOT, 'site'))):
-            if not f.endswith('.js'):
+            if not (f.endswith('.js') or f.endswith('.css')):
                 continue
             rel = 'site/' + f
             blob = subprocess.run(['git', 'show', ':' + rel], cwd=_ROOT,
@@ -254,12 +258,13 @@ class ScriptVersionStampTest(unittest.TestCase):
                             % (rel, len(local), len(blob)))
         self.assertEqual(
             diff, [],
-            '工作区与 Git 索引内容不一致（通常是 CRLF/LF 转换）：\n  '
+            '工作区与 Git 索引内容不一致（CRLF/LF 转换，或改了资源没 git add）：\n  '
             + '\n  '.join(diff)
-            + '\n影响：stamp_script_version 哈希的是工作区文件，而 Pages 下发 git 那份，'
-              '两者永远不同 → ?v= 缓存破坏完全失效。'
-              '\n修法：① 让 stamp 按 git 内容哈希；或 ② 仓库内统一使用 LF'
-              '（如在 .gitattributes 里为 site/*.js 固定 eol=lf，并重新 checkout）。')
+            + '\n影响：`?v=` 按索引内容计算；未 add 的改动会让版本戳指向旧内容，'
+              '提交后 CI test_99 也会红（部署被跳过）。'
+              '\n修法：先 git add -A site/，再重跑 scripts/gen_visits_trend.py 与'
+              ' scripts/generate_frontend_data.py（二轮收敛版本戳）；'
+              '若纯属 CRLF/LF，按 .gitattributes 统一为 LF。')
 
     def test_所有app分片都被引用(self):
         """反向：site/app*.js 都要被 index.html 引用，否则是孤儿文件。"""
