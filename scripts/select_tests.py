@@ -99,6 +99,7 @@ GROUPS = [
                'tests/test_time_unknown_autotag.py', 'tests/test_timeparse.py',
                'tests/test_title_clean.py', 'tests/test_title_vocab_convergence.py',
                'tests/test_hybrid.py', 'tests/test_cited_judge.py',
+               'tests/test_llm_text_replay.py',
                'tests/test_hallucination_guard.py', 'tests/test_stage_var_leak.py',
                'tests/test_listdate.py', 'tests/test_module_compile.py',
                'tests/test_poster_late_gate.py',

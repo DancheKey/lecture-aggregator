@@ -86,6 +86,11 @@ jobs:
         run: python tests/test_hybrid.py
       - name: Run cited-judge tests
         run: python tests/test_cited_judge.py
+      # 2026-11-06 纳入（#14）：LLM 双轨离线回放门禁。生产走 AI 双轨但 golden 锁纯规则、
+      # 每日主路径不跑 golden，LLM 分支回归 CI 全绿也发现不了。用桩 provider 回放录制响应，
+      # 零 key 零网络；详细机制见 tests/test_llm_text_replay.py 文件头。
+      - name: Run LLM dual-track replay tests
+        run: python tests/test_llm_text_replay.py
       - name: Run bio-bracket tests
         run: python tests/test_bio_bracket.py
       - name: Run bio-stop-words tests

@@ -75,6 +75,7 @@ jobs:
             tests/test_multi_session_split.py
             tests/test_hybrid.py
             tests/test_cited_judge.py
+            tests/test_llm_text_replay.py
             tests/test_bio_bracket.py
             tests/test_bio_stop_words.py
             tests/test_vlm_abstract_guard.py
