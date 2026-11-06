@@ -760,7 +760,12 @@ class CampusMatrixStatsTest(unittest.TestCase):
                       'stats.js 访问/点赞叠加段缺讲座级校区命中过滤')
 
     def test_70_校区矩阵与首页口径一致(self):
-        """对账：campusMatrix 每格 == 按首页 filtered() 口径直接算出的讲座-单位对数。"""
+        """对账：campusMatrix 每格 == 按「活动口径」算出的讲座-单位对数。
+
+        2026-11-06 起统计矩阵按论坛/会议活动归并（同源页+同一天 ≥4 场计 1 场），
+        首页列表仍逐场，故这里的期望值也要按同一口径独立重算——不复用
+        gen.forum_stat_skip_indexes，避免「用被测实现验证自己」的假绿。
+        """
         sp = os.path.join(ROOT, 'site', 'lectures', 'stats.json')
         lp = os.path.join(ROOT, 'site', 'lectures.json')
         if not (os.path.exists(sp) and os.path.exists(lp)):
@@ -769,8 +774,18 @@ class CampusMatrixStatsTest(unittest.TestCase):
             cm = (json.load(f) or {}).get('campusMatrix') or {}
         with open(lp, encoding='utf-8') as f:
             data = (json.load(f) or {}).get('data') or []
+        groups = {}
+        for i, l in enumerate(data):
+            k = (l.get('sourceUrl') or '', (l.get('lectureStart') or '')[:10])
+            groups.setdefault(k, []).append(i)
+        skip = set()
+        for idxs in groups.values():
+            if len(idxs) >= 4:      # 与 app.computed.js FORUM_MIN 同源
+                skip.update(idxs[1:])
         agg = {}
-        for l in data:
+        for idx, l in enumerate(data):
+            if idx in skip:
+                continue
             units, seen = [], set()
             for c in [l.get('college')] + [s.get('college') for s in l.get('sources') or []]:
                 if c and c not in seen:
@@ -792,6 +807,118 @@ class CampusMatrixStatsTest(unittest.TestCase):
         self.assertEqual(
             got, agg,
             f'校区矩阵与首页口径不一致（{len(diff)} 处，样例：{diff[:5]}）')
+
+
+class ForumStatDedupTest(unittest.TestCase):
+    """统计层论坛 / 会议归并（2026-11-06 用户拍板）。
+
+    规则：同源页 + 同一天 >= FORUM_MIN(4) 场 = 一场论坛 / 会议活动，统计矩阵
+    只计 1 场；同日 1~3 场、跨天系列仍逐场计 N 场。顶部 lectureCount、
+    sourceNoticeCount、最小索引 lectures 一律保持全量（列表、访问、点赞逐场）。
+    判据不使用标题关键词：跨天系列（如「扬帆教学论坛第1-4周」）标题同样带
+    「论坛」，按关键词会误归并。
+    """
+
+    @staticmethod
+    def _rec(url, start, ck=None, college='测试学院'):
+        r = {'sourceUrl': url, 'lectureStart': start, 'college': college,
+             'campus': '石牌校园', 'title': 't', 'topic': 't'}
+        if ck:
+            r['ck'] = ck
+        return r
+
+    @classmethod
+    def _sample(cls):
+        data = []
+        # 同页同日 5 场 -> 论坛 / 会议，统计计 1 场
+        for i in range(5):
+            data.append(cls._rec('http://x/a.html', '2025-05-01 09:00:00',
+                                 ck=f'http://x/a.html~{i + 1}'))
+        # 同页跨 4 天各 1 场 -> 普通系列，仍计 4 场
+        for d in range(1, 5):
+            data.append(cls._rec('http://x/b.html', f'2025-05-0{d} 09:00:00',
+                                 ck=f'http://x/b.html~{d}'))
+        # 同页同日 3 场（未达阈值）-> 仍计 3 场
+        for i in range(3):
+            data.append(cls._rec('http://x/c.html', '2025-05-06 09:00:00',
+                                 ck=f'http://x/c.html~{i + 1}'))
+        return data
+
+    def test_71_论坛组计1场_跨天系列与3场页仍逐场(self):
+        data = self._sample()
+        st = gen.build_stats(data, '2026-11-06T00:00:00+08:00')
+        self.assertEqual(st['matrix']['测试学院']['2025'], 8,
+                         '论坛 1 + 跨天系列 4 + 同日 3 场 3 = 8')
+        self.assertEqual(sum(st['yearTotals'].values()), 8,
+                         'yearTotals 必须与 matrix 同口径')
+        self.assertEqual(
+            sum(sum(y.values()) for colleges in st['campusMatrix'].values()
+                for y in colleges.values()),
+            8, 'campusMatrix 必须同步归并，否则选校区后数字分叉')
+        self.assertEqual(st['lectureCount'], 12,
+                         '顶部 lectureCount 必须仍是数据条数（用户拍板不随归并变动）')
+        self.assertEqual(st['sourceNoticeCount'], 3,
+                         '来源通知数按唯一 URL，不受统计归并影响')
+
+    def test_72_最小索引保持逐场全量(self):
+        data = self._sample()
+        st = gen.build_stats(data, '2026-11-06T00:00:00+08:00')
+        real = [l for l in st['lectures'] if not l.get('p')]
+        self.assertEqual(len(real), len(data),
+                         '访问/点赞/想听仍逐场记账，最小索引不得跟着归并删条')
+
+    def test_73_真实产物矩阵合计与活动口径对账(self):
+        """独立重算（不调用被测函数），防止归并只改了部分矩阵。"""
+        sp = os.path.join(ROOT, 'site', 'lectures', 'stats.json')
+        lp = os.path.join(ROOT, 'site', 'lectures.json')
+        if not (os.path.exists(sp) and os.path.exists(lp)):
+            self.skipTest('stats.json / lectures.json 未生成（本地未跑生成器）')
+        with open(sp, encoding='utf-8') as f:
+            st = json.load(f)
+        with open(lp, encoding='utf-8') as f:
+            data = (json.load(f) or {}).get('data') or []
+        groups = {}
+        for i, r in enumerate(data):
+            k = (r.get('sourceUrl') or '', (r.get('lectureStart') or '')[:10])
+            groups.setdefault(k, []).append(i)
+        skip = set()
+        for idxs in groups.values():
+            if len(idxs) >= 4:
+                skip.update(idxs[1:])
+        expect = 0
+        for i, r in enumerate(data):
+            if i in skip:
+                continue
+            units = []
+            for c in [r.get('college')] + [s.get('college') for s in r.get('sources') or []]:
+                if c and c not in units:
+                    units.append(c)
+            expect += len(units) if units else 1
+        got = sum(sum(y.values()) for y in st['matrix'].values())
+        self.assertEqual(got, expect,
+                         'matrix 合计与独立重算的活动口径不一致（某处漏了归并或漏了展开）')
+        self.assertEqual(st['lectureCount'], len(data),
+                         '顶部数字必须等于前端切片条数')
+
+    def test_74_FORUM_MIN全站同源且虚拟索引不再硬编码3(self):
+        with open(os.path.join(ROOT, 'scripts', 'generate_frontend_data.py'),
+                  encoding='utf-8') as f:
+            gsrc = f.read()
+        with open(os.path.join(ROOT, 'site', 'app.computed.js'), encoding='utf-8') as f:
+            csrc = f.read()
+        with open(os.path.join(ROOT, 'tests', 'js', 'liked_filter_keys.js'),
+                  encoding='utf-8') as f:
+            tsrc = f.read()
+        self.assertIsNotNone(re.search(r'^FORUM_MIN = 4$', gsrc, re.M),
+                             '生成器缺 FORUM_MIN=4 常量')
+        self.assertIsNotNone(re.search(r'const FORUM_MIN = 4;', csrc),
+                             '前端 FORUM_MIN 不再是 4（统计判据会分叉）')
+        self.assertIn('idx not in skip_stat_indexes', gsrc,
+                      '统计矩阵未按活动口径跳过组内非首条')
+        self.assertIn('< FORUM_MIN', gsrc,
+                      '页面级虚拟索引仍可能硬编码 3，会与合并卡口径分叉')
+        self.assertIn('if (n >= 4)', tsrc,
+                      'test_05 的合并页判据仍是 3，会误报缺索引')
 
 
 if __name__ == '__main__':

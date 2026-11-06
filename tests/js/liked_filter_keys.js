@@ -20,7 +20,7 @@
 //   test_02 页面级赞（无后缀 url，合并卡）能筛出整组，且仍渲染为 1 张合并卡
 //   test_03 未赞的场次不被筛出
 //   test_04 单场记录（ck === sourceUrl）照常筛出
-//   test_05 stats.json：只有「合并卡页」（同页同日 ≥3 场）才有 k=u 的页面级索引
+//   test_05 stats.json：只有「合并卡页」（同页同日 ≥4 场）才有 k=u 的页面级索引
 //          （B4；2026-10-19 收窄——早前给全部多场页都补，统计页与首页条数对不上）
 //   test_06 远期折叠条 count 是场次数而非渲染单元数（B6）
 //   test_07 index.html 分页导航用 totalPages 判定（B5）
@@ -114,7 +114,7 @@ function makeCtx(allData, over) {
   return cm;
 }
 
-// ---------- 共用数据：一页 3 场（会渲染成合并卡）+ 一条单场 ----------
+// ---------- 共用数据：一页 4 场（满足 FORUM_MIN=4，会渲染成合并卡）+ 一条单场 ----------
 const P = 'http://x.scnu.edu.cn/a/1.html';          // 多场源页
 const S = 'http://x.scnu.edu.cn/b/2.html';          // 单场源页
 const multi = [1, 2, 3, 4].map(i => rec({
@@ -166,7 +166,7 @@ const ALL = multi.concat([solo]);
 // 现象：只赞了「勤勤论坛第 3 期」，筛选却出来 3 条（第 1/2 期不高亮、计数 0）。
 // 根因：页面级兜底按 sourceUrl 无条件匹配，而该页 3 场分在两天、同日最多 2 场，
 // 逐场是独立单卡，页面上根本没有「整页赞」入口——那条页面级键是历史遗留。
-// 修法：页面级兜底只在「该场属于合并组（同页同日 ≥3 场）」时生效。
+// 修法：页面级兜底只在「该场属于合并组（同页同日 ≥4 场）」时生效。
 {
   const N = 'http://x.scnu.edu.cn/n/10265.html';   // 非合并多场页：3 场分 3 天
   const days = ['2026-10-13', '2026-10-14', '2026-10-14'];
@@ -279,8 +279,9 @@ const ALL = multi.concat([solo]);
 }
 
 // ---------- test_05：stats.json 只为「合并卡页」补页面级索引（B4，2026-10-19 收窄） ----------
-// 判定口径必须与 app.computed.js units() 的 MIN=3 完全一致：同源页 + 同一天 ≥3 场
+// 判定口径必须与 app.computed.js units() 的 FORUM_MIN=4 完全一致：同源页 + 同一天 ≥4 场
 // 才渲染成合并卡，才有「整页一个赞」的入口，页面级键（无后缀 url）才会被写入。
+// 生成器 build_stats 的虚拟索引也用同一阈值（2026-11-06 收敛，原残留 3）。
 // 早前对**全部** 94 个多场页都补了 k=u 虚拟记录，跨天拆分的页根本没有这个入口，
 // 统计页却把页面级键（历史脏值）当一条记录计入 → 与首页「只看已赞」条数对不上。
 {
@@ -295,7 +296,7 @@ const ALL = multi.concat([solo]);
     const dup = L.length - new Set(L.map(x => x.k)).size;
     ok(dup === 0, `test_05 stats.json 的 k 不唯一（重复 ${dup} 条），统计页会重复累加`);
 
-    // 用全量数据算出「会渲染成合并卡的源页」集合（同源页同日 ≥3 场）
+    // 用全量数据算出「会渲染成合并卡的源页」集合（同源页同日 ≥4 场）
     if (!fs.existsSync(dataPath)) {
       errs.push('test_05 site/lectures.json 不存在，无法校验合并页口径');
     } else {
@@ -310,7 +311,10 @@ const ALL = multi.concat([solo]);
       });
       const mergedPages = new Set();
       dayCount.forEach((n, gk) => {
-        if (n >= 3) mergedPages.add(gk.slice(0, gk.lastIndexOf('|')));
+        // 4 = site/app.computed.js 的 FORUM_MIN（2026-10-27 由 3 上调）。
+        // 生成器 build_stats 也用同一个常量补虚拟索引；此处若留在 3，
+        // 13 组「同日恰好 3 场」的页会被误判成「缺索引」而报错。
+        if (n >= 4) mergedPages.add(gk.slice(0, gk.lastIndexOf('|')));
       });
       const virtualPages = new Set(L.filter(x => x.p === 1).map(x => x.u));
       const extra = [...virtualPages].filter(u => !mergedPages.has(u));

@@ -596,7 +596,7 @@
                 {{ g.label }}
               </div>
               <template v-for="u in g.items" :key="u.key">
-              <!-- 论坛卡（2026-09-30 修订）：**同一天**场次 ≥3 才合并为一张卡，展开可看逐场清单；
+              <!-- 论坛卡（2026-09-30 修订，2026-10-27 阈值改为 4）：**同一天**场次 ≥4 才合并为一张卡，展开可看逐场清单；
                    跨天但每天仅 1~2 场的系列逐场单卡展示，不再整块折叠。
                    点赞/想听按键为**页面级**计数（记在无后缀 sourceUrl 上，与展开后各场的
                    讲座级 ck 互不干扰：点整页赞不会给某一场 +1，反之亦然），点标题进源页看完整议程 -->
@@ -662,7 +662,7 @@
                   <button v-if="u.head.isOnline" @click="toggleOnline()"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># 线上</button>
                   <div class="card-actions flex items-center gap-2 shrink-0">
-                    <!-- 整组加入日历（2026-10-20 批次 B）：合并卡代表「同页同日 ≥3 场」，
+                    <!-- 整组加入日历（2026-10-20 批次 B）：合并卡代表「同页同日 ≥4 场」，
                          逐场按钮会挤爆卡片，所以整组生成一个含多条 VEVENT 的 .ics。
                          显示条件是 showGroupCalBtn（2026-10-21 方案 B+）：
                          「组内还有能加的」或「组内我加过任意一场」。后半让「加过」的
@@ -1005,11 +1005,11 @@
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=47fddb4705"></script>
   <script defer src="app.state.js?v=dd5d2f91e2"></script>
-  <script defer src="app.computed.js?v=9740186f7f"></script>
+  <script defer src="app.computed.js?v=87b0f72bdd"></script>
   <script defer src="app.display.js?v=ec1bb21b72"></script>
   <script defer src="app.cloud.js?v=9c148fb828"></script>
-  <script defer src="app.social.js?v=27c3568e22"></script>
-  <script defer src="app.calendar.js?v=10018aacb3"></script>
+  <script defer src="app.social.js?v=aefbb4e777"></script>
+  <script defer src="app.calendar.js?v=a44c50f187"></script>
   <script defer src="app.data.js?v=c12c52afb2"></script>
   <script defer src="app.admin.js?v=51c29f817b"></script>
   <script defer src="app.js?v=305e058183"></script>

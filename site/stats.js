@@ -397,8 +397,11 @@ createApp({
       this._finalStart = performance.now();
       this._fromL = this.displayLecture;
       this._fromS = this.displaySource;
-      // 顶部始终展示「唯一讲座总数」（去重口径），不随跨源合并展开而放大；
-      // 各单位计数之和（合计行）会因联合发布而大于此数，由统计页说明文字解释。
+      // 顶部始终展示「数据中的讲座记录总数」（= lectures.json 条数，去重口径），
+      // 2026-11-06 用户拍板保持此口径，不随统计表的活动归并而变动。
+      // 合计行是「讲座-单位」计数：联合发布会在各单位各计 1 次（偏大），
+      // 论坛 / 会议议程的多场报告按 1 场计（偏小），故两者不必相等，
+      // 由统计页说明文字解释两个方向。
       this._toL = this.lectureCount;
       this._toS = this.sourceNoticeCount;
     },

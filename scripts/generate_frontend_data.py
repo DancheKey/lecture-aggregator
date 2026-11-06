@@ -250,12 +250,45 @@ def unique_source_urls(item):
     return urls
 
 
+# 论坛 / 会议活动的统计归并阈值（2026-11-06 用户拍板）。
+# 必须与 site/app.computed.js 的 FORUM_MIN、mergedDayKey 逐字同口径：
+# 分组键 = (sourceUrl, lectureStart[:10])，组内 >= FORUM_MIN 视为「一场论坛 /
+# 会议」，统计表按 1 场计；组内其余记录仍完整保留在列表、切片与计数索引里。
+# 不用标题关键词判定的原因：跨天系列（如「扬帆教学论坛第1-4周」「勷勤论坛
+# 分论坛」）标题同样带「论坛」，按关键词会误归并；只有「同源页 + 同一天 +
+# 场次密集」这个结构判据能把两类分开（实测 16 组全部为单日议程）。
+FORUM_MIN = 4
+
+
+def forum_stat_skip_indexes(data):
+    """返回统计矩阵中应跳过累加的记录下标集合（每组保留第一条）。
+
+    只作用于「讲座数量」口径（matrix / yearTotals / campusMatrix）。
+    lectureCount、sourceNoticeCount、最小索引 lectures、campusMap 一律保持全量：
+    首页列表/筛选/搜索/日历仍是逐场，访问、点赞、想听也仍是逐场计数。
+    """
+    groups = {}
+    for idx, item in enumerate(data):
+        key = (item.get('sourceUrl') or '', (item.get('lectureStart') or '')[:10])
+        groups.setdefault(key, []).append(idx)
+    skip = set()
+    for idxs in groups.values():
+        if len(idxs) >= FORUM_MIN:
+            skip.update(idxs[1:])
+    return skip
+
+
 def build_stats(data, updated_at):
     """生成统计页专用 JSON：预计算矩阵 + 最小讲座索引。"""
     years_set = set()
     # 来源通知总数：按**唯一来源 URL 集合**计（见 unique_source_urls 的口径说明）。
     # 早前是逐条累加 sourceCount，多场拆分页会因同一转发页被多次引用而虚高。
     seen_notice_urls = set()
+    # 统计口径（2026-11-06 用户拍板）：矩阵按「活动」计——同一论坛 / 会议议程
+    # 拆出的多场报告只计 1 场；普通单页多场、跨天系列仍逐场计 N 场。
+    # 顶部 lectureCount 不变（仍为数据条数），故合计行与顶部数字不必相等，
+    # 统计页说明文字需同时解释「联合发布放大」与「论坛归并缩小」两个方向。
+    skip_stat_indexes = forum_stat_skip_indexes(data)
     # 学院 -> 年份 -> 讲座-单位计数（同一讲座跨 N 个归口单位即在 N 个学院各计 1 次）
     matrix = {}
     # 年份 -> 讲座-单位计数（= matrix 各学院同年之和），**不是**「唯一来源通知数」。
@@ -283,10 +316,13 @@ def build_stats(data, updated_at):
     # 对不上——用户 2026-10-14 报告并确认方案 A（生成器预计算）。
     campus_matrix = {}
 
-    for item in data:
+    for idx, item in enumerate(data):
         y = year_of(item)
         if y:
             years_set.add(y)
+        # 论坛 / 会议议程组内非首条：只跳过「讲座数量」的矩阵累加，其余
+        # （来源去重、校区映射、最小索引、页面级键形态）仍按全量参与。
+        count_in_matrix = idx not in skip_stat_indexes
         primary_url = item.get('sourceUrl') or ''
         sources = item.get('sources') or [item]
         seen_notice_urls |= unique_source_urls(item)
@@ -303,10 +339,11 @@ def build_stats(data, updated_at):
                 seen_unit.add(c)
                 units.append(c)
         cell_year = y or UNKNOWN_YEAR
-        for c in units:
-            matrix.setdefault(c, {})
-            matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
-            year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
+        if count_in_matrix:
+            for c in units:
+                matrix.setdefault(c, {})
+                matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
+                year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
         # 学院 -> 校区映射：主学院优先；来源单位补全（保证合并讲座的来源单位也能按校区筛选）
         for c in units:
             if c in campus_map:
@@ -335,11 +372,12 @@ def build_stats(data, updated_at):
                 matched_campuses.add(uc)
         if _ac:
             matched_campuses.add(_ac)
-        for campus in matched_campuses:
-            cm = campus_matrix.setdefault(campus, {})
-            for c in units:
-                cm.setdefault(c, {})
-                cm[c][cell_year] = cm[c].get(cell_year, 0) + 1
+        if count_in_matrix:
+            for campus in matched_campuses:
+                cm = campus_matrix.setdefault(campus, {})
+                for c in units:
+                    cm.setdefault(c, {})
+                    cm[c][cell_year] = cm[c].get(cell_year, 0) + 1
         # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞。
         # cs = 该讲座归属的全部单位（含主学院与来源单位），供访问/点赞按单位展开归属；
         # c = 主学院（保留，供来源通知数等按主讲座口径统计）。
@@ -372,9 +410,10 @@ def build_stats(data, updated_at):
             _day = (item.get('lectureStart') or '')[:10]
             meta['days'][_day] = meta['days'].get(_day, 0) + 1
 
-    # 页面级虚拟索引（2026-10-19 B4）：合并卡（同页同日 ≥3 场）的赞/想听/访问
+    # 页面级虚拟索引（2026-10-19 B4）：合并卡（同页同日 ≥4 场）的赞/想听/访问
     # 记在**无后缀** sourceUrl 上（app.computed.js units() 的 forum 分支 ck: u），
-    # 而统计页只按 k 查 lectureStats，导致 30 组 / 225 场的页面级计数恒为 0。
+    # 而统计页只按 k 查 lectureStats，导致当时（阈值 3）30 组 / 225 场的
+    # 页面级计数恒为 0。
     # 这里为这些页补一条 k = u 的索引，按 u 去重（同页多天多张合并卡共用同一个
     # 页面级键，只补 1 条，避免把一份页面级计数放大 N 倍）。归属单位/年份取该页
     # 首条记录；p=1 标记非真实讲座（前端不读，仅便于排查）。
@@ -383,12 +422,15 @@ def build_stats(data, updated_at):
     # 但跨天拆分的页（如研究生院某页 3 场分 3 天）根本不渲染合并卡，页面上没有
     # 任何「整页赞」的入口，页面级键恒为 0/历史脏值，统计页却把它当一条记录计入
     # → 与首页「只看已赞」的条数对不上（用户：统计页 4 条 vs 首页筛出 1 条）。
-    # 判定依据必须与 units() 的 MIN=3 完全同口径：该页存在任意一天场次 ≥3。
+    # 判定依据必须与 units() 的 FORUM_MIN 完全同口径：该页存在任意一天场次 ≥4。
+    # 2026-11-06 修正：前端 2026-10-27 已把 3 上调为 4、app.social.js 也在
+    # 11-05 同步，此处却残留硬编码 3（旧注释写 MIN=3），导致当前 13 组
+    # 「同日恰好 3 场」的页被多补页面级虚拟索引。改引用同一常量，禁止再写数字。
     # plain 页（本身 k == u）原记录已能查到页面级键，不再补。
     for _u, meta in page_meta.items():
         if not meta['split'] or meta['plain']:
             continue
-        if max(meta['days'].values() or [0]) < 3:
+        if max(meta['days'].values() or [0]) < FORUM_MIN:
             continue
         lectures.append({
             'u': _u, 'k': _u, 'y': meta['y'], 'c': meta['c'],
@@ -405,6 +447,8 @@ def build_stats(data, updated_at):
 
     return {
         'updatedAt': updated_at,
+        # 顶部「去重后 N 场讲座」（2026-11-06 用户拍板保持 3868）：仍是数据条数，
+        # 不随统计矩阵的活动口径归并而变动；主库条数对账也依赖它。
         'lectureCount': len(data),
         # 唯一来源通知数（2026-10-08 口径变更，见 unique_source_urls）：
         # 由 seen_notice_urls 在遍历全部记录后统一得出——同一张转发页被多场拆分
