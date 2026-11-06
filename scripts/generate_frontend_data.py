@@ -260,22 +260,63 @@ def unique_source_urls(item):
 FORUM_MIN = 4
 
 
-def forum_stat_skip_indexes(data):
-    """返回统计矩阵中应跳过累加的记录下标集合（每组保留第一条）。
+def stat_units(item):
+    """统计矩阵的「讲座-单位」归属列表：主学院 + sources 转发单位，去重保序。
+
+    与 build_stats 原先的内联展开逐字同口径。抽成函数是为了让论坛组并集
+    （forum_stat_groups）和单条累加共用同一套展开规则，避免两处口径分叉。
+    """
+    sources = item.get('sources') or [item]
+    primary_college = item.get('college') or '未分类'
+    units, seen = [], set()
+    for c in [primary_college] + [s.get('college') for s in sources if s.get('college')]:
+        if c and c not in seen:
+            seen.add(c)
+            units.append(c)
+    return units
+
+
+def forum_stat_groups(data):
+    """返回 (skip, overrides)，供 build_stats 做论坛 / 会议归并。
+
+    skip      = 统计矩阵中应跳过累加的下标（论坛组保留首条）。
+    overrides = {首条下标: {'units': 组内归属单位并集,
+                            'sources': 组内全部 sources（供校区查找）}}。
+
+    2026-11-06 补并集（用户拍板 2B）：此前只保留首条，组内其他记录若带
+    `sources` 跨单位联办，归并成 1 场活动后那些单位会被静默漏计。现在这一场
+    活动在「组内所有单位」各计 1 次，与「联合发布在各单位各计 1 次」的既有
+    口径一致。判据仍是 (sourceUrl, lectureStart[:10]) + FORUM_MIN，不与前端
+    mergedDayKey 分叉。
 
     只作用于「讲座数量」口径（matrix / yearTotals / campusMatrix）。
-    lectureCount、sourceNoticeCount、最小索引 lectures、campusMap 一律保持全量：
-    首页列表/筛选/搜索/日历仍是逐场，访问、点赞、想听也仍是逐场计数。
+    lectureCount、sourceNoticeCount、最小索引 lectures 的 cs、campusMap 一律
+    保持逐场全量：首页列表/筛选/搜索/日历、访问、点赞、想听仍是逐场计数。
     """
     groups = {}
     for idx, item in enumerate(data):
         key = (item.get('sourceUrl') or '', (item.get('lectureStart') or '')[:10])
         groups.setdefault(key, []).append(idx)
-    skip = set()
+    skip, overrides = set(), {}
     for idxs in groups.values():
-        if len(idxs) >= FORUM_MIN:
-            skip.update(idxs[1:])
-    return skip
+        if len(idxs) < FORUM_MIN:
+            continue
+        skip.update(idxs[1:])
+        merged, seen, merged_sources = [], set(), []
+        for i in idxs:
+            rec = data[i]
+            merged_sources.extend(rec.get('sources') or [rec])
+            for c in stat_units(rec):
+                if c not in seen:
+                    seen.add(c)
+                    merged.append(c)
+        overrides[idxs[0]] = {'units': merged, 'sources': merged_sources}
+    return skip, overrides
+
+
+def forum_stat_skip_indexes(data):
+    """兼容入口：只取跳过集合（守卫用例与早期调用方使用，逐字同口径）。"""
+    return forum_stat_groups(data)[0]
 
 
 def build_stats(data, updated_at):
@@ -288,7 +329,7 @@ def build_stats(data, updated_at):
     # 拆出的多场报告只计 1 场；普通单页多场、跨天系列仍逐场计 N 场。
     # 顶部 lectureCount 不变（仍为数据条数），故合计行与顶部数字不必相等，
     # 统计页说明文字需同时解释「联合发布放大」与「论坛归并缩小」两个方向。
-    skip_stat_indexes = forum_stat_skip_indexes(data)
+    skip_stat_indexes, stat_overrides = forum_stat_groups(data)
     # 学院 -> 年份 -> 讲座-单位计数（同一讲座跨 N 个归口单位即在 N 个学院各计 1 次）
     matrix = {}
     # 年份 -> 讲座-单位计数（= matrix 各学院同年之和），**不是**「唯一来源通知数」。
@@ -332,15 +373,18 @@ def build_stats(data, updated_at):
         # 注意：这是「讲座-单位归属计数」，联合发布的讲座会在各单位重复计入，故
         # 各单位计数之和会大于唯一讲座总数 lectureCount（属正常，统计页有说明文字）。
         primary_college = item.get('college') or '未分类'
-        units = []
-        seen_unit = set()
-        for c in [primary_college] + [s.get('college') for s in sources if s.get('college')]:
-            if c and c not in seen_unit:
-                seen_unit.add(c)
-                units.append(c)
+        # 本条自己的归属单位：供 campusMap / campusActualMap / 最小索引 cs /
+        # page_meta 使用，一律逐场全量，不随统计归并改变。
+        units = stat_units(item)
+        # 归并后的「活动」单位并集：只有论坛组首条才有 override，其余与 units
+        # 完全相同。count_units / count_sources 只喂给 matrix / yearTotals /
+        # campusMatrix，绝不写回最小索引（访问 / 点赞 / 想听仍逐场）。
+        override = stat_overrides.get(idx) if count_in_matrix else None
+        count_units = override['units'] if override else units
+        count_sources = override['sources'] if override else sources
         cell_year = y or UNKNOWN_YEAR
         if count_in_matrix:
-            for c in units:
+            for c in count_units:
                 matrix.setdefault(c, {})
                 matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
                 year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
@@ -362,11 +406,11 @@ def build_stats(data, updated_at):
         # 注意 matched 是讲座级集合（对该讲座的所有归属单位相同），因此
         # campus_matrix[校区][单位][年份] = 该单位归属的、命中该校区的讲座数。
         matched_campuses = set()
-        for c in units:
+        for c in count_units:
             if c == primary_college:
                 uc = item.get('campus') or ''
             else:
-                src = next((s for s in sources if s.get('college') == c), None)
+                src = next((s for s in count_sources if s.get('college') == c), None)
                 uc = (src or {}).get('campus') or ''
             if uc:
                 matched_campuses.add(uc)
@@ -375,7 +419,7 @@ def build_stats(data, updated_at):
         if count_in_matrix:
             for campus in matched_campuses:
                 cm = campus_matrix.setdefault(campus, {})
-                for c in units:
+                for c in count_units:
                     cm.setdefault(c, {})
                     cm[c][cell_year] = cm[c].get(cell_year, 0) + 1
         # 最小索引：用于客户端结合 /api/lecture/stats 计算访问/点赞。

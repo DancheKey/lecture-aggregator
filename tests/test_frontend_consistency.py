@@ -882,12 +882,23 @@ class ForumStatDedupTest(unittest.TestCase):
             k = (r.get('sourceUrl') or '', (r.get('lectureStart') or '')[:10])
             groups.setdefault(k, []).append(i)
         skip = set()
+        forum_first = set()
+        expect = 0
+        # 独立重算（不调用被测函数）：论坛组按「组内单位并集」计 1 场，
+        # 其余记录逐条按自身单位累加。2026-11-06 2B 后对账口径同步更新。
         for idxs in groups.values():
             if len(idxs) >= 4:
                 skip.update(idxs[1:])
-        expect = 0
+                forum_first.add(idxs[0])
+                merged = []
+                for i in idxs:
+                    r = data[i]
+                    for c in [r.get('college')] + [s.get('college') for s in r.get('sources') or []]:
+                        if c and c not in merged:
+                            merged.append(c)
+                expect += len(merged) if merged else 1
         for i, r in enumerate(data):
-            if i in skip:
+            if i in skip or i in forum_first:
                 continue
             units = []
             for c in [r.get('college')] + [s.get('college') for s in r.get('sources') or []]:
@@ -919,6 +930,110 @@ class ForumStatDedupTest(unittest.TestCase):
                       '页面级虚拟索引仍可能硬编码 3，会与合并卡口径分叉')
         self.assertIn('if (n >= 4)', tsrc,
                       'test_05 的合并页判据仍是 3，会误报缺索引')
+
+    def test_75_论坛组跨单位按并集各计1场(self):
+        """2B：组内某条带 sources 联办单位时，归并后的 1 场活动在这些单位各计 1 次。"""
+        data = []
+        for i in range(4):
+            r = self._rec('http://x/forum.html', '2025-05-01 09:00:00',
+                          ck=f'http://x/forum.html~{i + 1}', college='学院A')
+            if i == 2:
+                r['sources'] = [{'college': '学院B', 'campus': '大学城',
+                                 'sourceUrl': 'http://y/b.html'}]
+            data.append(r)
+        st = gen.build_stats(data, '2026-11-06T00:00:00+08:00')
+        self.assertEqual(st['matrix']['学院A']['2025'], 1)
+        self.assertEqual(st['matrix']['学院B']['2025'], 1,
+                         '组内联办单位不得被静默漏计')
+        self.assertEqual(sum(st['yearTotals'].values()), 2,
+                         '1 场活动 × 2 个归属单位 = 2 个讲座-单位计数')
+        real = [l for l in st['lectures'] if not l.get('p')]
+        self.assertEqual(len(real), 4, '最小索引必须仍逐场全量')
+        self.assertEqual(real[2]['cs'], ['学院A', '学院B'],
+                         '访问 / 点赞 / 想听索引的 cs 不得被并集改写')
+        self.assertIn('学院B', st['campusMatrix'].get('大学城', {}),
+                      '校区矩阵也要按并集展开')
+
+    def test_76_并集守卫与判据同源(self):
+        """2A：并集完整覆盖组内单位；判据不得掺入 college（2C 回潮会与前端分叉）。"""
+        with open(os.path.join(ROOT, 'data', 'lectures.json'), encoding='utf-8') as f:
+            data = (json.load(f) or {}).get('data') or []
+        skip, overrides = gen.forum_stat_groups(data)
+        self.assertEqual(skip, gen.forum_stat_skip_indexes(data),
+                         '兼容入口与实际分组必须逐字同口径')
+        self.assertGreater(len(overrides), 0, '当前数据应有论坛组')
+        groups = {}
+        for i, r in enumerate(data):
+            k = (r.get('sourceUrl') or '', (r.get('lectureStart') or '')[:10])
+            groups.setdefault(k, []).append(i)
+        for idxs in groups.values():
+            if len(idxs) < 4:
+                continue
+            first = idxs[0]
+            self.assertIn(first, overrides)
+            expect = []
+            for i in idxs:
+                for c in gen.stat_units(data[i]):
+                    if c not in expect:
+                        expect.append(c)
+            self.assertEqual(overrides[first]['units'], expect,
+                             '并集必须等于组内全部单位（独立重算）')
+            self.assertTrue(set(gen.stat_units(data[first])).issubset(set(expect)),
+                            '并集不得丢掉首条自己的单位')
+        with open(os.path.join(ROOT, 'scripts', 'generate_frontend_data.py'),
+                  encoding='utf-8') as f:
+            gsrc = f.read()
+        self.assertIn(
+            "key = (item.get('sourceUrl') or '', (item.get('lectureStart') or '')[:10])",
+            gsrc, '判据必须与 mergedDayKey 同源，不得按学院分组')
+        self.assertIn('count_units = override', gsrc,
+                      '统计矩阵必须消费并集，否则 2B 未落地')
+
+
+class StatsModeNoteTest(unittest.TestCase):
+    """统计页 A+（2026-11-06 用户拍板）：口径提示条 + 说明文字按 displayMode 切换。
+
+    讲座数列是「活动」口径、访问 / 点赞 / 想听是「逐场」口径，两种口径在同一张
+    表里共存。切换模式时文案必须同步切换，桌面与移动端两套表格的核心文案逐字一致。
+    顶部 lectureCount 与列名「讲座数」按用户要求不动。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(ROOT, 'site', 'stats.html'), encoding='utf-8') as f:
+            cls.html = f.read()
+
+    def test_77_四种模式都有口径提示且提示条在两套表格之外(self):
+        h = self.html
+        self.assertEqual(h.count('· 活动口径'), 1, 'count 提示应只有一条')
+        self.assertEqual(h.count('· 逐场口径'), 3, '访问 / 点赞 / 想听各一条')
+        self.assertIn("v-else>想听数列", h, '缺兜底分支，未知模式会显示空白提示')
+        self.assertLess(h.index('口径提示条'), h.index('桌面端（≥640px）'),
+                        '提示条必须放在两套表格之外共用一份')
+
+    def test_78_两处说明文字按模式分段且核心文案一致(self):
+        h = self.html
+        count_note = (
+            '说明：同一讲座由多个单位联合发布（跨源合并）时，在每个相关单位各计 1 次；'
+            '同一论坛 / 会议议程拆出的多场报告，在统计表中按 1 场计（首页列表仍逐场展示）。'
+            '因此「各单位计数之和」与顶部「去重后讲座总数」不必相等。'
+            '表内为归并后的场次，列名沿用「讲座数」。')
+        other_note = (
+            '说明：访问量、点赞数、想听数按每一场讲座逐条统计（论坛 / 会议议程拆出的'
+            '各场报告分别计入），与「讲座数」列的活动口径不同，因此切换后排序与合计'
+            '可能不一致。同一讲座由多个单位联合发布时，在每个相关单位各计 1 次。')
+        self.assertEqual(h.count(count_note), 2,
+                         '桌面 / 移动的 count 文案必须逐字一致（第 3 处收口）')
+        self.assertEqual(h.count(other_note), 2,
+                         '桌面 / 移动的逐场文案必须逐字一致')
+        self.assertNotIn('说明：同一讲座若由多个单位联合发布', h,
+                         '旧版单段说明仍在，切换模式后文案不会变')
+        self.assertIn("v-if=\"summary && summary.lectureCount && displayMode === 'count'\"", h)
+        self.assertIn("v-else-if=\"summary && summary.lectureCount\"", h)
+        self.assertIn("<p v-if=\"displayMode === 'count'\"", h)
+        self.assertIn('<p v-else class="mt-3 px-4 pb-4', h)
+        self.assertEqual(h.count('左右滑动查看各年份数据。'), 2,
+                         '只有移动端两处补滑动提示，桌面不应出现')
 
 
 if __name__ == '__main__':
