@@ -46,6 +46,12 @@ jobs:
           cache-dependency-path: |
             scraper/requirements.txt
             requirements.txt
+      # 2026-11-06 评审 #32：gate 与 test.yml 跑同一套 node 门禁，必须同版本，
+      # 否则「日常绿、部署红」或反过来（app_timezone.js 依赖 Node >= 22）。
+      - name: 配置 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: 安装解析器依赖
         run: pip install -r scraper/requirements.txt
       - name: 安装后端依赖（ruamel 用于 sources.yaml 往返保注释）

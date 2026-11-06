@@ -1853,9 +1853,12 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
     visited_pages = set()
     local = {}
     # B8（2026-09-30）：列表页取不到内容时的失败记账。见 _process_source 结尾的归类说明。
-    # 三态：list_fetch_fail=取回失败（网络/HTTP/robots）；list_empty_ok=取回成功但 0 条链接
-    # （栏目真空或改版，属正常，不算失败）；list_seen_ok=取回成功且有链接。
+    # 四态：list_fetch_fail=策略放行后仍取回失败（网络/HTTP，真故障）；
+    #   list_policy_skipped=robots 明确禁止（合规跳过，2026-11-06 #12）；
+    #   list_empty_ok=取回成功但 0 条链接（栏目真空或改版，属正常）；
+    #   list_seen_ok=取回成功且有链接。
     list_fetch_fail = []
+    list_policy_skipped = []
     list_empty_ok = []
     list_seen_ok = 0
     # P0-2（2026-10-10）：详情页取回/解析失败的记账。此前循环内两处 continue
@@ -1883,6 +1886,16 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
             on_entry_page = True
             while cur and cur.rstrip('/') not in visited_pages:
                 visited_pages.add(cur.rstrip('/'))
+                # 2026-11-06 评审 #12：与详情页 P0-2 同口径，fetch 返回 None 有
+                # 三种语义（白名单拒绝 / robots 禁止 / 真失败）。列表页此前不预检，
+                # 把 robots 禁止整页记成 list_fetch_fail；而 failed_sources 是
+                # **全局**水位闸门，一个 robots 页就能让整轮增量白跑、退回全量重抓。
+                # ⚠ 只做合规预检，别顺手改「取回成功但 0 条」的口径（那本来就不算失败）。
+                if not _can_fetch(cur, allowed_domains=['scnu.edu.cn']):
+                    list_policy_skipped.append(cur)
+                    print(f'[LIST-POLICY] {name} | {cur} | robots 明确禁止，'
+                          f'按预期过滤（不判本源失败）', file=sys.stderr)
+                    break
                 html = fetch(cur, allowed_domains=['scnu.edu.cn'])
                 new_count = 0
                 # 列表页取不到正文：此前**无守卫静默空转**——collect_links(None) 返回 []、
@@ -2051,12 +2064,16 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     print(f'[WARN] {name} 分页超过 300 页，停止跟随')
                     break
         time.sleep(1)
-        # ---- B8 三态归类：只有「列表页取不回正文」才判本源失败 ----
+        # ---- B8 归类：只有「策略放行后列表页仍取不回正文」才判本源失败 ----
         # ⚠ failed_sources 在 main() 里是**全局**水位闸门（任一源失败即整轮不推进
         # last_scrape）。故口径必须分层，否则一个永久死链/改版栏目会把整个增量
         # 管线永久冻结，退回每轮全量重抓（实测 3.9h）。
-        #   list_fetch_fail 非空 → 判失败（网络/HTTP/robots 导致整页取不回，是真故障）
+        #   list_fetch_fail 非空 → 判失败（网络/HTTP 等策略放行后的真故障）
+        #   list_policy_skipped 非空 → 只记日志（robots 合规跳过，不是故障）
         #   list_empty_ok 非空  → 只记日志，不判失败（页面取回了，只是没有讲座条目）
+        if list_policy_skipped:
+            print(f'[LIST-POLICY] {name} | {len(list_policy_skipped)} 个列表页因 robots '
+                  f'合规跳过，不进 failed_sources（全局水位照常推进）', file=sys.stderr)
         if list_fetch_fail:
             # 分母只数**配置里的 list_url**（list_fetch_fail 与 list_seen_ok、
             # list_empty_ok 都是入口页；推导页失败不进这些列表——见上方 on_entry_page 注释）。

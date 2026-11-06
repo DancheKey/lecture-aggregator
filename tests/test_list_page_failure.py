@@ -133,6 +133,30 @@ class ListPageFailureAccountingTest(unittest.TestCase):
         self.assertIsNone(err,
                           f'0 条但取回成功不应判失败（会冻结全局水位）：{err}')
 
+    def test_02b_列表页robots禁止_不得判失败(self):
+        """2026-11-06 评审 #12：列表页也要区分「策略拒绝」与「真失败」。
+
+        fetch 返回 None 有三语义；此前列表页不预检，robots 明确禁止的整页被记进
+        list_fetch_fail → failed_sources 非空 → 全局水位每轮冻结、退回全量重抓。
+        桩里被禁止的那一页**本可正常取回**，所以只要它没被 fetch 且 err 为空，
+        就证明预检真的生效了；同批另一个正常源仍须照常抓到讲座。
+        """
+        r = _SourceRun(P, {self.u_bad: GOOD_PAGE, self.u_ok: GOOD_PAGE},
+                       robots_denied=(self.u_bad,))
+        err, local = r.run([_lu(self.u_bad), _lu(self.u_ok)])
+        self.assertIsNone(err, f'robots 禁止属合规跳过，不得记为列表页故障：{err}')
+        self.assertNotIn(self.u_bad, r.fetched, '被 robots 禁止的列表页不应发起 fetch')
+        self.assertIn(self.u_ok, r.fetched, '策略预检不得误伤其它正常列表页')
+        self.assertEqual(len(local), 1, '正常列表页的讲座仍应入库')
+
+    def test_02c_全部列表页被robots禁止_水位闸门仍为空(self):
+        """极端情形：整源都被 robots 禁止时也不能冻结全局水位。"""
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE}, robots_denied=(self.u_ok,))
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNone(err, f'整源合规跳过不应产生失败源：{err}')
+        self.assertEqual(r.fetched, [], '不应发起任何列表页请求')
+        self.assertEqual(len(local), 0)
+
     def test_03_部分页失败仍判失败(self):
         """一个 list_url 挂了、另一个正常 → 仍须判失败（那一页的讲座会漏抓）。"""
         r = _SourceRun(P, {self.u_ok: GOOD_PAGE, self.u_bad: None})

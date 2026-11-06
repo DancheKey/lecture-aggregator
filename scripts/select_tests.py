@@ -144,7 +144,10 @@ GROUPS = [
     # 显式列出而非通配——新增工具脚本会逼一次 conscious 决策（见 docstring 红线）。
     {'name': 'tools', 'pats': ['scripts/apply_duty_suffix_fix.py', 'scripts/apply_title_fragment_fix.py',
                                'scripts/fix_psy_speaker_restore.py', 'scripts/resplit_page.py',
-                               'scripts/reparse_diff_report.py', 'scripts/scan_title_fragment_residues.py'],
+                               'scripts/reparse_diff_report.py', 'scripts/scan_title_fragment_residues.py',
+                               # 2026-11-06 NEW1：推送前只读自检工具，不产生产物、不改门禁，
+                               # 故归 tools（无测试）；它是脚本不是测试，不入 GATE_TESTS。
+                               'scripts/prepush_check.py'],
      'tests': []},
     # 纯文档：不触发任何测试
     {'name': 'docs', 'pats': ['README.md', 'AGENTS.md', '.gitignore', '.zcodeignore',

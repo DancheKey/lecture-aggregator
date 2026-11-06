@@ -113,7 +113,11 @@ class ScriptVersionStampTest(unittest.TestCase):
     #
     # vendor/ 下的第三方库（tailwind.css / vue.global.prod.js）不在此列：
     # 它们不在 stamp 注册表里，按设计保持固定名 + CDN 缓存。
-    ALL_PAGES = ('site/index.html', 'site/stats.html', 'site/visits-trend.html')
+    # 2026-11-06 评审 #18：404 页此前不在这份清单里，theme-scnu.css 的戳错
+    # 没有任何门禁能拦（改了样式、回访用户拿到旧版，零告警）。该页零脚本是
+    # 刻意设计（test_site_assets 锁着），但**引用了本地 CSS 就该受同一条戳校验**。
+    ALL_PAGES = ('site/index.html', 'site/stats.html', 'site/visits-trend.html',
+                 'site/404.html')
     # ⚠ 尾部只捕获 ?v= 部分，不要用 [^"']*\1 回溯收尾——那会跨过闭合引号
     # 继续吞到下一个属性（本项目 index.html 里 <link ... /> 紧接 <script，
     # 实测会把 vendor/tailwind.css 匹配成 ' />\n  <script defer src='）。

@@ -672,25 +672,46 @@ def _parse_cst(s):
         return None
 
 
+def _feed_fallback_pub_dt(rec, built):
+    """publishTime 缺失 / 非法 / 晚于 built 时的**稳定**回退时刻。
+
+    一律回退成 built 会让几乎所有条目的 pubDate 完全相同（实测 15 条里 14 条
+    撞在一起），RSS 阅读器无法按发布时间排序（2026-11-06 #11）。这里按计数键
+    ck 做稳定哈希，在 built 之前 1~3600 秒取一个固定偏移：
+      · 恒 ≤ built —— 不出现未来时间，lastBuildDate 与 pubDate 不打架；
+      · 同一条记录每次生成结果相同 —— 数据不变则产物字节不变，订阅端不会
+        误判「条目被修改」；
+      · 不同条目（含同一源页拆出的多场，ck 带 ~序号）自然散开。
+    ⚠ 必须用 hashlib 而不是内置 hash()：后者受 PYTHONHASHSEED 随机化影响，
+      CI 与本机、今天与明天会算出不同偏移，等于每天把整份 feed 重写一遍。
+    ⚠ 也不要走 lectureStart 回头路（见 _feed_pub_dt 上方的 2026-10-30 结论）。
+    """
+    key = str(rec.get('ck') or rec.get('sourceUrl') or _feed_title(rec) or '')
+    digest = hashlib.sha256(key.encode('utf-8')).digest()
+    offset = 1 + int.from_bytes(digest[:2], 'big') % 3600   # 1..3600 秒
+    return built - timedelta(seconds=offset)
+
+
 def _feed_pub_dt(rec, built):
-    """RSS 条目的 pubDate：源站发布时间，缺失/异常一律回退 built。
+    """RSS 条目的 pubDate：源站发布时间，缺失/异常/晚于 built 走稳定回退。
 
     pubDate 的语义是「条目发布时间」，不是讲座发生时间（2026-10-30 修正）。
     原先用 lectureStart：阅读器会把条目排到未来，且 lastBuildDate 早于自己的
     pubDate，违反 RSS 规范的一致性要求（频道声称的构建时间早于条目发布时间）。
 
     · 源站 publishTime 有两种精度（秒 2429 条 / 分钟 767 条），都要认；
-    · 晚于 built 的直接回退（真实数据有 4 条：源站定时发布或时钟异常），
-      否则 feed 里会出现未来时间。
+    · 晚于 built 的（真实数据有 4 条：源站定时发布或时钟异常）不能原样保留，
+      否则 feed 里会出现未来时间；
+    · 三种回退情形一律交给 _feed_fallback_pub_dt 散开，别再塌缩成同一个 built。
     """
     raw = str(rec.get('publishTime') or '').strip()
     for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'):
         try:
             dt = datetime.strptime(raw[:19], fmt).replace(tzinfo=CST)
-            return dt if dt <= built else built
         except ValueError:
             continue
-    return built
+        return dt if dt <= built else _feed_fallback_pub_dt(rec, built)
+    return _feed_fallback_pub_dt(rec, built)
 
 
 def _rfc822(dt):
@@ -797,7 +818,13 @@ def _feed_desc(rec):
 
 
 def write_feeds(data, updated_at):
-    """生成 site/feed.xml（RSS 2.0）与 site/feed.ics（日历订阅）。"""
+    """生成 site/feed.xml（RSS 2.0）与 site/feed.ics（日历订阅）。
+
+    ⚠ data 必须是**派生后的 full_data**（main() 里已过 with_unit /
+    split_long_text）：guid 与 ICS UID 都取 rec['ck']，未派生时一律回退到
+    sourceUrl，同一网页拆出的多场会共用同一个 guid/UID，日历客户端按相同
+    UID 直接覆盖（2026-11-06 #10）。派生字段只在生成层写，data/ 源不补 ck。
+    """
     rows = feed_records(data)
     if not rows:
         print('[warn] 没有可订阅的讲座，跳过 feed 生成')
@@ -970,8 +997,13 @@ def main():
 
     # sitemap 与订阅源只依赖数据本身，放在最后：所有前端产物落盘后再写，即使这里
     # 出错也不影响首页/统计页可用（SEO 与订阅是附属物，不是功能件）。
+    # ⚠ 订阅源必须传 full_data 而不是 data：guid / ICS UID 取 ck，而 ck 只在
+    #   派生层（with_unit）产生。传 data 会让一页多场的 N 条订阅项共用
+    #   sourceUrl 这一个键，日历客户端按相同 UID 互相覆盖（#10）。
+    #   两者条数恒为 1:1（with_unit 复制 dict、split_long_text 只摘长文本），
+    #   排除名单过滤发生在派生之前，故 feed 的过滤口径不因换传参而改变。
     write_sitemap(updated_at)
-    write_feeds(data, updated_at)
+    write_feeds(full_data, updated_at)
 
 
 if __name__ == '__main__':

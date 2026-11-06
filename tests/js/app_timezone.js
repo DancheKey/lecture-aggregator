@@ -18,14 +18,23 @@
 //
 // 只断言「_bjMs('...14:00') === Date.UTC(...,6)」在 UTC+8 下**抓不住回归**——
 // 因为 new Date(s) 在 +8 下恰好也等于同一个值。所以本测试用 process.env.TZ
-// 切到多个时区（Node 22 运行时改 TZ 立即生效），逐时区断言结论不变；
-// 并用一条**反例断言**证明「如果退回 new Date，本测试确实会红」。
+// 切到多个时区（依赖 Node >= 22 的「运行时改 TZ 立即生效」语义），逐时区断言
+// 结论不变；并用一条**反例断言**证明「如果退回 new Date，本测试确实会红」。
+// 2026-11-06 #32：版本由 CI 的 setup-node 固定为 22，文件头再显式校一次，
+// 低版本直接红而不是静默改变行为（否则 TZ 不生效会让整份测试空转假绿）。
 //
 // 运行：node tests/js/app_timezone.js（纯 node，无浏览器无网络）
 
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
+
+const NODE_MAJOR = Number((process.versions.node || '').split('.')[0]);
+if (!Number.isFinite(NODE_MAJOR) || NODE_MAJOR < 22) {
+  console.log('[FAIL] 本测试依赖 Node >= 22 的 TZ 即时切换语义，当前 '
+    + process.versions.node + '；请先装 Node 22 再跑（CI 已用 setup-node 固定）');
+  process.exit(1);
+}
 
 const ROOT = path.join(__dirname, '..', '..');
 const SITE = path.join(ROOT, 'site');
@@ -207,6 +216,55 @@ for (const tz of TZS) {
   }
 }
 
+// ---------- 6) 「更新于」年份判定按北京时间（2026-11-06 评审 #24） ----------
+// _bjParts 是纯计算（new Date(ms + 8h) 取 UTC 分量），与进程 TZ 无关，所以这条
+// 用例**不需要切 TZ、也不需要 TZ 生效**；要桩的是时钟而不是被测对象本身
+// （桩掉 _bjParts 等于没测）。取北京刚跨年、纽约还在 12/31 的那一小时，
+// 两种年份口径必然分叉，反例才有说服力。
+process.env.TZ = 'America/New_York';
+const BJ_NEWYEAR_MS = Date.UTC(2026, 11, 31, 16, 30, 0);   // 北京 2027-01-01 00:30
+const localYear = new Date(BJ_NEWYEAR_MS).getFullYear();
+const C = vm.runInContext('APP_COMPUTED', ctx);
+ctx.__origDateNow = vm.runInContext('Date.now', ctx);
+vm.runInContext('Date.now = () => ' + BJ_NEWYEAR_MS, ctx);
+let bjYear;
+try {
+  bjYear = C.bjNowYear.call(M);
+} finally {
+  vm.runInContext('Date.now = __origDateNow', ctx);
+}
+if (localYear !== 2026) {
+  errs.push(`跨年边界样本失效：纽约本地年份应为 2026，实得 ${localYear}`);
+}
+if (bjYear !== 2027) {
+  errs.push(`bjNowYear 在北京 2027-01-01 00:30 应得 2027，实得 ${bjYear}`);
+}
+if (bjYear === localYear) {
+  errs.push('跨年边界没把两种口径拉开，本用例空转（换样本）');
+}
+const updatedLine = html.split('\n').find(l => l.indexOf('更新于 {{') >= 0);
+if (!updatedLine) {
+  errs.push('index.html 找不到「更新于」模板行——模板改动后本用例需同步');
+} else {
+  if (updatedLine.indexOf('getFullYear') >= 0) {
+    errs.push('「更新于」模板又用了访客本地时区的 getFullYear()（#24 回归）');
+  }
+  if (updatedLine.indexOf('bjNowYear') < 0) {
+    errs.push('「更新于」模板没有引用 bjNowYear computed');
+  }
+}
+// 行为反例：同一条 2027 年的更新时间，北京口径显示短日期，本地口径显示完整日期。
+const sampleUpdated = '2027-01-01 08:00';
+const fmtUpdated = year => String(sampleUpdated.slice(0, 4)) === String(year)
+  ? Number(sampleUpdated.slice(5, 7)) + '月' + Number(sampleUpdated.slice(8, 10)) + '日'
+  : sampleUpdated;
+if (fmtUpdated(bjYear) !== '1月1日') {
+  errs.push(`北京时间口径下应显示「1月1日」，实得「${fmtUpdated(bjYear)}」`);
+}
+if (fmtUpdated(localYear) !== sampleUpdated) {
+  errs.push('本地年份口径下应显示完整日期——反例不成立，本用例抓不到回归');
+}
+
 // 复原，避免影响同进程后续（本文件是独立进程，保险而已）
 process.env.TZ = 'Asia/Shanghai';
 
@@ -217,4 +275,5 @@ if (errs.length) {
   process.exit(1);
 }
 console.log(`[PASS] 北京时间口径跨 ${TZS.length} 个时区恒定`
-  + `（_bjMs/_bjParts/fmtDateTime/dayKey/isTimeTBD/statusOf/isNotStarted/statusInfo/_calUtcMs）`);
+  + `（_bjMs/_bjParts/fmtDateTime/dayKey/isTimeTBD/statusOf/isNotStarted/statusInfo/`
+  + `_calUtcMs/bjNowYear）｜Node ${process.versions.node}`);

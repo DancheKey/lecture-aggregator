@@ -449,12 +449,144 @@ class TestFeeds(unittest.TestCase):
             f'实际 DTSTAMP={dt_stamp} / lastBuildDate={dt_build}，'
             '不等说明有一方用了生成时刻 now()')
 
+    @staticmethod
+    def _generator():
+        """按路径加载生成器（CI 纯净检出同样可用；不写任何文件）。"""
+        import importlib.util
+        path = os.path.join(_ROOT, 'scripts', 'generate_frontend_data.py')
+        spec = importlib.util.spec_from_file_location('_gfd_for_feeds_test', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_main把派生数据交给订阅源(self):
+        """评审 #10 行为锁：main() 交给 write_feeds 的必须是**已派生 ck** 的 full_data。
+
+        原先传 data（未派生）时，同页多场的 N 条订阅项 guid / ICS UID 都回退成
+        同一个 sourceUrl，日历客户端按相同 UID 互相覆盖；这类错零报错、只有订阅
+        端才看得见。这里不靠「源码字符串长什么样」，而是桩掉所有落盘动作后真跑
+        一次 main()，把它实际交出去的记录接住验证。
+
+        同时锁住 GLM 复核提的过滤口径：换传参后 feed 条数与逐条 title/desc/link
+        必须与「传 raw data」一致（with_unit 是 1:1 复制、排除名单在派生前过滤）。
+        ⚠ pubDate 不在此列：#11 已把回退改成按 ck 稳定散开，它本来就该变。
+        """
+        import xml.etree.ElementTree as ET
+        from datetime import timedelta
+        from unittest import mock
+
+        mod = self._generator()
+        now = datetime.now(mod.CST)
+        start = (now + timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S')
+        end = (now + timedelta(days=2, hours=2)).strftime('%Y-%m-%d %H:%M:%S')
+        url_multi = 'https://maths.scnu.edu.cn/a/20261106/1.html'
+        url_one = 'https://maths.scnu.edu.cn/a/20261106/2.html'
+        rows = [
+            {'sourceUrl': url_multi, 'lectureIndex': 1, 'title': '系列讲座第一场',
+             'topic': '第一场题目', 'lectureStart': start, 'lectureEnd': end},
+            {'sourceUrl': url_multi, 'lectureIndex': 2, 'title': '系列讲座第二场',
+             'topic': '第二场题目', 'lectureStart': start, 'lectureEnd': end},
+            {'sourceUrl': url_one, 'title': '独立一场',
+             'topic': '独立题目', 'lectureStart': start, 'lectureEnd': end},
+        ]
+
+        captured, raw_cap, delivered = {}, {}, {}
+
+        def spy(data, updated_at):
+            delivered['data'] = data
+            return orig_feeds(data, updated_at)
+
+        def sink(target):
+            def _write(path, text):
+                target[os.path.basename(path)] = text
+            return _write
+
+        orig_feeds = mod.write_feeds
+        noop = lambda *a, **k: None
+        with mock.patch.object(mod, 'warn_uncommitted_scripts', noop), \
+             mock.patch.object(mod, 'warn_stale_stamp_inputs', noop), \
+             mock.patch.object(mod, 'write_visits_snapshot', noop), \
+             mock.patch.object(mod, 'load_lectures', lambda: (rows, '2026-11-06T08:00:00+08:00')), \
+             mock.patch.object(mod, 'load_excluded', lambda: set()), \
+             mock.patch.object(mod, 'atomic_write_json', noop), \
+             mock.patch.object(mod, 'atomic_write_text', sink(captured)), \
+             mock.patch.object(mod, 'write_chunks', noop), \
+             mock.patch.object(mod, 'write_detail_chunks', noop), \
+             mock.patch.object(mod, 'stamp_script_version', noop), \
+             mock.patch.object(mod, 'write_sitemap', noop), \
+             mock.patch.object(mod, 'write_feeds', spy):
+            mod.main()
+
+        data = delivered.get('data')
+        self.assertIsNotNone(data, 'main() 没有调用 write_feeds')
+        self.assertEqual(len(data), len(rows), '派生链不得增删条目（feed 过滤口径会跟着变）')
+        self.assertTrue(all(r.get('ck') for r in data),
+                        'write_feeds 收到的记录没有 ck —— 又被传成未派生的 data 了')
+        self.assertEqual(len({r['ck'] for r in data}), len(rows),
+                         '同页多场的 ck 必须各自唯一，否则 guid/UID 仍会撞车')
+
+        xml, ics = captured.get('feed.xml'), captured.get('feed.ics')
+        self.assertIsNotNone(xml, '未产出 feed.xml')
+        self.assertIsNotNone(ics, '未产出 feed.ics')
+        guids = re.findall(r'<guid[^>]*>([^<]+)</guid>', xml)
+        uids = re.findall(r'UID:([^\r\n]+)', ics)
+        self.assertEqual(len(guids), len(rows), 'feed.xml 条目数应与可订阅讲座数一致')
+        self.assertEqual(len(set(guids)), len(rows), 'RSS guid 有重复，阅读器会合并条目')
+        self.assertEqual(len(set(uids)), len(rows), 'ICS UID 有重复，日历客户端会互相覆盖')
+
+        # 与「传 raw data」对比：条数、逐条 title/description/link 必须逐字一致。
+        with mock.patch.object(mod, 'atomic_write_text', sink(raw_cap)):
+            orig_feeds(rows, '2026-11-06T08:00:00+08:00')
+        before = ET.fromstring(raw_cap['feed.xml']).find('channel').findall('item')
+        after = ET.fromstring(xml).find('channel').findall('item')
+        self.assertEqual(len(before), len(after), '换传参后 feed 条数变了（派生链可能增删记录）')
+        for i, (a, b) in enumerate(zip(before, after)):
+            for key in ('title', 'link', 'description'):
+                self.assertEqual(a.find(key).text, b.find(key).text,
+                                 f'第 {i} 条 {key} 因换传参而改变')
+
+    def test_pubDate回退按ck稳定散开(self):
+        """评审 #11：publishTime 缺失/晚于 built 时不得全部塌缩成同一个时刻。
+
+        三条硬约束：≤ built（RSS 不许有未来时间）、同一 ck 每次结果相同（数据不变
+        产物字节就不变）、不同 ck（含一页多场的 ~序号）能散开可供阅读器排序。
+        """
+        from datetime import timedelta
+        mod = self._generator()
+        built = mod._parse_cst('2026-11-06 08:00:00')
+        self.assertIsNotNone(built)
+        recs = [{'ck': f'https://x.scnu.edu.cn/a/{i}.html', 'title': f'讲座{i}'}
+                for i in range(15)]
+        dts = [mod._feed_pub_dt(r, built) for r in recs]
+        self.assertTrue(all(d <= built for d in dts), 'pubDate 不得晚于 lastBuildDate')
+        self.assertGreaterEqual(len(set(dts)), 12,
+                                '15 条回退时间仍几乎全相同，阅读器排不了序')
+        self.assertEqual(dts, [mod._feed_pub_dt(r, built) for r in recs],
+                         '同一记录两次生成必须得到同一 pubDate（禁止内置 hash 随机化）')
+        self.assertEqual(
+            mod._feed_pub_dt({'ck': 'u~1', 'sourceUrl': 'u'}, built),
+            mod._feed_pub_dt({'ck': 'u~1', 'sourceUrl': 'u'}, built))
+        self.assertNotEqual(
+            mod._feed_pub_dt({'ck': 'u~1', 'sourceUrl': 'u'}, built),
+            mod._feed_pub_dt({'ck': 'u~2', 'sourceUrl': 'u'}, built),
+            '同一源页拆出的两场也应拿到不同 pubDate')
+        self.assertLessEqual(
+            mod._feed_pub_dt({'ck': 'u~f', 'publishTime': '2027-01-01 10:00:00'}, built),
+            built, '晚于 built 的源站时间必须回退，不能让 feed 出现未来时间')
+        good = {'ck': 'u~g', 'publishTime': '2026-11-01 09:00:00'}
+        self.assertEqual(mod._feed_pub_dt(good, built),
+                         mod._parse_cst('2026-11-01 09:00:00'),
+                         '合法且早于 built 的源站时间必须原样保留')
+        self.assertGreater(built - max(dts), timedelta(0), '回退偏移不得为 0 或负')
+
     def test_订阅源由生成器产出(self):
-        with open(os.path.join(_ROOT, 'scripts', 'generate_frontend_data.py'),
-                  encoding='utf-8') as f:
-            src = f.read()
-        self.assertIn('def write_feeds(', src, 'generate_frontend_data.py 缺 write_feeds')
-        self.assertIn('write_feeds(data, updated_at)', src, 'main() 里没有调用 write_feeds')
+        import inspect
+        mod = self._generator()
+        self.assertTrue(hasattr(mod, 'write_feeds'), 'generate_frontend_data.py 缺 write_feeds')
+        # 只在 main() 函数体内查（自带信息边界），别对整份源码做 assertIn。
+        main_src = inspect.getsource(mod.main)
+        self.assertIn('write_feeds(full_data, updated_at)', main_src,
+                      'main() 里订阅源必须取派生后的 full_data')
 
     def test_ics在gitattributes里豁免换行归一(self):
         """`.gitattributes` 的 `site/** text eol=lf` 会把 feed.ics 的 CRLF 洗成 LF。

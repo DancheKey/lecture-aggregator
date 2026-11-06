@@ -22,6 +22,13 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: scraper/requirements.txt
+      # 2026-11-06 评审 #32：Python 与 runner 都钉死，Node 却随镜像浮动；
+      # app_timezone.js 依赖 Node >= 22 的「运行时改 TZ 立即生效」语义，
+      # 低版本会让整份跨时区门禁静默空转（文件头已加显式版本断言）。
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Install deps
         run: |
           pip install -r scraper/requirements.txt

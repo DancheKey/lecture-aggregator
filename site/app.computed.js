@@ -40,6 +40,17 @@ const APP_COMPUTED = {
       return this.lastRunAt || this.updatedAt || '';
     },
 
+    // 「是不是今年」必须按北京时间判（2026-11-06 评审 #24）。
+    // 全站时间口径都是东八区，只有 index.html 的「更新于」短日期判定原先直接用
+    // new Date().getFullYear() —— 北京已跨年、海外访客本地还是 12/31 的那几个小时，
+    // 会把今年的更新误判成「跨年」而显示成完整日期。
+    // ⚠ 名字不能以 _ / $ 开头：Vue3 对这类方法静默跳过绑定，模板里调用会整页白屏
+    //   （2026-10-11 事故，tests/js/app_template_hygiene.js 锁着）。这里刻意包一层
+    //   普通 computed，把纯计算的 _bjParts 藏在内部，模板只写 {{ bjNowYear }}。
+    bjNowYear() {
+      return this._bjParts(Date.now()).y;
+    },
+
     // 来源通知总数：按**唯一来源 URL 集合**计（2026-10-08 口径变更，与
     // generate_frontend_data.py::unique_source_urls 逐字对齐，两侧必须同口径，
     // 否则首页与统计页会显示两个不同的「覆盖 N 条来源通知」）。

@@ -471,8 +471,10 @@
                 </template>
                 <template v-if="displayUpdatedAt && dataStage === 'full'">
                   <span class="text-slate-300">·</span>
-                  <!-- 更新日期：当年显示「10月16日」（口语化且省宽），跨年才显示完整日期 -->
-                  更新于 {{ displayUpdatedAt.slice(0, 4) === String(new Date().getFullYear()) ? (Number(displayUpdatedAt.slice(5, 7)) + '月' + Number(displayUpdatedAt.slice(8, 10)) + '日') : displayUpdatedAt }}
+                  <!-- 更新日期：当年显示「10月16日」（口语化且省宽），跨年才显示完整日期。
+                       年份判定走 bjNowYear（北京时间 computed，见 app.computed.js），
+                       不用访客本地时区的 getFullYear —— 跨年那几小时海外访客会判错年。 -->
+                  更新于 {{ displayUpdatedAt.slice(0, 4) === String(bjNowYear) ? (Number(displayUpdatedAt.slice(5, 7)) + '月' + Number(displayUpdatedAt.slice(8, 10)) + '日') : displayUpdatedAt }}
                 </template>
               </div>
               <!-- 筛选控件区打包为单一整块。两种行位（JS 实测 toolbarWrapped，见
@@ -1003,7 +1005,7 @@
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=47fddb4705"></script>
   <script defer src="app.state.js?v=dd5d2f91e2"></script>
-  <script defer src="app.computed.js?v=9e4fdd30ca"></script>
+  <script defer src="app.computed.js?v=9740186f7f"></script>
   <script defer src="app.display.js?v=ec1bb21b72"></script>
   <script defer src="app.cloud.js?v=9c148fb828"></script>
   <script defer src="app.social.js?v=27c3568e22"></script>
