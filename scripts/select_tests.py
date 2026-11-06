@@ -102,6 +102,7 @@ GROUPS = [
                'tests/test_llm_text_replay.py',
                'tests/test_hallucination_guard.py', 'tests/test_stage_var_leak.py',
                'tests/test_listdate.py', 'tests/test_module_compile.py',
+               'tests/test_pdf_inline.py',
                'tests/test_poster_late_gate.py',
                'tests/test_poster_series_multisession.py',
                'tests/test_multi_speaker_merge_20261023.py',

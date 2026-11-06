@@ -8,82 +8,8 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://em.scnu.edu.cn/a/20261105/11227.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
-DTSTART:20261106T060000Z
-DTEND:20261106T070000Z
-SUMMARY:华师经管学术讲座第551期（经济）｜纵向监督下的
- 公共服务均等化
-LOCATION:大学城校园文二栋536国际学术报告厅
-DESCRIPTION:题目：纵向监督下的公共服务均等化\n主讲：梁
- 超（山东大学）\n地点：大学城校园文二栋536国际学术
- 报告厅\n主办：经济与管理学院
-URL:http://em.scnu.edu.cn/a/20261105/11227.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://mks.scnu.edu.cn/a/20261029/21.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
-DTSTART:20261106T070000Z
-DTEND:20261106T090000Z
-SUMMARY:在“生活史”视野下理解1920年代的中国革命
-LOCATION:马克思主义学院（桃李园唯实厅）
-DESCRIPTION:题目：在“生活史”视野下理解1920年代的中国
- 革命\n主讲：瞿骏（华东师范大学）\n地点：马克思主义
- 学院（桃李园唯实厅）\n主办：马克思主义学院
-URL:http://mks.scnu.edu.cn/a/20261029/21.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261106/8874.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
-DTSTART:20261106T080000Z
-DTEND:20261106T090000Z
-SUMMARY:勷勤数学•专家报告-田国梁｜A class of new symmetric d
- istributions based on scale mixtures of normal distribution and mean regr
- ession models by using N-EM and US algorithms
-LOCATION:数科院西楼二楼会议室
-DESCRIPTION:题目：A class of new symmetric distributions based on scale
-  mixtures of normal distribution and mean regression models by using N-EM
-  and US algorithms\n主讲：田国梁（南方科技大学）\n地点：
- 数科院西楼二楼会议室\n主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261106/8874.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://em.scnu.edu.cn/a/20261106/11228.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
-DTSTART:20261106T080000Z
-DTEND:20261106T090000Z
-SUMMARY:华师经管学术讲座第552期（经济）｜预算统筹管理
- 与地方债务风险防控:来自融资平台异常购地的证据
-LOCATION:大学城校园文二栋536国际学术报告厅
-DESCRIPTION:题目：预算统筹管理与地方债务风险防控:来自
- 融资平台异常购地的证据\n主讲：赵仁杰（西北大学）\n
- 地点：大学城校园文二栋536国际学术报告厅\n主办：经
- 济与管理学院
-URL:http://em.scnu.edu.cn/a/20261106/11228.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261108/8877.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261108T000000Z
 DTEND:20261108T010000Z
 SUMMARY:勷勤数学•专家报告-杨健夫｜On concentration of ground
@@ -101,7 +27,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261108/8878.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261108T010000Z
 DTEND:20261108T020000Z
 SUMMARY:勷勤数学•专家报告-龙薇｜Vortex solutions to mass-supe
@@ -119,7 +45,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261108/8879.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261108T020000Z
 DTEND:20261108T030000Z
 SUMMARY:勷勤数学•专家报告-余晓辉｜Classification of solution
@@ -138,7 +64,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261108/8880.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261108T030000Z
 DTEND:20261108T040000Z
 SUMMARY:勷勤数学•专家报告-李本鸟｜Subcritical elliptic probl
@@ -156,7 +82,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261108/8881.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261108T040000Z
 DTEND:20261108T050000Z
 SUMMARY:勷勤数学•专家报告-陈志杰｜Structure of critical poin
@@ -174,7 +100,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://em.scnu.edu.cn/a/20261109/11236.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261109T020000Z
 DTEND:20261109T030000Z
 SUMMARY:华师经管学术讲座第553期（管理）｜看见与被看见
@@ -192,7 +118,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://em.scnu.edu.cn/a/20261109/11232.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261109T063000Z
 DTEND:20261109T073000Z
 SUMMARY:华师经管实务讲座第104期（会计）｜行政事业单位
@@ -210,7 +136,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261110/8885.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261110T010000Z
 DTEND:20261110T020000Z
 SUMMARY:勷勤数学•专家报告-Elena Aladova Chestakov｜An introduct
@@ -228,7 +154,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261110/8886.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261110T020000Z
 DTEND:20261110T030000Z
 SUMMARY:勷勤数学•杰出学者报告-Ivan Shestakov｜On polynomial a
@@ -246,7 +172,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261105/13419.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261112T070000Z
 DTEND:20261112T080000Z
 SUMMARY:物理学院学术报告（第59期）中国科学技术大学曾
@@ -263,7 +189,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261113/8876.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261113T013000Z
 DTEND:20261113T023000Z
 SUMMARY:勷勤数学•专家报告-李竞阳｜在线张量学习:计算
@@ -280,8 +206,27 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://skc.scnu.edu.cn/a/20261106/1124.html@danchekey.github.io
+DTSTAMP:20261106T123239Z
+DTSTART:20261123T010000Z
+DTEND:20261123T020000Z
+SUMMARY:华南师范大学砺儒讲坛第148讲：社会合作规范——
+ 一个信息设计的解释（熊卫教授）
+LOCATION:文科楼二楼会议室
+DESCRIPTION:题目：社会合作规范——一个信息设计的解释\n
+ 主讲：熊卫（中山大学哲学系、教育部人文社会科学重
+ 点研究基地中山大学逻辑与认知研究所）\n地点：文科
+ 楼二楼会议室\n主办：社会科学处
+URL:http://skc.scnu.edu.cn/a/20261106/1124.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261124/8882.html@danchekey.github.io
-DTSTAMP:20261106T065234Z
+DTSTAMP:20261106T123239Z
 DTSTART:20261124T070000Z
 DTEND:20261124T080000Z
 SUMMARY:勷勤数学•专家报告-赵立璐｜关于二次型的Roth型

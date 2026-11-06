@@ -5,57 +5,13 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 06 Nov 2026 14:52:34 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 06 Nov 2026 20:32:39 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>华师经管学术讲座第551期（经济）｜纵向监督下的公共服务均等化</title>
-      <link>http://em.scnu.edu.cn/a/20261105/11227.html</link>
-      <guid isPermaLink="false">http://em.scnu.edu.cn/a/20261105/11227.html</guid>
-      <pubDate>Thu, 05 Nov 2026 14:00:00 +0800</pubDate>
-      <category>经济与管理学院</category>
-      <description>题目：纵向监督下的公共服务均等化
-主讲：梁超（山东大学）
-地点：大学城校园文二栋536国际学术报告厅
-主办：经济与管理学院</description>
-    </item>
-    <item>
-      <title>在“生活史”视野下理解1920年代的中国革命</title>
-      <link>http://mks.scnu.edu.cn/a/20261029/21.html</link>
-      <guid isPermaLink="false">http://mks.scnu.edu.cn/a/20261029/21.html</guid>
-      <pubDate>Thu, 29 Oct 2026 17:04:00 +0800</pubDate>
-      <category>马克思主义学院</category>
-      <description>题目：在“生活史”视野下理解1920年代的中国革命
-主讲：瞿骏（华东师范大学）
-地点：马克思主义学院（桃李园唯实厅）
-主办：马克思主义学院</description>
-    </item>
-    <item>
-      <title>勷勤数学•专家报告-田国梁｜A class of new symmetric distributions based on scale mixtures of normal distribution and mean regression models by using N-EM and US algorithms</title>
-      <link>http://maths.scnu.edu.cn/a/20261106/8874.html</link>
-      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261106/8874.html</guid>
-      <pubDate>Fri, 06 Nov 2026 10:50:00 +0800</pubDate>
-      <category>数学科学学院</category>
-      <description>题目：A class of new symmetric distributions based on scale mixtures of normal distribution and mean regression models by using N-EM and US algorithms
-主讲：田国梁（南方科技大学）
-地点：数科院西楼二楼会议室
-主办：数学科学学院</description>
-    </item>
-    <item>
-      <title>华师经管学术讲座第552期（经济）｜预算统筹管理与地方债务风险防控:来自融资平台异常购地的证据</title>
-      <link>http://em.scnu.edu.cn/a/20261106/11228.html</link>
-      <guid isPermaLink="false">http://em.scnu.edu.cn/a/20261106/11228.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:42:54 +0800</pubDate>
-      <category>经济与管理学院</category>
-      <description>题目：预算统筹管理与地方债务风险防控:来自融资平台异常购地的证据
-主讲：赵仁杰（西北大学）
-地点：大学城校园文二栋536国际学术报告厅
-主办：经济与管理学院</description>
-    </item>
     <item>
       <title>勷勤数学•专家报告-杨健夫｜On concentration of ground states of elliptic equations with the fractional Laplacian</title>
       <link>http://maths.scnu.edu.cn/a/20261108/8877.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261108/8877.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:50:45 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 20:30:50 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：On concentration of ground states of elliptic equations with the fractional Laplacian
 主讲：杨健夫（江西师范大学）
@@ -66,7 +22,7 @@
       <title>勷勤数学•专家报告-龙薇｜Vortex solutions to mass-supercritical Gross-Pitaevskii equations</title>
       <link>http://maths.scnu.edu.cn/a/20261108/8878.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261108/8878.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:15:08 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 19:55:13 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Vortex solutions to mass-supercritical Gross-Pitaevskii equations
 主讲：龙薇（江西师范大学）
@@ -77,7 +33,7 @@
       <title>勷勤数学•专家报告-余晓辉｜Classification of solutions for integral equations related to higher order trace inequalities</title>
       <link>http://maths.scnu.edu.cn/a/20261108/8879.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261108/8879.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:48:48 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 20:28:53 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Classification of solutions for integral equations related to higher order trace inequalities
 主讲：余晓辉（深圳大学）
@@ -88,7 +44,7 @@
       <title>勷勤数学•专家报告-李本鸟｜Subcritical elliptic problem with the variable exponent</title>
       <link>http://maths.scnu.edu.cn/a/20261108/8880.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261108/8880.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:19:31 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 19:59:36 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Subcritical elliptic problem with the variable exponent
 主讲：李本鸟（江西师范大学）
@@ -99,7 +55,7 @@
       <title>勷勤数学•专家报告-陈志杰｜Structure of critical points of multiple Green functions on flat torus and applications</title>
       <link>http://maths.scnu.edu.cn/a/20261108/8881.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261108/8881.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:51:35 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 20:31:40 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Structure of critical points of multiple Green functions on flat torus and applications
 主讲：陈志杰（清华大学）
@@ -110,7 +66,7 @@
       <title>华师经管学术讲座第553期（管理）｜看见与被看见——AI重塑一切,图书馆重塑自身</title>
       <link>http://em.scnu.edu.cn/a/20261109/11236.html</link>
       <guid isPermaLink="false">http://em.scnu.edu.cn/a/20261109/11236.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:43:15 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 20:23:20 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：看见与被看见——AI重塑一切,图书馆重塑自身
 主讲：张靖（中山大学）
@@ -121,7 +77,7 @@
       <title>华师经管实务讲座第104期（会计）｜行政事业单位内部控制评价问题研究</title>
       <link>http://em.scnu.edu.cn/a/20261109/11232.html</link>
       <guid isPermaLink="false">http://em.scnu.edu.cn/a/20261109/11232.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:22:02 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 20:02:07 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：行政事业单位内部控制评价问题研究
 主讲：张友昌（南方医科大学）
@@ -132,7 +88,7 @@
       <title>勷勤数学•专家报告-Elena Aladova Chestakov｜An introduction of superalgebras</title>
       <link>http://maths.scnu.edu.cn/a/20261110/8885.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261110/8885.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:24:17 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 20:04:22 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：An introduction of superalgebras
 主讲：Elena Aladova Chestakov（巴西圣保罗大学）
@@ -143,7 +99,7 @@
       <title>勷勤数学•杰出学者报告-Ivan Shestakov｜On polynomial automorphisms</title>
       <link>http://maths.scnu.edu.cn/a/20261110/8886.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261110/8886.html</guid>
-      <pubDate>Fri, 06 Nov 2026 13:53:26 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 19:33:31 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：On polynomial automorphisms
 主讲：Ivan Shestakov（巴西圣保罗大学）
@@ -165,7 +121,7 @@
       <title>勷勤数学•专家报告-李竞阳｜在线张量学习:计算与统计的权衡、自适应性与最优遗憾</title>
       <link>http://maths.scnu.edu.cn/a/20261113/8876.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261113/8876.html</guid>
-      <pubDate>Fri, 06 Nov 2026 13:56:54 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 19:36:59 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：在线张量学习:计算与统计的权衡、自适应性与最优遗憾
 主讲：李竞阳（复旦大学）
@@ -173,10 +129,21 @@
 主办：数学科学学院</description>
     </item>
     <item>
+      <title>华南师范大学砺儒讲坛第148讲：社会合作规范——一个信息设计的解释（熊卫教授）</title>
+      <link>http://skc.scnu.edu.cn/a/20261106/1124.html</link>
+      <guid isPermaLink="false">http://skc.scnu.edu.cn/a/20261106/1124.html</guid>
+      <pubDate>Fri, 06 Nov 2026 11:29:00 +0800</pubDate>
+      <category>社会科学处</category>
+      <description>题目：社会合作规范——一个信息设计的解释
+主讲：熊卫（中山大学哲学系、教育部人文社会科学重点研究基地中山大学逻辑与认知研究所）
+地点：文科楼二楼会议室
+主办：社会科学处</description>
+    </item>
+    <item>
       <title>勷勤数学•专家报告-赵立璐｜关于二次型的Roth型定理的研究</title>
       <link>http://maths.scnu.edu.cn/a/20261124/8882.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261124/8882.html</guid>
-      <pubDate>Fri, 06 Nov 2026 14:47:58 +0800</pubDate>
+      <pubDate>Fri, 06 Nov 2026 20:28:03 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：关于二次型的Roth型定理的研究
 主讲：赵立璐（中国科学技术大学）

@@ -546,6 +546,13 @@ jobs:
       - name: Run meta time conflict tests
         run: python tests/test_meta_time_conflict_20261016.py
 
+      # 2026-11-06：PDF 内嵌 / 附件页回归（skc/1124 把讲座时间写进 iframe 里的
+      # Word 导出 PDF，线上抓成发布时间）。锁四道断点：侧栏 DOM 剔除、结构判据
+      # 触发（正文再长也下载 PDF）、完整 UA+Referer 与 WAF 拦截页告警、PDF 文本
+      # 进入解析后 lectureStart 回到 11-23 09:00。夹具全固化，离线秒级。
+      - name: Run PDF inline tests
+        run: python tests/test_pdf_inline.py
+
       # 缓存并发门禁（2026-10-02）：data/.vlm_cache.json 曾被 parsers 与
       # llm_provider 各持一把**互不可见**的锁，两边都做「整文件读→改→写回」，
       # 单进程多线程下互相覆盖整批条目 → 缓存命中下降 → 重复烧付费 API 额度。

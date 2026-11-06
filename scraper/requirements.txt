@@ -25,3 +25,11 @@ pypinyin==0.55.0
 # _load_module 加载 server.py → CI 此前未装它而秒崩（2026-10-11 实证）。
 # 版本与根 requirements.txt 对齐，避免本地/CI 装出两套。
 ruamel.yaml==0.19.1
+
+# PyMuPDF：scraper/parsers.py 的 PDF-INLINE 通道用它把内嵌/附件 PDF 提成文本
+# （iframe viewer2.html#...pdf、.pdf 下载链接），是「讲座时间地点只写在附件里」
+# 那类页面唯一的正文来源。2026-11-06 排查 skc/1124 时发现本清单从未列它：
+# 本机能跑是因为本地装过，而 daily.yml / 两个门禁都只 pip install 本文件，
+# CI 里 `import fitz` 直接 ImportError 被静默吞掉 —— 整条 PDF 通道从未生效。
+# 固定版本与本机实装一致（保证可复现，勿改浮动版本）。
+PyMuPDF==1.27.2.2

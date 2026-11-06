@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-06T14:52:34+08:00",
+  "updatedAt": "2026-11-06T20:32:39+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261124/8882.html",
@@ -496,19 +496,19 @@
       "campus": "校级",
       "title": "华南师范大学砺儒讲坛第148讲：社会合作规范——一个信息设计的解释（熊卫教授）",
       "topic": "社会合作规范——一个信息设计的解释",
-      "lectureStart": "2026-11-06 11:29:00",
+      "lectureStart": "2026-11-23 09:00:00",
       "lectureEnd": null,
-      "location": "",
+      "location": "文科楼二楼会议室",
       "speaker": "熊卫",
       "speakerTitle": "教授",
-      "speakerAffiliation": "",
+      "speakerAffiliation": "中山大学哲学系、教育部人文社会科学重点研究基地中山大学逻辑与认知研究所",
       "inviter": "",
-      "speakerBio": "",
+      "speakerBio": "熊卫，中山大学哲学系、教育部人文社会科学重点研究基地中山大学逻辑与认知研究所教授，博士生导师，教育部长江学者特聘教授，\n中国逻辑学会副会长，中国逻辑学会归纳逻辑专业委员会主任，南粤优秀教师，国家社科基金重大项目首席专家，主要研究领域为哲学逻辑、理性选择与博弈、不确定性推理。",
       "organizer": "社会科学处",
       "publishTime": "2026-11-06 11:29:00",
       "publishTimeSource": "label",
       "timeConfidence": "high",
-      "timeNote": "general-body-full",
+      "timeNote": "same-year",
       "llmTextEnhanced": true,
       "llmVerdict": "llm",
       "llmSpeakerSource": null,
@@ -516,7 +516,7 @@
         "speaker": "熊卫教授",
         "speakerTitle": null,
         "affiliation": null,
-        "lectureStart": "2026-11-06 11:29:00",
+        "lectureStart": "2026-11-23 09:00:00",
         "lectureEnd": null,
         "location": null,
         "topic": "社会合作规范——一个信息设计的解释",
@@ -526,8 +526,9 @@
       "llmRejectReason": "speakerAffiliation@invalid:华南师范大学",
       "llmAdopted": "speakerTitle|lectureStart",
       "timeUnknownSource": "auto",
-      "timeUnknown": true,
-      "listTitle": "华南师范大学砺儒讲坛第148讲：社会合作规范——一个信息设计的解释（熊卫教授）"
+      "timeUnknown": false,
+      "listTitle": "华南师范大学砺儒讲坛第148讲：社会合作规范——一个信息设计的解释（熊卫教授）",
+      "abstract": "社会合作的生成与维系是社会规范理论的核心议题。既有\n研究大多将社会规范视作外生行为规则，对信息结构在合作中的关键作用\n关注不足。我们构建嵌入信息设计的有限状态囚徒困境博弈模型，为合作\n规范的内生起源提供均衡层面的微观解释，也为不完全信息下的合作研究\n\n提供信息设计的分析视角。"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20261105/11230.html",

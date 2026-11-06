@@ -1470,18 +1470,33 @@ def _is_safe_http_url(url):
     return True
 
 
-def _safe_fetch(url, max_bytes=_MAX_FETCH_BYTES, timeout=20, verify=True):
+_BROWSER_UA = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+
+
+def _safe_fetch(url, max_bytes=_MAX_FETCH_BYTES, timeout=20, verify=True,
+                referer=None, user_agent=None):
     """安全下载：SSRF 校验 + 逐跳校验的重定向跟随 + 响应体大小上限。
 
     成功返回 bytes；任何校验失败 / 网络错误 / 超限返回 None。
     verify=False 仅限已知校内域名的证书链残缺兜底（见 PDF 下载处），勿扩散使用。
+    referer / user_agent 供 PDF-INLINE 等场景透传来源页，绕过校内 CDN 的 WAF。
+
+    2026-11-06：默认 UA 由 'Mozilla/5.0' 换成完整浏览器 UA。statics.scnu.edu.cn
+    对「短 UA + 无 Referer」的请求会 302 到 HTTPS 后回吐一张 HTTP 200 的拦截页
+    HTML（skc/1124 实测约 49 KB），调用方若只按 '%PDF-' 魔数判断便会静默丢掉
+    整份附件。完整 UA 或带 Referer 任一补齐即可拿到真实 PDF（两者都带最稳）。
     """
+    _headers = {'User-Agent': user_agent or _BROWSER_UA}
+    if referer:
+        _headers['Referer'] = referer
     cur = url
     for _hop in range(_MAX_REDIRECTS + 1):
         if not _is_safe_http_url(cur):
             return None
         try:
-            r = requests.get(cur, headers={'User-Agent': 'Mozilla/5.0'},
+            r = requests.get(cur, headers=_headers,
                              timeout=timeout, stream=True,
                              allow_redirects=False, verify=verify)
         except requests.exceptions.RequestException:
@@ -3292,6 +3307,128 @@ _FOOTER_MARKERS = (
 )
 
 
+_SIDEBAR_CLASS_RE = re.compile(r'(?i)(?:right|side|sidebar|related|recommend)')
+_SIDEBAR_TITLE_RE = re.compile(
+    r'资讯及通知|相关推荐|热门(?:文章|推荐)|通知公告|相关链接|最新动态')
+
+# PDF-INLINE 的「正文过短」阈值。2026-11-06 起不再用它判断页面有没有附件
+# （skc/1124 侧栏把正文灌到 504 字，反而漏掉整份 PDF），只作为「可能选错
+# 正文容器」的兜底信号：正文中找不到附件且正文极短时，扩展到整页再找一次。
+_PDF_SHORT_BODY = 150
+
+
+def _sidebar_blocks(content_div):
+    """识别 content_div 直接子元素中的侧栏 / 推荐列表块。
+
+    只认「class 带 right/side/related 语义」+「开头是侧栏栏目标题」，且文本量
+    必须压过其余兄弟块；普通页面一律返回空，避免影响既有 golden 解析。
+
+    2026-11-06 skc/1124：div.content 下 pagecontentLeft3（115 字正文）与
+    pagecontentright3（388 字「资讯及通知」列表）并列，后者把 body_text 灌到
+    504 字，顶掉了 PDF-INLINE 的 <150 触发条件，也让 LLM 读到 10 条无关通知。
+    注意不能靠 _strip_footer 的文本标记截断：本页「资讯及通知」落在全文 22.8%，
+    过不了该函数「标记须在后 30%」的守卫，只能从 DOM 结构摘除。
+    """
+    if content_div is None:
+        return []
+    kids = [c for c in content_div.find_all(recursive=False)
+            if getattr(c, 'name', None) in ('div', 'section', 'aside')]
+    if len(kids) < 2:
+        return []
+    flagged = []
+    for c in kids:
+        cls = ' '.join(c.get('class') or [])
+        if not _SIDEBAR_CLASS_RE.search(cls):
+            continue
+        head = c.get_text(' ', strip=True)[:30]
+        if _SIDEBAR_TITLE_RE.search(head):
+            flagged.append(c)
+    if not flagged:
+        return []
+    side_len = sum(len(c.get_text(' ', strip=True)) for c in flagged)
+    rest_len = sum(len(c.get_text(' ', strip=True)) for c in kids if c not in flagged)
+    return flagged if side_len > rest_len else []
+
+
+def _content_text_without_sidebar(content_div):
+    """取正文文本，跳过侧栏块；纯读取，不改动原 soup（PDF/图片收集仍看完整 DOM）。"""
+    if content_div is None:
+        return None
+    drop_ids = {id(c) for c in _sidebar_blocks(content_div)}
+    if not drop_ids:
+        return content_div.get_text(' ')
+    parts = []
+    for child in content_div.children:
+        if getattr(child, 'name', None) in ('div', 'section', 'aside') \
+                and id(child) in drop_ids:
+            continue
+        parts.append(child.get_text(' ') if hasattr(child, 'get_text') else str(child))
+    return ' '.join(parts)
+
+
+def _collect_pdf_urls(scope, exclude_blocks=()):
+    """收集正文容器里的 PDF 附件 URL（去重保序），供 PDF-INLINE 下载。
+
+    覆盖 iframe viewer（viewer2.html#...pdf 或直接 .pdf）与 <a href="...pdf">
+    文件下载两种形态。2026-11-06 放宽：原先 a 标签还要求文本含「通知」，而
+    skc/1124 的链接文本是纯文件名「11月23日第148讲（熊卫）_20261106112256.pdf」，
+    直接漏掉。exclude_blocks 用于排除侧栏推荐列表里的无关附件。
+    """
+    if scope is None:
+        return []
+    drop_ids = {id(b) for b in exclude_blocks}
+    out, seen = [], set()
+
+    def _in_dropped(tag):
+        return bool(drop_ids) and any(id(p) in drop_ids for p in tag.parents)
+
+    for iframe in scope.find_all('iframe'):
+        if _in_dropped(iframe):
+            continue
+        isrc = iframe.get('src') or ''
+        if 'viewer' not in isrc and '.pdf' not in isrc.lower():
+            continue
+        m = re.search(r'#(.+\.pdf)', isrc, re.I)
+        cand = m.group(1) if m else (isrc if isrc.lower().endswith('.pdf') else None)
+        if cand and cand not in seen:
+            seen.add(cand)
+            out.append(cand)
+    for a in scope.find_all('a', href=True):
+        if _in_dropped(a):
+            continue
+        href = a.get('href', '')
+        if href.lower().split('?')[0].endswith('.pdf') and href not in seen:
+            seen.add(href)
+            out.append(href)
+    return out
+
+
+def _fetch_pdf_bytes(abs_pdf, referer=None):
+    """下载一份 PDF 附件，返回 (data, err)。成功时 err 为 None。
+
+    2026-11-06 skc/1124：statics.scnu.edu.cn 对「短 UA + 无 Referer」的请求
+    302 到 HTTPS 后回吐 HTTP 200 的 WAF 拦截页 HTML（约 49 KB）。调用方原来只按
+    `%PDF-` 魔数判断、不匹配就静默 pass，于是整份附件丢了也没人知道。
+    这里把「下载失败」「拿到非 PDF」都变成显式错误原因，交给调用方打日志。
+
+    证书链残缺兜底沿用 2026-08-05 的安全修复：只对 scnu.edu.cn 及其子域
+    放宽一次 TLS 校验，且仍然走 _safe_fetch 的 SSRF / 逐跳重定向 / 大小上限。
+    """
+    data = _safe_fetch(abs_pdf, referer=referer)
+    if data is None:
+        host = urlparse(abs_pdf).hostname or ''
+        # 域名边界锁死：endswith('scnu.edu.cn') 会被 evilscnu.edu.cn 绕过
+        if host == 'scnu.edu.cn' or host.endswith('.scnu.edu.cn'):
+            data = _safe_fetch(abs_pdf, verify=False, referer=referer)
+    if data is None:
+        return None, '下载失败（网络错误 / 非安全 URL / 重定向或体积超限）'
+    # 规范允许 %PDF- 出现在文件头前 1024 字节内；WAF 拦截页里不会有该魔数
+    if b'%PDF-' not in data[:1024]:
+        return None, ('返回非 PDF 内容（%d 字节，疑似 WAF 拦截页或错误页）'
+                      % len(data))
+    return data, None
+
+
 def _strip_footer(text):
     """截断全校级页脚/导航噪声，避免其被误并入 location/topic 等字段。
 
@@ -4308,7 +4445,10 @@ def _prep_doc_text(soup, list_title, _st):
                 _best, _best_len = _el, len(_t)
     if _first is not None:
         content_div = _first if _first_len >= 80 else _best
-    _st.body_text = content_div.get_text(' ') if content_div else _st.text
+    # 侧栏 / 推荐列表在 DOM 层摘除（见 _sidebar_blocks 注释）：既避免它把
+    # body_text 灌水顶掉 PDF-INLINE 门槛，也避免无关通知标题污染 LLM 抽取。
+    _st.body_text = (_content_text_without_sidebar(content_div)
+                     if content_div else _st.text)
     _st.body_text = re.sub(r'\s+', ' ', _st.body_text).strip()
     # LLM 证据旁路：保留 CJK 间原始空格的版本，专供模型 A/B 与溯源闸门使用。
     # 折叠版 body_text 仍服务纯规则正则（「张三 教授」→「张三教授」剥离依赖），
@@ -4440,91 +4580,91 @@ def _collect_assets(soup, content_div, url, _st):
     # （防本地路径落库——该 bug 曾触发 test_invariants.check_images_no_local_path
     #  拦截导致公网部署连续失败）
     _pdf_local_imgs = []
-    if len(_st.body_text.strip()) < 150:
-        _pdf_url = None
-        # 策略1：从 iframe src 中提取 PDF URL（工学部用 viewer2.html#URL 格式）
-        for iframe in (content_div or soup).find_all('iframe'):
-            isrc = (iframe.get('src') or '')
-            if 'viewer' in isrc or '.pdf' in isrc.lower():
-                m = re.search(r'#(.+\.pdf)', isrc, re.I)
-                if m:
-                    _pdf_url = m.group(1)
-                    break
-                # 完整 PDF URL
-                if isrc.lower().endswith('.pdf'):
-                    _pdf_url = isrc
-                    break
-        # 策略2：从 <a> 标签的 href 中找 .pdf 链接（文件下载）
-        if not _pdf_url:
-            for a in (content_div or soup).find_all('a', href=True):
-                href = a.get('href', '')
-                if href.lower().endswith('.pdf') and '通知' in a.get_text():
-                    _pdf_url = href
-                    break
-        if _pdf_url:
+    # 2026-11-06 触发判据改为「检测到 PDF 附件就尝试」为主，「正文 <150」降为兜底。
+    # 原先只认正文短：侧栏/页脚会把它灌长（skc/1124 实测 504 字），或页面本身
+    # 已有简介（必然 >=150 字）而时间地点在附件里 —— 两种都会静默漏掉整份附件。
+    # 调大阈值则几乎每页都去下 PDF，误伤与请求量都上升，故改用结构判据。
+    _pdf_scope = content_div or soup
+    _side_blocks = _sidebar_blocks(content_div) if content_div else ()
+    _pdf_candidates = _collect_pdf_urls(_pdf_scope, _side_blocks)
+    if not _pdf_candidates and len(_st.body_text.strip()) < _PDF_SHORT_BODY \
+            and soup is not _pdf_scope:
+        # 兜底：正文极短且容器内找不到附件时，可能选错了容器，扩展到整页再找一次。
+        # 这是旧「<150 才找 PDF」的兼容语义，不再用字数推断页面有没有附件。
+        _pdf_candidates = _collect_pdf_urls(soup, _side_blocks)
+    _pdf_data, _abs_pdf, _pdf_errors = None, '', []
+    for _pdf_url in _pdf_candidates:
+        _cand = urljoin(url, _pdf_url) if not _pdf_url.startswith('http') else _pdf_url
+        if _cand.startswith('//'):
+            _cand = 'http:' + _cand
+        _pdf_data, _err = _fetch_pdf_bytes(_cand, referer=url)
+        if _pdf_data:
+            _abs_pdf = _cand
+            break
+        _pdf_errors.append('%s | %s' % (_cand, _err))
+    if _pdf_candidates and not _pdf_data:
+        # 2026-11-06：原先非 PDF（WAF 拦截页）与下载失败都是静默 pass，
+        # 整份附件丢了在日志里毫无痕迹。这里必须留下可检索的告警。
+        print('[PDF-INLINE] %s 的 %d 个 PDF 附件均未取到，附件字段会缺失：%s'
+              % (url, len(_pdf_candidates), ' ; '.join(_pdf_errors)),
+              file=sys.stderr)
+    if _pdf_data:
+        try:
+            import io
             try:
-                _abs_pdf = urljoin(url, _pdf_url) if not _pdf_url.startswith('http') else _pdf_url
-                if _abs_pdf.startswith('//'):
-                    _abs_pdf = 'http:' + _abs_pdf
-                # 2026-08-05 安全修复：原先全局禁用 TLS 证书校验（CERT_NONE），
-                # 中间人可替换 PDF 内容。改用 _safe_fetch：SSRF 校验 + 启用证书校验
-                # + 逐跳重定向校验 + 大小上限；仅对校内域名（证书链可能残缺）
-                # 放宽一次重试，避免个别学院 PDF 因证书问题失抓。
-                _pdf_data = _safe_fetch(_abs_pdf)
-                if _pdf_data is None:
-                    _pdf_host = urlparse(_abs_pdf).hostname or ''
-                    # 2026-08-05 复查修正：endswith('scnu.edu.cn') 会被
-                    # evilscnu.edu.cn 之类的域名绕过，必须锁定域名边界
-                    if _pdf_host == 'scnu.edu.cn' or _pdf_host.endswith('.scnu.edu.cn'):
-                        _pdf_data = _safe_fetch(_abs_pdf, verify=False)
-                if _pdf_data and _pdf_data[:5] == b'%PDF-':
-                    import io
+                import fitz as _fitz
+                _doc = _fitz.open(stream=io.BytesIO(_pdf_data), filetype='pdf')
+                _pages_text = []
+                for _pg in _doc:
+                    _t = _pg.get_text()
+                    if _t.strip():
+                        _pages_text.append(_t)
+                _pdf_text = '\n'.join(_pages_text)
+                if _pdf_text:
+                    _st.body_text = _st.body_text + '\n' + _pdf_text
+                    _st.body_text_llm = _st.body_text_llm + '\n' + _pdf_text
+                    _st.body_text_folded = _st.body_text_folded + '\n' + _pdf_text
+                    _st.text = _st.text + '\n' + _pdf_text
+                    # text_folded 同步追加（topic/location 提取用 folded 版，
+                    # 否则海报页 OCR 文本只进 spaced 版，folded 停在页脚截断处）
+                    _st.text_folded = _st.text_folded + '\n' + _pdf_text
+                # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
+                # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
+                _is_poster_pdf = (('海报' in (_abs_pdf or ''))
+                                  or (len(_st.body_text.strip()) < _PDF_SHORT_BODY)
+                                  or (content_div and bool(content_div.find('iframe'))))
+                if _is_poster_pdf and _doc.page_count > 0:
                     try:
-                        import fitz as _fitz
-                        _doc = _fitz.open(stream=io.BytesIO(_pdf_data), filetype='pdf')
-                        _pages_text = []
-                        for _pg in _doc:
-                            _t = _pg.get_text()
-                            if _t.strip():
-                                _pages_text.append(_t)
-                        _pdf_text = '\n'.join(_pages_text)
-                        if _pdf_text:
-                            _st.body_text = _st.body_text + '\n' + _pdf_text
-                            _st.body_text_llm = _st.body_text_llm + '\n' + _pdf_text
-                            _st.body_text_folded = _st.body_text_folded + '\n' + _pdf_text
-                            _st.text = _st.text + '\n' + _pdf_text
-                            # text_folded 同步追加（topic/location 提取用 folded 版，
-                            # 否则海报页 OCR 文本只进 spaced 版，folded 停在页脚截断处）
-                            _st.text_folded = _st.text_folded + '\n' + _pdf_text
-                        # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
-                        # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
-                        _is_poster_pdf = ('海报' in (_abs_pdf or '')) or (len(_st.body_text.strip()) < 150) or (content_div and bool(content_div.find('iframe')))
-                        if _is_poster_pdf and _doc.page_count > 0:
-                            try:
-                                from PIL import Image as _Image
-                                _pg = _doc[0]
-                                _mat = _fitz.Matrix(2, 2)
-                                _pix = _pg.get_pixmap(matrix=_mat)
-                                _tmp_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'tmp', 'pdf_posters')
-                                _os.makedirs(_tmp_dir, exist_ok=True)
-                                _pdf_basename = re.sub(r'[^\w.-]', '_', _os.path.basename(unquote(_abs_pdf)))
-                                _tmp_path = _os.path.join(_tmp_dir, _pdf_basename + '.png')
-                                _pix.save(_tmp_path)
-                                _im = _Image.open(_tmp_path)
-                                if max(_im.size) > 2000:
-                                    _im.thumbnail((2000, 2000))
-                                    _im.save(_tmp_path)
-                                _pdf_local_imgs.append(_tmp_path)
-                                _pdf_poster_converted = True
-                            except Exception:
-                                pass  # PDF 转图失败不阻塞主流程
-                        _doc.close()
-                    except ImportError:
-                        pass  # PyMuPDF 未安装时静默跳过
+                        from PIL import Image as _Image
+                        _pg = _doc[0]
+                        _mat = _fitz.Matrix(2, 2)
+                        _pix = _pg.get_pixmap(matrix=_mat)
+                        _tmp_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'tmp', 'pdf_posters')
+                        _os.makedirs(_tmp_dir, exist_ok=True)
+                        _pdf_basename = re.sub(r'[^\w.-]', '_', _os.path.basename(unquote(_abs_pdf)))
+                        _tmp_path = _os.path.join(_tmp_dir, _pdf_basename + '.png')
+                        _pix.save(_tmp_path)
+                        _im = _Image.open(_tmp_path)
+                        if max(_im.size) > 2000:
+                            _im.thumbnail((2000, 2000))
+                            _im.save(_tmp_path)
+                        _pdf_local_imgs.append(_tmp_path)
+                        _pdf_poster_converted = True
                     except Exception:
-                        pass  # PDF 解析失败时不阻塞主流程
-            except Exception:
-                pass  # PDF 下载失败时不阻塞
+                        pass  # PDF 转图失败不阻塞主流程
+                _doc.close()
+            except ImportError:
+                # 2026-11-06：CI 曾因 requirements 漏列 PyMuPDF 而整条通道空转，
+                # 连一行日志都没有。依赖再丢必须当场可见，不许再静默吞。
+                print('[PDF-INLINE] %s 取到 PDF（%d 字节）但 PyMuPDF 未安装，'
+                      '附件文本无法提取；检查 scraper/requirements.txt'
+                      % (url, len(_pdf_data)), file=sys.stderr)
+            except Exception as _pdf_e:
+                print('[PDF-INLINE] %s 的 PDF 解析失败：%s' % (url, _pdf_e),
+                      file=sys.stderr)
+        except Exception as _pdf_e:
+            print('[PDF-INLINE] %s 的 PDF 处理失败：%s' % (url, _pdf_e),
+                  file=sys.stderr)
 
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 _st.text / _st.body_text（仅做一次）。
