@@ -124,7 +124,9 @@ def check_workflows():
             uses = ' '.join(str(s.get('uses') or '') for s in steps if isinstance(s, dict))
             runs = ' '.join(str(s.get('run') or '') for s in steps if isinstance(s, dict))
             # #32：凡跑 node 门禁的 job 必须固定 Node 版本，否则跨时区测试可能空转。
-            if re.search(r'\bnode\s+tests/', runs):
+            # 两种形态都要认：test.yml 的 `node tests/js/x.js` 直跑，以及 deploy.yml
+            # gate 里 GATE_TESTS 循环的 `cmd="node $t"`（后者极易被漏掉）。
+            if re.search(r'\bnode\s+(?:tests/|\$t\b)', runs):
                 node_jobs += 1
                 if 'actions/setup-node@' not in uses:
                     problems.append(f'{rel}:{job_name} 跑 node 门禁却没 setup-node')
