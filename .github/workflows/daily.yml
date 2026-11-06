@@ -227,6 +227,57 @@ jobs:
           { echo "### 门禁9 水位闸门（rc=$rc）"; echo '```'; tail -25 gate9.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $rc
 
+      # 2026-11-06（#15）：每日主路径护栏补强。原 9 项偏代码/数据行为门禁，缺「静默错」类
+      # 元测试——这些门禁只在 test.yml / deploy gate 侧跑，每日自动上线路径（GITHUB_TOKEN
+      # 提交不触发那两条流水线）不执行；若改动只破坏了这类门禁，要等部署或人工才发现。
+      # 下沉 5 项「零报错但结果错」类元测试（均离线、秒级；test.yml 已有，非游离）：
+      #   · 门禁10 CI 门禁清单漂移锁（清单两侧不一致本就无任何报错）
+      #   · 门禁11 模型A 融合逻辑（LLM 双轨核心，与 #14 回放门禁互补）
+      #   · 门禁12 引证裁决值级闸门（模型B 的采纳/拒绝路径）
+      #   · 门禁13 站点静态资产守卫（sitemap/og 静默退化）
+      #   · 门禁14 幻觉守卫（LLM 编造假值不报错，纯规则基线拦不住）
+      # daily 门禁 9 → 14；与 NEW1（prepush_check.py）共用同一份 test.yml/deploy 双清单
+      # （由 test_ci_gate_coverage 反向锁漂移），daily 这份独立内联清单不纳入该锁。
+      - name: 门禁10 CI门禁清单漂移锁
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_ci_gate_coverage.py > gate10.log 2>&1; rc=$?
+          { echo "### 门禁10 CI门禁清单漂移锁（rc=$rc）"; echo '```'; tail -25 gate10.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: 门禁11 模型A融合逻辑
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_hybrid.py > gate11.log 2>&1; rc=$?
+          { echo "### 门禁11 模型A融合逻辑（rc=$rc）"; echo '```'; tail -25 gate11.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: 门禁12 引证裁决值级闸门
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_cited_judge.py > gate12.log 2>&1; rc=$?
+          { echo "### 门禁12 引证裁决值级闸门（rc=$rc）"; echo '```'; tail -25 gate12.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: 门禁13 站点静态资产守卫
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_site_assets.py > gate13.log 2>&1; rc=$?
+          { echo "### 门禁13 站点静态资产守卫（rc=$rc）"; echo '```'; tail -25 gate13.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: 门禁14 幻觉守卫
+        if: always()
+        run: |
+          set -uo pipefail
+          python tests/test_hallucination_guard.py > gate14.log 2>&1; rc=$?
+          { echo "### 门禁14 幻觉守卫（rc=$rc）"; echo '```'; tail -25 gate14.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
       # 数据质量体检（2026-09-06）：每天抓取+修复后自动检查全库字段
       # （时间/地点/主讲人/单位的错误与缺失），报告存为运行附件保留 30 天，
       # 出现异常当天可见，不用等用户在网页上发现问题来反馈。
