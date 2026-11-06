@@ -1036,5 +1036,55 @@ class StatsModeNoteTest(unittest.TestCase):
                          '只有移动端两处补滑动提示，桌面不应出现')
 
 
+class StatsYearTotalsDerivedTest(unittest.TestCase):
+    """yearTotals 单一事实源（2026-11-06）。
+
+    评审 #26 要求保留该字段供外部消费者与回归用例，但统计页并不读它；
+    此前在遍历里单独累加，与 matrix 构成两套口径——将来改归并规则漏改一边，
+    页面与测试都会全绿，产物却悄悄分叉。现改为返回前从 matrix 派生，
+    以下守卫锁死「字段保留、口径同源」这一约定。
+    """
+
+    @staticmethod
+    def _from_matrix(st):
+        """按矩阵独立重算年份合计（不依赖被测字段）。"""
+        out = {}
+        for year_map in st['matrix'].values():
+            for y, n in year_map.items():
+                out[y] = out.get(y, 0) + n
+        return out
+
+    def test_构造数据_含论坛归并跨年跨单位时同源(self):
+        data = ForumStatDedupTest._sample()
+        data.append(ForumStatDedupTest._rec('http://x/d.html',
+                                           '2024-03-01 09:00:00', college='学院B'))
+        st = gen.build_stats(data, '2026-11-06T00:00:00+08:00')
+        self.assertEqual(dict(st['yearTotals']), self._from_matrix(st))
+        self.assertIn('2024', st['yearTotals'])
+        self.assertIn('2025', st['yearTotals'])
+
+    def test_全量真实数据同源(self):
+        with open(DATA_PATH, encoding='utf-8') as f:
+            data = json.load(f)['data']
+        st = gen.build_stats(data, '2026-11-06T00:00:00+08:00')
+        self.assertEqual(dict(st['yearTotals']), self._from_matrix(st))
+        self.assertEqual(sum(st['yearTotals'].values()),
+                         sum(sum(m.values()) for m in st['matrix'].values()))
+
+    def test_产物stats_json同源(self):
+        path = os.path.join(ROOT, 'site', 'lectures', 'stats.json')
+        with open(path, encoding='utf-8') as f:
+            st = json.load(f)
+        self.assertEqual(dict(st['yearTotals']), self._from_matrix(st),
+                         '产物里的 yearTotals 必须与同文件 matrix 一致')
+
+    def test_源码不得恢复独立累加器(self):
+        path = os.path.join(ROOT, 'scripts', 'generate_frontend_data.py')
+        with open(path, encoding='utf-8') as f:
+            src = f.read()
+        self.assertNotIn('year_totals[cell_year] = year_totals.get', src,
+                         'yearTotals 必须由 matrix 派生，独立累加会重新引入双轨分叉')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

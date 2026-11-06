@@ -289,7 +289,7 @@ def forum_stat_groups(data):
     口径一致。判据仍是 (sourceUrl, lectureStart[:10]) + FORUM_MIN，不与前端
     mergedDayKey 分叉。
 
-    只作用于「讲座数量」口径（matrix / yearTotals / campusMatrix）。
+    只作用于「讲座数量」口径（matrix / campusMatrix；yearTotals 由 matrix 派生）。
     lectureCount、sourceNoticeCount、最小索引 lectures 的 cs、campusMap 一律
     保持逐场全量：首页列表/筛选/搜索/日历、访问、点赞、想听仍是逐场计数。
     """
@@ -332,12 +332,6 @@ def build_stats(data, updated_at):
     skip_stat_indexes, stat_overrides = forum_stat_groups(data)
     # 学院 -> 年份 -> 讲座-单位计数（同一讲座跨 N 个归口单位即在 N 个学院各计 1 次）
     matrix = {}
-    # 年份 -> 讲座-单位计数（= matrix 各学院同年之和），**不是**「唯一来源通知数」。
-    # 评审 #26（2026-11-05）：原注释把它写成来源通知数，与实现和字段名都不符。
-    # 统计页 stats.js 自己从 matrix 重算同名 computed，不读本字段；保留它是给
-    # 外部消费者与 build_stats 回归用例用的（tests/test_cross_url_dup_20261024.py），
-    # 不可直接删除或改名。
-    year_totals = {}
     # 最小讲座索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
     lectures = []
     # 页面级计数索引的原料（2026-10-19 B4）：u -> {split, plain, days, y, c, cs}。
@@ -377,8 +371,8 @@ def build_stats(data, updated_at):
         # page_meta 使用，一律逐场全量，不随统计归并改变。
         units = stat_units(item)
         # 归并后的「活动」单位并集：只有论坛组首条才有 override，其余与 units
-        # 完全相同。count_units / count_sources 只喂给 matrix / yearTotals /
-        # campusMatrix，绝不写回最小索引（访问 / 点赞 / 想听仍逐场）。
+        # 完全相同。count_units / count_sources 只喂给 matrix / campusMatrix
+        # （yearTotals 由 matrix 派生），绝不写回最小索引（访问 / 点赞 / 想听仍逐场）。
         override = stat_overrides.get(idx) if count_in_matrix else None
         count_units = override['units'] if override else units
         count_sources = override['sources'] if override else sources
@@ -387,7 +381,6 @@ def build_stats(data, updated_at):
             for c in count_units:
                 matrix.setdefault(c, {})
                 matrix[c][cell_year] = matrix[c].get(cell_year, 0) + 1
-                year_totals[cell_year] = year_totals.get(cell_year, 0) + 1
         # 学院 -> 校区映射：主学院优先；来源单位补全（保证合并讲座的来源单位也能按校区筛选）
         for c in units:
             if c in campus_map:
@@ -489,6 +482,19 @@ def build_stats(data, updated_at):
     if UNKNOWN_YEAR in years_set:
         years.append(UNKNOWN_YEAR)
 
+    # 年份 -> 讲座-单位计数：从 matrix 派生，不再单独累加（2026-11-06）。
+    # 此前遍历里另有一套 year_totals 累加器，改归并规则时漏改一边就会分叉；
+    # 而统计页 stats.js 自己从 matrix 重算同名 computed、根本不读本字段，
+    # 于是「测试全绿、产物悄悄错」无从察觉。现改为物理同源。
+    # 字段本身按评审 #26（2026-11-05）保留：给外部消费者与 build_stats 回归用例
+    # （tests/test_cross_url_dup_20261024.py）用，不可删除或改名；它也不是
+    # 「唯一来源通知数」。只输出 matrix 中实际出现过的年份，顺序沿用 years。
+    year_totals = {}
+    for y in years:
+        n = sum(m.get(y, 0) for m in matrix.values())
+        if n:
+            year_totals[y] = n
+
     return {
         'updatedAt': updated_at,
         # 顶部「去重后 N 场讲座」（2026-11-06 用户拍板保持 3868）：仍是数据条数，
@@ -500,7 +506,8 @@ def build_stats(data, updated_at):
         'sourceNoticeCount': len(seen_notice_urls),
         'years': years,
         'matrix': matrix,
-        # 年份 -> 讲座-单位计数，口径见 build_stats 顶部注释（非唯一来源通知数）
+        # 年份 -> 讲座-单位计数：由上方 matrix 派生，口径见 build_stats 顶部注释
+        # （非唯一来源通知数）。字段保留供外部消费者与回归用例，统计页不读。
         'yearTotals': year_totals,
         'lectures': lectures,
         'campusMap': campus_map,
