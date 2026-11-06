@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-05T21:14:47+08:00",
+  "updatedAt": "2026-11-06T14:52:34+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261124/8882.html",
@@ -488,6 +488,46 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "● 华师经管学术讲座第551期（经济）"
+    },
+    {
+      "sourceUrl": "http://skc.scnu.edu.cn/a/20261106/1124.html",
+      "images": [],
+      "college": "社会科学处",
+      "campus": "校级",
+      "title": "华南师范大学砺儒讲坛第148讲：社会合作规范——一个信息设计的解释（熊卫教授）",
+      "topic": "社会合作规范——一个信息设计的解释",
+      "lectureStart": "2026-11-06 11:29:00",
+      "lectureEnd": null,
+      "location": "",
+      "speaker": "熊卫",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "社会科学处",
+      "publishTime": "2026-11-06 11:29:00",
+      "publishTimeSource": "label",
+      "timeConfidence": "high",
+      "timeNote": "general-body-full",
+      "llmTextEnhanced": true,
+      "llmVerdict": "llm",
+      "llmSpeakerSource": null,
+      "llmSelfExtract": {
+        "speaker": "熊卫教授",
+        "speakerTitle": null,
+        "affiliation": null,
+        "lectureStart": "2026-11-06 11:29:00",
+        "lectureEnd": null,
+        "location": null,
+        "topic": "社会合作规范——一个信息设计的解释",
+        "title": "华南师范大学砺儒讲坛第148讲"
+      },
+      "llmRejected": "speakerAffiliation",
+      "llmRejectReason": "speakerAffiliation@invalid:华南师范大学",
+      "llmAdopted": "speakerTitle|lectureStart",
+      "timeUnknownSource": "auto",
+      "timeUnknown": true,
+      "listTitle": "华南师范大学砺儒讲坛第148讲：社会合作规范——一个信息设计的解释（熊卫教授）"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20261105/11230.html",
