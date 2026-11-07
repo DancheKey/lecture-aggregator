@@ -204,7 +204,9 @@ def main():
         print(f'  {k}: {n}')
 
     if args.html:
-        _write_html(args.html, data, issues)
+        _write_html(args.html, data, issues,
+                    attachment_path=os.path.join(ROOT, 'data',
+                                                 'attachment_health.json'))
         print(f'\nHTML 明细报告: {args.html}')
 
     # ---- 退出码（2026-10-02）----
@@ -260,8 +262,51 @@ def _esc_url(u):
     return ''
 
 
-def _write_html(path, recs, issues):
+def _attachment_health_html(path):
+    """渲染「附件提取告警」小节：读本轮台账，失败也不让体检报告崩。
+
+    台账里的 sourceUrl / message 来自外部站点，全部经 _esc / _esc_url；
+    路径为 None（旧调用方，如 HTML 转义守卫测试）或文件缺失时只给纯文本
+    提示，不生成任何链接，避免影响既有报告的链接白名单断言。
+    """
+    if not path or not os.path.exists(path):
+        return ('<div class="box"><b>附件提取告警：</b>本轮无台账数据'
+                '（data/attachment_health.json 尚未生成）</div>')
+    try:
+        with open(path, encoding='utf-8') as f:
+            payload = json.load(f)
+        events = payload.get('events') or []
+    except Exception as exc:
+        return ('<div class="box"><b>附件提取告警：</b>台账读取失败：'
+                + _esc(exc) + '</div>')
+    if not isinstance(events, list):
+        return ('<div class="box"><b>附件提取告警：</b>台账格式异常'
+                '（events 不是列表）</div>')
+    if not events:
+        return ('<div class="box"><b>附件提取告警：</b>本轮 0 条'
+                '（识别到的附件均已成功提取，或本轮未抓到附件页）</div>')
+    rows = []
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        raw_url = str(ev.get('sourceUrl') or '')
+        safe_href = _esc_url(raw_url)
+        label = _esc(raw_url[-60:])
+        link = ('<a href="' + safe_href + '" target="_blank" '
+                'rel="noopener noreferrer">' + label + '</a>') if safe_href else label
+        rows.append('<tr><td>' + link + '</td><td>'
+                    + _esc(str(ev.get('message') or '')[:300]) + '</td></tr>')
+    return ('<h2>附件提取告警 · ' + str(len(rows)) + ' 条</h2>'
+            '<div class="box">来源是本轮抓取的 [PDF-INLINE]/[ATTACH] 失败事件；'
+            '出现新站点说明该站点的附件形态还没被识别、或下载被 WAF 拦下，'
+            '请点来源页回查。</div>'
+            '<table><tr><th>来源页</th><th>告警内容</th></tr>'
+            + '\n'.join(rows) + '</table>')
+
+
+def _write_html(path, recs, issues, attachment_path=None):
     by_cat = Counter((i[0], i[2]) for i in issues)
+    attach_html = _attachment_health_html(attachment_path)
     rows = []
     for cat, fld, sev, desc, r in issues:
         u = r.get('sourceUrl', '')
@@ -303,7 +348,7 @@ def _write_html(path, recs, issues):
         '</div>'
         '<table><tr><th>类型</th><th>严重度</th><th>记录</th><th>学院</th>'
         '<th>字段</th><th>问题描述</th><th>字段现值</th></tr>' +
-        '\n'.join(rows) + '</table></body></html>'
+        '\n'.join(rows) + '</table>' + attach_html + '</body></html>'
     )
     parent = os.path.dirname(path)
     if parent:

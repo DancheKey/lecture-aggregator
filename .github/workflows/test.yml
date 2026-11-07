@@ -553,6 +553,13 @@ jobs:
       - name: Run PDF inline tests
         run: python tests/test_pdf_inline.py
 
+      # 2026-11-07：通用附件正文通道（PDF + Word）回归。锁 9 种静态附件形态、
+      # DOCX 纯标准库提取进入 5 份正文副本并影响 lectureStart、老 .doc 只告警、
+      # 3 个真实站点页面回放不误下载/不误剔侧栏、告警台账与体检报告转义。
+      # 夹具全固化，离线秒级、零网络零密钥。
+      - name: Run attachment channel tests
+        run: python tests/test_attachment_channel.py
+
       # 缓存并发门禁（2026-10-02）：data/.vlm_cache.json 曾被 parsers 与
       # llm_provider 各持一把**互不可见**的锁，两边都做「整文件读→改→写回」，
       # 单进程多线程下互相覆盖整批条目 → 缓存命中下降 → 重复烧付费 API 额度。

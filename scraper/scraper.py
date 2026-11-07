@@ -18,7 +18,8 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
-from parsers import parse_detail, is_lecture, is_news_record  # noqa: E402
+from parsers import (parse_detail, is_lecture, is_news_record,  # noqa: E402
+                     get_attachment_events, clear_attachment_events)
 from excluded_urls import load_excluded, canon_url_key as _canon_url_key  # noqa: E402
 from env_flags import flag as env_flag  # noqa: E402  开关真值判定的单一事实源
 import field_vocab  # noqa: E402  讲者归一/职称词表单一事实源（B6 口径收敛）
@@ -2549,6 +2550,22 @@ def main():
     if _LISTDATE_STATS['skipped']:
         print(f'[LISTDATE] 本轮共按列表页条目日期跳过 {_LISTDATE_STATS["skipped"]} 个历史详情页'
               f'（未 fetch、未 parse，省下对应 LLM 开销）')
+    # 附件通道告警台账（2026-11-07）：本轮 [PDF-INLINE]/[ATTACH] 失败写进
+    # data/attachment_health.json，供 scripts/audit_fields.py 的每日体检报告展示。
+    # 新站点「附件拿不到」因此当天可见，而不是只留在 CI 日志里等人翻。
+    # 只记失败、不记成功；写失败不影响本轮数据（与 source_bootstrap 同纪律）。
+    try:
+        _attach_events = get_attachment_events()
+        _atomic_write_json(
+            os.path.join(ROOT, 'data', 'attachment_health.json'),
+            {'updatedAt': now_iso, 'events': _attach_events})
+        clear_attachment_events()
+        if _attach_events:
+            print(f'[ATTACH] 本轮 {len(_attach_events)} 条附件告警已写入台账'
+                  f'（每日体检报告可见）', file=sys.stderr)
+    except Exception as e:
+        print(f'[WARN] 写入 attachment_health.json 失败（不影响本轮数据）：{e!r}',
+              file=sys.stderr)
     report_ledger()
 
 

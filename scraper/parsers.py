@@ -6,7 +6,7 @@ import datetime
 import unicodedata
 import difflib as _difflib
 import requests
-from urllib.parse import urljoin, unquote, urlparse
+from urllib.parse import urljoin, unquote, urlparse, parse_qs
 from bs4 import BeautifulSoup
 from timeparse import (parse_cn_time, _year_from_text, resolve_lecture_time,
                        _date_from_title, is_reasonable_span as _is_reasonable_span,
@@ -3366,45 +3366,180 @@ def _content_text_without_sidebar(content_div):
     return ' '.join(parts)
 
 
-def _collect_pdf_urls(scope, exclude_blocks=()):
-    """收集正文容器里的 PDF 附件 URL（去重保序），供 PDF-INLINE 下载。
+# ---------------------------------------------------------------------------
+# 通用附件正文通道（2026-11-07）
+# ---------------------------------------------------------------------------
+# 背景：2026-11-06 的 [PDF-INLINE] 修复只认 iframe viewer#...pdf 与 a[href].pdf，
+# 相当于按 skc/1124 一套户型定制。离线实测 8 种常见附件形态只认得 2 种：
+# <embed>/<object>、viewer 的 ?file= 参数、.docx/.doc 下载链接全部漏掉。
+# 这里把「找附件」与「读附件」拆开：收集器只从静态 DOM 里找 URL，提取器按
+# **内容魔数**分派（不信任扩展名 / Content-Type，防 WAF 拦截页伪装），以后
+# 要支持 pptx/xlsx 只需再加一个提取器分支。
+# 边界：链接由 JS 动态注入的页面，静态 HTML 里看不到 URL，本通道无能为力，
+# 只能靠 [ATTACH] 告警 + 每日体检让它可见，不假装「彻底」。
+_ATTACH_URL_RE = re.compile(
+    r'(?i)((?:(?:https?:)?//|/)?[^\s"<>#?=&]+\.(?:pdf|docx|doc)(?:\?[^\s"<>#]*)?)')
+_OLE2_MAGIC = b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
+_MAX_ATTACHMENT_TRIES = 5      # 单页最多尝试下载的附件数，防异常页面放大请求量
+_W_NS = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
 
-    覆盖 iframe viewer（viewer2.html#...pdf 或直接 .pdf）与 <a href="...pdf">
-    文件下载两种形态。2026-11-06 放宽：原先 a 标签还要求文本含「通知」，而
-    skc/1124 的链接文本是纯文件名「11月23日第148讲（熊卫）_20261106112256.pdf」，
-    直接漏掉。exclude_blocks 用于排除侧栏推荐列表里的无关附件。
+
+def _attachment_urls_from_attr(value):
+    """从一个 href/src/data 属性值里解出附件 URL（去重保序）。
+
+    支持三种写法：
+      ① 属性本身即附件链接：  /x/notice.pdf、//host/x.docx?download=1
+      ② viewer 的 hash 内嵌： viewer2.html#//host/x.pdf（skc/1124、1125）
+      ③ viewer 的 query 内嵌： viewer.html?file=/x/notice.pdf
+    """
+    value = (value or '').strip()
+    if not value:
+        return []
+    parts = [value]
+    if '#' in value:
+        parts.append(value.split('#', 1)[1])
+    try:
+        for vals in parse_qs(urlparse(value).query, keep_blank_values=False).values():
+            parts.extend(vals)
+    except Exception:
+        pass
+    out = []
+    for part in parts:
+        for m in _ATTACH_URL_RE.finditer(unquote(part)):
+            cand = m.group(1)
+            # query 片段偶有「file=」参数名残留，只在开头出现时剥掉
+            cand = re.sub(r'(?i)^[a-z_]+=', '', cand)
+            if cand and cand not in out:
+                out.append(cand)
+    return out
+
+
+def _collect_attachment_urls(scope, exclude_blocks=()):
+    """收集正文容器里的 PDF / Word 附件 URL（去重保序）。
+
+    覆盖 a[href]、iframe[src]、embed[src]、object[data]；viewer 的 hash 与
+    query 参数里内嵌的附件也能解出。exclude_blocks 用于排除侧栏推荐列表，
+    避免把「相关通知」里的附件当成本页正文下载。
     """
     if scope is None:
         return []
     drop_ids = {id(b) for b in exclude_blocks}
     out, seen = [], set()
-
-    def _in_dropped(tag):
-        return bool(drop_ids) and any(id(p) in drop_ids for p in tag.parents)
-
-    for iframe in scope.find_all('iframe'):
-        if _in_dropped(iframe):
+    for tag in scope.find_all(('a', 'iframe', 'embed', 'object')):
+        if drop_ids and any(id(p) in drop_ids for p in tag.parents):
             continue
-        isrc = iframe.get('src') or ''
-        if 'viewer' not in isrc and '.pdf' not in isrc.lower():
-            continue
-        m = re.search(r'#(.+\.pdf)', isrc, re.I)
-        cand = m.group(1) if m else (isrc if isrc.lower().endswith('.pdf') else None)
-        if cand and cand not in seen:
-            seen.add(cand)
-            out.append(cand)
-    for a in scope.find_all('a', href=True):
-        if _in_dropped(a):
-            continue
-        href = a.get('href', '')
-        if href.lower().split('?')[0].endswith('.pdf') and href not in seen:
-            seen.add(href)
-            out.append(href)
+        for attr in ('href', 'src', 'data'):
+            for cand in _attachment_urls_from_attr(tag.get(attr)):
+                if cand not in seen:
+                    seen.add(cand)
+                    out.append(cand)
     return out
 
 
+def _collect_pdf_urls(scope, exclude_blocks=()):
+    """兼容入口：只返回 PDF 附件（旧 [PDF-INLINE] 通道及 test_pdf_inline.py 用它）。"""
+    return [u for u in _collect_attachment_urls(scope, exclude_blocks)
+            if re.search(r'(?i)\.pdf$', u.split('?')[0].split('#')[0])]
+
+
+def _attachment_kind(data):
+    """按内容魔数判断附件类型：pdf / ooxml / ole2 / None。
+
+    绝不按 URL 扩展名判断——statics.scnu.edu.cn 的 WAF 拦截页曾以 HTTP 200
+    回吐约 49KB HTML，旧逻辑靠 %PDF- 魔数才没被骗；放宽附件类型后同样
+    必须先验内容。ole2 是 97-2003 的 .doc，纯 Python 无可靠解析器。
+    """
+    if b'%PDF-' in data[:1024]:
+        return 'pdf'
+    if data[:4] == b'PK\x03\x04':
+        return 'ooxml'
+    if data[:8] == _OLE2_MAGIC:
+        return 'ole2'
+    return None
+
+
+def _extract_docx_text(data):
+    """从 .docx（OOXML ZIP）里抽段落文本，返回 (text, err)。
+
+    纯标准库实现（zipfile + ElementTree），无需 python-docx，CI 不用加依赖。
+    只取 word/document.xml 的 w:p / w:t，表格内段落同样覆盖；对解压膨胀
+    设 4MB 上限，避免恶意附件拖垮抓取进程。
+    """
+    import zipfile
+    import xml.etree.ElementTree as _ET
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            if 'word/document.xml' not in zf.namelist():
+                return '', 'OOXML 包内无 word/document.xml（可能是 xlsx/pptx 等非 Word 附件）'
+            if zf.getinfo('word/document.xml').file_size > 4 * 1024 * 1024:
+                return '', 'word/document.xml 解压后超过 4MB，拒绝解析'
+            root = _ET.fromstring(zf.read('word/document.xml'))
+    except Exception as exc:
+        return '', ('DOCX 解析失败：%s' % exc)
+    paras = []
+    for para in root.iter(_W_NS + 'p'):
+        chunks = []
+        for node in para.iter():
+            if node.tag == _W_NS + 't':
+                chunks.append(node.text or '')
+            elif node.tag == _W_NS + 'tab':
+                chunks.append('\t')
+            elif node.tag in (_W_NS + 'br', _W_NS + 'cr'):
+                chunks.append('\n')
+        line = ''.join(chunks).strip()
+        if line:
+            paras.append(line)
+    return '\n'.join(paras), None
+
+
+def _append_attachment_text(st, text):
+    """把附件正文并入解析器的全部文本副本（规则层 / LLM 层 / folded 层）。
+
+    五份副本必须同步，否则 topic/location 的 folded 版会停在页脚截断处
+    （2026-11-06 PDF-POSTER-VLM 修复的教训）。
+    """
+    if not text:
+        return
+    for attr in ('body_text', 'body_text_llm', 'body_text_folded',
+                 'text', 'text_folded'):
+        setattr(st, attr, (getattr(st, attr, '') or '') + '\n' + text)
+
+
+# 附件通道告警台账（进程内存）：scraper.py 每轮抓取收尾把它写进
+# data/attachment_health.json，供 scripts/audit_fields.py 的每日体检报告展示。
+# 只记「需要人处理」的失败，不记成功提取，避免台账被正常日志淹没；
+# 设上限防止异常页面把内存撑大。测试用 clear_attachment_events() 隔离。
+_ATTACHMENT_EVENTS = []
+_MAX_ATTACHMENT_EVENTS = 200
+
+
+def _attachment_alert(url, message, tag='[ATTACH]'):
+    """打一条附件告警（tag 保留 [PDF-INLINE] 兼容旧门禁）并记入本轮台账。"""
+    print('%s %s %s' % (tag, url, message), file=sys.stderr)
+    if len(_ATTACHMENT_EVENTS) < _MAX_ATTACHMENT_EVENTS:
+        _ATTACHMENT_EVENTS.append({
+            'level': 'warn',
+            'sourceUrl': url,
+            'message': str(message)[:300],
+        })
+
+
+def get_attachment_events():
+    """返回本轮附件告警的浅拷贝（供 scraper 写台账）。"""
+    return list(_ATTACHMENT_EVENTS)
+
+
+def clear_attachment_events():
+    """清空本轮告警（测试隔离 / 新一轮抓取前调用）。"""
+    _ATTACHMENT_EVENTS.clear()
+
+
 def _fetch_pdf_bytes(abs_pdf, referer=None):
-    """下载一份 PDF 附件，返回 (data, err)。成功时 err 为 None。
+    """下载一份附件（PDF / Word），返回 (data, err)。成功时 err 为 None。
+
+    2026-11-07 通用附件通道：魔数校验由「只认 %PDF-」放宽为 PDF / OOXML /
+    OLE2 三类，具体类型由 _attachment_kind 在下载后判定；函数名沿用旧称以
+    保持 [PDF-INLINE] 通道与既有回归测试的调用点不变。
 
     2026-11-06 skc/1124：statics.scnu.edu.cn 对「短 UA + 无 Referer」的请求
     302 到 HTTPS 后回吐 HTTP 200 的 WAF 拦截页 HTML（约 49 KB）。调用方原来只按
@@ -3422,9 +3557,11 @@ def _fetch_pdf_bytes(abs_pdf, referer=None):
             data = _safe_fetch(abs_pdf, verify=False, referer=referer)
     if data is None:
         return None, '下载失败（网络错误 / 非安全 URL / 重定向或体积超限）'
-    # 规范允许 %PDF- 出现在文件头前 1024 字节内；WAF 拦截页里不会有该魔数
-    if b'%PDF-' not in data[:1024]:
-        return None, ('返回非 PDF 内容（%d 字节，疑似 WAF 拦截页或错误页）'
+    # 规范允许 %PDF- 出现在文件头前 1024 字节内；WAF 拦截页里不会有附件魔数。
+    # 2026-11-07：三类附件都放行，类型由 _attachment_kind 按内容判定，不信任扩展名。
+    # 错误措辞保留「非 PDF」子串，兼容 test_pdf_inline.test_09 的断言语义。
+    if _attachment_kind(data) is None:
+        return None, ('返回非 PDF/Office 附件内容（%d 字节，疑似 WAF 拦截页或错误页）'
                       % len(data))
     return data, None
 
@@ -4586,14 +4723,14 @@ def _collect_assets(soup, content_div, url, _st):
     # 调大阈值则几乎每页都去下 PDF，误伤与请求量都上升，故改用结构判据。
     _pdf_scope = content_div or soup
     _side_blocks = _sidebar_blocks(content_div) if content_div else ()
-    _pdf_candidates = _collect_pdf_urls(_pdf_scope, _side_blocks)
+    _pdf_candidates = _collect_attachment_urls(_pdf_scope, _side_blocks)
     if not _pdf_candidates and len(_st.body_text.strip()) < _PDF_SHORT_BODY \
             and soup is not _pdf_scope:
         # 兜底：正文极短且容器内找不到附件时，可能选错了容器，扩展到整页再找一次。
         # 这是旧「<150 才找 PDF」的兼容语义，不再用字数推断页面有没有附件。
-        _pdf_candidates = _collect_pdf_urls(soup, _side_blocks)
+        _pdf_candidates = _collect_attachment_urls(soup, _side_blocks)
     _pdf_data, _abs_pdf, _pdf_errors = None, '', []
-    for _pdf_url in _pdf_candidates:
+    for _pdf_url in _pdf_candidates[:_MAX_ATTACHMENT_TRIES]:
         _cand = urljoin(url, _pdf_url) if not _pdf_url.startswith('http') else _pdf_url
         if _cand.startswith('//'):
             _cand = 'http:' + _cand
@@ -4605,66 +4742,81 @@ def _collect_assets(soup, content_div, url, _st):
     if _pdf_candidates and not _pdf_data:
         # 2026-11-06：原先非 PDF（WAF 拦截页）与下载失败都是静默 pass，
         # 整份附件丢了在日志里毫无痕迹。这里必须留下可检索的告警。
-        print('[PDF-INLINE] %s 的 %d 个 PDF 附件均未取到，附件字段会缺失：%s'
-              % (url, len(_pdf_candidates), ' ; '.join(_pdf_errors)),
-              file=sys.stderr)
+        _attachment_alert(
+            url,
+            '的 %d 个附件均未取到，附件字段会缺失：%s'
+            % (len(_pdf_candidates), ' ; '.join(_pdf_errors)),
+            tag='[PDF-INLINE]')
     if _pdf_data:
-        try:
-            import io
+        # 2026-11-07 通用附件通道：按**内容魔数**分派，PDF 走 PyMuPDF、
+        # Word(.docx) 走纯标准库、老 .doc(OLE2) 只告警不假装成功。
+        _kind = _attachment_kind(_pdf_data)
+        if _kind == 'pdf':
             try:
-                import fitz as _fitz
-                _doc = _fitz.open(stream=io.BytesIO(_pdf_data), filetype='pdf')
-                _pages_text = []
-                for _pg in _doc:
-                    _t = _pg.get_text()
-                    if _t.strip():
-                        _pages_text.append(_t)
-                _pdf_text = '\n'.join(_pages_text)
-                if _pdf_text:
-                    _st.body_text = _st.body_text + '\n' + _pdf_text
-                    _st.body_text_llm = _st.body_text_llm + '\n' + _pdf_text
-                    _st.body_text_folded = _st.body_text_folded + '\n' + _pdf_text
-                    _st.text = _st.text + '\n' + _pdf_text
-                    # text_folded 同步追加（topic/location 提取用 folded 版，
-                    # 否则海报页 OCR 文本只进 spaced 版，folded 停在页脚截断处）
-                    _st.text_folded = _st.text_folded + '\n' + _pdf_text
-                # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
-                # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
-                _is_poster_pdf = (('海报' in (_abs_pdf or ''))
-                                  or (len(_st.body_text.strip()) < _PDF_SHORT_BODY)
-                                  or (content_div and bool(content_div.find('iframe'))))
-                if _is_poster_pdf and _doc.page_count > 0:
-                    try:
-                        from PIL import Image as _Image
-                        _pg = _doc[0]
-                        _mat = _fitz.Matrix(2, 2)
-                        _pix = _pg.get_pixmap(matrix=_mat)
-                        _tmp_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'tmp', 'pdf_posters')
-                        _os.makedirs(_tmp_dir, exist_ok=True)
-                        _pdf_basename = re.sub(r'[^\w.-]', '_', _os.path.basename(unquote(_abs_pdf)))
-                        _tmp_path = _os.path.join(_tmp_dir, _pdf_basename + '.png')
-                        _pix.save(_tmp_path)
-                        _im = _Image.open(_tmp_path)
-                        if max(_im.size) > 2000:
-                            _im.thumbnail((2000, 2000))
-                            _im.save(_tmp_path)
-                        _pdf_local_imgs.append(_tmp_path)
-                        _pdf_poster_converted = True
-                    except Exception:
-                        pass  # PDF 转图失败不阻塞主流程
-                _doc.close()
-            except ImportError:
-                # 2026-11-06：CI 曾因 requirements 漏列 PyMuPDF 而整条通道空转，
-                # 连一行日志都没有。依赖再丢必须当场可见，不许再静默吞。
-                print('[PDF-INLINE] %s 取到 PDF（%d 字节）但 PyMuPDF 未安装，'
-                      '附件文本无法提取；检查 scraper/requirements.txt'
-                      % (url, len(_pdf_data)), file=sys.stderr)
+                import io
+                try:
+                    import fitz as _fitz
+                    _doc = _fitz.open(stream=io.BytesIO(_pdf_data), filetype='pdf')
+                    _pages_text = []
+                    for _pg in _doc:
+                        _t = _pg.get_text()
+                        if _t.strip():
+                            _pages_text.append(_t)
+                    _pdf_text = '\n'.join(_pages_text)
+                    _append_attachment_text(_st, _pdf_text)
+                    # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
+                    # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
+                    _is_poster_pdf = (('海报' in (_abs_pdf or ''))
+                                      or (len(_st.body_text.strip()) < _PDF_SHORT_BODY)
+                                      or (content_div and bool(content_div.find('iframe'))))
+                    if _is_poster_pdf and _doc.page_count > 0:
+                        try:
+                            from PIL import Image as _Image
+                            _pg = _doc[0]
+                            _mat = _fitz.Matrix(2, 2)
+                            _pix = _pg.get_pixmap(matrix=_mat)
+                            _tmp_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'tmp', 'pdf_posters')
+                            _os.makedirs(_tmp_dir, exist_ok=True)
+                            _pdf_basename = re.sub(r'[^\w.-]', '_', _os.path.basename(unquote(_abs_pdf)))
+                            _tmp_path = _os.path.join(_tmp_dir, _pdf_basename + '.png')
+                            _pix.save(_tmp_path)
+                            _im = _Image.open(_tmp_path)
+                            if max(_im.size) > 2000:
+                                _im.thumbnail((2000, 2000))
+                                _im.save(_tmp_path)
+                            _pdf_local_imgs.append(_tmp_path)
+                            _pdf_poster_converted = True
+                        except Exception:
+                            pass  # PDF 转图失败不阻塞主流程
+                    _doc.close()
+                except ImportError:
+                    # 2026-11-06：CI 曾因 requirements 漏列 PyMuPDF 而整条通道空转，
+                    # 连一行日志都没有。依赖再丢必须当场可见，不许再静默吞。
+                    _attachment_alert(
+                        url,
+                        '取到 PDF（%d 字节）但 PyMuPDF 未安装，附件文本无法提取；'
+                        '检查 scraper/requirements.txt' % len(_pdf_data),
+                        tag='[PDF-INLINE]')
+                except Exception as _pdf_e:
+                    _attachment_alert(url, '的 PDF 解析失败：%s' % _pdf_e,
+                                      tag='[PDF-INLINE]')
             except Exception as _pdf_e:
-                print('[PDF-INLINE] %s 的 PDF 解析失败：%s' % (url, _pdf_e),
-                      file=sys.stderr)
-        except Exception as _pdf_e:
-            print('[PDF-INLINE] %s 的 PDF 处理失败：%s' % (url, _pdf_e),
-                  file=sys.stderr)
+                _attachment_alert(url, '的 PDF 处理失败：%s' % _pdf_e,
+                                  tag='[PDF-INLINE]')
+        elif _kind == 'ooxml':
+            _docx_text, _docx_err = _extract_docx_text(_pdf_data)
+            if _docx_text:
+                _append_attachment_text(_st, _docx_text)
+                print('[ATTACH] %s 的 Word 附件提取 %d 字（%s）'
+                      % (url, len(_docx_text), _abs_pdf), file=sys.stderr)
+            else:
+                _attachment_alert(url, '的 Word 附件未取到文本：%s' % _docx_err)
+        elif _kind == 'ole2':
+            _attachment_alert(
+                url, '的附件是 97-2003 老式 .doc（OLE2），纯 Python 无可靠解析器，'
+                     '讲座字段可能缺失；建议源站改提供 PDF/DOCX')
+        else:
+            _attachment_alert(url, '的附件类型未知，已跳过')
 
     def _do_ocr():
         """对正文海报图片做 OCR，把识别文字并入 _st.text / _st.body_text（仅做一次）。
