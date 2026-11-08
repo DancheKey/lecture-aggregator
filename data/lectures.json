@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-06T20:59:11+08:00",
+  "updatedAt": "2026-11-08T14:06:43+08:00",
   "data": [
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20261106/1125.html",
@@ -157,6 +157,46 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "2026年11月12日物理学院学术报告（第59期）中国科学技术大学曾长淦教授"
+    },
+    {
+      "sourceUrl": "http://maths.scnu.edu.cn/a/20261111/8889.html",
+      "images": [],
+      "college": "数学科学学院",
+      "campus": "石牌",
+      "title": "勷勤数学•专家报告-姚经",
+      "topic": "Distributionally Robust Downside Risk Optimization",
+      "lectureStart": "2026-11-11 16:00:00",
+      "lectureEnd": "2026-11-11 17:00:00",
+      "location": "数科院西楼二楼会议室",
+      "speaker": "姚经",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "苏州大学",
+      "inviter": "杨舟",
+      "speakerBio": "姚经,苏州大学杰出人才特聘教授,金融工程研究中心副主任,博士和硕士生导师,入选国家人才计划,江苏省特聘教授,重庆\"巴渝学者\"讲座教授等。于2013年5月获得比利时布鲁塞尔自由大学应用经济学博士学位。曾先后任职于比利时FWO基金研究员,比利时布鲁塞尔自由大学科研教授,英国麦克斯韦数学科学研究所和赫瑞瓦特大学统计精算系准教授。主持国家自然科学基金面上项目、比利时FWO科研基金、以色列Zimmerman基金、欧盟伊拉斯莫斯科研基金、英国伦敦数学学会、爱丁堡数学学会等多个国内外科研项目。主要研究方向包括量化金融风险管理与定价、最优投资,资产配置和控制、高维风险模型与系统风险、绿色金融等。",
+      "organizer": "数学科学学院",
+      "publishTime": "2026-11-11 10:50:00",
+      "publishTimeSource": "label",
+      "timeConfidence": "high",
+      "timeNote": "same-day-normal",
+      "abstract": "We introduce a portfolio framework that jointly integrates investors' aversion to downside risk and distributional ambiguity. We measure downside risk with the lower partial moment and capture ambiguity with a distributionally robust formulation using a Wasserstein ball around a reference distribution of asset returns. Our problem is general and allows for various downside risk measures, orders of the Wasserstein distance, and choices of the cost function. We provide a convex dual formulation of the distributionally robust problem and characterize the Slater condition analytically. When the cost function is the Mahalanobis distance and the reference distribution is elliptical, we derive an analytical solution for the optimal portfolio and show that it is located on the sample mean-variance efficient frontier. For other cost functions, the optimal portfolio can be located outside of the frontier. We also establish formal relations between our framework and two classical portfolio paradigms showing that the risk-aversion and ambiguity-aversion coefficients can be linked to a more intuitive downside return threshold. An empirical analysis on datasets of characteristic-sorted portfolios and individual stocks shows that our portfolio strategies deliver gains in terms of downside risk, risk-return tradeoff, and turnover relative to distributionally robust mean-variance strategies, non-robust strategies, and naive diversification.",
+      "llmTextEnhanced": true,
+      "llmVerdict": "rule",
+      "llmSpeakerSource": null,
+      "llmSelfExtract": {
+        "speaker": "姚经 教授",
+        "speakerTitle": "苏州大学杰出人才特聘教授,金融工程研究中心副主任,博士和硕士生导师,入选国家人才计划,江苏省特聘教授,重庆\"巴渝学者\"讲座教授",
+        "affiliation": "苏州大学",
+        "lectureStart": "11 月11日 16:00-17:00",
+        "lectureEnd": null,
+        "location": "数科院西楼二楼会议室",
+        "topic": "Distributionally Robust Downside Risk Optimization",
+        "title": "勷勤数学•专家报告"
+      },
+      "llmAdopted": "speakerTitle",
+      "needsHumanReview": "lectureStart",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "勷勤数学•专家报告-姚经"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261110/8886.html",
