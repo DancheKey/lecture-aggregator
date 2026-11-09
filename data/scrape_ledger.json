@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-06T06:52:34+00:00",
+  "updatedAt": "2026-11-09T06:38:25+00:00",
   "ttlDays": 180,
   "note": "被拒 URL 台账：抓过且判定不入库（新闻报道/回溯稿/历史旧讲座）的详情页，增量轮 fetch 前直接跳过，避免每轮重复抓取。SCNU_LEDGER_SKIP=0 可临时关闭。",
   "entries": {
@@ -683,6 +683,16 @@
       "v": "rejected",
       "d": "2026-05-29",
       "t": "2026-09-29"
+    },
+    "http://ibc.scnu.edu.cn/a/20261109/3267.html": {
+      "v": "rejected",
+      "d": "2026-11-09",
+      "t": "2026-11-09"
+    },
+    "http://ibc.scnu.edu.cn/a/20261109/3268.html": {
+      "v": "rejected",
+      "d": "2026-11-09",
+      "t": "2026-11-09"
     },
     "http://ibrr.scnu.edu.cn/a/20190107/162.html": {
       "v": "rejected",

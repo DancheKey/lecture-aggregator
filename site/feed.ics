@@ -8,24 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://em.scnu.edu.cn/a/20261109/11236.html@danchekey.github.io
-DTSTAMP:20261108T060643Z
-DTSTART:20261109T020000Z
-DTEND:20261109T030000Z
-SUMMARY:华师经管学术讲座第553期（管理）｜看见与被看见
- ——AI重塑一切\,图书馆重塑自身
-LOCATION:大学城校园文二栋536国际学术报告厅
-DESCRIPTION:题目：看见与被看见——AI重塑一切\,图书馆重
- 塑自身\n主讲：张靖（中山大学）\n地点：大学城校园文
- 二栋536国际学术报告厅\n主办：经济与管理学院
-URL:http://em.scnu.edu.cn/a/20261109/11236.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://em.scnu.edu.cn/a/20261109/11232.html@danchekey.github.io
 DTSTAMP:20261108T060643Z
 DTSTART:20261109T063000Z
