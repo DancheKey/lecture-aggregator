@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-08T14:06:43+08:00",
+  "updatedAt": "2026-11-09T21:56:51+08:00",
   "data": [
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20261106/1125.html",
@@ -199,6 +199,36 @@
       "listTitle": "勷勤数学•专家报告-姚经"
     },
     {
+      "sourceUrl": "http://life.scnu.edu.cn/a/20261109/6842.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/life/2026/1109/1794207164572534.jpg"
+      ],
+      "college": "生命科学学院",
+      "campus": "石牌",
+      "title": "学术讲座：“跨界RNAi”和“种间RNAi”——从基础研究到抗病应用",
+      "topic": "“跨界RNAi”和“种间RNAi”——从基础研究到抗病应用",
+      "lectureStart": "2026-11-11 09:30:00",
+      "lectureEnd": null,
+      "location": "生命科学学院138会议室",
+      "speaker": "郭惠珊",
+      "speakerTitle": "研究员",
+      "speakerAffiliation": "中国科学院微生物研究所",
+      "inviter": "",
+      "speakerBio": "郭惠珊，中国科学院微生物研究所 研究员，博导，中国科学院特聘核心骨干，中国科学院大学岗位教授。2004年入选中科院‘百人计划’；2005年获国家杰出青年基金；2015年获政府特殊津贴。研究方向为植物RNA沉默及其抗病应用、真菌致病性研究；发现“植物-真菌跨界RNAi”和“真菌种间RNAi”，创制抗黄萎病、抗棉蚜RNAi棉花种质；创建新型RNA生物农药MiGS技术体系和“小RNA抗菌微生物菌剂”。在Nature、Nature Plants、Mol Plant、Nature Communications、PLoS Pathogens、Plant Cell等期刊发表论文百余篇。成果入选《2020中国农业科学重大进展》、获2022年第十二届大北农科技创新奖。担任FEMS Microbiology Review、mLife等编辑或编委。",
+      "organizer": "生命科学学院",
+      "publishTime": "2026-11-09 14:51:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "host": "赖建彬",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026年11月11日学术讲座：“跨界RNAi”和“种间RNAi”——从基础研究到抗病应用"
+    },
+    {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261110/8886.html",
       "images": [],
       "college": "数学科学学院",
@@ -326,6 +356,37 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "● 华师经管学术讲座第553期（管理）"
+    },
+    {
+      "sourceUrl": "http://life.scnu.edu.cn/a/20261109/6841.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/life/2026/1109/1794206903468027.png"
+      ],
+      "college": "生命科学学院",
+      "campus": "石牌",
+      "title": "学术讲座：母源因子在胚胎发育中的调控作用",
+      "topic": "母源因子在胚胎发育中的调控作用",
+      "lectureStart": "2026-11-09 09:00:00",
+      "lectureEnd": null,
+      "location": "生命科学学院102会议室",
+      "speaker": "孟安明",
+      "speakerTitle": "院士",
+      "speakerAffiliation": "清华大学",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "生命科学学院",
+      "publishTime": "2026-11-09 14:47:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "host": "李胜",
+      "qaGate": "speakerBio:emptied",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026年11月09日学术讲座：母源因子在胚胎发育中的调控作用"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261108/8881.html",
