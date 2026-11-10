@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-09T21:56:51+08:00",
+  "updatedAt": "2026-11-10T09:30:55+08:00",
   "data": [
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20261106/1125.html",
@@ -197,6 +197,36 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-姚经"
+    },
+    {
+      "sourceUrl": "http://cs.scnu.edu.cn/a/20261109/6029.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/computer/2026/1109/1794215711103907.jpg"
+      ],
+      "college": "计算机学院",
+      "campus": "石牌",
+      "title": "第69期学术报告预告",
+      "topic": "第十九届 \" 勷勤论坛 \" 主论坛 \" AI 赋能之 AI 学伴",
+      "lectureStart": "2026-11-11 14:30:00",
+      "lectureEnd": "2026-11-11 16:00:00",
+      "location": "计算机学院东阶梯学术报告厅",
+      "speaker": "汤庸",
+      "speakerTitle": "",
+      "speakerAffiliation": "华南师范大学计算机学院",
+      "inviter": "",
+      "speakerBio": "汤庸,学者网创始人,国家教学名师 ( \" 万人计划 \" 领军人才 ) ,国务院特殊津贴专家,教育部新世纪优秀人才,国际人工智能科学院会士 (AAIS Fellow) ,华南师范大学首批二级教授 ; 教育部数据科学课程群虚拟教研室负责人,琶洲实验室杰出科学家。专注学者社交网络及数据智能,获广东省科学技术一等奖、教育部科技进步二等奖、国家教学成果二等奖、宝钢教育奖、丁颖科技奖、教育部-华为智能基座优秀教师、 CCF 协同计算杰出贡献奖等。曾任中国计算机学会理事、协同计算专委主任、 YOCSEF 广州创始主席、 ACM 广州分会主席、广东省计算机学会监事长。",
+      "organizer": "计算机学院",
+      "publishTime": "2026-11-09 17:13:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "数智融合是推动教育高质量发展与教育数字化转型的重要路径,在智慧教学、学术服务、教育治理等领域具备广阔应用前景。本报告首先梳理数智赋能教育的发展背景与典型范式,重点围绕 SCHOLAT 平台的建设定位,介绍面向教研、学术交流场景的数智化支撑体系,阐述平台基座对于打通学术资源、教研活动、学者协作链路的支撑价值。 报告进一步围绕数智技术赋能教学实践、学术服务等方向展开介绍梳理数智技术在教育场景下的典型应用模式,探讨知识图谱、智能检索等技术融入教育学术场景的可行方案,探索面向教育学术场景的智能服务构建思路。 最后结合 SCHOLAT 的实践探索,总结数智融合赋能教育发展的经验与现存瓶颈,展望人工智能、学术平台生态持续助力教育创新、学术提质的未来发展方向。",
+      "qaGate": "speakerBio",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026-11-09第69期学术报告预告"
     },
     {
       "sourceUrl": "http://life.scnu.edu.cn/a/20261109/6842.html",
