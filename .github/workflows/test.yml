@@ -560,6 +560,12 @@ jobs:
       - name: Run attachment channel tests
         run: python tests/test_attachment_channel.py
 
+      # 2026-11-10：单页多场拆分候选12 回归。em/3736「第N场（时段）：人名，"题目"」
+      # 因候选5 被时段里的冒号骗到而整页漏拆，em/3716 同版式重解析会退化回 1 条。
+      # 锁两版式字段、四重守卫与级联位置；真实页面全固化，离线秒级、零网络零密钥。
+      - name: Run numbered slot session tests
+        run: python tests/test_numbered_slot_sessions.py
+
       # 缓存并发门禁（2026-10-02）：data/.vlm_cache.json 曾被 parsers 与
       # llm_provider 各持一把**互不可见**的锁，两边都做「整文件读→改→写回」，
       # 单进程多线程下互相覆盖整批条目 → 缓存命中下降 → 重复烧付费 API 额度。

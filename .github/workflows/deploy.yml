@@ -156,6 +156,7 @@ jobs:
             tests/test_meta_time_conflict_20261016.py
             tests/test_pdf_inline.py
             tests/test_attachment_channel.py
+            tests/test_numbered_slot_sessions.py
         run: |
           set -euo pipefail
           rc=0

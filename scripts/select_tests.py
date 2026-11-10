@@ -104,6 +104,7 @@ GROUPS = [
                'tests/test_listdate.py', 'tests/test_module_compile.py',
                'tests/test_pdf_inline.py',
                'tests/test_attachment_channel.py',
+               'tests/test_numbered_slot_sessions.py',
                'tests/test_poster_late_gate.py',
                'tests/test_poster_series_multisession.py',
                'tests/test_multi_speaker_merge_20261023.py',

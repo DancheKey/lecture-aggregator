@@ -8391,6 +8391,90 @@ def _detect_numbered_agenda_sessions(text, default_year=None, publish_time=None,
     return out if len(out) >= 2 else []
 
 
+def _detect_numbered_slot_sessions(text, default_year=None, publish_time=None,
+                                   title_year=None, url_year=None,
+                                   base_start=None):
+    """候选12（兜底，em/3736、em/3716「华南经济论坛」）：逐行
+    「第N场（14:00-15:00）：董志强教授，"题目"」。
+
+    2026-11-10 实测上游全部落空的原因：候选5 认出了「第N场」，却把段首时段里的
+    冒号当成题目标签，抽出「00-15」这类残片、清洗后为空，三场全丢；候选9/10/11
+    又都要求「题目N：」「人名（单位）题目：」等字段块形态，而本版式是
+    「人名+职称，题目」。故在瀑布最末补一个形态专属候选，以「第N场（时段）」
+    为强锚点，逐段显式给出主讲人、题目与独立时段（split_record_by_sessions
+    在块内无「主讲人：」标签时会直接采用这里的 speaker）。
+
+    守卫：≥2 段且编号互异、姓名与题目均有效、时段合法且严格递增。
+    """
+    _MARK = re.compile(
+        r'第\s*([一二三四五六七八九十百零0-9]+)\s*场\s*'
+        r'[（(]\s*(\d{1,2})\s*[:：]\s*(\d{2})\s*[-–—~至]\s*'
+        r'(\d{1,2})\s*[:：]\s*(\d{2})\s*[)）]\s*[:：]?\s*')
+    marks = list(_MARK.finditer(text))
+    if len(marks) < 2 or len({m.group(1) for m in marks}) < 2:
+        return []
+
+    # 页面讲座日：优先用 parse_detail 已算出的整页时间，其次按正文/发布时间解析。
+    _day = base_start
+    if _day is None:
+        _pdt = parse_cn_time(text, default_year=default_year,
+                             publish_time=publish_time,
+                             title_year=title_year, url_year=url_year)
+        _day = _pdt['start'] if _pdt and _pdt.get('start') else None
+    if _day is None and publish_time:
+        try:
+            _day = datetime.datetime.fromisoformat(str(publish_time)[:19])
+        except ValueError:
+            pass
+    if _day is None:
+        return []
+
+    # 姓名非贪婪 + 职称必需，避免「吴明琴副教授」被贪心截成「吴明琴副」。
+    _TITLED = re.compile(
+        r'^\s*([\u4e00-\u9fff·]{2,4}?)\s*'
+        r'(副教授|副研究员|助理教授|教授|研究员|讲师|博士|院士|博士后)'
+        r'\s*[,，、:：]?\s*')
+    _BARE = re.compile(r'^\s*([\u4e00-\u9fff·]{2,4})\s*[,，、:：]\s*')
+    _STOP = re.compile(
+        r'(?:评论人|点评人|评议人|主持人)\s*[:：]|\*\s*注|欢迎广大|Copyright|\n')
+    _QUOTED = re.compile(r'^[“"‘\'](.+?)[”"’\']', re.S)
+
+    out = []
+    for i, mk in enumerate(marks):
+        sh, sm, eh, em = (int(mk.group(j)) for j in range(2, 6))
+        if not (0 <= sh < 24 and 0 <= eh < 24 and sm < 60 and em < 60):
+            continue
+        start = _day.replace(hour=sh, minute=sm, second=0, microsecond=0)
+        end = _day.replace(hour=eh, minute=em, second=0, microsecond=0)
+        if end <= start:
+            continue
+        seg = text[mk.end():
+                   marks[i + 1].start() if i + 1 < len(marks) else len(text)]
+        pm = _TITLED.match(seg) or _BARE.match(seg)
+        if not pm:
+            continue
+        speaker = pm.group(1).strip()
+        if not _looks_like_real_name(speaker):
+            continue
+        rest = seg[pm.end():]
+        stop = _STOP.search(rest)
+        if stop:
+            rest = rest[:stop.start()]
+        rest = rest.strip()
+        qm = _QUOTED.match(rest)
+        topic = _clean_session_topic((qm.group(1) if qm else rest).strip(' ,，、;；'))
+        if not topic or len(topic) < 2:
+            continue
+        out.append({'topic': topic, 'start': start, 'end': end,
+                    'block': mk.group() + seg, 'speaker': speaker,
+                    'affiliation': '', 'splitMode': 'numbered-slot'})
+    if len(out) < 2:
+        return []
+    if any(b['start'] <= a['start'] for a, b in zip(out, out[1:])):
+        return []
+    return out
+
+
 def _detect_plain_numbered_sessions(text, default_year=None, publish_time=None,
                                     title_year=None, url_year=None):
     """候选7（兜底）：纯阿拉伯数字编号列表（「1. 题目 时间：… 地点：…」型，ibc/2779 等）。
@@ -9709,6 +9793,17 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         cand11 = _ms_gate_filter(cand11)
         if len(cand11) >= 2:
             sessions = cand11
+    # 候选12（兜底，em/3736、em/3716）：「第N场（时段）：人名职称，"题目"」。
+    # 放在瀑布最末，仅候选0-11 全落空时启用；marker 需「编号+括号时段+冒号」强形态，
+    # 候选内部另有编号互异/姓名/题目/时段递增四重守卫，误命中风险低。
+    if len(sessions) < 2:
+        cand12 = _detect_numbered_slot_sessions(
+            text, default_year=default_year, publish_time=publish_time,
+            title_year=title_year, url_year=url_year,
+            base_start=base_start)
+        cand12 = _ms_gate_filter(cand12)
+        if len(cand12) >= 2:
+            sessions = cand12
     # 去重：同 (topic, start) 视为同一场（顶部「题目」常与首期「主题/报告N题目」重复出现）。
     # topic 比较前去掉所有空白，避免正文数学符号/排版导致的「ℤ_{2^k}」与「ℤ _{2^k}」式微差误判为不同场。
     # 同 key 的多块中保留「信息更完整」者（含主讲人/报告人/摘要/参与者等子字段的块优先），
