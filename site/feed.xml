@@ -5,19 +5,8 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 10 Nov 2026 09:30:55 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 10 Nov 2026 10:35:02 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>勷勤数学•专家报告-Elena Aladova Chestakov｜An introduction of superalgebras</title>
-      <link>http://maths.scnu.edu.cn/a/20261110/8885.html</link>
-      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261110/8885.html</guid>
-      <pubDate>Tue, 10 Nov 2026 07:57:00 +0800</pubDate>
-      <category>数学科学学院</category>
-      <description>题目：An introduction of superalgebras
-主讲：Elena Aladova Chestakov（巴西圣保罗大学）
-地点：数科院东楼401
-主办：数学科学学院</description>
-    </item>
     <item>
       <title>勷勤数学•杰出学者报告-Ivan Shestakov｜On polynomial automorphisms</title>
       <link>http://maths.scnu.edu.cn/a/20261110/8886.html</link>
@@ -41,12 +30,12 @@
 主办：生命科学学院</description>
     </item>
     <item>
-      <title>第69期学术报告预告｜第十九届 &quot; 勷勤论坛 &quot; 主论坛 &quot; AI 赋能之 AI 学伴</title>
+      <title>第69期学术报告预告｜SCHOLAT数智融合赋能教育发展研究与实践</title>
       <link>http://cs.scnu.edu.cn/a/20261109/6029.html</link>
       <guid isPermaLink="false">http://cs.scnu.edu.cn/a/20261109/6029.html</guid>
       <pubDate>Mon, 09 Nov 2026 17:13:00 +0800</pubDate>
       <category>计算机学院</category>
-      <description>题目：第十九届 &quot; 勷勤论坛 &quot; 主论坛 &quot; AI 赋能之 AI 学伴
+      <description>题目：SCHOLAT数智融合赋能教育发展研究与实践
 主讲：汤庸（华南师范大学计算机学院）
 地点：计算机学院东阶梯学术报告厅
 主办：计算机学院</description>
@@ -55,7 +44,7 @@
       <title>勷勤数学•专家报告-姚经｜Distributionally Robust Downside Risk Optimization</title>
       <link>http://maths.scnu.edu.cn/a/20261111/8889.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261111/8889.html</guid>
-      <pubDate>Tue, 10 Nov 2026 09:19:59 +0800</pubDate>
+      <pubDate>Tue, 10 Nov 2026 10:24:06 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Distributionally Robust Downside Risk Optimization
 主讲：姚经（苏州大学）
@@ -77,7 +66,7 @@
       <title>勷勤数学•专家报告-李竞阳｜在线张量学习:计算与统计的权衡、自适应性与最优遗憾</title>
       <link>http://maths.scnu.edu.cn/a/20261113/8876.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261113/8876.html</guid>
-      <pubDate>Tue, 10 Nov 2026 08:35:15 +0800</pubDate>
+      <pubDate>Tue, 10 Nov 2026 09:39:22 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：在线张量学习:计算与统计的权衡、自适应性与最优遗憾
 主讲：李竞阳（复旦大学）
@@ -99,7 +88,7 @@
       <title>勷勤数学•专家报告-赵立璐｜关于二次型的Roth型定理的研究</title>
       <link>http://maths.scnu.edu.cn/a/20261124/8882.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261124/8882.html</guid>
-      <pubDate>Tue, 10 Nov 2026 09:26:19 +0800</pubDate>
+      <pubDate>Tue, 10 Nov 2026 10:30:26 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：关于二次型的Roth型定理的研究
 主讲：赵立璐（中国科学技术大学）

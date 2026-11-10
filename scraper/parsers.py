@@ -5168,6 +5168,18 @@ def _extract_topic_location(_st, result, title, loc_times):
     # 导致 (.+?) 永远到不了下一行的终止标签。故 location 专用终止符在 STOP 基础上
     # 追加行尾（\n|$），使「值行尾」成为自然截断点（单行场景下 STOP 仍优先生效）。
     LOC_STOP = rf'(?={STOP}|\n|$)'
+    # 系列主题标签词表（2026-11-10 cs/6029）：单一事实源，同时供 TOPIC_STOP、
+    # 裸主题正则的负向后顾与「更早锚点补全」使用，禁止三处手抄漂移。
+    # 这类标签写的是论坛/会议/活动名，不是本场讲座的真题目；页面常与「题目：」
+    # 并排出现，N1 折叠后还会直接粘连（「…研究与实践论坛主题:」）。
+    # 注：沙龙/工作坊主题同时是 _topic_pat_b 的合法题目标签，题目类优先匹配
+    # 保证它们仍能被正常取值；此处只禁止「裸主题」把它们拆开误取。
+    _SERIES_TOPIC_LABELS = ('分论坛主题', '论坛主题', '研讨会主题', '会议主题',
+                            '沙龙主题', '活动主题', '工作坊主题')
+    _SERIES_TOPIC_STOP = r'(?:' + '|'.join(_SERIES_TOPIC_LABELS) + r')\s*[：:]'
+    # 负向后顾检查的是「主题」二字**左侧的前缀**（论坛/会议/…），不是标签全名：
+    # 正则匹配点落在「主」字，其左边不含标签末尾的「主题」二字，写全名会恒不命中。
+    _SERIES_NEG = ''.join('(?<!%s)' % lab[:-2] for lab in _SERIES_TOPIC_LABELS)
     # TOPIC-STOP（2026-09-01 修复）：主题（题目）文本本身常含「时间/地点/题目/主题」等词
     # （如 13295「量子开放系统中的非平衡周期振荡：时间晶体与量子同步」含"时间晶体"），
     # 若用共享 STOP（含裸 时间/地点 标签）会提前命中而把主题截断到冒号处。
@@ -5180,6 +5192,11 @@ def _extract_topic_location(_st, result, title, loc_times):
         r'报告时间|报告地点|报告内容|报告题目|报告专家|报告嘉宾|'
         r'讲座题目|讲座时间|讲座地点|主办单位|学术主持|上一篇|下一篇|标签|Tags|'
         r'讲座主题|演讲题目|报告主题|'
+        # 系列主题标签须整体作为终止符（2026-11-10 cs/6029）：只写裸
+        # 「主题[：:]」时，lookahead 会在「论」之后的「主题:」处才命中，
+        # 题目尾部因此多带「论坛」二字；整体登记后从「论」处即收尾。
+        # 必须带冒号（同下条 1818 教训），散文「活动主题为XX」不受影响。
+        + _SERIES_TOPIC_STOP + '|' +
         # 带冒号的「主题：/题目：」重复标签（2026-10-24 cs/1818 修复）：CMS 页面常把
         # 主题同时写进 meta description 与正文 title，取文后同一标签出现两遍
         # （「…减少稀疏 主题： Collaborative…」），无此 STOP 会把第二遍整段吞进
@@ -5215,9 +5232,15 @@ def _extract_topic_location(_st, result, title, loc_times):
     # 边界+可选冒号：「一、主题X」「 主题：X」「（主题：X」
     _topic_pat_a = rf'(?:^|(?<=、)|(?<= )|(?<=（)|(?<=\n))主题\s*[：:]?\s*(.+?){TOPIC_STOP}'
     # 任意位置+必须冒号：解决 collapsed text 中「303室主题：X」无边界空格的情况
-    _topic_pat_a2 = rf'主题[：:]\s*(.+?){TOPIC_STOP}'
+    # 2026-11-10 cs/6029：负向后顾排除「论坛主题/会议主题…」被拆开命中
+    # （「主题」前若为系列标签，则它不是独立字段标签）。词表同源，禁手抄。
+    _topic_pat_a2 = rf'{_SERIES_NEG}主题[：:]\s*(.+?){TOPIC_STOP}'
     _topic_pat_b = rf'(?:讲座主题|沙龙主题|工作坊主题|报告主题|讲座题目|题目|报告题目|演讲题目|Topic|Title)[：:]\s*(.+?){TOPIC_STOP}'
-    m = re.search(_topic_pat_a, _t) or re.search(_topic_pat_a2, _t) or re.search(_topic_pat_b, _t)
+    # 题目类标签优先（2026-11-10 cs/6029）：旧顺序 pat_a → pat_a2 → pat_b 短路，
+    # 页面同时写「题目：真题目」与「论坛主题：系列名」时，pat_a2 先拆开
+    # 「论坛主题」命中，真正取题目的 pat_b 永远轮不到。题目类语义最明确，
+    # 必须最先尝试；裸「主题」是无题目可用时的兜底。
+    m = re.search(_topic_pat_b, _t) or re.search(_topic_pat_a, _t) or re.search(_topic_pat_a2, _t)
     if m:
         tp = (m.group(1) or m.group(2) or m.group(3) or '').strip()
         # 重复主题/题目标签取完整份（2026-10-24 cs/1818 修复）：CMS 常把主题同时写进
@@ -5241,7 +5264,9 @@ def _extract_topic_location(_st, result, title, loc_times):
         # 末尾那份**不完整**的主题（meta 常被 HTML 截断）。故若首个「主题：」锚点
         # 早于当前匹配，从该锚点再提取一份；仅当现有份**未以收尾符结尾**（不像完整
         # 主题）且锚点份更长时才顶替——tp 已正常收尾时不补，防散文假阳性污染。
-        _anchor_m = re.search(r'(?:主题|题目)\s*[：:]', _t)
+        # 系列主题标签不得当锚点（2026-11-10 cs/6029）：否则「论坛主题：系列名
+        # … 题目：真题目」页面里，更早锚点补全会把更长的系列名顶替掉真题目。
+        _anchor_m = re.search(_SERIES_NEG + r'(?:主题|题目)\s*[：:]', _t)
         if _anchor_m and _anchor_m.start() < m.start():
             _m0 = re.match(r'\s*(.+?)' + TOPIC_STOP, _t[_anchor_m.end():])
             if _m0:
