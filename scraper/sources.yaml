@@ -80,6 +80,7 @@ sources:
   list_urls:
   - http://cs.scnu.edu.cn/yanjiusheng/yanjiushengxwtz/index.html
   - http://cs.scnu.edu.cn/yanjiusheng/yanjiushengxwtz/
+  - http://cs.scnu.edu.cn/xueyuanxinwen/
 - name: 心理学院
   campus: 石牌
   base: https://psy.scnu.edu.cn
