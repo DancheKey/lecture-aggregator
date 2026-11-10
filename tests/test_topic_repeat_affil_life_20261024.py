@@ -15,10 +15,14 @@ cs/1818 实测三连修：
 
 离线单测：不发网络请求、不走 LLM（SCNU_LLM_*=0）。
 
-2026-11-10 追加（cs/6029，见文件尾 SeriesTopicLabelTest）：页面同时写
+2026-11-10 追加（cs/6029，见 SeriesTopicLabelTest）：页面同时写
 「题目：真题目」与「论坛主题：系列名」且 N1 折叠后两者粘连时，题目类正则
 必须优先于裸「主题」，系列主题标签不得被拆开命中。真实源页已固化为
 tests/fixtures/html/cs6029.html；测试内剥离 <img>/<script> 以密封化。
+
+2026-11-10 再追加（乙方案，见文件尾 ThreePageRulesTest）：life/6021 系列名
+占位守卫、ggy/5492 正文单讲「第N讲：」、physics/11723「活动嘉宾」讲者标签
+与地点终止符。三条真实源页固化为 life6021/ggy5492/physics11723 夹具。
 """
 import os
 import re
@@ -236,6 +240,131 @@ class SeriesTopicLabelTest(unittest.TestCase):
         body2 = (_META + '<p>本场活动主题为生成式AI与教育变革的融合路径</p>'
                  '<p>主题：生成式AI与教育变革</p>' + _TAIL)
         self.assertEqual(_topic_of(body2), '生成式AI与教育变革')
+
+
+# ---------------------------------------------------------------------------
+# 2026-11-10 乙方案：三条真实源页 + 三处规则加固
+#   ① life/6021  系列名占位守卫：标题「学术讲座：X教授“勷勤论坛”专场讲座」
+#      的冒号后是系列名，不得当 topic 占住 VLM/正文真题目的位置。
+#   ② ggy/5492   正文单讲「第N讲：题目」提为 topic，多编号/标题场次号不接管。
+#   ③ physics/11723「活动嘉宾」进讲者标签词表，并作地点值终止符。
+# 三条源页固化为 tests/fixtures/html/{life6021,ggy5492,physics11723}.html。
+# ---------------------------------------------------------------------------
+_FX_DIR = os.path.join(_ROOT, 'tests', 'fixtures', 'html')
+_FX_META = {
+    'life6021.html': (
+        'http://life.scnu.edu.cn/a/20231010/6021.html', '生命科学学院', '石牌',
+        '学术讲座：西北农林科技大学教授“勷勤论坛”专场讲座'),
+    'ggy5492.html': (
+        'http://ggy.scnu.edu.cn/a/20210510/5492.html', '政治与公共管理学院', '大学城',
+        '华南师范大学政治与公共管理学院「社会保障与社会政策论坛」预告'),
+    'physics11723.html': (
+        'https://physics.scnu.edu.cn/a/20211008/11723.html', '物理学院', '大学城',
+        '20211012  华南师范大学第十四届勷勤论坛之理科类论文写作指导'),
+}
+
+
+def _fixture_record(fn):
+    """真实源页夹具 → 单条解析结果（零 OCR / 零 VLM / 零网络）。"""
+    url, college, campus, list_title = _FX_META[fn]
+    with open(os.path.join(_FX_DIR, fn), encoding='utf-8') as f:
+        html = f.read()
+    html = re.sub(r'<img\b[^>]*>', '', html, flags=re.I)
+    html = re.sub(r'<script\b.*?</script>', '', html, flags=re.S | re.I)
+    out = parsers.parse_detail(html, url, college, campus,
+                               list_title=list_title, skip_news_filter=True)
+    out = out if isinstance(out, list) else ([out] if out else [])
+    assert len(out) == 1, (fn, len(out))
+    return out[0]
+
+
+class ThreePageRulesTest(unittest.TestCase):
+    """三条真实源页端到端 + 规则边界形态。"""
+
+    def test_01_fixture_files_keep_source_labels(self):
+        """夹具必须保留原始标签，防「把样本改成正确值」架空门禁。"""
+        for fn, keys in (
+                ('life6021.html', ('勷勤论坛', '学术讲座')),
+                ('ggy5492.html', ('第一讲', '城市贫困人口兜底保障')),
+                ('physics11723.html', ('活动嘉宾', '薛正远', '刘勇', '肖洋'))):
+            with open(os.path.join(_FX_DIR, fn), encoding='utf-8') as f:
+                html = f.read()
+            for k in keys:
+                self.assertIn(k, html, '%s 缺少原文标签 %s' % (fn, k))
+
+    def test_02_life6021_series_name_not_used_as_topic(self):
+        """占位系列名须在出口清空；title 恒为源页列表标题。"""
+        rec = _fixture_record('life6021.html')
+        self.assertEqual(rec['title'], _FX_META['life6021.html'][3])
+        self.assertEqual(rec['topic'], '')
+        self.assertNotIn('专场讲座', rec['topic'] or '')
+
+    def test_03_ggy5492_single_nth_label_becomes_topic(self):
+        rec = _fixture_record('ggy5492.html')
+        self.assertEqual(rec['topic'], '城市贫困人口兜底保障的焦点、难点与路径选择')
+
+    def test_04_physics11723_all_guests_and_clean_location(self):
+        rec = _fixture_record('physics11723.html')
+        self.assertEqual(rec['speaker'], '薛正远、刘勇、肖洋')
+        self.assertEqual(rec['location'], '理6栋525报告厅')
+
+    def test_05_legal_series_topic_not_cleared(self):
+        """守卫只拦「系列名占位」，合法系列题目（砺儒讲坛第80讲：…）不动。"""
+        self.assertFalse(parsers._is_series_topic_placeholder(
+            '砺儒讲坛第80讲：新发展阶段的城乡和区域格局',
+            '砺儒讲坛第80讲：新发展阶段的城乡和区域格局'))
+        self.assertFalse(parsers._is_series_topic_placeholder(
+            '华南师范大学文学院汉语言文字学专业“说文论语”系列讲座之四',
+            '华南师范大学文学院汉语言文字学专业“说文论语”系列讲座之四'))
+        self.assertTrue(parsers._is_series_topic_placeholder(
+            '西北农林科技大学教授“勷勤论坛”专场讲座',
+            '学术讲座：西北农林科技大学教授“勷勤论坛”专场讲座'))
+
+    def test_06_multi_nth_labels_not_taken_as_single_topic(self):
+        """正文出现多个场次编号 → 交给多场拆分，整页 topic 不接管。"""
+        text = ('第一讲：城市贫困人口兜底保障 主讲人：张三 '
+                '第二讲：社会救助国际比较 主讲人：李四')
+        self.assertEqual(parsers._single_nth_session_topic(text, '社会保障论坛预告'), '')
+
+    def test_07_title_with_nth_label_not_taken(self):
+        """标题自带「第N讲：」交给 R9/R10，正文规则不抢。"""
+        self.assertEqual(parsers._single_nth_session_topic(
+            '第80讲：新发展阶段 主讲人：张三',
+            '砺儒讲坛第80讲：新发展阶段的城乡和区域格局'), '')
+
+    def test_08_site_navigation_not_taken_as_topic(self):
+        """<title>/导航里的「第148讲：」带站点噪声，不得提为题目。"""
+        text = ('第148讲:社会合作规范——一个信息设计的解释(熊卫教授) - 学术活动预告 - '
+                '华南师范大学社会科学处首页机构设置办事指南 主讲人：熊卫')
+        self.assertEqual(parsers._single_nth_session_topic(text, '讲座预告'), '')
+
+    def test_09_repeated_same_nth_label_is_still_single_session(self):
+        """同一场次编号在 meta/正文重复多遍仍是单讲（CMS 常见）。"""
+        text = ('第一讲：城市贫困人口兜底保障 主讲人：张三 '
+                '第一讲：城市贫困人口兜底保障 主讲人：张三')
+        self.assertEqual(parsers._single_nth_session_topic(text, '论坛预告'),
+                         '城市贫困人口兜底保障')
+
+    def test_10_explicit_topic_label_wins_over_nth(self):
+        """正文已有明确「题目：」时，正文单讲规则不得覆盖。"""
+        # 「主讲人：」是既有 topic 终止标签，把两段字段分开；页面同时写了
+        # 明确题目标签与正文单讲标签时，前者优先，后者不得顶替。
+        body = (_META + '<p>题目：图神经网络前沿进展</p>'
+                '<p>主讲人：张三</p>'
+                '<p>第一讲：另一个题目 主讲人：李四</p>')
+        self.assertEqual(_topic_of(body), '图神经网络前沿进展')
+
+    def test_11_guest_label_does_not_swallow_next_field(self):
+        """「活动嘉宾」值到「活动内容」为止，不得把分享内容吞进讲者。"""
+        body = ('<p>地点：理6栋525报告厅</p>'
+                '<p>活动嘉宾：张三教授、李四老师</p>'
+                '<p>活动内容：分享论文写作技巧</p>')
+        html = '<html><body><div class="content">' + body + '</div></body></html>'
+        recs = _parse_html(html, url='https://physics.scnu.edu.cn/a/20211008/11723.html',
+                           list_title='理科类论文写作指导')
+        rec = recs[0]
+        self.assertEqual(rec['speaker'], '张三、李四')
+        self.assertEqual(rec['location'], '理6栋525报告厅')
 
 
 if __name__ == '__main__':

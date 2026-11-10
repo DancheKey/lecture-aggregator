@@ -3619,7 +3619,9 @@ def _normalize_label_text(text):
         '题目', '主题', '讲座主题', '报告题目', '演讲题目', '报告主题', '讲座题目',
         # 时间地点人物
         '讲座地点', '讲座时间', '地点', '时间', '主讲人', '主讲师', '报告人', '讲座人', '主讲嘉宾', '讲座嘉宾', '演讲人', '主讲',
-        '学术主持', '主办单位',
+        # 物理学院老页「活动嘉宾：薛正远教授、刘勇老师、肖洋老师」（2026-11-10 11723）：
+        # 标签拆字时须整体折叠，否则讲者词表命中不到。
+        '活动嘉宾', '活动内容', '活动流程', '学术主持', '主办单位',
         # 线上会议平台标签（maths 等 CMS 把「腾 讯 会 议」拆成单字空格，须整体折叠后才能被 FB3 兜底识别）
         '腾讯会议',
         # 单位类复合标签：必须整体折叠，防「单位」裸词命中「组织单位」内部（physics787 病根）
@@ -5158,6 +5160,76 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
     }
 
 
+# ---------------------------------------------------------------------------
+# 2026-11-10 两条题目加固规则（life/6021、ggy/5492），均为「仅兜底时生效」的
+# 收窄判据，不触碰正文标签已取到题目的页面：
+#   ① 系列名占位守卫：标题「学术讲座：X教授“勷勤论坛”专场讲座」派生出的 X
+#      是系列名而非本场题目，出口统一清掉，避免占位值挡住 VLM/正文真题目。
+#   ② 正文单讲「第N讲：题目」：只在全文场次编号唯一、且标签值处在讲座信息块
+#      （紧邻主讲人/主持人等字段）时提为 topic；标题本身含「第N讲：」交给
+#      R9/R10，正文出现多个编号交给多场拆分（候选0/候选5），两边都不抢。
+# ---------------------------------------------------------------------------
+_SERIES_SHELL_RE = re.compile(r'专场讲座|专场报告|专场论坛|系列讲座|论坛之|讲坛之')
+_GENERIC_TOPIC_TAIL_RE = re.compile(r'(?:讲座|报告|论坛|讲坛|沙龙|研讨会)\s*$')
+
+
+def _is_series_topic_placeholder(topic, title):
+    """topic 是否为「从列表标题派生的系列名占位」而非本场真题目。
+
+    三条判据同时成立才拦截：含系列壳词、以通用讲座词收尾、与标题是抄写关系。
+    存量 3874 条逐条核对：命中 0 条（详见当日工作日志），「砺儒讲坛第80讲：…」
+    「…系列讲座之四」等合法题目均不收通用词尾，不受影响。
+    """
+    tp = (topic or '').strip()
+    if not tp or not _SERIES_SHELL_RE.search(tp) or not _GENERIC_TOPIC_TAIL_RE.search(tp):
+        return False
+    ti = title or ''
+    return tp in ti or ti.endswith(tp)
+
+
+_NTH_SESSION_LABEL_RE = re.compile(r'第([一二三四五六七八九十百零\d]+)\s*[讲场期]\s*[：:]')
+_NTH_TOPIC_TAIL_RE = re.compile(
+    r'(?=\s*(?:主讲人|报告人|主持人|主讲嘉宾|讲座人|主讲|报告人简介|'
+    r'时间|地点|题目|主题|摘要|简介|发布|点击|收藏|附件|主办|$))')
+_NTH_SITE_NOISE_RE = re.compile(
+    r'发布时间|点击|收藏|首页|机构设置|资讯|下载|学术活动预告|'
+    r'上一篇|下一篇|Copyright|版权|文件下载|扫码|\d{4}-\d{2}-\d{2}')
+_NTH_FIELD_EVIDENCE_RE = re.compile(r'主讲人|报告人|主持人|主讲嘉宾|讲座人')
+
+
+def _single_nth_session_topic(text, title=''):
+    """正文里唯一一个「第N讲：题目」标签 → 返回题目；否则返回空串。
+
+    「唯一」按场次编号集合判定：CMS 常把同一标签在 <title>/导航/正文重复多遍
+    （skc 砺儒讲坛 2~3 遍），编号仍是同一个，属单讲；编号集合 >1 则是真多讲，
+    必须留给多场拆分，不能提为整页 topic。标题本身含场次号也一律不接管。
+    取值只到下一个字段标签为止，且要求标签后 180 字内出现主讲人/主持人等
+    字段（讲座信息块证据），并拒绝站点导航/发布时间等噪声值。
+    """
+    if not text or _NTH_SESSION_LABEL_RE.search(title or ''):
+        return ''
+    matches = list(_NTH_SESSION_LABEL_RE.finditer(text))
+    if not matches:
+        return ''
+    nos = {re.sub(r'\s+', '', m.group(1)) for m in matches}
+    if len(nos) != 1:
+        return ''
+    vals = []
+    for m in matches:
+        rest = text[m.end():]
+        vm = re.match(r'\s*(.+?)' + _NTH_TOPIC_TAIL_RE.pattern, rest)
+        v = (vm.group(1) if vm else '').strip(' 　:：,，。;；-—')
+        if not (4 <= len(v) <= 120) or _NTH_SITE_NOISE_RE.search(v):
+            return ''
+        if not _NTH_FIELD_EVIDENCE_RE.search(rest[:180]):
+            return ''
+        vals.append(v)
+    uniq = {re.sub(r'\s+', '', v) for v in vals}
+    if len(uniq) != 1:
+        return ''
+    return max(vals, key=len).strip()
+
+
 def _extract_topic_location(_st, result, title, loc_times):
     _t = getattr(_st, "text_folded", None) or _st.text
     """阶段 5a：从正文抽取 topic 与 location（含 OCR/FB1-FB4 兜底），
@@ -5285,6 +5357,14 @@ def _extract_topic_location(_st, result, title, loc_times):
         # 要求姓名后紧跟冒号（且冒号后为结尾或列表符号），避免误伤正常主题里的英文人名。
         tp = re.split(r'\s+[A-Z][a-z]+(?:\s+[A-Z][a-z\.]+){1,2}\s*[:：](?=\s*$|\s+[*＊•·\-\d])', tp)[0].strip()
         result['topic'] = tp
+
+    # 正文单讲「第N讲：题目」（2026-11-10 ggy/5492）：正文标签优先于标题派生
+    # 占位值，且只在正文题目标签没取到值、场次编号唯一时才启用，避免与
+    # R9/R10（标题去期号）和多场拆分（第N讲分段）抢同一段文本。
+    if not result['topic']:
+        _nth_tp = _single_nth_session_topic(_t, title)
+        if _nth_tp:
+            result['topic'] = _nth_tp
 
     # 标题格式兜底：「2026年7月2日学术讲座：主题」或「学术讲座：主题」
     if not result['topic'] and title:
@@ -5497,6 +5577,9 @@ LABELS = (
     '日期(?=[:：])|'
     '地点|题目|主题|讲座主题|演讲题目|报告主题|'
     '时间|主讲[人师]|讲座人|主持人|主讲|报告人|主讲嘉宾|讲座嘉宾|演讲人|邀请人|'
+    # 2026-11-10 physics/11723：同主题多人分享页用「活动嘉宾：」标注全部讲者；
+    # 既作讲者标签，也作地点/题目值的终止符（否则地点被污染成「…报告厅活动嘉宾」）。
+    '活动嘉宾|活动内容|活动流程|'
     'Speaker|Presenter|Lecturer|'
     # 「主要内容」须紧跟冒号才算字段标签（2026-09-10 io1563 实测：摘要散文
     # 「以《联合国海洋法公约》为主要内容的…」被裸词截断在「为」）
@@ -5613,7 +5696,7 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
     # segments 列表（主分支逗号分隔检测与 OCR 连写分支共用，须在主分支前初始化）
     multi_speakers = None
     speaker_pat = (
-        rf'(?:主讲嘉宾|讲座嘉宾|报告嘉宾|主讲人(?!简介|简历|介绍)|主讲师(?!简介|简历)'
+        rf'(?:活动嘉宾|主讲嘉宾|讲座嘉宾|报告嘉宾|主讲人(?!简介|简历|介绍)|主讲师(?!简介|简历)'
         rf'|主讲(?!《|简介|简历)(?:专家)?'
         rf'|报告人(?!简介|简历)|讲座人(?!简介|简历)|演讲人|报告专家|专家姓名'
         rf'|Speaker|Presenter|Lecturer)\s*[：:]\s*(.+?){STOP}'
@@ -6972,6 +7055,15 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
             result['abstract'] = _abs
         else:
             result['abstract'] = ''
+
+    # 系列名占位守卫（2026-11-10 life/6021）：「学术讲座：X教授“勷勤论坛”
+    # 专场讲座」冒号后写的是系列名，不是本场题目。旧链路把它当兜底题目写进
+    # topic 后，VLM 因「非空不覆盖」再也进不来。放在所有题目兜底之后的统一
+    # 出口清理，覆盖标题/OCR/叙事三条派生路径；判据见 _is_series_topic_placeholder
+    # （存量 3874 条命中 0 条，合法系列题目不受影响）。
+    _tp_final = (result.get('topic') or '').strip()
+    if _tp_final and _is_series_topic_placeholder(_tp_final, title):
+        result['topic'] = ''
 
 
 def _trim_bio_to_first_speaker(bio, speaker):
