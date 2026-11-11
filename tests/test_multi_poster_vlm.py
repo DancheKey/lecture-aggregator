@@ -51,6 +51,13 @@ VLM_PROMPT_SHA256 = '24da4af773e2559239d17cf6b0b868988261aa90aa6c0927efe812f9327
 
 CONTENT_DIV = BeautifulSoup(HTML, 'html.parser').find('div', class_='article-content')
 
+# 纯净检出 / CI 没有 .env，_load_vlm_configs() 返回空 → 多海报通道会在
+# `if _mp_cfgs:` 处短路，一次 VLM 都不调（本机有密钥全绿、CI 假红 6 例）。
+# 显式桩成非空假配置：_vlm_extract_fields 已被下面的 fixture 桩替换，配置只透传、
+# 不发任何请求；name 键必需（provider 限速分桶会读它）。
+_FAKE_VLM_CFGS = [{'name': 'fixture', 'model': 'fixture-replay',
+                   'api_key': 'unused', 'base_url': 'http://fixture.invalid/vlm'}]
+
 
 class _FakeVLM:
     """按 URL 返回固化海报结果，并记录每次调用（用于验证「逐张」而非 [:3]）。"""
@@ -77,6 +84,7 @@ def _parse(fake=None, env=None):
     # 也与「_safe_fetch=None → 真 OCR 拿不到图」的实际结果一致。
     # 用 patch.object 上下文自动还原，不会像 golden 那样把桩常驻全进程。
     with patch.object(P, '_vlm_extract_fields', side_effect=fake), \
+         patch.object(P, '_load_vlm_configs', return_value=_FAKE_VLM_CFGS), \
          patch.object(P, '_img_to_text', return_value=''), \
          patch.object(P, '_safe_fetch', return_value=None), \
          patch.dict(os.environ, env):
