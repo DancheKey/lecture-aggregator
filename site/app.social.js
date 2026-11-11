@@ -188,12 +188,16 @@ Object.assign(APP_METHODS, {
       // 属于合并组的场次：sourceUrl -> Set(lectureIndex)，expand/prune 的共同依据
       const mergedIdx = new Map();
       const dayIdx = new Map();   // sourceUrl|日期 -> lectureIndex[]
+      // 2026-11-11：生成器标记的多地点组会逐场展开成独立单卡，不再有「整页
+      // 一个赞」的入口，故不能把它们算作合并组（否则会展开出伪造已赞键）。
+      const blockedDays = new Set();
       all.forEach(l => {
         if (!l || !l.sourceUrl || l.lectureIndex == null) return;
         let s = multi.get(l.sourceUrl);
         if (!s) { s = new Set(); multi.set(l.sourceUrl, s); }
         s.add(l.lectureIndex);
         const gk = l.sourceUrl + '|' + (l.lectureStart || '').slice(0, 10);
+        if (l.vf === 0) blockedDays.add(gk);
         let arr = dayIdx.get(gk);
         if (!arr) { arr = []; dayIdx.set(gk, arr); }
         arr.push(l.lectureIndex);
@@ -208,6 +212,7 @@ Object.assign(APP_METHODS, {
       // 且 index.html 中 computed 排在 social 之前，可直接引用（勿再写数字）。
       dayIdx.forEach((idxs, gk) => {
         if (idxs.length < FORUM_MIN) return;         // 同日 <4 场：不折叠，逐场单卡
+        if (blockedDays.has(gk)) return;             // 多地点组：逐场单卡，无整页赞
         const u = gk.slice(0, gk.lastIndexOf('|'));
         mergedUrls.add(u);
         let ms = mergedIdx.get(u);

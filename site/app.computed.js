@@ -29,6 +29,11 @@ const FAR_FOLD_KEY = '__far_future__';
 const FORUM_MIN = 4;
 // 合并/分组的键：源页 + 日期。units() 与 filtered() 共用，保证口径逐字一致。
 const mergedDayKey = l => (l.sourceUrl || '') + '|' + (l.lectureStart || '').slice(0, 10);
+// 2026-11-11 用户拍板补一道闸门：达到阈值的组若「组内出现 ≥2 个不同地点」，
+// 说明只是一页罗列多场独立活动（时间/地点/校区各不相同），折叠会把除首场外的
+// 地点全藏起来 → 整组逐场展开。空 /「待定」地点不参与比较（默认折叠）。
+// 判据由生成器预计算，结果落在记录级 `vf: 0`；units()、filtered()、
+// app.social.js 三处只读该标记，Python 统计侧读同一份结果，不另写一套。
 
 const APP_COMPUTED = {
     totalCount() { return this.all.length; },
@@ -187,13 +192,17 @@ const APP_COMPUTED = {
       const inMergedDay = l => {
         if (!mergedDays) {
           const cnt = new Map();
+          const blocked = new Set();   // 与 units() 的 blockedDays 同源：vf === 0
           this.all.forEach(x => {
             if (!x || !x.sourceUrl) return;
             const k = mergedDayKey(x);
             cnt.set(k, (cnt.get(k) || 0) + 1);
+            if (x.vf === 0) blocked.add(k);
           });
           mergedDays = new Set();
-          cnt.forEach((n, k) => { if (n >= FORUM_MIN) mergedDays.add(k); });
+          cnt.forEach((n, k) => {
+            if (n >= FORUM_MIN && !blocked.has(k)) mergedDays.add(k);
+          });
         }
         return mergedDays.has(mergedDayKey(l));
       };
@@ -399,15 +408,20 @@ const APP_COMPUTED = {
       //      「筛选命中子集时自动展开场次清单」整条策略静默失效。
       const filteredCounts = new Map();
       const allCounts = new Map();
+      // 2026-11-11（用户拍板）：生成器预计算的「多地点组」黑名单。判据只按
+      // 全集算一次，不随筛选变化——否则筛掉一个地点后同一组会忽然改判折叠。
+      // 前端只读标记、不比较地点，避免与 Python 侧出现两份归一实现。
+      const blockedDays = new Set();
       this.filtered.forEach(l => {
         if (!l.sourceUrl) return;
         const k = groupKey(l);
         filteredCounts.set(k, (filteredCounts.get(k) || 0) + 1);
       });
       this.all.forEach(l => {
-        if (!l.sourceUrl) return;
+        if (!l || !l.sourceUrl) return;
         const k = groupKey(l);
         allCounts.set(k, (allCounts.get(k) || 0) + 1);
+        if (l.vf === 0) blockedDays.add(k);
       });
       const units = [];
       const seen = new Set();
@@ -426,7 +440,7 @@ const APP_COMPUTED = {
           return;
         }
         const k = groupKey(l);
-        if ((filteredCounts.get(k) || 0) >= MIN) {
+        if ((filteredCounts.get(k) || 0) >= MIN && !blockedDays.has(k)) {
           if (seen.has(k)) return;
           seen.add(k);
           const recs = this.filtered.filter(x => groupKey(x) === k);

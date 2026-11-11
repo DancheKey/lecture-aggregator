@@ -303,18 +303,25 @@ const ALL = multi.concat([solo]);
       const raw = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
       const recs = raw.data || [];
       const dayCount = new Map();
+      // 2026-11-11 地点分流：生成器对「同源同日 ≥4 场且多地点」的每条记录写
+      // vf: 0，前端逐场展开、不再有整页赞入口，build_stats 也不再补 k=u 虚拟索引。
+      // 这里必须用同一份标记排除这些组，否则会把它们误报成「缺页面级索引」。
+      const blockedDays = new Set();
       recs.forEach(r => {
         const u = r.sourceUrl || '';
         if (!u) return;
         const gk = u + '|' + String(r.lectureStart || '').slice(0, 10);
         dayCount.set(gk, (dayCount.get(gk) || 0) + 1);
+        if (r.vf === 0) blockedDays.add(gk);
       });
       const mergedPages = new Set();
       dayCount.forEach((n, gk) => {
         // 4 = site/app.computed.js 的 FORUM_MIN（2026-10-27 由 3 上调）。
         // 生成器 build_stats 也用同一个常量补虚拟索引；此处若留在 3，
         // 13 组「同日恰好 3 场」的页会被误判成「缺索引」而报错。
-        if (n >= 4) mergedPages.add(gk.slice(0, gk.lastIndexOf('|')));
+        if (n >= 4 && !blockedDays.has(gk)) {
+          mergedPages.add(gk.slice(0, gk.lastIndexOf('|')));
+        }
       });
       const virtualPages = new Set(L.filter(x => x.p === 1).map(x => x.u));
       const extra = [...virtualPages].filter(u => !mergedPages.has(u));

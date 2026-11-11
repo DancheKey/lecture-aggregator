@@ -38,7 +38,13 @@ scr = _load_module('scraper_mod', os.path.join(ROOT, 'scraper', 'scraper.py'))
 
 
 def _pipeline_gen(data, excluded):
-    """generate_frontend_data 路径：过滤 excluded → 构 url_dates → with_unit。"""
+    """generate_frontend_data 路径：过滤 excluded → 构 url_dates → with_unit。
+
+    2026-11-11：地点分流闸门由 main() 对过滤后的 data 预计算一次再传给
+    with_unit()。这里必须对同一份 rows 做同样的预计算，才能与
+    server._attach_unit_types（内部自算 venue_blocked）逐条对齐；
+    漏传会让公网切片少掉 `vf: 0`，正是本文件要拦的两端分叉。
+    """
     rows = [r for r in data if (r.get('sourceUrl') or '') not in excluded]
     url_dates = {}
     for item in rows:
@@ -47,7 +53,8 @@ def _pipeline_gen(data, excluded):
         url_dates.setdefault(u, set())
         if d:
             url_dates[u].add(d)
-    return [gen.with_unit(item, url_dates) for item in rows]
+    venue_blocked = gen.venue_blocked_groups(rows)
+    return [gen.with_unit(item, url_dates, venue_blocked) for item in rows]
 
 
 def _pipeline_srv(data, excluded):
@@ -765,6 +772,9 @@ class CampusMatrixStatsTest(unittest.TestCase):
         2026-11-06 起统计矩阵按论坛/会议活动归并（同源页+同一天 ≥4 场计 1 场），
         首页列表仍逐场，故这里的期望值也要按同一口径独立重算——不复用
         gen.forum_stat_skip_indexes，避免「用被测实现验证自己」的假绿。
+        2026-11-11 补充：多地点组整体不折叠也不归并（vf 闸门），黑名单取
+        gen.venue_blocked_groups ——判据本身由 tests/test_venue_fold.py 独立守卫，
+        此处只做矩阵对账，不复制第二份地点归一实现。
         """
         sp = os.path.join(ROOT, 'site', 'lectures', 'stats.json')
         lp = os.path.join(ROOT, 'site', 'lectures.json')
@@ -776,11 +786,13 @@ class CampusMatrixStatsTest(unittest.TestCase):
             data = (json.load(f) or {}).get('data') or []
         groups = {}
         for i, l in enumerate(data):
-            k = (l.get('sourceUrl') or '', (l.get('lectureStart') or '')[:10])
+            k = gen.forum_group_key(l)
             groups.setdefault(k, []).append(i)
+        blocked = gen.venue_blocked_groups(data)
         skip = set()
-        for idxs in groups.values():
-            if len(idxs) >= 4:      # 与 app.computed.js FORUM_MIN 同源
+        for key, idxs in groups.items():
+            # 与 app.computed.js 的 FORUM_MIN + vf 闸门同源
+            if len(idxs) >= 4 and key not in blocked:
                 skip.update(idxs[1:])
         agg = {}
         for idx, l in enumerate(data):
@@ -879,15 +891,17 @@ class ForumStatDedupTest(unittest.TestCase):
             data = (json.load(f) or {}).get('data') or []
         groups = {}
         for i, r in enumerate(data):
-            k = (r.get('sourceUrl') or '', (r.get('lectureStart') or '')[:10])
-            groups.setdefault(k, []).append(i)
+            groups.setdefault(gen.forum_group_key(r), []).append(i)
         skip = set()
         forum_first = set()
         expect = 0
-        # 独立重算（不调用被测函数）：论坛组按「组内单位并集」计 1 场，
-        # 其余记录逐条按自身单位累加。2026-11-06 2B 后对账口径同步更新。
-        for idxs in groups.values():
-            if len(idxs) >= 4:
+        # 独立重算（不调用被测的 forum_stat_groups）：可折叠组按「组内单位并集」
+        # 计 1 场，其余记录逐条按自身单位累加。2026-11-06 2B 后对账口径同步更新；
+        # 2026-11-11 地点分流后，多地点组也归入「逐条累加」（判据由
+        # tests/test_venue_fold.py 独立守卫，这里只做矩阵对账）。
+        blocked = gen.venue_blocked_groups(data)
+        for key, idxs in groups.items():
+            if len(idxs) >= 4 and key not in blocked:
                 skip.update(idxs[1:])
                 forum_first.add(idxs[0])
                 merged = []
@@ -955,19 +969,32 @@ class ForumStatDedupTest(unittest.TestCase):
                       '校区矩阵也要按并集展开')
 
     def test_76_并集守卫与判据同源(self):
-        """2A：并集完整覆盖组内单位；判据不得掺入 college（2C 回潮会与前端分叉）。"""
+        """2A：并集完整覆盖组内单位；判据不得掺入 college（2C 回潮会与前端分叉）。
+
+        2026-11-11 地点分流补充：多地点组整体不折叠也不归并，故「首条必有
+        override」只对**可折叠组**成立；对被拦组反向锁定 skip / overrides
+        都不含该组任何下标，避免展示层逐场展开、统计表仍按 1 场活动计。
+        """
         with open(os.path.join(ROOT, 'data', 'lectures.json'), encoding='utf-8') as f:
             data = (json.load(f) or {}).get('data') or []
         skip, overrides = gen.forum_stat_groups(data)
         self.assertEqual(skip, gen.forum_stat_skip_indexes(data),
                          '兼容入口与实际分组必须逐字同口径')
         self.assertGreater(len(overrides), 0, '当前数据应有论坛组')
+        blocked = gen.venue_blocked_groups(data)
+        self.assertGreater(len(blocked), 0, '当前数据应有多地点、逐场展开的组')
         groups = {}
         for i, r in enumerate(data):
-            k = (r.get('sourceUrl') or '', (r.get('lectureStart') or '')[:10])
-            groups.setdefault(k, []).append(i)
-        for idxs in groups.values():
+            groups.setdefault(gen.forum_group_key(r), []).append(i)
+        for key, idxs in groups.items():
             if len(idxs) < 4:
+                continue
+            if key in blocked:
+                for i in idxs:
+                    self.assertNotIn(i, skip,
+                                     '多地点组已逐场展开，统计侧不得再跳过组内非首条')
+                    self.assertNotIn(i, overrides,
+                                     '多地点组不得生成并集 override（否则统计仍算 1 场）')
                 continue
             first = idxs[0]
             self.assertIn(first, overrides)
@@ -983,11 +1010,23 @@ class ForumStatDedupTest(unittest.TestCase):
         with open(os.path.join(ROOT, 'scripts', 'generate_frontend_data.py'),
                   encoding='utf-8') as f:
             gsrc = f.read()
+        # 分组键单点在 forum_group_key；不得改回按 college 分组（2C 回潮会与前端分叉）
+        self.assertIn('def forum_group_key(item):', gsrc,
+                      '判据必须收敛为单一函数，不得在各处重写元组')
         self.assertIn(
-            "key = (item.get('sourceUrl') or '', (item.get('lectureStart') or '')[:10])",
-            gsrc, '判据必须与 mergedDayKey 同源，不得按学院分组')
+            "return ((item.get('sourceUrl') or ''), (item.get('lectureStart') or '')[:10])",
+            gsrc, '分组键必须与前端 mergedDayKey 同源（源页 + 日期），不得按学院分组')
+        self.assertIn('groups.setdefault(forum_group_key(item), []).append(idx)', gsrc,
+                      'forum_stat_groups 必须复用统一分组键')
         self.assertIn('count_units = override', gsrc,
                       '统计矩阵必须消费并集，否则 2B 未落地')
+        with open(os.path.join(ROOT, 'site', 'app.computed.js'),
+                  encoding='utf-8') as f:
+            csrc = f.read()
+        self.assertIn(
+            "const mergedDayKey = l => (l.sourceUrl || '') + '|' "
+            "+ (l.lectureStart || '').slice(0, 10);",
+            csrc, '前端 mergedDayKey 与 Python forum_group_key 必须逐字同口径')
 
 
 class StatsModeNoteTest(unittest.TestCase):

@@ -68,6 +68,11 @@ FRONTEND_KEEP = frozenset({
     # 由 with_unit() 派生，前端 app.social.js / stats.js / app.computed.js 消费。
     'ck',
     'b',  # 长文本所在桶号（0-15）：展开某条时前端据此只拉那一桶 detail 分片
+    # 折叠闸门（2026-11-11 用户拍板）：所在「同源同日 ≥4 场」组若含 ≥2 个
+    # 不同地点，写 0 让前端逐场展开；缺省即允许折叠。由生成器统一预计算，
+    # 前端只读不算（units/filtered/migrateCountKeys 三处共用），
+    # 与统计侧 forum_stat_groups 同源。
+    'vf',
 })
 
 

@@ -260,6 +260,74 @@ def unique_source_urls(item):
 FORUM_MIN = 4
 
 
+# ---------- 地点分流：多地点组不折叠（2026-11-11 用户拍板） ----------
+#
+# 背景：yjsy/10291「勷勤论坛一周活动预告」把一个页面里 10 场活动拆成 10 条，
+# 11-11 / 11-12 各 4 场，按旧的「同源同日 ≥4 场」判据会各折成一张合并卡。
+# 但这 4 场时间、地点、校区全不同，而合并卡模板只渲染 head.location（首场），
+# 另外 3 个地点与校区被藏进展开清单——用户要的正是逐场看清在哪办。
+#
+# 新判据（用户 2026-11-11 四条拍板）：
+#   ① 同源同日 ≥4 场仍是折叠候选；
+#   ② 组内「归一后不同地点数 ≥2」→ 整组逐场展开，不折叠；
+#   ③ 地点为空 /「待定」视为不提供信息，不参与制造差异（即默认折叠）；
+#   ④ 历史多地点组一并展开，不做时间特判；统计侧同步按同口径归并。
+#
+# ⚠ 单一事实源：本判据只在 Python 侧算一次，结果以记录级 `vf: 0` 下发前端
+# （vf = venue fold；缺省即允许折叠，兼容所有存量构造数据与旧缓存）。
+# 前端 units()/filtered()/migrateCountKeys() 一律只读该标记、不再自己比较地点，
+# 统计侧 forum_stat_groups() 与页面级虚拟索引也读同一份结果。这样 JS 与 Python
+# 不存在两份地点归一实现，不会重演「FORUM_MIN 3→4 漏改一处」的分叉事故。
+
+_VENUE_PLACEHOLDERS = frozenset({
+    '', '待定', '暂定', '另行通知', '待通知', '待公布', '暂无', '无', '未定',
+    'tbd', 'tba', '?', '？', '-', '—',
+})
+
+
+def forum_group_key(item):
+    """折叠 / 归并的分组键，与前端 mergedDayKey 逐字同口径（源页 + 日期）。"""
+    return ((item.get('sourceUrl') or ''), (item.get('lectureStart') or '')[:10])
+
+
+def normalize_venue(location):
+    """地点归一，仅供「同组是否同一场地」比较；空 / 占位返回 ''。
+
+    只做轻度归一：去空白、全角转半角、剥离解析噪声尾巴（yjsy/10291 曾把
+    「嘉宾介绍」粘进地点）。不做楼栋同义词合并——过度归一会反过来把真实的
+    不同场地合并成「同地点」，那正是本次要避免的错误。
+    """
+    s = (location or '').strip()
+    if not s:
+        return ''
+    s = re.sub(r'\s+', '', s)
+    s = ''.join(chr(ord(ch) - 0xFEE0) if 0xFF01 <= ord(ch) <= 0xFF5E else ch
+                for ch in s)
+    s = s.replace('（', '(').replace('）', ')').replace('：', ':')
+    s = re.sub(r'(?:嘉宾介绍|主讲人简介|报告人简介|主讲人|报告人|活动地点|活动时间)+$',
+               '', s)
+    s = s.strip('.,;:、，。；：/\\-—()')
+    return '' if s.lower() in _VENUE_PLACEHOLDERS else s.lower()
+
+
+def venue_blocked_groups(data, min_sessions=FORUM_MIN):
+    """返回「禁止折叠」的组键集合：组内 ≥2 个不同有效地点。
+
+    只考察本身已达折叠阈值的组；空 / 待定地点不计入差异（默认折叠）。
+    """
+    groups = {}
+    for item in data:
+        groups.setdefault(forum_group_key(item), []).append(item)
+    blocked = set()
+    for key, items in groups.items():
+        if len(items) < min_sessions:
+            continue
+        venues = {v for v in (normalize_venue(x.get('location')) for x in items) if v}
+        if len(venues) >= 2:
+            blocked.add(key)
+    return blocked
+
+
 def stat_units(item):
     """统计矩阵的「讲座-单位」归属列表：主学院 + sources 转发单位，去重保序。
 
@@ -276,7 +344,7 @@ def stat_units(item):
     return units
 
 
-def forum_stat_groups(data):
+def forum_stat_groups(data, blocked=None):
     """返回 (skip, overrides)，供 build_stats 做论坛 / 会议归并。
 
     skip      = 统计矩阵中应跳过累加的下标（论坛组保留首条）。
@@ -292,14 +360,20 @@ def forum_stat_groups(data):
     只作用于「讲座数量」口径（matrix / campusMatrix；yearTotals 由 matrix 派生）。
     lectureCount、sourceNoticeCount、最小索引 lectures 的 cs、campusMap 一律
     保持逐场全量：首页列表/筛选/搜索/日历、访问、点赞、想听仍是逐场计数。
+
+    2026-11-11（用户拍板第四条）：多地点组同步不再归并。此类页面只是把一周
+    活动罗列在一页，各场时间地点不同，本就不是「一场论坛 / 会议议程」，
+    展示层逐场展开、统计层也应逐场计数，否则首页 4 张卡、统计表只算 1 场。
+    `blocked` 可由 build_stats 传入复用；不传时自算，兼容既有调用方与守卫用例。
     """
+    if blocked is None:
+        blocked = venue_blocked_groups(data)
     groups = {}
     for idx, item in enumerate(data):
-        key = (item.get('sourceUrl') or '', (item.get('lectureStart') or '')[:10])
-        groups.setdefault(key, []).append(idx)
+        groups.setdefault(forum_group_key(item), []).append(idx)
     skip, overrides = set(), {}
-    for idxs in groups.values():
-        if len(idxs) < FORUM_MIN:
+    for key, idxs in groups.items():
+        if len(idxs) < FORUM_MIN or key in blocked:
             continue
         skip.update(idxs[1:])
         merged, seen, merged_sources = [], set(), []
@@ -319,8 +393,10 @@ def forum_stat_skip_indexes(data):
     return forum_stat_groups(data)[0]
 
 
-def build_stats(data, updated_at):
+def build_stats(data, updated_at, blocked=None):
     """生成统计页专用 JSON：预计算矩阵 + 最小讲座索引。"""
+    if blocked is None:
+        blocked = venue_blocked_groups(data)
     years_set = set()
     # 来源通知总数：按**唯一来源 URL 集合**计（见 unique_source_urls 的口径说明）。
     # 早前是逐条累加 sourceCount，多场拆分页会因同一转发页被多次引用而虚高。
@@ -329,7 +405,7 @@ def build_stats(data, updated_at):
     # 拆出的多场报告只计 1 场；普通单页多场、跨天系列仍逐场计 N 场。
     # 顶部 lectureCount 不变（仍为数据条数），故合计行与顶部数字不必相等，
     # 统计页说明文字需同时解释「联合发布放大」与「论坛归并缩小」两个方向。
-    skip_stat_indexes, stat_overrides = forum_stat_groups(data)
+    skip_stat_indexes, stat_overrides = forum_stat_groups(data, blocked)
     # 学院 -> 年份 -> 讲座-单位计数（同一讲座跨 N 个归口单位即在 N 个学院各计 1 次）
     matrix = {}
     # 最小讲座索引：用于客户端结合 /api/lecture/stats 计算访问/点赞
@@ -467,7 +543,11 @@ def build_stats(data, updated_at):
     for _u, meta in page_meta.items():
         if not meta['split'] or meta['plain']:
             continue
-        if max(meta['days'].values() or [0]) < FORUM_MIN:
+        # 2026-11-11：只有「可折叠组」才有整页赞的 UI 入口。多地点组已逐场
+        # 展开成独立单卡，再补页面级虚拟索引会让统计页多出一条无对应按钮的
+        # 记录（与 2026-10-19 那次「跨天页误补」同类问题）。
+        if not any(n >= FORUM_MIN and (_u, day) not in blocked
+                   for day, n in meta['days'].items()):
             continue
         lectures.append({
             'u': _u, 'k': _u, 'y': meta['y'], 'c': meta['c'],
@@ -529,7 +609,7 @@ def speaker_keys(name):
     return _fv.speaker_keys(name)
 
 
-def with_unit(item, url_dates):
+def with_unit(item, url_dates, venue_blocked=None):
     """为单页多讲座拆分记录标注 unitType，供前端区分「场」与「期」：
 
     - 同一 sourceUrl 组内所有记录的讲座日期完全相同（同一天多场次）
@@ -570,6 +650,11 @@ def with_unit(item, url_dates):
     #     同页的 N 场各自成键，修复「点一场 N 场同增」「统计页 1 次点赞累加 N 次」。
     #     该页整页级的计数（首页合并卡片单元）仍用无后缀的 sourceUrl，两者互不干扰。
     it['ck'] = count_key(item)
+    # 折叠闸门（2026-11-11）：该条所在「同源同日 ≥4 场」组若出现 ≥2 个不同
+    # 地点，整组逐场展开。缺省即允许折叠，故只需给被拦的组写 0，体积最小、
+    # 且旧缓存 / 测试构造数据缺字段时行为与改造前完全一致。
+    if venue_blocked is not None and forum_group_key(item) in venue_blocked:
+        it['vf'] = 0
     return strip_frontend_fields(it)
 
 
@@ -1025,20 +1110,26 @@ def main():
             url_dates[u].add(d)
 
     sorted_data = sort_for_latest(data)
+    # 地点分流只算一次：同一个集合同时驱动前端切片标记与统计侧归并，
+    # 保证展示层与统计表不会出现「一边展开、一边仍按 1 场活动计」的分叉。
+    venue_blocked = venue_blocked_groups(data)
+    print(f'[venue] 同源同日 ≥{FORUM_MIN} 场且多地点 → 逐场展开: '
+          f'{len(venue_blocked)} 组')
     # 长文本（简介/摘要）先剥离到独立分片，主分片因此只带结构化字段。
     # latest.json 例外：首屏 50 条的简介/摘要就地内联（本来就是截断预览），
     # 让「不点展开、只看首屏」的场景零额外请求；但仍须标出桶号 b，
     # 否则用户在这 50 条上点「展开更多」时前端不知道去哪一桶取全文。
-    full_data = [with_unit(item, url_dates) for item in data]
+    full_data = [with_unit(item, url_dates, venue_blocked) for item in data]
     full_data, detail_buckets = split_long_text(full_data)
-    latest_src = [with_unit(item, url_dates) for item in sorted_data[:LATEST_SIZE]]
+    latest_src = [with_unit(item, url_dates, venue_blocked)
+                  for item in sorted_data[:LATEST_SIZE]]
     latest = []
     for it in latest_src:
         b = lt_bucket(it)
         if b is not None:
             it['b'] = b
         latest.append(latest_preview(it))
-    stats = build_stats(data, updated_at)
+    stats = build_stats(data, updated_at, venue_blocked)
 
     # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
     atomic_write_json(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': full_data})

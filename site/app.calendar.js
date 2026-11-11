@@ -266,7 +266,8 @@ Object.assign(APP_METHODS, {
     return this.hasLiveRecs(u) || this.hasGroupCalAdded(u);
   },
 
-  // 论坛卡（同页同日 ≥4 场折叠成一张卡，FORUM_MIN）：整组一起加。
+  // 论坛卡（同页同日 ≥4 场且同地点，FORUM_MIN + vf 闸门）：整组一起加。
+  // 多地点组已逐场展开成独立单卡，不会走到这里。
   // 只取「还没结束」的场次——把上周的讲座塞进日历没有意义（判据见 _calLive）。
   // 本函数会收到「全组已结束但加过」的组（见 showGroupCalBtn），此时过滤后为空，
   // 需提示而非静默返回——否则按钮点了没反应（与单场 addToCalendar 同处理）。

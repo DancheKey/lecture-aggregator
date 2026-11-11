@@ -61,6 +61,7 @@ jobs:
           GATE_TESTS: >-
             tests/test_parser_golden.py
             tests/test_frontend_consistency.py
+            tests/test_venue_fold.py
             tests/test_timeparse.py
             tests/test_hallucination_guard.py
             tests/test_poster_series_multisession.py

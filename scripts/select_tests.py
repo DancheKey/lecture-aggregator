@@ -76,11 +76,13 @@ GROUPS = [
                                   # 的两个常量，改它必须连前端 schema/一致性一起验。
                                   'scripts/gen_search_t2s.py'],
      'tests': ['tests/test_frontend_schema.py', 'tests/test_frontend_consistency.py',
+               'tests/test_venue_fold.py',
                'tests/test_module_compile.py', 'tests/test_env_flags.py',
                'tests/test_site_assets.py']},
     # server.py（含它镜像的前端派生逻辑；socket 超时用例使其偏重）
     {'name': 'server', 'pats': ['server.py'],
      'tests': ['tests/test_server.py', 'tests/test_frontend_consistency.py',
+               'tests/test_venue_fold.py',
                'tests/test_module_compile.py', 'tests/test_env_flags.py']},
     # 解析器（parsers.py 是单体巨文件，拆函数都归这里；env_flags 多处共用）
     {'name': 'parser', 'pats': ['scraper/parsers.py', 'scraper/timeparse.py',

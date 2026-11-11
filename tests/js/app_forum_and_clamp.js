@@ -333,9 +333,90 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
   }
 }
 
+// ================= B5：按地点分流（2026-11-11 用户拍板） =================
+// 生成器对「同源同日 ≥4 场且组内 ≥2 个不同地点」的每条记录写 vf: 0。
+// 前端三处消费点（units / filtered / migrateCountKeys）只读该标记。
+// 这里跑真实 computed / methods，防止「源码里出现了 vf 但逻辑没接上」的静默退化
+// ——2026-10-27 阈值 3→4 漏改 app.social.js 就是这么造出 13 组伪造已赞的。
+{
+  const U5 = 'http://x.scnu.edu.cn/a';
+  const spread = [1, 2, 3, 4].map(i => Object.assign(mk(i), {
+    lectureIndex: i, ck: `${U5}~${i}`, vf: 0, location: `地点${i}`,
+  }));
+  const folded = [1, 2, 3, 4].map(i => Object.assign(mk(i), {
+    lectureIndex: i, ck: `${U5}~${i}`, location: '同一报告厅',
+  }));
+
+  // ① units()：多地点组 4 场 → 4 张独立单卡，不再是 1 张合并卡
+  {
+    const cm = makeCtx(spread);
+    const units = computed.units.call(cm);
+    ok(units.length === 4,
+       `B5: 多地点 4 场应逐场 4 张卡，实得 ${units.length} 个单元`);
+    ok(units.every(u => u.type === 'single'), 'B5: 多地点组不应再出现 forum 合并卡');
+    ok(units.every(u => /~[1-4]$/.test(u.ck)),
+       'B5: 逐场单卡的计数键应是讲座级 ck，不能沿用页面级 sourceUrl');
+  }
+
+  // ② 对照组：同样 4 场、同地点、无 vf → 仍折成一张卡（别把折叠整个关掉）
+  {
+    const cm = makeCtx(folded);
+    const forum = computed.units.call(cm).find(u => u.type === 'forum');
+    ok(!!forum, 'B5: 同地点 4 场（论坛 / 大会）仍应折成合并卡');
+    if (forum) ok(forum.ck === U5, 'B5: 合并卡计数键应回到页面级 sourceUrl');
+  }
+
+  // ③ 黑名单按全集「按组」收集：组内只要有一条 vf=0 就整组展开，
+  //    且不随 filtered 变化（筛掉几个地点后不能忽然又折起来）
+  {
+    const partial = folded.map((r, n) => Object.assign({}, r, n === 0 ? { vf: 0 } : {}));
+    const cm = makeCtx(partial);
+    const units = computed.units.call(cm);
+    ok(units.length === 4 && units.every(u => u.type === 'single'),
+       'B5: 组内任一记录带 vf=0 即整组展开（生成器应齐标，此处兜底）');
+  }
+
+  // ④ filtered()：多地点组没有「整页赞」入口，页面级键不得兜底命中
+  {
+    const cm = makeCtx(spread, {
+      showLikedOnly: true,
+      lectureStats: { [U5]: { visits: 0, likes: 5, wants: 0 } },
+    });
+    ok(cm.filtered.length === 0,
+       `B5: 多地点组不是合并组，页面级赞不应命中整组，实际筛出 ${cm.filtered.length} 条`);
+  }
+  // 对照组：同地点组仍应兜底命中 4 场
+  {
+    const cm = makeCtx(folded, {
+      showLikedOnly: true,
+      lectureStats: { [U5]: { visits: 0, likes: 5, wants: 0 } },
+    });
+    ok(cm.filtered.length === 4,
+       `B5: 同地点合并组的页面级赞仍应命中 4 场，实际 ${cm.filtered.length} 条`);
+  }
+
+  // ⑤ migrateCountKeys()：被拦组不得展开出 sourceUrl~N 伪造已赞键
+  {
+    const cm = makeCtx(spread, {
+      lectureStats: { [U5]: { visits: 0, likes: 5, wants: 0 } },
+      likedUrls: new Set([U5]),
+    });
+    cm.migrateCountKeys();
+    ok([...cm.likedUrls].every(k => k.indexOf('~') === -1),
+       'B5: 多地点组不得展开出伪造的 sourceUrl~N 已赞键');
+    const cm2 = makeCtx(folded, {
+      lectureStats: { [U5]: { visits: 0, likes: 5, wants: 0 } },
+      likedUrls: new Set([U5]),
+    });
+    cm2.migrateCountKeys();
+    ok(cm2.likedUrls.has(`${U5}~1`),
+       'B5: 对照组：同地点合并组仍应把页面级赞展开到场次键');
+  }
+}
+
 if (errs.length) {
   console.log('[FAIL]');
   errs.forEach(e => console.log(' -', e));
   process.exit(1);
 }
-console.log('[PASS] B1 论坛卡 total 取全集口径、部分命中自动展开；B2 clamp 签名覆盖全部筛选维度；B4 合并阈值 3→4（≤3 场逐场独立成卡）');
+console.log('[PASS] B1 论坛卡 total 取全集口径、部分命中自动展开；B2 clamp 签名覆盖全部筛选维度；B4 合并阈值 3→4（≤3 场逐场独立成卡）；B5 按地点分流（vf 闸门三处消费点）');

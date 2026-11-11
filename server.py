@@ -40,6 +40,9 @@ sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 from excluded_urls import load_excluded, is_record_excluded
 from frontend_fields import strip_frontend_fields
+# 折叠闸门单一事实源（2026-11-11）：两端共用同一份「多地点组」计算结果，
+# 本地 /api/lectures 与公网静态切片必须给出相同的 vf 标记。
+from generate_frontend_data import forum_group_key, venue_blocked_groups
 import field_vocab as _fv
 
 
@@ -258,6 +261,8 @@ def _attach_unit_types(data):
         url_dates.setdefault(u, set())
         if d:
             url_dates[u].add(d)
+    # 与 generate_frontend_data.main() 同一步预计算，勿在此另写一份地点比较逻辑。
+    venue_blocked = venue_blocked_groups(data)
     out = []
     for item in data:
         it = dict(item)
@@ -281,6 +286,9 @@ def _attach_unit_types(data):
         src = item.get('sourceUrl') or ''
         idx = item.get('lectureIndex')
         it['ck'] = f'{src}~{idx}' if (idx is not None and src) else src
+        # 折叠闸门：多地点组逐场展开（须与 with_unit() 逐字同口径）。
+        if forum_group_key(item) in venue_blocked:
+            it['vf'] = 0
         # 按白名单裁掉前端无消费者的内部字段（llmSelfExtract/qaRepaired 等）。
         # 必须与 generate_frontend_data.with_unit() 用同一份白名单，
         # 否则本地下发与公网静态切片字段集分叉，test_frontend_consistency 会失败。
