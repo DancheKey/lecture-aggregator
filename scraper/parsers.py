@@ -5003,6 +5003,19 @@ def _match_poster_vlm(rec, cands):
     return None
 
 
+def _poster_multi_speaker_names(sp):
+    """海报 VLM 给出的「A、B、C」式并列主讲名单；非多主讲返回 []。
+
+    只认「每段都是 2~4 字合法中文姓名」的串，避免把「张三，华南师范大学教授」
+    这类姓名+单位误拆成两个人（与 _extract_speaker 的多主讲判据同口径）。
+    """
+    segs = [x.strip() for x in re.split(r'[、,，;；/]', sp or '') if x.strip()]
+    if len(segs) >= 2 and all(_looks_like_real_name(x) for x in segs) \
+            and len(set(segs)) == len(segs):
+        return segs
+    return []
+
+
 def _merge_poster_vlm_into_sessions(recs, poster_vlm_sessions, default_year,
                                     publish_time, title_year, url_year):
     """把逐张 VLM 结果对齐到规则拆分出的各场，并清掉「一份文本复制 N 条」的串场。
@@ -5010,9 +5023,12 @@ def _merge_poster_vlm_into_sessions(recs, poster_vlm_sessions, default_year,
     无论 VLM 是否成功都执行串场清理（离线 / 无 key / 限流时行为仍优于改前）：
       · 组内重复出现的 abstract / speakerBio → 清空；
       · speakerAffiliation 是整段简历（过长或含逗号）→ 清空；
-      · location 尾部字段标签 → 剥除。
-    VLM 命中时只修 speaker（正文非姓名才用）、speakerTitle、speakerAffiliation、
-    speakerBio；title/topic/时间/地点/摘要一律不动。
+      · location 尾部字段标签 → 剥除；
+      · speakerBio 尾部粘连的「活动 N：」块标签 → 剥除（正文按块截简介时
+        常把下一场的块头带进来，如 yjsy/10291 无问西东场末尾的「活动 7:」）。
+    VLM 命中时只修 speaker（正文非姓名才用；多主讲名单按「正文首位优先 +
+    海报补其余」合并）、speakerTitle、speakerAffiliation、speakerBio；
+    title/topic/时间/地点/摘要一律不动。
     """
     if not recs:
         return recs
@@ -5066,7 +5082,25 @@ def _merge_poster_vlm_into_sessions(recs, poster_vlm_sessions, default_year,
         rbio = r.get('speakerBio') or ''
         if loose and not (sp and sp in rbio and (not cur or cur not in rbio)):
             continue
+        # 同题多人分享会（2026-11-11 用户截图：yjsy/10291「无问西东」场）：
+        # 正文「嘉宾简介：谈子敏，…；胡扬，…；曾东林，…；江云颖，…」只被块首
+        # 正则抠出第一人，海报 VLM 又读出「胡扬、曾东林、江云颖」这个并列串——
+        # 旧逻辑拿 _looks_like_real_name 判整串（多段姓名必然 False）后整个丢弃，
+        # 结果一场 4 人分享会只入库 1 人，前端「第一位 + 等」的多主讲规则
+        # （2026-10-20，app.display.js isMultiSpeaker）也无从触发。
+        # 按「正文首位优先、海报补其余」合并：正文仍是权威，海报只补漏读的人。
+        # 仅多海报通道生效；单人海报、形近字纠正等既有路径逐字不变。
+        poster_names = _poster_multi_speaker_names(sp)
+        merged_names = []
+        if poster_names:
+            for n in [x.strip() for x in re.split(r'[、,，;；/]', cur)
+                      if x.strip()] + poster_names:
+                if n not in merged_names:
+                    merged_names.append(n)
+            if len(merged_names) >= 2:
+                r['speaker'] = '、'.join(merged_names)
         if sp and len(sp) <= 40 and _looks_like_real_name(sp) \
+                and not merged_names \
                 and (loose or not cur or not _looks_like_real_name(cur)):
             r['speaker'] = sp
         # 校区冲突纠正（仅精确匹配）：正文块串到别的校区时，海报是更可靠的
@@ -5077,19 +5111,42 @@ def _merge_poster_vlm_into_sessions(recs, poster_vlm_sessions, default_year,
             if rc and vc and rc != vc:
                 r['location'] = _normalize_vlm_venue(f.get('location'))
         st = (f.get('speakerTitle') or '').strip()
-        if st and len(st) <= 30 and not re.search(r'[，,。;；]', st):
+        # 多人场海报给的职称往往属于名单里某一位（本页「副教授」是胡扬的），
+        # 不能挂到首位讲者名下；单人海报行为不变。
+        if st and len(st) <= 30 and not re.search(r'[，,。;；]', st) \
+                and not merged_names:
             r['speakerTitle'] = st
         sa = (f.get('speakerAffiliation') or '').strip()
         if sa and len(sa) <= 40 and not re.search(r'[，,。;；]', sa):
             r['speakerAffiliation'] = sa
         # 海报上确有嘉宾简介原文，逐张读天然不串场；仍过幻觉守卫。
+        # 但「同题多人分享会」是例外：正文那一段本来就是 4 人合写的完整简介，
+        # 海报只印了其中一位（本页 VLM 给的是「胡扬：…」），若照旧覆盖，卡片
+        # 就会变成「主讲 谈子敏 / 简介 胡扬」的张冠李戴（用户 2026-11-11 截图）。
+        # 判据宁缺毋滥，两条任一命中就保留正文简介、不用海报单人简介：
+        #   · 正文简介里已提到组内 ≥2 位姓名 → 它是共享简介，比海报全；
+        #   · 海报简介以「姓名：」开头且该姓名不是组内首位 → 明确是别人的。
         bio = (f.get('speakerBio') or '').strip()
-        if bio and not _is_hallucinated(bio):
+        body_bio_is_shared = (len(merged_names) >= 2
+                              and sum(1 for n in merged_names if n and n in rbio) >= 2)
+        lead = re.match(r'^\s*([\u4e00-\u9fff·]{2,4})\s*[：:]', bio)
+        poster_bio_is_others = bool(len(merged_names) >= 2 and lead
+                                    and lead.group(1) in merged_names[1:])
+        if bio and not _is_hallucinated(bio) \
+                and not body_bio_is_shared and not poster_bio_is_others:
             r['speakerBio'] = bio
         # abstract 刻意不回填：宁缺毋滥，前端维持「无摘要不渲染」。
         r['vlmExtracted'] = True
         r['imageParseMethod'] = 'vlm'
         r['hasPosterImage'] = True
+    # 正文按块截简介时会把下一场块头带进来（「…访问学者。 活动 7:」）。
+    # 放在最后统一剥，不干扰上面 dup_bio / 姓名归属判据所用的原始值。
+    for r in recs:
+        sb = (r.get('speakerBio') or '').strip()
+        if sb:
+            sb = re.sub(r'\s*活动\s*[0-9〇一二三四五六七八九十]+\s*[:：]?\s*$',
+                        '', sb).strip(' :：,，、;；')
+            r['speakerBio'] = sb
     return recs
 
 

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-11T10:44:32+08:00",
+  "updatedAt": "2026-11-11T15:07:56+08:00",
   "data": [
     {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20261106/1125.html",
@@ -307,11 +307,11 @@
       "lectureStart": "2026-11-12 15:30:00",
       "lectureEnd": null,
       "location": "石牌校园一课西102",
-      "speaker": "谈子敏",
-      "speakerTitle": "副教授",
+      "speaker": "谈子敏、胡扬、曾东林、江云颖",
+      "speakerTitle": "研究员",
       "speakerAffiliation": "华南师范大学哲学与社会发展学院",
       "inviter": "",
-      "speakerBio": "胡扬：华南师范大学哲学与社会发展学院副教授，法国里昂高等师范学院哲学博士、中国华东师范大学逻辑学博士",
+      "speakerBio": "华南师范大学哲学与社会发展学院特聘研究员,澳大利亚新南威尔士大学社会政策博士; 胡扬,华南师范大学哲学与社会发展学院副教授,法国里昂高等师范学校哲学博士、中国华东师范大学逻辑学博士; 曾东林,华南师范大学哲学与社会发展学院特聘研究员,香港科技大学社会科学部哲学硕士、博士,上海纽约大学博士后研究员 : 江云颖,华南师范大学哲学与社会发展学院 2022级外国哲学专业博士,法国新索邦大学访问学者。",
       "organizer": "研究生院",
       "publishTime": "2026-11-10 15:12:00",
       "publishTimeSource": "label",
@@ -539,7 +539,7 @@
       "lectureStart": "2026-11-12 10:00:00",
       "lectureEnd": "2026-11-12 12:00:00",
       "location": "大学城校园文三栋201厚德讲学厅",
-      "speaker": "张冉",
+      "speaker": "张冉、张奕",
       "speakerTitle": "教授",
       "speakerAffiliation": "华东师范大学公共管理学院",
       "inviter": "",

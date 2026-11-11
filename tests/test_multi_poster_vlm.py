@@ -17,7 +17,10 @@ base 再复制给每条 —— 10 条 abstract 全是「教育情怀与育人智
   · 正文仍是权威：title/topic/时间不动，VLM 把「陈昉」读成「陈妨」不得覆盖；
   · 海报与正文校区冲突时才按海报纠正地点；
   · 时刻读不一致时（Eser 海报 09:00 / 正文 11:00）走保守次级联，须过姓名归属证据；
-  · 摘要一律不回填 VLM（铁律：源站没写摘要就不补，AI 生成 = 编造）。
+  · 摘要一律不回填 VLM（铁律：源站没写摘要就不补，AI 生成 = 编造）；
+  · 同题多人分享会按「正文首位优先 + 海报补其余」合并主讲名单（用户 2026-11-11
+    截图），使前端「第一位 + 等」规则生效；海报上某一位的单人简介不得覆盖正文
+    里多人合写的共享简介，顺带剥掉简介尾部的「活动 N：」块头。
 
 全离线：真实页面 + 12 份 VLM 结果固化为 tests/fixtures/，无网络无密钥。
 另锁 VLM_PROMPT 的 SHA256 —— 本次修复刻意不改模型输入一个字，防后续无意识漂移。
@@ -257,6 +260,51 @@ class MergeUnitTest(unittest.TestCase):
         self.assertEqual(out[0]['speaker'], '张三')
         self.assertFalse(out[0].get('vlmExtracted'))
 
+    def test_poster_multi_speaker_names_guard(self):
+        # 只认「每段都是合法姓名」的并列串，姓名+单位不得误拆成两个人。
+        self.assertEqual(P._poster_multi_speaker_names('胡扬、曾东林、江云颖'),
+                         ['胡扬', '曾东林', '江云颖'])
+        self.assertEqual(P._poster_multi_speaker_names('陈妨'), [])
+        self.assertEqual(P._poster_multi_speaker_names('张三，华南师范大学教授'), [])
+        self.assertEqual(P._poster_multi_speaker_names('张三、张三'), [])
+
+    def test_shared_topic_panel_merges_names_and_keeps_body_bio(self):
+        """同题多人分享会：正文首位 + 海报补其余；海报单人简介不得覆盖共享简介。
+
+        用户 2026-11-11 截图：yjsy/10291「无问西东」场正文列 4 位嘉宾，入库只有
+        第一人，简介却变成第二人胡扬的；前端「第一位 + 等」规则因 speakerKeys=1
+        无从触发。
+        """
+        body_bio = ('华南师范大学哲学与社会发展学院特聘研究员; 胡扬,副教授; '
+                    '曾东林,特聘研究员 : 江云颖,法国新索邦大学访问学者。 活动 7:')
+        recs = [{'lectureStart': '2026-11-12 15:30:00', 'speaker': '谈子敏',
+                 'abstract': '', 'speakerBio': body_bio,
+                 'speakerAffiliation': '华南师范大学哲学与社会发展学院',
+                 'location': '石牌校园一课西102'}]
+        vlm = [{'lectureStart': '2026-11-12 15:30',
+                'speaker': '胡扬、曾东林、江云颖', 'speakerTitle': '副教授',
+                'speakerAffiliation': '华南师范大学哲学与社会发展学院',
+                'speakerBio': '胡扬：华南师范大学哲学与社会发展学院副教授，法国里昂高等师范学院哲学博士'}]
+        r = P._merge_poster_vlm_into_sessions(recs, vlm, *self.ARGS)[0]
+        self.assertEqual(r['speaker'], '谈子敏、胡扬、曾东林、江云颖')
+        # 生成器据此产出 4 个 speakerKeys → app.display.js isMultiSpeaker 显示「等」
+        self.assertEqual(len(P._fv.speaker_keys(r['speaker'])), 4)
+        self.assertIn('江云颖', r['speakerBio'])
+        self.assertNotIn('胡扬：', r['speakerBio'])
+        self.assertNotIn('活动 7', r['speakerBio'])     # 下一场块头尾巴
+        self.assertNotEqual(r.get('speakerTitle'), '副教授')  # 不是首位讲者的职称
+
+    def test_activity_label_tail_stripped_from_bio(self):
+        recs = [
+            {'lectureStart': '2026-11-11 09:00:00',
+             'speakerBio': '甲，某大学教授。 活动 7:', 'abstract': ''},
+            {'lectureStart': '2026-11-11 15:00:00',
+             'speakerBio': '乙，某大学副教授', 'abstract': ''},
+        ]
+        out = P._merge_poster_vlm_into_sessions(recs, [], *self.ARGS)
+        self.assertEqual(out[0]['speakerBio'], '甲，某大学教授。')
+        self.assertEqual(out[1]['speakerBio'], '乙，某大学副教授')
+
 
 class EndToEndTest(unittest.TestCase):
     @classmethod
@@ -312,6 +360,26 @@ class EndToEndTest(unittest.TestCase):
         bios = [(r.get('speakerBio') or '').strip() for r in recs]
         self.assertEqual(len([b for b in bios if b]), len(set(b for b in bios if b)))
         self.assertFalse(any(r.get('vlmExtracted') for r in recs))
+
+    def test_shared_topic_panel_ready_for_deng_display(self):
+        """真实页：4 人分享会合并成 1 条、首位是正文权威，前端自动显示「…等」。"""
+        hit = _by_start(self.recs, '2026-11-12 15:30:00')
+        self.assertEqual(len(hit), 1)
+        r = hit[0]
+        self.assertEqual(r['speaker'], '谈子敏、胡扬、曾东林、江云颖')
+        self.assertEqual(len(P._fv.speaker_keys(r['speaker'])), 4)
+        bio = r.get('speakerBio') or ''
+        self.assertIn('江云颖', bio)
+        self.assertNotIn('胡扬：', bio)          # 不能用第二人的海报简介顶替
+        self.assertNotIn('活动 7', bio)
+        self.assertNotEqual(r.get('speakerTitle'), '副教授')
+        self.assertEqual(r['location'], '石牌校园一课西102')
+
+    def test_ai_panel_also_recognized_as_multi_speaker(self):
+        hit = _by_start(self.recs, '2026-11-12 10:00:00')
+        self.assertEqual(len(hit), 1)
+        self.assertIn('、', hit[0]['speaker'])
+        self.assertGreaterEqual(len(P._fv.speaker_keys(hit[0]['speaker'])), 2)
 
 
 if __name__ == '__main__':
