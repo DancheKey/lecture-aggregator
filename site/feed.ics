@@ -8,63 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://cs.scnu.edu.cn/a/20261109/6029.html@danchekey.github.io
-DTSTAMP:20261111T070756Z
-DTSTART:20261111T063000Z
-DTEND:20261111T080000Z
-SUMMARY:第69期学术报告预告｜SCHOLAT数智融合赋能教育发展
- 研究与实践
-LOCATION:计算机学院东阶梯学术报告厅
-DESCRIPTION:题目：SCHOLAT数智融合赋能教育发展研究与实践\
- n主讲：汤庸（华南师范大学计算机学院）\n地点：计算
- 机学院东阶梯学术报告厅\n主办：计算机学院
-URL:http://cs.scnu.edu.cn/a/20261109/6029.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~3@danchekey.github.io
-DTSTAMP:20261111T070756Z
-DTSTART:20261111T070000Z
-DTEND:20261111T090000Z
-SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
- 动预告｜第十九届 "勷勤论坛"行业前沿板块之行走泉州\
- ,读懂一座城——地方文化记忆的整理与公共传播:以风
- 雅颂书局的实践为线索
-LOCATION:石牌校园第二教学楼109报告厅
-DESCRIPTION:题目：第十九届 "勷勤论坛"行业前沿板块之行
- 走泉州\,读懂一座城——地方文化记忆的整理与公共传
- 播:以风雅颂书局的实践为线索\n主讲：连真\n地点：石
- 牌校园第二教学楼109报告厅\n主办：研究生院
-URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261111/8889.html@danchekey.github.io
-DTSTAMP:20261111T070756Z
-DTSTART:20261111T080000Z
-DTEND:20261111T090000Z
-SUMMARY:勷勤数学•专家报告-姚经｜Distributionally Robust Downs
- ide Risk Optimization
-LOCATION:数科院西楼二楼会议室
-DESCRIPTION:题目：Distributionally Robust Downside Risk Optimization\n
- 主讲：姚经（苏州大学）\n地点：数科院西楼二楼会议
- 室\n主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261111/8889.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~4@danchekey.github.io
 DTSTAMP:20261111T070756Z
 DTSTART:20261111T110000Z
@@ -77,24 +20,6 @@ DESCRIPTION:题目：第十九届 "勷勤论坛"名师·名校长讲座板
  块之朴素而伟大——与准教师共话教育生命\n主讲：高
  珂娟（广东省教育研究院）\n地点：石牌校园教育科学
  学院125室\n主办：研究生院
-URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~5@danchekey.github.io
-DTSTAMP:20261111T070756Z
-DTSTART:20261111T110000Z
-DTEND:20261111T123000Z
-SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
- 动预告｜科研写作与论文发表的实践经验
-LOCATION:石牌校园教育信息技术学院103
-DESCRIPTION:题目：科研写作与论文发表的实践经验\n主讲：
- 刘晓凡（华南师范大学教育信息技术学院）\n地点：石
- 牌校园教育信息技术学院103\n主办：研究生院
 URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
 BEGIN:VALARM
 TRIGGER:-PT30M
