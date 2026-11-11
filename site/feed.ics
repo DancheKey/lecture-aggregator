@@ -8,46 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://em.scnu.edu.cn/a/20261111/11248.html@danchekey.github.io
-DTSTAMP:20261111T024432Z
-DTSTART:20261111T020000Z
-DTEND:20261111T030000Z
-SUMMARY:华师经管学术讲座第554期（经济）｜全球化背景下
- 的地方分权与现代化——来自近代中国早期工商业发展
- 的证据
-LOCATION:大学城校园文二栋301会议室
-DESCRIPTION:题目：全球化背景下的地方分权与现代化——
- 来自近代中国早期工商业发展的证据\n主讲：李辉文（
- 上海对外经贸大学）\n地点：大学城校园文二栋301会议
- 室\n主办：经济与管理学院
-URL:http://em.scnu.edu.cn/a/20261111/11248.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~1@danchekey.github.io
-DTSTAMP:20261111T024432Z
-DTSTART:20261111T030000Z
-DTEND:20261111T040000Z
-SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
- 动预告｜第十九届 "勷勤论坛"国际交流板块之海外学术
- 与文化体验分享会
-LOCATION:大学城校园理5栋二楼报告厅
-DESCRIPTION:题目：第十九届 "勷勤论坛"国际交流板块之海
- 外学术与文化体验分享会\n主讲：Eser Metin Akinoglu（Jinan U
- niversity）\n地点：大学城校园理5栋二楼报告厅\n主办：
- 研究生院
-URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://cs.scnu.edu.cn/a/20261109/6029.html@danchekey.github.io
 DTSTAMP:20261111T024432Z
 DTSTART:20261111T063000Z
