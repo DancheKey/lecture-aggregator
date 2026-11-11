@@ -8,27 +8,8 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://life.scnu.edu.cn/a/20261109/6842.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
-DTSTART:20261111T013000Z
-DTEND:20261111T023000Z
-SUMMARY:学术讲座：“跨界RNAi”和“种间RNAi”——从基础
- 研究到抗病应用
-LOCATION:生命科学学院138会议室
-DESCRIPTION:题目：“跨界RNAi”和“种间RNAi”——从基础研
- 究到抗病应用\n主讲：郭惠珊（中国科学院微生物研究
- 所）\n地点：生命科学学院138会议室\n主办：生命科学学
- 院
-URL:http://life.scnu.edu.cn/a/20261109/6842.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://em.scnu.edu.cn/a/20261111/11248.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261111T020000Z
 DTEND:20261111T030000Z
 SUMMARY:华师经管学术讲座第554期（经济）｜全球化背景下
@@ -48,7 +29,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~1@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261111T030000Z
 DTEND:20261111T040000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -56,8 +37,9 @@ SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
  与文化体验分享会
 LOCATION:大学城校园理5栋二楼报告厅
 DESCRIPTION:题目：第十九届 "勷勤论坛"国际交流板块之海
- 外学术与文化体验分享会\n主讲：卢俊杰（2025 级）\n地
- 点：大学城校园理5栋二楼报告厅\n主办：研究生院
+ 外学术与文化体验分享会\n主讲：Eser Metin Akinoglu（Jinan U
+ niversity）\n地点：大学城校园理5栋二楼报告厅\n主办：
+ 研究生院
 URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
 BEGIN:VALARM
 TRIGGER:-PT30M
@@ -67,7 +49,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://cs.scnu.edu.cn/a/20261109/6029.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261111T063000Z
 DTEND:20261111T080000Z
 SUMMARY:第69期学术报告预告｜SCHOLAT数智融合赋能教育发展
@@ -85,7 +67,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~3@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261111T070000Z
 DTEND:20261111T090000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -95,13 +77,8 @@ SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
 LOCATION:石牌校园第二教学楼109报告厅
 DESCRIPTION:题目：第十九届 "勷勤论坛"行业前沿板块之行
  走泉州\,读懂一座城——地方文化记忆的整理与公共传
- 播:以风雅颂书局的实践为线索\n主讲：连真（泉州风雅
- 颂书局创办人、福建省出版物发行协会副会长、闽南文
- 化推广人。专注于地方史研究\,编著包括《吃在石狮 —
- —石狮美食十二时辰》《泉州美食》在内的多部闽南文
- 化图书。 2023 年、 2025 年深圳 "年度十大好书"评委\, 2023
-  年获评 "福建省全民阅读优秀阅读推广人" 活动 6:）\n地
- 点：石牌校园第二教学楼109报告厅\n主办：研究生院
+ 播:以风雅颂书局的实践为线索\n主讲：连真\n地点：石
+ 牌校园第二教学楼109报告厅\n主办：研究生院
 URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
 BEGIN:VALARM
 TRIGGER:-PT30M
@@ -111,7 +88,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261111/8889.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261111T080000Z
 DTEND:20261111T090000Z
 SUMMARY:勷勤数学•专家报告-姚经｜Distributionally Robust Downs
@@ -129,7 +106,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~4@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261111T110000Z
 DTEND:20261111T130000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -149,7 +126,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~5@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261111T110000Z
 DTEND:20261111T123000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -167,7 +144,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://iqm.scnu.edu.cn/a/20261110/575.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261112T020000Z
 DTEND:20261112T030000Z
 SUMMARY:王健——精确希格斯物理
@@ -183,7 +160,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~6@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261112T020000Z
 DTEND:20261112T040000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -203,7 +180,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://em.scnu.edu.cn/a/20261112/11249.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261112T043000Z
 DTEND:20261112T053000Z
 SUMMARY:华师经英Seminar第66期｜The Tilted Scale: Local Protectionis
@@ -222,7 +199,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~7@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261112T063000Z
 DTEND:20261112T093000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -231,8 +208,8 @@ SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
 LOCATION:大学城校园文三栋201厚德讲学厅
 DESCRIPTION:题目：第十九届 "勷勤论坛"名师·名校长讲座板
  块之构建特色教师发展体系的校本实践与探索\n主讲：
- 高秀丽（广州市花都区邝维煜纪念中学校）\n地点：大
- 学城校园文三栋201厚德讲学厅\n主办：研究生院
+ 高秀丽（广州市花都区邝维煜纪念中学）\n地点：大学
+ 城校园文三栋201厚德讲学厅\n主办：研究生院
 URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
 BEGIN:VALARM
 TRIGGER:-PT30M
@@ -242,7 +219,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261105/13419.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261112T070000Z
 DTEND:20261112T080000Z
 SUMMARY:物理学院学术报告（第59期）中国科学技术大学曾
@@ -259,21 +236,17 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~8@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261112T070000Z
 DTEND:20261112T080000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
  动预告｜第十九届 "勷勤论坛"行业前沿板块之自然教育:
  从丹霞山世界地质公园\,走向青年成长
-LOCATION:石牌校园计算机学院学术报告厅嘉宾介绍
+LOCATION:大学城校园国际会议厅（主会场）
 DESCRIPTION:题目：第十九届 "勷勤论坛"行业前沿板块之自
  然教育:从丹霞山世界地质公园\,走向青年成长\n主讲：
- 陈昉（\,丹霞山科普顾问、联合国教科文组织世界地质
- 公园评估专家\,原韶关市丹霞山管理委员会副主任\,长期
- 深耕地质保护与自然教育实践\,曾代表丹霞山出席联合
- 国教科文组织世界地质公园大会\,开展自然教育）\n地点
- ：石牌校园计算机学院学术报告厅嘉宾介绍\n主办：研
- 究生院
+ 陈昉\n地点：大学城校园国际会议厅（主会场）\n主办：
+ 研究生院
 URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
 BEGIN:VALARM
 TRIGGER:-PT30M
@@ -283,7 +256,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~9@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261112T073000Z
 DTEND:20261112T083000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -303,7 +276,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261113/8876.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261113T013000Z
 DTEND:20261113T023000Z
 SUMMARY:勷勤数学•专家报告-李竞阳｜在线张量学习:计算
@@ -321,7 +294,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~10@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261113T013000Z
 DTEND:20261113T033000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -330,8 +303,9 @@ SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
 LOCATION:石牌校园教育科学学院125室
 DESCRIPTION:题目：第十九届 "勷勤论坛"学术科研板块之定
  量研究与问卷分析实务:在数据中寻找群体的声音与规律
- \n主讲：高原（华南师范大学国际商学院）\n地点：石牌
- 校园教育科学学院125室\n主办：研究生院
+ \n主讲：高原（华南师范大学国际商学院、广东省中外
+ 合作办学研究中心）\n地点：石牌校园教育科学学院125
+ 室\n主办：研究生院
 URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
 BEGIN:VALARM
 TRIGGER:-PT30M
@@ -341,7 +315,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~11@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261113T060000Z
 DTEND:20261113T070000Z
 SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
@@ -361,7 +335,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://em.scnu.edu.cn/a/20261116/11250.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261116T063000Z
 DTEND:20261116T073000Z
 SUMMARY:华师经管学术讲座第555期（管理）｜Demurrage and Dete
@@ -381,7 +355,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://iqm.scnu.edu.cn/a/20261110/574.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261119T060000Z
 DTEND:20261119T070000Z
 SUMMARY:费少明——量子计算与量子信息处理相关研究介绍
@@ -398,7 +372,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1124.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261123T010000Z
 DTEND:20261123T020000Z
 SUMMARY:华南师范大学砺儒讲坛第148讲：社会合作规范——
@@ -417,7 +391,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261124/8882.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261124T070000Z
 DTEND:20261124T080000Z
 SUMMARY:勷勤数学•专家报告-赵立璐｜关于二次型的Roth型
@@ -435,7 +409,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1125.html@danchekey.github.io
-DTSTAMP:20261110T133119Z
+DTSTAMP:20261111T024432Z
 DTSTART:20261210T060000Z
 DTEND:20261210T070000Z
 SUMMARY:华南师范大学砺儒讲坛第149讲： 预测人口的空间

@@ -158,6 +158,7 @@ jobs:
             tests/test_pdf_inline.py
             tests/test_attachment_channel.py
             tests/test_numbered_slot_sessions.py
+            tests/test_multi_poster_vlm.py
         run: |
           set -euo pipefail
           rc=0

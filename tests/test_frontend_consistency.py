@@ -942,8 +942,12 @@ class ForumStatDedupTest(unittest.TestCase):
                       '统计矩阵未按活动口径跳过组内非首条')
         self.assertIn('< FORUM_MIN', gsrc,
                       '页面级虚拟索引仍可能硬编码 3，会与合并卡口径分叉')
-        self.assertIn('if (n >= 4)', tsrc,
-                      'test_05 的合并页判据仍是 3，会误报缺索引')
+        # 2026-11-11 按地点分流（f269c20）后判据变成
+        # `if (n >= 4 && !blockedDays.has(gk))`：同源同日 ≥4 场但多地点、前端
+        # 逐场展开（vf=0）的组不再有整页赞入口，build_stats 也不补虚拟索引。
+        # 守卫只锁阈值，不再逐字匹配条件，免得 JS 每次加条件都要同步改这里。
+        self.assertIsNotNone(re.search(r'if \(n >= 4\b', tsrc),
+                             'test_05 的合并页判据不再是 4，会与合并卡口径分叉')
 
     def test_75_论坛组跨单位按并集各计1场(self):
         """2B：组内某条带 sources 联办单位时，归并后的 1 场活动在这些单位各计 1 次。"""

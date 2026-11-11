@@ -569,6 +569,13 @@ jobs:
       - name: Run numbered slot session tests
         run: python tests/test_numbered_slot_sessions.py
 
+      # 2026-11-11：多海报周预告页逐张 VLM 回归（yjsy/10291 一页 12 场+12 张海报，
+      # 旧链路只试 imgs[:3] 并把同一份长文本复制给每条，导致摘要/简介/单位/地点串场）。
+      # 锁结构判据、逐张调用、时刻对齐与校区校正、正文权威不被形近字覆盖、
+      # VLM 全失败仍清串场；真实页面 + 12 份 VLM 结果固化，离线秒级、零网络零密钥。
+      - name: Run multi-poster VLM tests
+        run: python tests/test_multi_poster_vlm.py
+
       # 缓存并发门禁（2026-10-02）：data/.vlm_cache.json 曾被 parsers 与
       # llm_provider 各持一把**互不可见**的锁，两边都做「整文件读→改→写回」，
       # 单进程多线程下互相覆盖整批条目 → 缓存命中下降 → 重复烧付费 API 额度。

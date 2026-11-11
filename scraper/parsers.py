@@ -4859,6 +4859,240 @@ def _collect_assets(soup, content_div, url, _st):
     return url_year, url_date, imgs, _pdf_local_imgs, _pdf_poster_converted, _do_ocr
 
 
+# ---------------------------------------------------------------------------
+# 多海报周预告页：逐张海报走 VLM（2026-11-11，yjsy/10291 实测）
+#
+# 症状：研究生院「勷勤论坛 11月9日-15日活动预告」一页列 12 场活动、配 12 张
+# 独立海报，正文有「活动N：/活动时间：/活动地点：/嘉宾介绍：」结构化标签，
+# 因此 poster_only=False，不会走海报 VLM 主链路。规则层用 repeated-label 拆出
+# 10 条，但「图文页补摘要/简介」分支只试 imgs[:3]、首个有效即 break，把**同一份**
+# 长文本写进 base 记录再复制给每条：10 条 abstract 全是「教育情怀与育人智慧」、
+# speakerBio 大量是「连真，泉州风雅颂书局…」，speakerAffiliation 被灌进整段简历，
+# location 尾部串「嘉宾介绍」。
+#
+# 判据（结构优先，阈值只做数量比对，不看正文长短）：正文容器里「活动N：」锚点
+# ≥2、结构化时间标签 ≥2、正文图片 ≥2 且与活动块数量相当 → 认定为多海报页。
+# 此时对**每张**内容图单独调 VLM（不 [:3]、不拼图），按「日期+时刻」与正文拆出的
+# 场次对齐，只补/修主讲人相关字段与简介；title/topic/时间/地点仍以正文为权威
+# （实测 VLM 把「陈昉」读成形近字「陈妨」，且地点会带「华南师范大学」前缀）。
+#
+# ⚠ 不改 VLM_PROMPT 一个字：模型输入不变，只改触发判据与调用方式。
+# ⚠ 摘要不采纳 VLM 输出：项目铁律「源站没写摘要就不补，AI 生成 = 编造内容」
+#   （2026-10-23 用户拍板）。本通道只清掉组内重复的串场摘要，不新填。
+# ---------------------------------------------------------------------------
+
+_ACTIVITY_BLOCK_RE = re.compile(r'活动[0-9]{1,2}\s*[:：]')
+_ACTIVITY_TIME_RE = re.compile(r'(?:活动时间|讲座时间)\s*[:：]')
+_MULTI_POSTER_MAX_IMAGES = 20          # 防御异常页面烧 VLM 额度
+_VENUE_LABEL_TAIL_RE = re.compile(
+    r'(?:嘉宾介绍|嘉宾简介|主讲人简介|报告人简介|主讲人|报告人|'
+    r'活动地点|讲座地点|活动时间|讲座时间)+$')
+
+
+def _count_activity_blocks(content_div):
+    """正文容器折叠文本里的「活动N：」锚点数与结构化时间标签数。"""
+    if content_div is None:
+        return 0, 0
+    folded = re.sub(r'\s+', '', content_div.get_text(' ', strip=False) or '')
+    return (len(_ACTIVITY_BLOCK_RE.findall(folded)),
+            len(_ACTIVITY_TIME_RE.findall(folded)))
+
+
+def _multi_poster_page(content_div, imgs, poster_only):
+    """是否为「一页多场 + 每场一张海报」的周预告页。"""
+    if poster_only or not imgs:
+        return False
+    if not (2 <= len(imgs) <= _MULTI_POSTER_MAX_IMAGES):
+        return False
+    blocks, time_labels = _count_activity_blocks(content_div)
+    # 图数须与活动块数量相当（允许少 2 张，如首块无海报）；时间标签独立佐证
+    # 「一页多场」，避免把插图丰富的新闻页误判进来。
+    if blocks < 2 or time_labels < 2 or len(imgs) < blocks - 2:
+        return False
+    return True
+
+
+def _multi_poster_vlm_enabled():
+    """运行时开关；SCNU_MULTI_POSTER_VLM=0 可整体关闭该通道（离线回归/应急）。"""
+    v = _os.environ.get('SCNU_MULTI_POSTER_VLM')
+    if v is None:
+        v = _load_dotenv().get('SCNU_MULTI_POSTER_VLM')
+    return env_flags.is_true('1' if v is None or str(v).strip() == '' else v)
+
+
+def _collect_poster_vlm_sessions(imgs, cfgs):
+    """逐张内容图单独调 VLM，摊平为 [{字段}, ...]（单张海报也可能返回多场数组）。
+
+    每张图一个缓存键（_vlm_extract_fields 内部按 URL 组合哈希），重跑不重复烧额度；
+    单张失败只跳过该张，不影响其余场次。
+    """
+    out = []
+    for u in imgs:
+        f = _normalize_vlm_keys(_vlm_extract_fields([u], cfgs))
+        if isinstance(f, list):
+            out.extend(x for x in f if isinstance(x, dict))
+        elif isinstance(f, dict):
+            out.append(f)
+    return out
+
+
+def _clean_venue_label_tail(loc):
+    """剥掉地点尾部粘连的字段标签（如「…学术报告厅嘉宾介绍」），不改动正文。"""
+    s = (loc or '').strip()
+    if not s:
+        return s
+    prev = None
+    while prev != s:
+        prev = s
+        s = _VENUE_LABEL_TAIL_RE.sub('', s).strip(' :：,，、;；-—')
+    return s
+
+
+_CAMPUS_TOKEN_RE = re.compile(r'(石牌|大学城|汕尾|南海|惠州)')
+
+
+def _vlm_venue_campus(v):
+    """从地点串里取校区关键词；取不到返回空串（不参与校区冲突判定）。"""
+    m = _CAMPUS_TOKEN_RE.search(v or '')
+    return m.group(1) if m else ''
+
+
+def _normalize_vlm_venue(v):
+    """VLM 地点归一（去校名前缀、校区→校园、压空白）。
+
+    仅在「正文地点与海报地点的校区关键词冲突」时用于替换：VLM 常把
+    「华南师范大学大学城校区国际会议厅」写全，而正文用「大学城校园…」口径。
+    """
+    s = (v or '').replace('华南师范大学', '').replace('校区', '校园')
+    return re.sub(r'\s+', '', s).strip()
+
+
+def _poster_vlm_time_key(f, default_year, publish_time, title_year, url_year):
+    dt = _parse_vlm_datetime(f.get('lectureStart'), default_year,
+                             publish_time, title_year, url_year)
+    return (dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M')) if dt else None
+
+
+def _rec_time_key(r):
+    s = r.get('lectureStart') or ''
+    return (s[:10], s[11:16]) if len(s) >= 16 else None
+
+
+def _match_poster_vlm(rec, cands):
+    """同一时刻有多张海报时，先按主讲人（含形近字）消歧，再按地点包含消歧；
+    仍不唯一则放弃融合，保守回退正文值。"""
+    if not cands:
+        return None
+    if len(cands) == 1:
+        return cands[0]
+    sp = (rec.get('speaker') or '').strip()
+    if sp:
+        for f, i in cands:
+            v = (f.get('speaker') or '').strip()
+            if v and (v == sp or (len(v) == len(sp) and _edit_distance(v, sp) <= 1)):
+                return f, i
+    loc = re.sub(r'\s+', '', rec.get('location') or '')
+    if loc:
+        hits = []
+        for f, i in cands:
+            vl = re.sub(r'\s+', '', f.get('location') or '')
+            if vl and (loc in vl or vl in loc):
+                hits.append((f, i))
+        if len(hits) == 1:
+            return hits[0]
+    return None
+
+
+def _merge_poster_vlm_into_sessions(recs, poster_vlm_sessions, default_year,
+                                    publish_time, title_year, url_year):
+    """把逐张 VLM 结果对齐到规则拆分出的各场，并清掉「一份文本复制 N 条」的串场。
+
+    无论 VLM 是否成功都执行串场清理（离线 / 无 key / 限流时行为仍优于改前）：
+      · 组内重复出现的 abstract / speakerBio → 清空；
+      · speakerAffiliation 是整段简历（过长或含逗号）→ 清空；
+      · location 尾部字段标签 → 剥除。
+    VLM 命中时只修 speaker（正文非姓名才用）、speakerTitle、speakerAffiliation、
+    speakerBio；title/topic/时间/地点/摘要一律不动。
+    """
+    if not recs:
+        return recs
+    idx = {}
+    for i, f in enumerate(poster_vlm_sessions or []):
+        k = _poster_vlm_time_key(f, default_year, publish_time, title_year, url_year)
+        if k:
+            idx.setdefault(k, []).append((f, i))
+    by_date = {}
+    for (d, _hm), lst in idx.items():
+        by_date.setdefault(d, []).extend(lst)
+
+    def _dup_values(field):
+        counts = {}
+        for r in recs:
+            v = (r.get(field) or '').strip()
+            if v:
+                counts[v] = counts.get(v, 0) + 1
+        return {v for v, n in counts.items() if n >= 2} if len(recs) >= 2 else set()
+
+    dup_abs = _dup_values('abstract')
+    dup_bio = _dup_values('speakerBio')
+    for r in recs:
+        if r.get('location'):
+            r['location'] = _clean_venue_label_tail(r['location'])
+        aff = (r.get('speakerAffiliation') or '').strip()
+        if len(aff) > 30 or re.search(r'[，,]', aff):
+            r['speakerAffiliation'] = ''
+        if (r.get('abstract') or '').strip() in dup_abs:
+            r['abstract'] = ''
+        if (r.get('speakerBio') or '').strip() in dup_bio:
+            r['speakerBio'] = ''
+        k = _rec_time_key(r)
+        hit = _match_poster_vlm(r, idx.get(k, [])) if k else None
+        loose = False
+        if not hit and k:
+            # 次级联：海报与正文时刻读不一致时（实测大学城3 海报 09:00、
+            # 正文 11:00），仅在「同日期且校区关键词唯一的海报」上尝试对齐，
+            # 且下方还要过「姓名归属证据」才放行，绝不拿别场海报改本场。
+            rc = _vlm_venue_campus(r.get('location'))
+            if rc:
+                same = [(f, i) for f, i in by_date.get(k[0], [])
+                        if _vlm_venue_campus(f.get('location')) == rc]
+                if len(same) == 1:
+                    hit, loose = same[0], True
+        if not hit:
+            continue
+        f, _ = hit
+        sp = (f.get('speaker') or '').strip()
+        cur = (r.get('speaker') or '').strip()
+        rbio = r.get('speakerBio') or ''
+        if loose and not (sp and sp in rbio and (not cur or cur not in rbio)):
+            continue
+        if sp and len(sp) <= 40 and _looks_like_real_name(sp) \
+                and (loose or not cur or not _looks_like_real_name(cur)):
+            r['speaker'] = sp
+        # 校区冲突纠正（仅精确匹配）：正文块串到别的校区时，海报是更可靠的
+        # 证据（yjsy/10291 陈昉场被串成「石牌校园计算机学院学术报告厅」）。
+        if not loose:
+            rc = _vlm_venue_campus(r.get('location'))
+            vc = _vlm_venue_campus(f.get('location'))
+            if rc and vc and rc != vc:
+                r['location'] = _normalize_vlm_venue(f.get('location'))
+        st = (f.get('speakerTitle') or '').strip()
+        if st and len(st) <= 30 and not re.search(r'[，,。;；]', st):
+            r['speakerTitle'] = st
+        sa = (f.get('speakerAffiliation') or '').strip()
+        if sa and len(sa) <= 40 and not re.search(r'[，,。;；]', sa):
+            r['speakerAffiliation'] = sa
+        # 海报上确有嘉宾简介原文，逐张读天然不串场；仍过幻觉守卫。
+        bio = (f.get('speakerBio') or '').strip()
+        if bio and not _is_hallucinated(bio):
+            r['speakerBio'] = bio
+        # abstract 刻意不回填：宁缺毋滥，前端维持「无摘要不渲染」。
+        r['vlmExtracted'] = True
+        r['imageParseMethod'] = 'vlm'
+        r['hasPosterImage'] = True
+    return recs
+
+
 def _resolve_time_init_result(soup, content_div, url, title, list_title,
                               college, campus, default_year, url_year,
                               imgs, _pdf_local_imgs, _pdf_poster_converted,
@@ -4868,8 +5102,10 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
 
     自 _parse_detail_impl 拆出（渐进重构第 4 步）。返回 dict，键：
       result / poster_only / vlm_fields / vlm_sessions / publish_time /
-      title_year / loc_times / t_untrusted / pub_year_hint
-    （vlm_sessions 即 _vlm_sessions，阶段 6 多场拆分消费；pub_year_hint 即
+      title_year / loc_times / t_untrusted / pub_year_hint /
+      multi_poster / poster_vlm_sessions
+    （vlm_sessions 即 _vlm_sessions，阶段 6 多场拆分消费；poster_vlm_sessions 为
+    多海报周预告页逐张 VLM 的摊平结果，阶段 6 对齐融合消费；pub_year_hint 即
     _pub_year_hint，供 detect_multi_session 年份补全。t / publish_level /
     url_date 仅段内使用，不外传。）
     """
@@ -4911,6 +5147,18 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
                 break
         if not vlm_fields:
             _do_ocr()
+
+    # 多海报周预告页（正文有结构化标签 → poster_only=False，但每场各配一张海报）：
+    # 逐张图单独调 VLM，结果在阶段 6 按「日期+时刻」对齐到规则拆出的各场。
+    # 不拼图、不 [:3]、不改 VLM_PROMPT；失败/无 key 时列表为空，阶段 6 仍做串场清理。
+    multi_poster = _multi_poster_page(content_div, imgs, poster_only)
+    poster_vlm_sessions = []
+    if multi_poster and _multi_poster_vlm_enabled():
+        _mp_cfgs = _load_vlm_configs()
+        if _mp_cfgs:
+            poster_vlm_sessions = _collect_poster_vlm_sessions(imgs, _mp_cfgs)
+            print(f'[MULTI-POSTER] {url} 内容图 {len(imgs)} 张 → VLM 场次 '
+                  f'{len(poster_vlm_sessions)}', file=sys.stderr)
 
     # R3 发布时间定位（标签 > 伴生词/class > 位置兜底）
     publish_time, publish_level = _locate_publish_time(soup, content_div, _st.body_text, _st.text)
@@ -5151,6 +5399,8 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
         'poster_only': poster_only,
         'vlm_fields': vlm_fields,
         'vlm_sessions': _vlm_sessions,
+        'multi_poster': multi_poster,
+        'poster_vlm_sessions': poster_vlm_sessions,
         'publish_time': publish_time,
         'title_year': title_year,
         'loc_times': loc_times,
@@ -7097,7 +7347,8 @@ def _trim_bio_to_first_speaker(bio, speaker):
 def _finalize_record(soup, url, title, list_title, _st, result,
                      poster_only, publish_time, title_year, url_year,
                      url_date, default_year, skip_news_filter, imgs,
-                     _pub_year_hint, _vlm_sessions, multi_speakers):
+                     _pub_year_hint, _vlm_sessions, multi_speakers,
+                     multi_poster=False, poster_vlm_sessions=None):
     """阶段 6：R-RETRO 回顾稿守卫/多场检测与拆分/新闻过滤/CV 交叉校验/
     真名守卫/LLM 融合/VLM sessions 合并/主持人·点评人抽取/bio 反推单位。
     返回 result。
@@ -7254,7 +7505,10 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     # 2026-11-05（评审 #34）：改走运行时求值，import 之后设 env 也生效；既有测试桩
     # 直接改写常量的路径由 _llm_flags_runtime 内部保持兼容。
     _llm_text_on, _llm_rich_on = _llm_flags_runtime()
-    if (_llm_text_on or _llm_rich_on) and not poster_only and len(_st.body_text) >= 80:
+    # 多海报周预告页禁用页级 hybrid：整页文本只跑一次模型，产出的摘要/简介是
+    # 页级值，会被复制给每条拆分记录（串场）。各场信息由逐张 VLM 对齐后单独给。
+    if (_llm_text_on or _llm_rich_on) and not poster_only and not multi_poster \
+            and len(_st.body_text) >= 80:
         try:
             from llm_provider import get_text_provider, get_judge_provider
             from hybrid import apply_llm_text_hybrid
@@ -7337,6 +7591,12 @@ def _finalize_record(soup, url, title, list_title, _st, result,
                 # 故必须在出口修，不能只靠存量脚本补一次。
                 kept[0]['sourceCount'] = 1
                 kept[0].pop('splitMode', None)
+        if multi_poster:
+            # 多海报周预告页：逐张 VLM 结果按时刻对齐到各场，并清掉「一份文本
+            # 复制 N 条」的串场字段。VLM 失败时仍执行串场清理（行为不劣于改前）。
+            kept = _merge_poster_vlm_into_sessions(
+                kept, poster_vlm_sessions, default_year, publish_time,
+                title_year, url_year)
         return kept
 
     # ---- 多主讲人连写拆分（同一公告含多位主讲人，报告人字段以「[头衔]姓名职称」拼接）----
@@ -7484,7 +7744,9 @@ def _finalize_record(soup, url, title, list_title, _st, result,
     # ---- 图文页补摘要/简介（治本地科院「摘要被导航垃圾污染、缺主讲人简介」问题）----
     # 正文已有元数据结构（非 poster_only），但 abstract 缺失/被导航垃圾污染 或 speakerBio 缺失，
     # 且存在内部海报图 → 对首张有效海报图跑 VLM 提取 abstract + speakerBio（无 Key 时自动跳过）。
-    if (bool(imgs) and not poster_only
+    # ⚠ 多海报周预告页禁用本分支：它只试 imgs[:3]、首个有效即 break，得到的一份
+    # 长文本会写进 base 再复制给每条拆分记录（yjsy/10291 十条摘要全同的根因）。
+    if (bool(imgs) and not poster_only and not multi_poster
             and (not (result.get('abstract') or '').strip()
                  or _abstract_is_nav_noise(result.get('abstract') or '')
                  or not (result.get('speakerBio') or '').strip())):
@@ -7567,6 +7829,8 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     poster_only = _t4['poster_only']
     vlm_fields = _t4['vlm_fields']
     _vlm_sessions = _t4['vlm_sessions']
+    multi_poster = _t4['multi_poster']
+    poster_vlm_sessions = _t4['poster_vlm_sessions']
     publish_time = _t4['publish_time']
     title_year = _t4['title_year']
     loc_times = _t4['loc_times']
@@ -7595,7 +7859,9 @@ def _parse_detail_impl(html, url, college, campus, default_year=None, list_title
     return _finalize_record(soup, url, title, list_title, _st, result,
                             poster_only, publish_time, title_year, url_year,
                             url_date, default_year, skip_news_filter, imgs,
-                            _pub_year_hint, _vlm_sessions, multi_speakers)
+                            _pub_year_hint, _vlm_sessions, multi_speakers,
+                            multi_poster=multi_poster,
+                            poster_vlm_sessions=poster_vlm_sessions)
 
 
 # ---------------------------------------------------------------------------
