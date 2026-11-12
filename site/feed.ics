@@ -8,61 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://iqm.scnu.edu.cn/a/20261110/575.html@danchekey.github.io
-DTSTAMP:20261111T070756Z
-DTSTART:20261112T020000Z
-DTEND:20261112T030000Z
-SUMMARY:王健——精确希格斯物理
-LOCATION:理8栋118学术报告厅
-DESCRIPTION:题目：精确希格斯物理\n主讲：王健（山东大学
- ）\n地点：理8栋118学术报告厅\n主办：量子物质研究院
-URL:http://iqm.scnu.edu.cn/a/20261110/575.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~6@danchekey.github.io
-DTSTAMP:20261111T070756Z
-DTSTART:20261112T020000Z
-DTEND:20261112T040000Z
-SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
- 动预告｜第十九届 "勷勤论坛"学术科研板块之 AI 时代的
- 跨学科视野与专业建设发展模式探析
-LOCATION:大学城校园文三栋201厚德讲学厅
-DESCRIPTION:题目：第十九届 "勷勤论坛"学术科研板块之 AI 
- 时代的跨学科视野与专业建设发展模式探析\n主讲：张
- 冉、张奕（华东师范大学公共管理学院）\n地点：大学
- 城校园文三栋201厚德讲学厅\n主办：研究生院
-URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://em.scnu.edu.cn/a/20261112/11249.html@danchekey.github.io
-DTSTAMP:20261111T070756Z
-DTSTART:20261112T043000Z
-DTEND:20261112T053000Z
-SUMMARY:华师经英Seminar第66期｜The Tilted Scale: Local Protectionis
- m in China's Intellectual Property Adjudication
-LOCATION:大学城校园文2栋401室
-DESCRIPTION:题目：The Tilted Scale: Local Protectionism in China's Inte
- llectual Property Adjudication\n主讲：陈思含（华南师范大学
- ）\n地点：大学城校园文2栋401室\n主办：经济与管理学
- 院
-URL:http://em.scnu.edu.cn/a/20261112/11249.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~7@danchekey.github.io
 DTSTAMP:20261111T070756Z
 DTSTART:20261112T063000Z
