@@ -664,13 +664,13 @@
     },
     {
       "date": "2026-11-12",
-      "capturedAt": "2026-11-12T15:17:13+08:00",
-      "site_pv": 2088,
+      "capturedAt": "2026-11-12T21:48:40+08:00",
+      "site_pv": 2092,
       "site_uv": null,
       "page_pv": null,
       "page_uv": null,
       "uv_delta": null,
-      "pv_delta": 1,
+      "pv_delta": 5,
       "note": ""
     }
   ]
