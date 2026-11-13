@@ -8,28 +8,8 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:https://yjsy.scnu.edu.cn/a/20261110/10291.html~11@danchekey.github.io
-DTSTAMP:20261113T040551Z
-DTSTART:20261113T060000Z
-DTEND:20261113T070000Z
-SUMMARY:【培养】第十九届“勷勤论坛”11月9日-11月15日活
- 动预告｜第十九届 "勷勤论坛"学术科研板块之 对音乐理
- 论建构中国自主知识体系的若干思考
-LOCATION:大学城校园音乐学院学术报告厅
-DESCRIPTION:题目：第十九届 "勷勤论坛"学术科研板块之 对
- 音乐理论建构中国自主知识体系的若干思考\n主讲：黄
- 宗权（中央音乐学院）\n地点：大学城校园音乐学院学
- 术报告厅\n主办：研究生院
-URL:https://yjsy.scnu.edu.cn/a/20261110/10291.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261116/8895.html@danchekey.github.io
-DTSTAMP:20261113T040551Z
+DTSTAMP:20261113T130900Z
 DTSTART:20261116T013000Z
 DTEND:20261116T023000Z
 SUMMARY:勷勤数学•专家报告-凌晨｜A Transformed Tubal Tensor Tr
@@ -48,7 +28,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://em.scnu.edu.cn/a/20261116/11250.html@danchekey.github.io
-DTSTAMP:20261113T040551Z
+DTSTAMP:20261113T130900Z
 DTSTART:20261116T063000Z
 DTEND:20261116T073000Z
 SUMMARY:华师经管学术讲座第555期（管理）｜Demurrage and Dete
@@ -67,8 +47,26 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://cs.scnu.edu.cn/a/20261113/6033.html@danchekey.github.io
+DTSTAMP:20261113T130900Z
+DTSTART:20261117T020000Z
+DTEND:20261117T033000Z
+SUMMARY:第70期学术报告预告｜大模型最新技术进展及教育
+ 应用实践
+LOCATION:计算机学院东阶梯学术报告厅
+DESCRIPTION:题目：大模型最新技术进展及教育应用实践\n主
+ 讲：王士进（科大讯飞）\n地点：计算机学院东阶梯学
+ 术报告厅\n主办：计算机学院
+URL:http://cs.scnu.edu.cn/a/20261113/6033.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://iqm.scnu.edu.cn/a/20261110/574.html@danchekey.github.io
-DTSTAMP:20261113T040551Z
+DTSTAMP:20261113T130900Z
 DTSTART:20261119T060000Z
 DTEND:20261119T070000Z
 SUMMARY:费少明——量子计算与量子信息处理相关研究介绍
@@ -85,7 +83,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261120/8897.html@danchekey.github.io
-DTSTAMP:20261113T040551Z
+DTSTAMP:20261113T130900Z
 DTSTART:20261120T020000Z
 DTEND:20261120T030000Z
 SUMMARY:勷勤数学•专家报告-李平｜Topological obstructions to g
@@ -103,7 +101,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1124.html@danchekey.github.io
-DTSTAMP:20261113T040551Z
+DTSTAMP:20261113T130900Z
 DTSTART:20261123T010000Z
 DTEND:20261123T020000Z
 SUMMARY:华南师范大学砺儒讲坛第148讲：社会合作规范——
@@ -122,7 +120,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261124/8882.html@danchekey.github.io
-DTSTAMP:20261113T040551Z
+DTSTAMP:20261113T130900Z
 DTSTART:20261124T070000Z
 DTEND:20261124T080000Z
 SUMMARY:勷勤数学•专家报告-赵立璐｜关于二次型的Roth型
@@ -140,7 +138,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1125.html@danchekey.github.io
-DTSTAMP:20261113T040551Z
+DTSTAMP:20261113T130900Z
 DTSTART:20261210T060000Z
 DTEND:20261210T070000Z
 SUMMARY:华南师范大学砺儒讲坛第149讲： 预测人口的空间
@@ -150,6 +148,24 @@ DESCRIPTION:题目：预测人口的空间分布——跨越10年的Zipf
  ’s Law研究\n主讲：陆铭（北京师范大学）\n地点：大学
  城校园文二栋536国际学术报告厅\n主办：社会科学处
 URL:http://skc.scnu.edu.cn/a/20261106/1125.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:http://maths.scnu.edu.cn/a/20261218/8898.html@danchekey.github.io
+DTSTAMP:20261113T130900Z
+DTSTART:20261218T020000Z
+DTEND:20261218T030000Z
+SUMMARY:勷勤数学•专家报告-杨绮云｜Dimensional reduction for 
+ anyons in the average-field approximation
+LOCATION:数科院东楼401
+DESCRIPTION:题目：Dimensional reduction for anyons in the average-field
+  approximation\n主讲：杨绮云（Basque Center for Applied Mathematic
+ s (BCAM)）\n地点：数科院东楼401\n主办：数学科学学院
+URL:http://maths.scnu.edu.cn/a/20261218/8898.html
 BEGIN:VALARM
 TRIGGER:-PT30M
 ACTION:DISPLAY

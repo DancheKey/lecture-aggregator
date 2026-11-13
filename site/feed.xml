@@ -5,24 +5,13 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 13 Nov 2026 12:05:51 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 13 Nov 2026 21:09:00 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>【培养】第十九届“勷勤论坛”11月9日-11月15日活动预告｜第十九届 &quot;勷勤论坛&quot;学术科研板块之 对音乐理论建构中国自主知识体系的若干思考</title>
-      <link>https://yjsy.scnu.edu.cn/a/20261110/10291.html</link>
-      <guid isPermaLink="false">https://yjsy.scnu.edu.cn/a/20261110/10291.html~11</guid>
-      <pubDate>Tue, 10 Nov 2026 15:12:00 +0800</pubDate>
-      <category>研究生院</category>
-      <description>题目：第十九届 &quot;勷勤论坛&quot;学术科研板块之 对音乐理论建构中国自主知识体系的若干思考
-主讲：黄宗权（中央音乐学院）
-地点：大学城校园音乐学院学术报告厅
-主办：研究生院</description>
-    </item>
     <item>
       <title>勷勤数学•专家报告-凌晨｜A Transformed Tubal Tensor Train Decomposition Method for Internet Traffic Data Recovery and Forecast</title>
       <link>http://maths.scnu.edu.cn/a/20261116/8895.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261116/8895.html</guid>
-      <pubDate>Fri, 13 Nov 2026 11:23:15 +0800</pubDate>
+      <pubDate>Fri, 13 Nov 2026 20:26:24 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：A Transformed Tubal Tensor Train Decomposition Method for Internet Traffic Data Recovery and Forecast
 主讲：凌晨（杭州电子科技大学）
@@ -33,12 +22,23 @@
       <title>华师经管学术讲座第555期（管理）｜Demurrage and Detention Charging Strategy Design for Empty Container Repositioning in Hinterland Multimodal Transportation</title>
       <link>http://em.scnu.edu.cn/a/20261116/11250.html</link>
       <guid isPermaLink="false">http://em.scnu.edu.cn/a/20261116/11250.html</guid>
-      <pubDate>Fri, 13 Nov 2026 11:18:26 +0800</pubDate>
+      <pubDate>Fri, 13 Nov 2026 20:21:35 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：Demurrage and Detention Charging Strategy Design for Empty Container Repositioning in Hinterland Multimodal Transportation
 主讲：余明珠（深圳大学）
 地点：大学城校园文二栋536国际学术报告厅
 主办：经济与管理学院</description>
+    </item>
+    <item>
+      <title>第70期学术报告预告｜大模型最新技术进展及教育应用实践</title>
+      <link>http://cs.scnu.edu.cn/a/20261113/6033.html</link>
+      <guid isPermaLink="false">http://cs.scnu.edu.cn/a/20261113/6033.html</guid>
+      <pubDate>Fri, 13 Nov 2026 16:55:00 +0800</pubDate>
+      <category>计算机学院</category>
+      <description>题目：大模型最新技术进展及教育应用实践
+主讲：王士进（科大讯飞）
+地点：计算机学院东阶梯学术报告厅
+主办：计算机学院</description>
     </item>
     <item>
       <title>费少明——量子计算与量子信息处理相关研究介绍</title>
@@ -55,7 +55,7 @@
       <title>勷勤数学•专家报告-李平｜Topological obstructions to geometric positivity on Calabi-Yau manifolds</title>
       <link>http://maths.scnu.edu.cn/a/20261120/8897.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261120/8897.html</guid>
-      <pubDate>Fri, 13 Nov 2026 11:14:55 +0800</pubDate>
+      <pubDate>Fri, 13 Nov 2026 20:18:04 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Topological obstructions to geometric positivity on Calabi-Yau manifolds
 主讲：李平（复旦大学）
@@ -77,7 +77,7 @@
       <title>勷勤数学•专家报告-赵立璐｜关于二次型的Roth型定理的研究</title>
       <link>http://maths.scnu.edu.cn/a/20261124/8882.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261124/8882.html</guid>
-      <pubDate>Fri, 13 Nov 2026 12:01:15 +0800</pubDate>
+      <pubDate>Fri, 13 Nov 2026 21:04:24 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：关于二次型的Roth型定理的研究
 主讲：赵立璐（中国科学技术大学）
@@ -94,6 +94,17 @@
 主讲：陆铭（北京师范大学）
 地点：大学城校园文二栋536国际学术报告厅
 主办：社会科学处</description>
+    </item>
+    <item>
+      <title>勷勤数学•专家报告-杨绮云｜Dimensional reduction for anyons in the average-field approximation</title>
+      <link>http://maths.scnu.edu.cn/a/20261218/8898.html</link>
+      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261218/8898.html</guid>
+      <pubDate>Fri, 13 Nov 2026 20:10:14 +0800</pubDate>
+      <category>数学科学学院</category>
+      <description>题目：Dimensional reduction for anyons in the average-field approximation
+主讲：杨绮云（Basque Center for Applied Mathematics (BCAM)）
+地点：数科院东楼401
+主办：数学科学学院</description>
     </item>
   </channel>
 </rss>

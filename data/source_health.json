@@ -2,15 +2,6 @@
   "history": [
     {
       "date": "2026-10-25",
-      "checkedAt": "2026-10-25T02:50:11+08:00",
-      "totalUrls": 60,
-      "failCount": 0,
-      "suspectCount": 0,
-      "unconfiguredCount": 1,
-      "failedKeys": []
-    },
-    {
-      "date": "2026-10-25",
       "checkedAt": "2026-10-25T12:46:53+08:00",
       "totalUrls": 60,
       "failCount": 0,
@@ -539,9 +530,18 @@
       "suspectCount": 0,
       "unconfiguredCount": 1,
       "failedKeys": []
+    },
+    {
+      "date": "2026-11-13",
+      "checkedAt": "2026-11-13T21:09:34+08:00",
+      "totalUrls": 61,
+      "failCount": 0,
+      "suspectCount": 0,
+      "unconfiguredCount": 1,
+      "failedKeys": []
     }
   ],
-  "lastCheckedAt": "2026-11-13T14:51:26+08:00",
+  "lastCheckedAt": "2026-11-13T21:09:34+08:00",
   "lastResults": [
     {
       "source": "教育科学学院",
