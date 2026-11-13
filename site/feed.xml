@@ -5,30 +5,8 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 11 Nov 2026 15:07:56 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 13 Nov 2026 12:05:51 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>勷勤数学•专家报告-李竞阳｜在线张量学习:计算与统计的权衡、自适应性与最优遗憾</title>
-      <link>http://maths.scnu.edu.cn/a/20261113/8876.html</link>
-      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261113/8876.html</guid>
-      <pubDate>Wed, 11 Nov 2026 14:12:16 +0800</pubDate>
-      <category>数学科学学院</category>
-      <description>题目：在线张量学习:计算与统计的权衡、自适应性与最优遗憾
-主讲：李竞阳（复旦大学）
-地点：数科院东楼401
-主办：数学科学学院</description>
-    </item>
-    <item>
-      <title>【培养】第十九届“勷勤论坛”11月9日-11月15日活动预告｜第十九届 &quot;勷勤论坛&quot;学术科研板块之定量研究与问卷分析实务:在数据中寻找群体的声音与规律</title>
-      <link>https://yjsy.scnu.edu.cn/a/20261110/10291.html</link>
-      <guid isPermaLink="false">https://yjsy.scnu.edu.cn/a/20261110/10291.html~10</guid>
-      <pubDate>Tue, 10 Nov 2026 15:12:00 +0800</pubDate>
-      <category>研究生院</category>
-      <description>题目：第十九届 &quot;勷勤论坛&quot;学术科研板块之定量研究与问卷分析实务:在数据中寻找群体的声音与规律
-主讲：高原（华南师范大学国际商学院、广东省中外合作办学研究中心）
-地点：石牌校园教育科学学院125室
-主办：研究生院</description>
-    </item>
     <item>
       <title>【培养】第十九届“勷勤论坛”11月9日-11月15日活动预告｜第十九届 &quot;勷勤论坛&quot;学术科研板块之 对音乐理论建构中国自主知识体系的若干思考</title>
       <link>https://yjsy.scnu.edu.cn/a/20261110/10291.html</link>
@@ -41,10 +19,21 @@
 主办：研究生院</description>
     </item>
     <item>
+      <title>勷勤数学•专家报告-凌晨｜A Transformed Tubal Tensor Train Decomposition Method for Internet Traffic Data Recovery and Forecast</title>
+      <link>http://maths.scnu.edu.cn/a/20261116/8895.html</link>
+      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261116/8895.html</guid>
+      <pubDate>Fri, 13 Nov 2026 11:23:15 +0800</pubDate>
+      <category>数学科学学院</category>
+      <description>题目：A Transformed Tubal Tensor Train Decomposition Method for Internet Traffic Data Recovery and Forecast
+主讲：凌晨（杭州电子科技大学）
+地点：数科院西楼二楼会议室
+主办：数学科学学院</description>
+    </item>
+    <item>
       <title>华师经管学术讲座第555期（管理）｜Demurrage and Detention Charging Strategy Design for Empty Container Repositioning in Hinterland Multimodal Transportation</title>
       <link>http://em.scnu.edu.cn/a/20261116/11250.html</link>
       <guid isPermaLink="false">http://em.scnu.edu.cn/a/20261116/11250.html</guid>
-      <pubDate>Wed, 11 Nov 2026 14:20:31 +0800</pubDate>
+      <pubDate>Fri, 13 Nov 2026 11:18:26 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：Demurrage and Detention Charging Strategy Design for Empty Container Repositioning in Hinterland Multimodal Transportation
 主讲：余明珠（深圳大学）
@@ -63,6 +52,17 @@
 主办：量子物质研究院</description>
     </item>
     <item>
+      <title>勷勤数学•专家报告-李平｜Topological obstructions to geometric positivity on Calabi-Yau manifolds</title>
+      <link>http://maths.scnu.edu.cn/a/20261120/8897.html</link>
+      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261120/8897.html</guid>
+      <pubDate>Fri, 13 Nov 2026 11:14:55 +0800</pubDate>
+      <category>数学科学学院</category>
+      <description>题目：Topological obstructions to geometric positivity on Calabi-Yau manifolds
+主讲：李平（复旦大学）
+地点：数科院东楼401
+主办：数学科学学院</description>
+    </item>
+    <item>
       <title>华南师范大学砺儒讲坛第148讲：社会合作规范——一个信息设计的解释（熊卫教授）</title>
       <link>http://skc.scnu.edu.cn/a/20261106/1124.html</link>
       <guid isPermaLink="false">http://skc.scnu.edu.cn/a/20261106/1124.html</guid>
@@ -77,7 +77,7 @@
       <title>勷勤数学•专家报告-赵立璐｜关于二次型的Roth型定理的研究</title>
       <link>http://maths.scnu.edu.cn/a/20261124/8882.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261124/8882.html</guid>
-      <pubDate>Wed, 11 Nov 2026 15:03:20 +0800</pubDate>
+      <pubDate>Fri, 13 Nov 2026 12:01:15 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：关于二次型的Roth型定理的研究
 主讲：赵立璐（中国科学技术大学）
