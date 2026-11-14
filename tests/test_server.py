@@ -471,7 +471,7 @@ class TestTmpFileGuardBypass(_StaticGuardLiveBase):
 
     def test_32_正常文件不受影响(self):
         """守卫不能误伤：正常 JSON 与首页必须 200。"""
-        for p in ('/lectures/chunks.json', '/index.html', '/'):
+        for p in ('/lectures/chunks.json', '/lectures/chunks.json?v=1', '/index.html', '/'):
             status, _ = self._request(self._req('GET', p))
             self.assertIn('200', status, f'GET {p} 不应被误伤，实得 {status}')
 
@@ -493,6 +493,28 @@ class TestTmpFileGuardBypass(_StaticGuardLiveBase):
         self.assertIn('def do_HEAD(self):', src,
                       '缺少 do_HEAD —— HEAD 会绕过全部静态守卫')
         self.assertIn('unquote(', src, '守卫必须基于解码后的路径判定')
+
+    def test_36_双重编码目录不得泄露目录列表(self):
+        """守卫与实际服务必须共用原始 self.path（2026-11-14 复核）。
+
+        修复前 _static_guard 把已 unquote 的 path 交给 translate_path，后者内部
+        再解一次（双解码）；而 super().do_GET() 只解一次。构造一个名字含 '%'
+        字面量的真实目录，用 %25 双重编码访问时两者指向不同目录：守卫放行，
+        实际服务却渲染目录列表（实测 GET 200 + 221B 列表页，HEAD 同样 200）。
+        """
+        d = os.path.join(self.srv_mod.SITE_DIR, 'lectures', '_pct%2e')
+        os.makedirs(d, exist_ok=True)
+        try:
+            for m in ('GET', 'HEAD'):
+                status, data = self._request(self._req(m, '/lectures/_pct%252e/'))
+                self.assertIn('404', status,
+                              f'{m} 双重编码目录应被守卫屏蔽，实得 {status}')
+                # 404 错误页自带「Directory listing not available」，故用列表页
+                # 独有的 'Directory listing for' 区分，避免把 404 误判成泄露。
+                self.assertNotIn(b'Directory listing for', data,
+                                 f'{m} 泄露了目录列表内容')
+        finally:
+            os.rmdir(d)
 
 
 class TestSlowBodyNoBlock(_StaticGuardLiveBase):

@@ -101,10 +101,11 @@ const app = createApp({
       this._scheduleUrlSync(true, 120);
     },
     // 翻页也是「用户在深挖」的信号：提前把长文本拉齐，翻到哪页简介与摘要都已在手。
-    // 页码写 URL 用 replace（不产生历史条目）；若同窗口内已有筛选变化标记 push，保留 push。
+    // 页码写 URL 用 push（2026-11-14 用户确认「翻页也要能后退」）：每页进历史栈，
+    // 代价是连翻 N 页要按 N 次后退；若同窗口内已有筛选变化标记 push，保留 push。
     currentPage() {
       this._ensureLongTextAll();
-      this._scheduleUrlSync(false, 120);
+      this._scheduleUrlSync(true, 120);
     },
     campus() { this.currentPage = 1; this._scheduleUrlSync(true, 120); },
     college() { this.currentPage = 1; this._scheduleUrlSync(true, 120); },
@@ -123,7 +124,7 @@ const app = createApp({
     // page（数据增减后旧链接失效），静态上界（MAX_URL_PAGE）拦不住这种「合法
     // 但越界」值。数据到达/筛选变化使 totalPages 变小时，把 currentPage 钳回
     // 末页——否则 pagedUnits 切片越界，渲染出空白列表。
-    // 钳位会顺势触发上方 currentPage watcher 以 replace 语义更新 URL，不留脏链接。
+    // 钳位会顺势触发上方 currentPage watcher 以 push 语义更新 URL，不留脏链接。
     totalPages(n) {
       if (this.currentPage > n) this.currentPage = n;
     },

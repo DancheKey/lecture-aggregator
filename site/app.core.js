@@ -73,7 +73,7 @@ const APP_METHODS = {};
  *   farFutureOpen 与各类展开态（同为 localStorage 本机偏好，已有独立持久化）。
  * 写入约定：
  *   - 筛选维度变化 → pushState（浏览器前进/后退可在筛选快照间回放）；
- *   - 页码变化 → replaceState（翻页频繁，不污染历史栈）；
+ *   - 页码变化 → pushState（2026-11-14 用户确认「翻页也要能后退」，每页可回放）；
  *   - 写前与当前 location.search 去重；popstate 回放期间抑制写回（防循环）。
  * 单一事实源：校区白名单 CAMPUS_LIST 同时供 APP_STATE.campusList 与 URL 校验使用。
  */

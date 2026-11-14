@@ -18,6 +18,8 @@
 //      保留 ongoing（互斥枚举，同真必空集）
 //   T11 popstate 回放恢复 upcomingRange（2026-11-05 评审 #3）：解析/序列化两条
 //      链路都有 range，唯独回放漏赋；URL 有 ?range=3 而 state 为空会展示全部待开始
+//   T12 翻页也要能后退（2026-11-14 用户确认）：watch.currentPage 必须以 push
+//      语义调度，翻页产生历史条目，popstate 回放不得再 push（否则后退被抵消）
 //
 // 运行：node tests/js/app_url_sync.js（纯 node，无浏览器无网络）
 const fs = require('fs');
@@ -364,6 +366,49 @@ setUrl('');
   methods._applyUrlFiltersFromUrl.call(vmThis);
   ok(vmThis.upcomingRange === '',
      `T11 无 range 的 URL 应清空残留范围，实得 "${vmThis.upcomingRange}"`);
+}
+
+// ---- T12 翻页也要能后退（2026-11-14 用户确认「翻页也要能后退」）----
+// 原实现页码用 replaceState（不进历史栈），按后退会直接离开当前筛选视图。
+// 改成 push 后每页都是可回放的历史条目；同时回放路径不得再 push，否则后退被抵消。
+{
+  const w = appOpts && appOpts.watch;
+  ok(!!w && typeof w.currentPage === 'function', 'T12 watch.currentPage 未接线');
+  if (w && typeof w.currentPage === 'function') {
+    // ① watcher 必须以 push 语义调度 URL 同步
+    const calls = [];
+    w.currentPage.call({
+      _ensureLongTextAll: () => {},
+      _scheduleUrlSync: (push, delay) => calls.push([push, delay]),
+    });
+    ok(calls.length === 1 && calls[0][0] === true,
+       `T12 翻页必须 push（可后退）：${JSON.stringify(calls)}`);
+
+    // ② 端到端：翻到第 3 页产生历史条目，后退到 ?page=2 时回放不得新增条目
+    sandbox.history._push = [];
+    sandbox.history._replace = [];
+    timers = [];
+    setUrl('');
+    const vmThis = {
+      campus: '', college: '', year: '', speaker: '', query: '', searchField: '',
+      onlineOnly: false, upcomingOnly: false, ongoingOnly: false, upcomingRange: '',
+      currentPage: 3,
+      campusList: ['石牌', '大学城', '佛山', '汕尾', '校级'],
+      _urlSyncSuppress: false, _urlSyncPendingPush: false, _urlSyncTimer: 0,
+      _flushUrlSync: methods._flushUrlSync,
+      $nextTick: (fn) => fn(),
+    };
+    methods._scheduleUrlSync.call(vmThis, true, 120);
+    fireTimers();
+    ok(sandbox.history._push.length === 1 && sandbox.history._push[0] === '?page=3',
+       `T12 翻页应 push ?page=3：${JSON.stringify(sandbox.history._push)}`);
+    setUrl('?page=2');
+    methods._applyUrlFiltersFromUrl.call(vmThis);
+    ok(sandbox.history._push.length === 1,
+       `T12 后退回放不得新增历史条目：${JSON.stringify(sandbox.history._push)}`);
+    ok(vmThis.currentPage === 2,
+       `T12 后退应回放页码 2，实得 ${vmThis.currentPage}`);
+  }
 }
 
 console.log('');

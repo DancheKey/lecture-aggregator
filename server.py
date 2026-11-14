@@ -1081,15 +1081,18 @@ class Handler(SimpleHTTPRequestHandler):
         攻击者可用 HEAD 探测写入窗口内半份文件的存在性与长度。
         """
         # unquote 而非只 split('?')：%3F（?）、%2e（.）等百分号编码都要还原后判定。
-        # 只解一次即可——解码出的路径若仍含 %.. 之类，translate_path 内部的
-        # 安全检查（越界即 403/404）会兜住。
+        # 后缀判定用解过一次的 path（%2etmp 也要拦住）；目录判定则必须把**原始
+        # self.path** 交给 translate_path，让它自己解一次——与实际取文件的
+        # super().do_GET() 完全同源。2026-11-14 复核：此前传已解码的 path，
+        # translate_path 内部又解一次（双解码），实测 /lectures/_pct%252e/
+        # 会让守卫指向别处、实际服务却列出目录（200 + 目录列表）。
         from urllib.parse import unquote, urlsplit
         path = unquote(urlsplit(self.path).path)
         if path.endswith('.tmp'):
             # 状态行仅 latin-1 安全，中文消息会 UnicodeEncodeError 断连（2026-09-26 修复）
             self.send_error(404, 'Temporary file not accessible')
             return True
-        _dir = self.translate_path(path)
+        _dir = self.translate_path(self.path)
         if os.path.isdir(_dir) and not os.path.exists(os.path.join(_dir, 'index.html')):
             self.send_error(404, 'Directory listing not available')
             return True
