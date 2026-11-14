@@ -132,6 +132,8 @@ jobs:
         run: python tests/test_p0_abstract_fix.py
       - name: Run bio/abstract cross guard tests
         run: python tests/test_bio_abs_cross_guard.py
+      - name: Run review-fixes regression tests (2026-11-14)
+        run: python tests/test_review_fixes_20261114.py
       - name: Run mother-record guard tests
         run: python tests/test_mother_record_guard.py
       - name: Run stage function variable leak check

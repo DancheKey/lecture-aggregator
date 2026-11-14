@@ -339,7 +339,18 @@ const ALL = multi.concat([solo]);
 // ---------- test_06：折叠条 count 是场次数（B6） ----------
 {
   // 3 个远期渲染单元：一页同日 5 场（合并卡）+ 2 条单场 → 实际 7 场
-  const day = '2026-11-20';
+  // ⚠ 时间炸弹教训（2026-11-14）：本组数据必须落在 FAR_FUTURE_DAYS=7 的远期
+  // 窗口内，原硬编码 '2026-11-20/21/22' 随真实时间推进在 11-14 起失守
+  // （只剩 6 天 < 7），折叠组造不出来 → 门禁假红。改为相对 now 的
+  // +14/+15/+16 天，任何日期运行都恒在窗口内；新建远期夹具一律用本模式，
+  // 禁止再写死日历日期。
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const futureDay = offsetDays => {
+    const d = new Date(Date.now() + offsetDays * DAY_MS);
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  const day = futureDay(14);
   const forumPage = 'http://x.scnu.edu.cn/c/9.html';
   const data = [];
   for (let i = 1; i <= 5; i++) {
@@ -347,9 +358,9 @@ const ALL = multi.concat([solo]);
                     lectureStart: `${day} 10:00:00`, title: `论坛第${i}场` }));
   }
   data.push(rec({ sourceUrl: 'http://x.scnu.edu.cn/d/1.html', ck: 'http://x.scnu.edu.cn/d/1.html',
-                  lectureStart: '2026-11-21 10:00:00', title: '远期单场1' }));
+                  lectureStart: `${futureDay(15)} 10:00:00`, title: '远期单场1' }));
   data.push(rec({ sourceUrl: 'http://x.scnu.edu.cn/d/2.html', ck: 'http://x.scnu.edu.cn/d/2.html',
-                  lectureStart: '2026-11-22 10:00:00', title: '远期单场2' }));
+                  lectureStart: `${futureDay(16)} 10:00:00`, title: '远期单场2' }));
   const cm = makeCtx(data);
   const fold = cm.pagedGroups.find(g => g.key === FAR_FOLD_KEY);
   ok(!!fold, 'test_06 应产生远期折叠组');

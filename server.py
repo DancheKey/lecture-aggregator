@@ -327,9 +327,12 @@ def _atomic_write_json(path, obj):
     """原子写 JSON：先写 .tmp 再 os.replace，避免中途崩溃留下半份文件。
 
     indent=2 与 scraper/scraper.py::_atomic_write_json 保持一致（diff 可读）。
+    newline='\\n'（AGENTS.md §1 写盘铁律，2026-11-14 复核）：Windows 文本模式
+    默认把 \\n 落成 \\r\\n——实测 sources.yaml 334/334 行全 CRLF 即源于
+    本函数与 _save_sources。
     """
     tmp = path + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
 
@@ -589,7 +592,9 @@ class Handler(SimpleHTTPRequestHandler):
     def _save_sources(self, data):
         """原子写回 sources.yaml，保留注释（见 _load_sources 的说明）。"""
         tmp = SOURCES_PATH + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
+        # newline='\n'（AGENTS.md §1 铁律，2026-11-14 复核）：无此参时 Windows
+        # 文本模式落盘 CRLF，git 跟踪文件与 .gitattributes 的 eol=lf 承诺背离。
+        with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
             _yaml_rt().dump(data, f)
         os.replace(tmp, SOURCES_PATH)
 

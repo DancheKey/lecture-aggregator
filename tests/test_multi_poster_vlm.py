@@ -200,9 +200,13 @@ class MergeUnitTest(unittest.TestCase):
     ARGS = (2026, '2026-11-10 15:12:00', None, 2026)
 
     def test_dup_cleanup_runs_even_without_vlm(self):
+        # 2026-11-14（复核）aff 清洗判据收敛为「简历段特征」后，样例值同步改为
+        # 真简历形态（含职称词）：原值「某某，整段简历很长很长很长很长」只靠
+        # 「含逗号」触发清空，新判据下它不是简历、应当幸存（与库内
+        # 「University of California, Santa Barbara」等合法逗号单位同一形态）。
         recs = [
             {'lectureStart': '2026-11-11 09:00:00', 'abstract': '同一段串场摘要',
-             'speakerBio': '同一段串场简介', 'speakerAffiliation': '某某，整段简历很长很长很长很长',
+             'speakerBio': '同一段串场简介', 'speakerAffiliation': '某某教授，现任某研究院院长，长期从事研究',
              'location': '石牌校园学术报告厅嘉宾介绍'},
             {'lectureStart': '2026-11-11 15:00:00', 'abstract': '同一段串场摘要',
              'speakerBio': '同一段串场简介', 'speakerAffiliation': '华南师范大学',

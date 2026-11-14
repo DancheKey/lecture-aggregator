@@ -68,7 +68,18 @@ def short(out, limit=400):
 def changed_files(explicit):
     if explicit:
         return list(explicit)
-    # 推送前最后一次提交视为「本轮改动」；只有一个根提交时退回空列表。
+    # 「本轮改动」= 待推送区间（与 origin/main 的 merge-base..HEAD 全部本地
+    # 提交），不再只看最后一笔。2026-11-14 实测：连推两笔（代码笔 + 数据笔）
+    # 时，HEAD~1 只看到数据笔，代码笔里的 tests/ 与 .github/ 改动被漏判，
+    # 纯净检出复跑被错误跳过——「本地门禁全绿」只覆盖了 Python 层。
+    r = run(['git', 'rev-parse', '--verify', '--quiet', 'origin/main'])
+    if r.returncode == 0:
+        mb = run(['git', 'merge-base', 'origin/main', 'HEAD'])
+        if mb.returncode == 0 and (mb.stdout or '').strip():
+            d = run(['git', 'diff', '--name-only', mb.stdout.strip(), 'HEAD'])
+            if d.returncode == 0:
+                return [x.strip() for x in (d.stdout or '').splitlines() if x.strip()]
+    # 退路：无 origin/main（无 remote / 根提交）→ 仍按旧行为只看最后一笔。
     r = run(['git', 'diff', '--name-only', 'HEAD~1', 'HEAD'])
     if r.returncode != 0:
         r = run(['git', 'show', '--pretty=format:', '--name-only', 'HEAD'])

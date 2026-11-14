@@ -3378,7 +3378,12 @@ def _content_text_without_sidebar(content_div):
 # 边界：链接由 JS 动态注入的页面，静态 HTML 里看不到 URL，本通道无能为力，
 # 只能靠 [ATTACH] 告警 + 每日体检让它可见，不假装「彻底」。
 _ATTACH_URL_RE = re.compile(
-    r'(?i)((?:(?:https?:)?//|/)?[^\s"<>#?=&]+\.(?:pdf|docx|doc)(?:\?[^\s"<>#]*)?)')
+    # 2026-11-14（复核）：尾部加右边界 (?=$|[?#])——扩展名必须结束于 token 末尾
+    # 或 ?/# 之前。原无边界时「file.docx.html」会在内部截出假候选 /file.docx，
+    # 触发注定失败的真实下载，持续污染 attachment_health.json 体检报告。
+    # 调用点只喂 bs4 属性值（已 strip）与 viewer 的 hash/query 片段，
+    # token 边界即字符串末尾或 ?/#，不会漏合法附件。
+    r'(?i)((?:(?:https?:)?//|/)?[^\s"<>#?=&]+\.(?:pdf|docx|doc)(?:\?[^\s"<>#]*)?(?=$|[?#]))')
 _OLE2_MAGIC = b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
 _MAX_ATTACHMENT_TRIES = 5      # 单页最多尝试下载的附件数，防异常页面放大请求量
 _W_NS = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
@@ -5055,7 +5060,17 @@ def _merge_poster_vlm_into_sessions(recs, poster_vlm_sessions, default_year,
         if r.get('location'):
             r['location'] = _clean_venue_label_tail(r['location'])
         aff = (r.get('speakerAffiliation') or '').strip()
-        if len(aff) > 30 or re.search(r'[，,]', aff):
+        # 2026-11-14（复核）收敛清洗判据：原「len>30 或含任意逗号即清空」会误杀
+        # 合法单位名——库内实测「University of California, Santa Barbara」（39 字、
+        # ASCII 逗号）、「Department of Experimental Psychology, Ghent University」
+        # （55 字）、「华南师范大学（汕尾），中山大学」皆为正当形态。
+        # 改按「简历段特征」清空：命中人物简历关键词（职称/头衔/履历动词）、
+        # 含中文句读（。；——单位名不用句号分句），或超长段落（>60 字）。
+        # 英文缩写点（St. John's）与列表顿号（、）不受影响。
+        if (len(aff) > 60
+                or re.search(r'[。；]|曾任|现任|主要从事|研究方向|毕业于|教授|博导|'
+                             r'博士生导师|硕士生导师|博士|研究员|院士|获得者|会士|'
+                             r'杰青|优青|人才计划|特聘|讲席|长江学者', aff)):
             r['speakerAffiliation'] = ''
         if (r.get('abstract') or '').strip() in dup_abs:
             r['abstract'] = ''
@@ -5093,8 +5108,14 @@ def _merge_poster_vlm_into_sessions(recs, poster_vlm_sessions, default_year,
         poster_names = _poster_multi_speaker_names(sp)
         merged_names = []
         if poster_names:
+            # 2026-11-14 补姓名校验（复核 P1）：cur（正文块首讲者）的每个分段
+            # 与单人路径（下方 _looks_like_real_name 口径）同判——「特邀嘉宾」
+            # 这类非姓名碎片不得借合并路径混进名单首位（实测探针：cur='特邀嘉宾'
+            # + 海报「胡扬、曾东林」→ speaker 被拼成「特邀嘉宾、胡扬、曾东林」）。
+            # 不过校验的碎片直接丢弃，名单只剩海报真名；海报名 poster_names
+            # 已由 _poster_multi_speaker_names 过滤，不再重复判。
             for n in [x.strip() for x in re.split(r'[、,，;；/]', cur)
-                      if x.strip()] + poster_names:
+                      if x.strip() and _looks_like_real_name(x.strip())] + poster_names:
                 if n not in merged_names:
                     merged_names.append(n)
             if len(merged_names) >= 2:
@@ -5495,9 +5516,19 @@ def _is_series_topic_placeholder(topic, title):
 
 
 _NTH_SESSION_LABEL_RE = re.compile(r'第([一二三四五六七八九十百零\d]+)\s*[讲场期]\s*[：:]')
+# 2026-11-14（复核 P1）：裸「时间/地点/题目/主题」会把题目内嵌词拦腰截断
+# （实测「第3讲：量子开放系统中的非平衡周期振荡：时间晶体与量子同步 主讲人：…」
+#  → 只取到「…非平衡周期振荡」，「时间晶体」被吃掉）。这正是 TOPIC_STOP
+# （_extract_topic_location 内 13295 教训）早已修过的同类病，两处没同步。
+# 故尾表收敛到与 TOPIC_STOP 同口径：时间后须跟时间标记、地点后须跟场所词、
+# 题目/主题须带冒号；摘要/简介维持裸词（TOPIC_STOP 同款）。时间证据集比
+# TOPIC_STOP 少裸「上|下」二字（「时间上下文」类题目会被误截），只收成词。
 _NTH_TOPIC_TAIL_RE = re.compile(
     r'(?=\s*(?:主讲人|报告人|主持人|主讲嘉宾|讲座人|主讲|报告人简介|'
-    r'时间|地点|题目|主题|摘要|简介|发布|点击|收藏|附件|主办|$))')
+    r'时间(?=[:：\s]*(?:\d|年|月|日|周|点|时|上午|下午|晚上|凌晨|星期))|'
+    r'地点(?=[:：\s]*(?:[^，。；、]{0,12}?(?:楼|室|厅|馆|号|校区|学院|大学|研究院)))|'
+    r'题目\s*[：:]|主题\s*[：:]|'
+    r'摘要|简介|发布|点击|收藏|附件|主办|$))')
 _NTH_SITE_NOISE_RE = re.compile(
     r'发布时间|点击|收藏|首页|机构设置|资讯|下载|学术活动预告|'
     r'上一篇|下一篇|Copyright|版权|文件下载|扫码|\d{4}-\d{2}-\d{2}')
@@ -5886,7 +5917,11 @@ LABELS = (
     '时间|主讲[人师]|讲座人|主持人|主讲|报告人|主讲嘉宾|讲座嘉宾|演讲人|邀请人|'
     # 2026-11-10 physics/11723：同主题多人分享页用「活动嘉宾：」标注全部讲者；
     # 既作讲者标签，也作地点/题目值的终止符（否则地点被污染成「…报告厅活动嘉宾」）。
-    '活动嘉宾|活动内容|活动流程|'
+    # 2026-11-14（复核）：三个词都加 (?=[:：])——标签形态必带冒号，终止力不变；
+    # 裸词放行散文（「地点：…会议室，活动流程见附件」「主讲人：张三，负责活动
+    # 内容策划」），否则统一终止符会把字段值拦腰截断。同款教训见上方
+    # 「日期(?=[:：])」「主要内容(?=[:：])」。
+    '活动嘉宾(?=[:：])|活动内容(?=[:：])|活动流程(?=[:：])|'
     'Speaker|Presenter|Lecturer|'
     # 「主要内容」须紧跟冒号才算字段标签（2026-09-10 io1563 实测：摘要散文
     # 「以《联合国海洋法公约》为主要内容的…」被裸词截断在「为」）

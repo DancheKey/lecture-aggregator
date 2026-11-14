@@ -30,9 +30,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _atomic_write_json(path, obj, indent=2):
-    """原子写 JSON：先写 .tmp 再 os.replace，避免中途崩溃/被杀留下截断 JSON。"""
+    """原子写 JSON：先写 .tmp 再 os.replace，避免中途崩溃/被杀留下截断 JSON。
+
+    newline='\\n'（AGENTS.md §1 铁律，2026-11-14 复核补同款）：本函数写
+    last_scrape/scrape_ledger/source_health 等跟踪文件，Windows 文本模式
+    无此参会落成 CRLF，与 .gitattributes 的 eol=lf 背离。
+    """
     tmp = path + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(obj, f, ensure_ascii=False, indent=indent)
     os.replace(tmp, path)
 
