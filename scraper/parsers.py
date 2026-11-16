@@ -4160,7 +4160,13 @@ _EN_SPK_TITLE_RE = re.compile(
 _EN_SPK_PREFIX_RE = re.compile(
     r'^(?:Professor|P\s*rof|Prof|Pro|Dr|Mr|Mrs|Ms|Miss)\.?\s*(?=[A-Z])')
 # 合理英文姓名：1~4 个词，允许词内 - . ’ '（Jean-Paul / O’Neill / J.），总长 ≤ 40。
-_EN_NAME_OK_RE = re.compile(r"^[A-Za-z][A-Za-z\.\-’']*(?:\s+[A-Za-z][A-Za-z\.\-’']*){0,3}$")
+# 2026-11-16（life/6848 实测）：姓名可含 Latin-1 补充区重音字母（í é ñ ü ó…）。
+# 类定义刻意排除同区段的 ×(U+00D7)/÷(U+00F7) 两个非字母：Ø(00D8) 卡住 ×，
+# ø(00F8) 卡住 ÷。供 _EN_NAME_OK_RE 与 _split_english_speaker 的姓名 token 共用，
+# 勿手抄副本（G4 词表收敛同纪律）。
+_LATIN1_LETTER = 'A-Za-zÀ-ÖØ-öø-ÿ'
+_EN_NAME_OK_RE = re.compile(
+    rf"^[{_LATIN1_LETTER}][{_LATIN1_LETTER}\.\-’']*(?:\s+[{_LATIN1_LETTER}][{_LATIN1_LETTER}\.\-’']*){{0,3}}$")
 
 # 「机构/团体介绍」型简介的强锚点与开头机构词（xz 49/98、io 826/779/686 实测——
 # speakerBio 被填成「物电学院创新基地成立于2004年…」「交响乐团创建于2013年…」
@@ -9086,6 +9092,14 @@ def _split_english_speaker(sp):
     if not sp:
         return '', '', ''
     s = sp.strip()
+    # 2026-11-16（life/6848 实测）：CMS 把重音字母夹在 span 标签之间
+    # （Rodr</span>í<span>guez…），get_text(' ') 在标签边界插空格 →「Rodr í guez」。
+    # í 非 CJK，N1a 折叠不合并这些空格；即使姓名 token 已扩重音字母，
+    # 碎成独词的「í」仍使姓名匹配断裂 → 拉丁路径整体落空，残值被 F3 清空
+    # （speaker 空，公网卡片无主讲人行）。入口把「两侧均为拉丁字母的单个
+    # Latin-1 重音字母」重连（×/÷ 不在字母类内不会误触）。
+    # 跨标签的其他碎裂形态（重音字母随片段连写等）暂无实证语料，不扩。
+    s = re.sub(r'(?<=[A-Za-z])\s+([À-ÖØ-öø-ÿ])\s+(?=[A-Za-zÀ-ÖØ-öø-ÿ])', r'\1', s)
     # 入参守卫（2026-10-23，em 6966 实测）：本函数只在「主讲人标签值」上搜索英文姓名，
     # 而标签值最多是「Prof. XXX, University of XXX」这种 ≤ 60 字的短串。若调用方误把
     # **整段主讲人简介**喂进来（OCR 兜底路径 `_ocr_sp_pat` 的值捕获在长 bio 上会越界），
@@ -9093,7 +9107,11 @@ def _split_english_speaker(sp):
     # 「…已在国内外重要期刊Fuzzy Sets and Systems、IEEE Transactions on Fuzzy System…」
     # 被抽成 speaker='Fuzzy Sets'、affiliation='and Systems、IEEE Transactions on Fuzzy S'。
     # 简介必有「，男，/，女，/研究方向/发表论文」等特征，标签值绝无；二者任一命中即放弃。
-    if len(s) > 60 or re.search(
+    # 2026-11-16（life/6848）：60 字守卫会拦下「姓名, 英文单位」的合法标签值
+    #（本页去空格后仍 62 字）。放宽到 90——简历护栏本就由下方特征词承担
+    #（，男，/研究方向/发表论文…，em 6966 实测值 90+ 字且必含特征词），
+    # 纯长度无法区分「长单位名」与「误喂的简介」。
+    if len(s) > 90 or re.search(
             r'[，,]\s*[男女][，,]|研究方向|主要从事|主要研究|发表(?:论文|文章)|'
             r'代表作|曾(?:任|获)|现任|毕业(?:于|院校)|简介|简历', s):
         return '', '', ''
@@ -9130,9 +9148,9 @@ def _split_english_speaker(sp):
     #      ——原枚举只列 教授/副教授/助理教授/研究员，值后跟「副研究员」时匹配不上。
     # 与下方 aff 分支同理收敛到主表，职称词表不再手抄（tests/test_title_vocab_convergence 锁）。
     m = re.search(
-        r'(?<![A-Za-z])'
-        r'([A-Z][a-z]+(?:-[A-Z][a-z]+)*'
-        r'(?:\s+(?!(?:' + _EN_ORG_KW + r')\b)[A-Z][a-zA-Z\.]+){1,3})'
+        r'(?<![' + _LATIN1_LETTER + r'])'
+        r'([A-ZÀ-ÖØ][a-zà-öø-ÿ]+(?:-[A-ZÀ-ÖØ][a-zà-öø-ÿ]+)*'
+        r'(?:\s+(?!(?:' + _EN_ORG_KW + r')\b)[A-ZÀ-ÖØ][A-Za-zÀ-ÖØ-öø-ÿ\.]+){1,3})'
         r'(?=\s*(?:的|之)?'
         r'(?:学术讲座|讲座|报告|学术报告|演讲|专场|工作坊|沙龙|讲坛|论坛|会议|'
         r'研讨会|分享会|座谈会|讨论会|大讲堂|开讲|讲座预告|通知|启事|预告|'
