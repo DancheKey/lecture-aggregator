@@ -486,7 +486,12 @@ def build_stats(data, updated_at, blocked=None):
         if _ac:
             matched_campuses.add(_ac)
         if count_in_matrix:
-            for campus in matched_campuses:
+            # 2026-11-16（life/6848 推送核验实测）：matched_campuses 是字符串 set，
+            # 迭代顺序随 PYTHONHASHSEED 变化（seed 7/42/999 实测产出不同键序的
+            # stats.json）——deploy CI 全量重跑生成器时与本地 committed 产物
+            # 键序漂移，破坏「静态产物逐字节核验」。sorted() 固定 campus 维度
+            # 插入序；单位/年份维度本就来自 list/整数，无此问题。
+            for campus in sorted(matched_campuses):
                 cm = campus_matrix.setdefault(campus, {})
                 for c in count_units:
                     cm.setdefault(c, {})
