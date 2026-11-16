@@ -4214,7 +4214,9 @@ _EN_SPK_PREFIX_RE = re.compile(
 # 类定义刻意排除同区段的 ×(U+00D7)/÷(U+00F7) 两个非字母：Ø(00D8) 卡住 ×，
 # ø(00F8) 卡住 ÷。供 _EN_NAME_OK_RE 与 _split_english_speaker 的姓名 token 共用，
 # 勿手抄副本（G4 词表收敛同纪律）。
-_LATIN1_LETTER = 'A-Za-zÀ-ÖØ-öø-ÿ'
+# 2026-11-16：字面量定义上收为 field_vocab.LATIN1_LETTER 单一事实源
+# （DIRTY_TITLE_RE 的 Dr 前瞻同样需要这个类，两份副本必然漂移——G4 纪律）。
+_LATIN1_LETTER = _fv.LATIN1_LETTER
 _EN_NAME_OK_RE = re.compile(
     rf"^[{_LATIN1_LETTER}][{_LATIN1_LETTER}\.\-’']*(?:\s+[{_LATIN1_LETTER}][{_LATIN1_LETTER}\.\-’']*){{0,3}}$")
 

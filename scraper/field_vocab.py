@@ -749,13 +749,24 @@ def is_online_lecture(item):
 # 本块不参与摘要边界截断、不改 VOCAB_VERSION（llm 文本缓存仍有效）。
 # ---------------------------------------------------------------------------
 
+# Latin-1 补充区字母类（单一事实源，2026-11-16）：A-Z a-z + 重音拉丁字母
+# （À-Ö Ø-ö ø-ÿ），刻意排除同区段的 ×(U+00D7)/÷(U+00F7) 两个非字母。
+# 供 DIRTY_TITLE_RE 与 parsers 的英文姓名判据共用，勿手抄副本（G4 同纪律）。
+# 诞生背景（life/6848 实测）：DIRTY_TITLE_RE 的 `Dr\.?(?![A-Za-z])` 只挡
+# ASCII 字母，`Pedro L. Rodríguez` 内部的 R-o-**dr**-í-guez 命中 dr（í 非
+# ASCII）→ 正确的西语姓名被判「污染」→ daily 体检基线对比红、阻断发布。
+# 这是 Hedrich/Dreher（2026-09-22）同一教训的重音版翻版。
+LATIN1_LETTER = 'A-Za-zÀ-ÖØ-öø-ÿ'
+
 # 职称/职务噪声：field_vocab 主词表 + hybrid 历史补充词 + 英文头衔。
 # 内容与原 hybrid._DIRTY_TITLE_RE 一致，仅修正 Dr 的词边界（2026-09-22）：
 # 旧 `Dr\.?` 无边界会命中 Hedrich/Dreher 内部的 dr/Dr，把真人名判脏。
+# 2026-11-16：前瞻从 [A-Za-z] 放宽到 LATIN1_LETTER（重音字母也是字母），
+# `Rodríguez` 内部 dr 不再判脏；`Dr. 张三`/`Dr. John` 等真头衔照旧拦。
 DIRTY_TITLE_RE = re.compile(
     NAME_TITLE_SUFFIX_RE.pattern + '|' + ORG_TITLE_SUFFIX_RE.pattern +
     r'|博导|硕导|主编|编委|委员|会员|校长|副院长'
-    r'|Prof\.?|Professor|Dr\.?(?![A-Za-z])|Director|Dean|Chair', re.I)
+    rf'|Prof\.?|Professor|Dr\.?(?![{LATIN1_LETTER}])|Director|Dean|Chair', re.I)
 DIRTY_ORG_RE = re.compile(
     r'(大学|学院|研究院|研究所|实验室|研究中心|公司|集团|'
     r'University|Institute|College|School|Academy|Laboratory)', re.I)

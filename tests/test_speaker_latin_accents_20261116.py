@@ -138,5 +138,48 @@ class Life6848EndToEndTest(unittest.TestCase):
         self.assertTrue(P._looks_like_real_name(self.rec.get('speaker') or ''))
 
 
+class DirtySpeakerAccentsTest(unittest.TestCase):
+    r"""判脏词表的重音边界（2026-11-16 daily 红根因，与上两环同日连环）。
+
+    7182565 把 life/6848 的 speaker 修成 'Pedro L. Rodríguez' 后，
+    audit_fields 的「污染」检测经 field_vocab.is_dirty_speaker 把它判脏：
+    DIRTY_TITLE_RE 的 `Dr\.?(?![A-Za-z])` 在 R-o-**dr**-í-guez 内部命中
+    （í 非 ASCII 字母，前瞻挡不住）→ +1 新高危 → daily 基线对比红、阻断发布。
+    修复：前瞻与姓名字符类同用 field_vocab.LATIN1_LETTER（重音字母也是字母）。
+    """
+
+    def test_accent_name_not_dirty(self):
+        # 本次事故直接复现：正确的西语姓名不得判「污染」
+        import field_vocab as fv
+        self.assertFalse(fv.is_dirty_speaker('Pedro L. Rodríguez'))
+
+    def test_real_title_still_dirty(self):
+        # 真头衔形态照旧拦（放宽不得漏放）
+        import field_vocab as fv
+        self.assertTrue(fv.is_dirty_speaker('Dr. 张三'))
+        self.assertTrue(fv.is_dirty_speaker('Dr. John Smith'))
+        self.assertTrue(fv.is_dirty_speaker('主讲人：Dr. Wang'))
+
+    def test_dreher_unregressed(self):
+        # 2026-09-22 Hedrich/Dreher 修正成果不回退
+        import field_vocab as fv
+        self.assertFalse(fv.is_dirty_speaker('Dreher'))
+
+    def test_latin1_letter_single_source(self):
+        # G4 防漂移：parsers 的姓名字符类必须引用 field_vocab 单一事实源
+        self.assertEqual(P._LATIN1_LETTER, 'A-Za-zÀ-ÖØ-öø-ÿ')
+        import field_vocab as fv
+        self.assertEqual(P._LATIN1_LETTER, fv.LATIN1_LETTER)
+
+    def test_audit_no_pollution_high(self):
+        # 体检集成：带该 speaker 的记录不再产出「污染」高危（daily 基线口径）
+        sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+        import audit_fields
+        rec = {'title': '学术讲座', 'speaker': 'Pedro L. Rodríguez'}
+        issues = audit_fields.audit([rec])
+        poll = [i for i in issues if i[0] == '讲座人' and '污染' in i[3]]
+        self.assertEqual(poll, [])
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
