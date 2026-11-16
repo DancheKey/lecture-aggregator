@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 import field_vocab as _fv  # noqa: E402  多人/判脏词表单一事实源（C2 收敛）
 from excluded_urls import load_excluded, is_excluded, record_urls  # noqa: E402
+from parsers import _looks_like_real_name  # noqa: E402  姓名校验单一事实源（F3 同口径）
 
 
 def get(r, *keys):
@@ -188,6 +189,12 @@ FIX_RULES = [
     (r'^发布日期晚于讲座日', 'manual', '疑似回顾稿/新闻稿：按规则应删除而非修复，需人工确认'),
     (r'^隐形记录', 'manual', '确认无需展示后从主库删除该条（排除名单的语义即「删过的不再回来」，'
                             '合并中间态漏删的存量会长期占位）；若属名单误登，则复议名单'),
+    (r'^VLM/海报有据但主讲人为空', 'manual',
+     '管线丢值（VLM 好值被规则残值覆盖后被守卫清空，life/6848 三连环）：'
+     '回源页重解析，或从 data/.vlm_cache.json 的 VLM 结果回填后走 lectures_writer 落库'),
+    (r'^VLM/海报有据但主讲人未过姓名校验', 'manual',
+     '疑似正文残值入库：回源页重解析。守卫降级（F3-FALLBACK，2026-11-16）上线后'
+     '新入库记录会自动回退 VLM 候选，存量需人工处理'),
 ]
 
 FIX_LABEL = {'auto': ('可自动修', 'fx-a'),
@@ -313,7 +320,27 @@ def scan(recs, excluded=None):
         # ---------- 主讲人 ----------
         if not spk:
             issues.append(('缺失', 'speaker', '低', '主讲人为空', '(空)', r))
+            # 不变量绊线（2026-11-16 ①，life/6848 三连环教训）：「源页本没有
+            # 主讲人」与「VLM 读到过人名却被管线弄丢」在既有低危缺失档里无法
+            # 区分——后者必须单独标红督促回源。判据与解析器守卫同源
+            # （parsers._looks_like_real_name），多主讲「、」串逐段校验。
+            if (r.get('hasPosterImage')
+                    or (r.get('imageParseMethod') or '') == 'vlm'
+                    or bool(r.get('vlmExtracted'))):
+                issues.append(('主讲人', 'speaker', '高',
+                               'VLM/海报有据但主讲人为空（管线丢值，候选可救）',
+                               "img=%s vlm=%s poster=%s"
+                               % (r.get('imageParseMethod'), r.get('vlmExtracted'),
+                                  r.get('hasPosterImage')), r))
         else:
+            _spk_segs = [x.strip() for x in re.split(r'[、,，]', spk) if x.strip()]
+            if (_spk_segs and all(_looks_like_real_name(x) for x in _spk_segs)):
+                pass  # 单人过校验或多主讲逐段全过（含外文音译「·」），合规
+            elif (r.get('hasPosterImage')
+                  or (r.get('imageParseMethod') or '') == 'vlm'
+                  or bool(r.get('vlmExtracted'))):
+                issues.append(('主讲人', 'speaker', '高',
+                               'VLM/海报有据但主讲人未过姓名校验（疑似残值入库）', spk, r))
             if TITLE_RE.search(spk):
                 issues.append(('主讲人', 'speaker', '高', '姓名含职称/职务', spk, r))
             if ORG_RE.search(spk):

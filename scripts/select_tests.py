@@ -122,6 +122,7 @@ GROUPS = [
                'tests/test_bio_abs_cross_guard.py',
                'tests/test_review_fixes_20261114.py',
                'tests/test_speaker_latin_accents_20261116.py',
+               'tests/test_f3_fallback_tripwire_20261116.py',
                'tests/test_env_flags.py']},
     # 抓取主流程 / 水位 / 台账 / 缓存 / sources.yaml
     {'name': 'crawl', 'pats': ['scraper/scraper.py', 'scraper/sources.yaml',
@@ -148,7 +149,8 @@ GROUPS = [
     {'name': 'audit', 'pats': ['scripts/audit_fields.py', 'scripts/audit_data_quality.py',
                                'scripts/gen_title_audit_html.py', 'scripts/gen_reparse_review_html.py',
                                'scripts/backfill_abstract.py'],
-     'tests': ['tests/test_audit_html_escape.py', 'tests/test_backfill_abstract.py']},
+     'tests': ['tests/test_audit_html_escape.py', 'tests/test_backfill_abstract.py',
+               'tests/test_f3_fallback_tripwire_20261116.py']},
     # 一次性运维工具（fix_/apply_/scan_/resplit_/reparse_）：无任何测试覆盖是现状，
     # 显式列出而非通配——新增工具脚本会逼一次 conscious 决策（见 docstring 红线）。
     {'name': 'tools', 'pats': ['scripts/apply_duty_suffix_fix.py', 'scripts/apply_title_fragment_fix.py',

@@ -2181,6 +2181,39 @@ def _vlm_try_one_provider(message, cfg, proxies, rpm=None):
     return None, False
 
 
+def _f3_fallback_to_vlm(result):
+    """F3 守卫降级不销毁（2026-11-16 ②，life/6848 三连环教训）。
+
+    事故链：VLM 从海报读到干净人名 → 规则层用正文残值**无条件覆盖**（:6430
+    elif sp_clean 分支不查空位）→ F3 守卫判残值非人名**清空**。三步各自按
+    合同正确，组合却把好值弄丢，公网卡片静默缺「主讲人」行。
+
+    本函数在 wipe 前查 `_apply_vlm_to_result` 暂存的候选（`_vlmSpCand`，已
+    按 `_vlm_speaker_valid` 同口径逐段过 `_looks_like_real_name`），命中即
+    恢复 speaker（speakerAffiliation 为空时一并从 `_vlmAffCand` 恢复），
+    返回 True；无候选 / 候选无效返回 False，调用方照旧清空并打 [F3-WIPE]，
+    无候选时行为与历史逐字节一致。
+
+    候选键为 `_` 前缀私有键（_hasClock 同惯例），由 `_gate_record` 出闸统一
+    pop，不进 lectures.json。恢复值统一以「、」连接多段（与同题多人合并
+    口径一致，且保证恢复值自身能通过多段校验）。
+    """
+    cand = (result.get('_vlmSpCand') or '').strip()
+    if not cand:
+        return False
+    segs = [x.strip() for x in re.split(r'[、,，/]', cand) if x.strip()]
+    if not (segs and all(_looks_like_real_name(x) for x in segs)):
+        return False
+    result['speaker'] = '、'.join(segs)
+    if not (result.get('speakerAffiliation') or '').strip():
+        affc = (result.get('_vlmAffCand') or '').strip()
+        if affc:
+            result['speakerAffiliation'] = affc
+    print('[F3-FALLBACK] %s speaker=%r <- vlm候选'
+          % (result.get('sourceUrl') or '?', result['speaker']), file=sys.stderr)
+    return True
+
+
 def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_year,
                           poster_only=False):
     """把 VLM 结构化字段填入 result（非空才填，不覆盖已有）。
@@ -2244,6 +2277,16 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
     _vlm_sp_segs = [x.strip() for x in re.split(r'[、,，/]', _vlm_speaker) if x.strip()]
     _vlm_speaker_valid = bool(_vlm_sp_segs) and all(
         _looks_like_real_name(x) for x in _vlm_sp_segs)
+    # 2026-11-16 守卫降级不销毁（②）：把通过姓名校验的 VLM 主讲人/单位暂存为
+    # 私有候选键。规则层此后可能用正文残值覆盖 speaker（elif sp_clean 分支
+    # 不查空位），下游 F3/D-FINAL/D-ORG 清空守卫经 _f3_fallback_to_vlm 回退
+    # 到这里，避免「VLM 好值 → 规则覆盖 → F3 清空」三连环丢人名（life/6848）。
+    # `_` 前缀私有键（_hasClock 同惯例），_gate_record 出闸统一 pop。
+    if _vlm_speaker_valid:
+        result['_vlmSpCand'] = '、'.join(_vlm_sp_segs)
+        _vlm_aff_cand = (f.get('speakerAffiliation') or '').strip()
+        if _vlm_aff_cand:
+            result['_vlmAffCand'] = _vlm_aff_cand
     _MAP = [
         ('title', 'title'), ('topic', 'topic'),
         ('speaker', 'speaker'), ('speakerTitle', 'speakerTitle'),
@@ -2279,13 +2322,15 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
             _segs = [s.strip() for s in re.split(r'[、,，]', result['speaker']) if s.strip()]
             if not (_segs and all(_looks_like_real_name(s) for s in _segs)
                     and len(set(_segs)) == len(_segs)):
+                if not _f3_fallback_to_vlm(result):
+                    result['speaker'] = ''
+                    result['speakerAffiliation'] = ''
+                    _f3_wiped = True
+        else:
+            if not _f3_fallback_to_vlm(result):
                 result['speaker'] = ''
                 result['speakerAffiliation'] = ''
                 _f3_wiped = True
-        else:
-            result['speaker'] = ''
-            result['speakerAffiliation'] = ''
-            _f3_wiped = True
         if _f3_wiped:
             print('[F3-WIPE] %s vlm-path speaker=%r'
                   % (result.get('sourceUrl') or result.get('title') or '?', _f3_bad),
@@ -4030,6 +4075,11 @@ def _replace_schedule_tables_with_text(soup):
 # ---------------------------------------------------------------------------
 def _gate_record(r, url=''):
     """对单条记录的富文本字段做出口清洗。改动写入 r['qaGate'] 便于审计。"""
+    # 私有候选键出闸即剥（_hasClock 同惯例，2026-11-16 ②）：仅供管线内
+    # F3/D-FINAL/D-ORG 降级回退消费，不进最终字段集；FRONTEND_KEEP 白名单
+    # 不收下划线键，这里是双保险，保证 data/lectures.json 也干净。
+    r.pop('_vlmSpCand', None)
+    r.pop('_vlmAffCand', None)
     changed = []
     # topic 专项：只做边界截断（MS 拆分场次的 topic 常拖"报告专家:…北京师范大学"
     # 尾巴），不置空、不做摘要专属守卫——题目短是正常的。
@@ -6646,18 +6696,22 @@ def _extract_speaker(_st, result, title, imgs, vlm_fields, t, t_untrusted,
     if result.get('speaker') and not _looks_like_real_name(result['speaker']):
         # 多主讲人用「、」「,」「，」连接：逐段校验，全为有效人名时保留
         # 2026-10-07 留证：清空时打 [F3-WIPE]（详见 _apply_vlm_to_result 同名块）
+        # 2026-11-16 ②：清空改为降级——先回退 VLM 候选（life/6848 三连环），
+        # 无候选/候选无效才真正清空。
         _f3_bad = result['speaker']
         _f3_wiped = False
         if re.search(r'[、,，]', result['speaker']):
             _segs = [s.strip() for s in re.split(r'[、,，]', result['speaker']) if s.strip()]
             if not (_segs and all(_looks_like_real_name(s) for s in _segs)):
+                if not _f3_fallback_to_vlm(result):
+                    result['speaker'] = ''
+                    result['speakerAffiliation'] = ''
+                    _f3_wiped = True
+        else:
+            if not _f3_fallback_to_vlm(result):
                 result['speaker'] = ''
                 result['speakerAffiliation'] = ''
                 _f3_wiped = True
-        else:
-            result['speaker'] = ''
-            result['speakerAffiliation'] = ''
-            _f3_wiped = True
         if _f3_wiped:
             print('[F3-WIPE] %s ocr-path speaker=%r'
                   % (result.get('sourceUrl') or title or '?', _f3_bad),
@@ -7227,8 +7281,10 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
     if result.get('speaker') and re.search(
             r'(?:处|部|院|系|中心|公司|局|委|办|室|所|厅|署|集团|大学|学院|研究院|'
             r'巡视员|科员|科长|副科长|干事|二级|一级|三级)$', result['speaker']):
-        result['speaker'] = ''
-        result['speakerAffiliation'] = ''
+        # 2026-11-16 ②：同为清空守卫，先降级回退 VLM 候选再清空（口径统一）。
+        if not _f3_fallback_to_vlm(result):
+            result['speaker'] = ''
+            result['speakerAffiliation'] = ''
 
     # D-ORG: speaker 命中组织名后缀时清空；speaker 为空时也尝试从
     # 「特邀专家/专家:姓名」补充提取。
@@ -7238,7 +7294,10 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         r'^(?:法学会|学会|协会|研究会|联合会|基金会|中心|委员会|'
         r'团队|联盟|工作组|办公室|编辑部|理事会|组委会)$')
     if result.get('speaker') and _ORG_SUFFIX.match(result['speaker'].strip()):
-        result['speaker'] = ''
+        # 2026-11-16 ②：同 D-FINAL，先降级回退 VLM 候选（只清 speaker 不清
+        # 单位的原行为保留在无候选分支）。
+        if not _f3_fallback_to_vlm(result):
+            result['speaker'] = ''
     if not result.get('speaker'):
         # 尝试从 text/topic/abstract 提取「特邀专家/特邀嘉宾/专家: 姓名」
         for _src in (_st.text, result.get('topic') or '', result.get('abstract') or ''):
