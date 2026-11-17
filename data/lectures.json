@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-16T21:41:12+08:00",
+  "updatedAt": "2026-11-17T22:25:56+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261218/8898.html",
@@ -237,6 +237,36 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "[2026年11月19日]费少明——量子计算与量子信息处理相关研究介绍"
+    },
+    {
+      "sourceUrl": "http://iqm.scnu.edu.cn/a/20261117/576.html",
+      "images": [],
+      "college": "量子物质研究院",
+      "campus": "大学城",
+      "title": "Yue Zhao——Gravitational wave probes to new physics beyond the Standard Model",
+      "topic": "Gravitational wave probes to new physics beyond the Standard Model",
+      "lectureStart": "2026-11-18 10:00:00",
+      "lectureEnd": "2026-11-18 11:00:00",
+      "location": "理8栋230会议室",
+      "speaker": "Yue Zhao",
+      "speakerTitle": "Associate Director",
+      "speakerAffiliation": "Hong Kong University of Science and Technology",
+      "inviter": "",
+      "speakerBio": "Yue Zhao is a theoretical particle physicist who focuses on searching for new physics and understanding dark matter. He got his B.S. from Peking University and Ph.D. from Rutgers University. He did his postdoc at Stanford and U. of Michigan. He joined the Physics & Astronomy Department at the University of Utah in 2018, and he moved to Hong Kong University Science and Technology in 2025. Now he is the Associate Director of IAS Center for Fundamental Physics.",
+      "organizer": "量子物质研究院",
+      "publishTime": "2026-11-17 16:52:00",
+      "publishTimeSource": "position",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "speakerSource": "label",
+      "abstract": "This talk will explore how gravitational-wave interferometers can serve as powerful probes of new physics across vastly different mass scales. I will first show that data from the LIGO-Virgo-KAGRA Collaboration can help resolve a long-standing puzzle: whether the GeV gamma-ray excess at the Galactic Center originates from annihilating weakly interacting massive particles or from a population of milisecond pulsars. Turning to lighter dark matter candidates, I will then demonstrate how the same gravitational-wave detectors enable the direct detection of several species of ultralight bosons, including dark photons, axions, and dilatons. Finally, I will present recent efforts to bring dark radiation into the scope of multi-messenger astronomy. More explicitly, we demonstrate how to fully utilize information from gravitational-wave channel physics to search for dark radiation from black hole mergers using quantum sensing techniques. Together, these methods illustrate how GW channels can form powerful discovery tools for new physics.",
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": "label",
+      "llmAdopted": "speakerTitle|speakerAffiliation",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "[2026年11月18日]Yue Zhao——Gravitational wave probes to new physics beyond the Standard Model"
     },
     {
       "sourceUrl": "http://cs.scnu.edu.cn/a/20261113/6033.html",
