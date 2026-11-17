@@ -8,24 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://cs.scnu.edu.cn/a/20261113/6033.html@danchekey.github.io
-DTSTAMP:20261116T134112Z
-DTSTART:20261117T020000Z
-DTEND:20261117T033000Z
-SUMMARY:第70期学术报告预告｜大模型最新技术进展及教育
- 应用实践
-LOCATION:计算机学院东阶梯学术报告厅
-DESCRIPTION:题目：大模型最新技术进展及教育应用实践\n主
- 讲：王士进（科大讯飞）\n地点：计算机学院东阶梯学
- 术报告厅\n主办：计算机学院
-URL:http://cs.scnu.edu.cn/a/20261113/6033.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://iqm.scnu.edu.cn/a/20261110/574.html@danchekey.github.io
 DTSTAMP:20261116T134112Z
 DTSTART:20261119T060000Z
