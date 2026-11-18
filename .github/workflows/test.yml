@@ -73,6 +73,10 @@ jobs:
       # （bio 出口清理后叙事兜底子串判据须归一化比较，防元信息骨架污染 abstract）
       - name: Run bio speaker-prefix life tests
         run: python tests/test_bio_speaker_prefix_20261024.py
+      # 2026-11-18：cs/6036「报告人：姓名，」短句与「报告人简介」完整段双锚点冲突，
+      # 短句抢起点 + BIO_STOP 自撞导致简介只剩 15 字；锁 395 字完整原文与关键字段。
+      - name: Run bio anchor conflict tests
+        run: python tests/test_bio_anchor_cs6036.py
       # 2026-10-25：VLM 题目单字互校（mks/20「勷→勠」形近字，difflib 对齐 + 源页
       # 双佐证才替换）+ VLM 缓存 provider 归因（value 写 _provider，防两视觉通道
       # 产出无法归因）+ poster_only 接线回归锁

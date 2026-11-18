@@ -123,6 +123,7 @@ GROUPS = [
                'tests/test_review_fixes_20261114.py',
                'tests/test_speaker_latin_accents_20261116.py',
                'tests/test_f3_fallback_tripwire_20261116.py',
+               'tests/test_bio_anchor_cs6036.py',
                'tests/test_env_flags.py']},
     # 抓取主流程 / 水位 / 台账 / 缓存 / sources.yaml
     {'name': 'crawl', 'pats': ['scraper/scraper.py', 'scraper/sources.yaml',

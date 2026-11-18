@@ -6956,6 +6956,21 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
         return _despace_cjk_digits(bio)
 
     m = re.search(_bio_rx, _st.body_text)
+    # 2026-11-18 cs/6036 实测病根（锚点优先级冲突，非标签断裂/VLM/抓取漏页）：
+    # 同页先出现「报告人：郑伟诗，中山大学计算机学院教授」短句锚点，后文又有独立
+    # 「报告人简介：郑伟诗，…（395 字）」完整段。旧逻辑 re.search 只取首个 → 短句
+    # 抢到起点，而 BIO_STOP 含裸词「报告人简介」又把短句截断在该标签处，完整简介
+    # 反倒成了短句的终止符（最终只剩 15 字）。
+    # 精准修法：仅当首个锚点是「报告人：姓名，」短句（其匹配文本不含「简介」），
+    # 且其**后文确有**「报告人简介」标签、后者抽出的候选更长时，才切换起点。
+    # ⚠ 不改成泛化的「谁长取谁」——psy1179/psy1305/yjsy10291 实测会被英文片段或
+    #   「研究员,博士生导师…」错误开头替换；41 个离线夹具实测本变体零差异。
+    if m and m.group(0).startswith('报告人') and '简介' not in m.group(0):
+        _lb = re.search(r'报告人简介', _st.body_text[m.start():])
+        if _lb:
+            _m2 = re.search(_bio_rx, _st.body_text[m.start() + _lb.start():])
+            if _m2 and len(_m2.group(1)) > len(m.group(1)):
+                m = _m2
     if m:
         bio = _clean_bio_candidate(m)
         if len(bio) > 10:
