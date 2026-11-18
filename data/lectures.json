@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-18T16:03:08+08:00",
+  "updatedAt": "2026-11-18T22:00:17+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261218/8898.html",
@@ -387,6 +387,34 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "2026-11-13第70期学术报告预告"
+    },
+    {
+      "sourceUrl": "http://xz.scnu.edu.cn/a/20261111/376.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/xingzhi/2026/1118/1794988985158896.jpg"
+      ],
+      "college": "行知书院",
+      "campus": "汕尾",
+      "title": "弹指千年:走进琵琶的艺术世界",
+      "topic": "弹指千年:走进琵琶的艺术世界",
+      "lectureStart": "2026-11-16 19:00:00",
+      "lectureEnd": null,
+      "location": "汕尾校区一站式服务中心",
+      "speaker": "张婷婷",
+      "speakerTitle": "",
+      "speakerAffiliation": "广东省民族乐团",
+      "inviter": "",
+      "speakerBio": "广东省民族乐团国家二级演奏员",
+      "organizer": "行知书院",
+      "publishTime": "2026-11-11 16:00:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "abstract": "2020年8月，获第四届“敦煌杯”中国琵琶艺术菁英展演优秀指导教师奖；2022年7月，获首届“国韵杯”民族器乐艺术展演活动优秀指导教师称号；2023年8月，获第七届“敦煌杯”中国琵琶艺术菁英展演优秀指导教师奖。本次讲座，张老师将以琵琶艺术为主线，从琵琶名称由来、历史演变、形制构造与演奏技法切入带领大家赏析不同时期琵琶作品，感受乐曲独有的风格特征，搭配现场演奏示范，沉浸式领略琵琶从古至今的风采，展现琵琶由传统走向当代的蓬勃艺术生命力。",
+      "vlmExtracted": true,
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "20261116 弹指千年:走进琵琶的艺术世界"
     },
     {
       "sourceUrl": "https://physics.scnu.edu.cn/a/20261116/13431.html",
@@ -1724,6 +1752,34 @@
       "listTitle": "在“生活史”视野下理解1920年代的中国革命"
     },
     {
+      "sourceUrl": "http://xz.scnu.edu.cn/a/20261103/377.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/xingzhi/2026/1118/1794989046223431.jpg"
+      ],
+      "college": "行知书院",
+      "campus": "汕尾",
+      "title": "土地与歌 中国民歌的地域风格",
+      "topic": "土地与歌",
+      "lectureStart": "2026-11-06 15:00:00",
+      "lectureEnd": null,
+      "location": "汕尾校区南区教学楼303",
+      "speaker": "万钟如",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "华南师范大学音乐学院",
+      "inviter": "",
+      "speakerBio": "华南师范大学音乐学院教授，博士研究生导师",
+      "organizer": "行知书院",
+      "publishTime": "2026-11-03 16:00:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "abstract": "土地与歌·听见中国的另一种地图。你听过“土地的口音”吗？同样一句“我爱你”，在黄土高坡是朝天生吼，在黑土地是火辣辣的俏皮，在红土深山是清亮亮的多声合唱。民歌，不是乐谱上尘封的古董，是方言、地貌、劳作凝结而成的“声音化石”，是土地自己开口说话。信天游高亢，源于沟壑深远；江南小调婉婉，来自水网巷陌。一方水土，养一方歌声。本场讲座不带乐理门槛，不用识谱，不用懂调式。只用耳朵，带你听见山河：南与北，为何一曲两样腔调？黑土地、黄土地、红土地，各自长出怎样的歌？一首民歌里，藏着怎样的中国人情与山河故事。面向所有人，尤其适合没系统学过音乐，却偏爱声音里“味道”的你。",
+      "vlmExtracted": true,
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "20261106 土地与歌 中国民歌的地域风格"
+    },
+    {
       "sourceUrl": "http://em.scnu.edu.cn/a/20261105/11227.html",
       "images": [],
       "college": "经济与管理学院",
@@ -1752,6 +1808,34 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "● 华师经管学术讲座第551期（经济）"
+    },
+    {
+      "sourceUrl": "http://xz.scnu.edu.cn/a/20261102/378.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/xingzhi/2026/1118/1794989080747136.jpg"
+      ],
+      "college": "行知书院",
+      "campus": "汕尾",
+      "title": "从海岸出发:汕尾青年音乐创作分享会",
+      "topic": "从海岸出发:汕尾青年音乐创作分享会",
+      "lectureStart": "2026-11-05 19:00:00",
+      "lectureEnd": null,
+      "location": "汕尾校区南区教学楼102",
+      "speaker": "曾粤特",
+      "speakerTitle": "",
+      "speakerAffiliation": "",
+      "inviter": "",
+      "speakerBio": "",
+      "organizer": "行知书院",
+      "publishTime": "2026-11-02 16:00:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "abstract": "凌晨海岸乐队，由汕尾本地音乐人共同组建，擅长R&B等流行音乐创作与演出，关注沿海青年生活，以音乐展现汕尾滨海城市文化气息。乐队于2026年参与《“山海升明月”2026粤港澳大湾区中秋晚会》音乐监制与节目演出，同年受邀参加海丰“致青春·逐梦前行”五四青年节音乐会。\n本次讲座采用音乐交流沙龙形式，结合创作分享、现场演绎和师生互动，介绍音乐创作实践经历与青年成长体验，分享汕尾滨海生活、乡土人情与地方文化符号在当代音乐中的表达，展现汕尾本土音乐的活力与地域文化魅力。",
+      "vlmExtracted": true,
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "20261105 从海岸出发:汕尾青年音乐创作分享会"
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20261105/11230.html",
