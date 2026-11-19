@@ -8,45 +8,8 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:https://em.scnu.edu.cn/a/20261119/11258.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
-DTSTART:20261119T043000Z
-DTEND:20261119T053000Z
-SUMMARY:华师经英Seminar第67期｜Female Leaders' Adaptive Responses t
- o AI-related Gender Stereotypes: A Study Based on Social Cognitive Career
-  Theory
-LOCATION:大学城校园文2栋301会议室
-DESCRIPTION:题目：Female Leaders' Adaptive Responses to AI-related Gend
- er Stereotypes: A Study Based on Social Cognitive Career Theory\n主讲
- ：李馨（华南师范大学）\n地点：大学城校园文2栋301会
- 议室\n主办：经济与管理学院
-URL:https://em.scnu.edu.cn/a/20261119/11258.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://iqm.scnu.edu.cn/a/20261110/574.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
-DTSTART:20261119T060000Z
-DTEND:20261119T070000Z
-SUMMARY:费少明——量子计算与量子信息处理相关研究介绍
-LOCATION:理8栋118学术报告厅
-DESCRIPTION:题目：量子计算与量子信息处理相关研究介绍\n
- 主讲：费少明（首都师范大学）\n地点：理8栋118学术报
- 告厅\n主办：量子物质研究院
-URL:http://iqm.scnu.edu.cn/a/20261110/574.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261120/8897.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
+DTSTAMP:20261119T073112Z
 DTSTART:20261120T020000Z
 DTEND:20261120T030000Z
 SUMMARY:勷勤数学•专家报告-李平｜Topological obstructions to g
@@ -64,7 +27,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261116/13432.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
+DTSTAMP:20261119T073112Z
 DTSTART:20261120T020000Z
 DTEND:20261120T030000Z
 SUMMARY:物理学院学术报告（第61期）上海交通大学王佛泓
@@ -82,7 +45,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://cs.scnu.edu.cn/a/20261118/6036.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
+DTSTAMP:20261119T073112Z
 DTSTART:20261120T023000Z
 DTEND:20261120T040000Z
 SUMMARY:第71期学术报告预告｜移动机器人视觉言语自主导
@@ -100,7 +63,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261120/8901.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
+DTSTAMP:20261119T073112Z
 DTSTART:20261120T080000Z
 DTEND:20261120T090000Z
 SUMMARY:勷勤数学•专家报告-赖柏顺｜Quantitative regularity to
@@ -118,7 +81,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1124.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
+DTSTAMP:20261119T073112Z
 DTSTART:20261123T010000Z
 DTEND:20261123T020000Z
 SUMMARY:华南师范大学砺儒讲坛第148讲：社会合作规范——
@@ -137,7 +100,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261124/8882.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
+DTSTAMP:20261119T073112Z
 DTSTART:20261124T070000Z
 DTEND:20261124T080000Z
 SUMMARY:勷勤数学•专家报告-赵立璐｜关于二次型的Roth型
@@ -154,8 +117,27 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:https://em.scnu.edu.cn/a/20261126/11260.html@danchekey.github.io
+DTSTAMP:20261119T073112Z
+DTSTART:20261126T073000Z
+DTEND:20261126T083000Z
+SUMMARY:华师经管学术讲座第557期（管理）｜中国科创债券
+ 的发行定价之谜——基于债券市场"科技板"的证据
+LOCATION:大学城校园文二栋301会议室
+DESCRIPTION:题目：中国科创债券的发行定价之谜——基于
+ 债券市场"科技板"的证据\n主讲：张凯亮（暨南大学）\n
+ 地点：大学城校园文二栋301会议室\n主办：经济与管理
+ 学院
+URL:https://em.scnu.edu.cn/a/20261126/11260.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1125.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
+DTSTAMP:20261119T073112Z
 DTSTART:20261210T060000Z
 DTEND:20261210T070000Z
 SUMMARY:华南师范大学砺儒讲坛第149讲： 预测人口的空间
@@ -173,7 +155,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261218/8898.html@danchekey.github.io
-DTSTAMP:20261118T140017Z
+DTSTAMP:20261119T073112Z
 DTSTART:20261218T020000Z
 DTEND:20261218T030000Z
 SUMMARY:勷勤数学•专家报告-杨绮云｜Dimensional reduction for 

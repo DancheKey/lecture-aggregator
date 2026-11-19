@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-18T22:00:17+08:00",
+  "updatedAt": "2026-11-19T15:31:12+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261218/8898.html",
@@ -69,6 +69,36 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "华南师范大学砺儒讲坛第149讲： 预测人口的空间分布——跨越10年的Zipf’s Law研究（陆铭教授）"
+    },
+    {
+      "sourceUrl": "https://em.scnu.edu.cn/a/20261126/11260.html",
+      "images": [],
+      "college": "经济与管理学院",
+      "campus": "大学城",
+      "title": "华师经管学术讲座第557期（管理）",
+      "topic": "中国科创债券的发行定价之谜——基于债券市场\"科技板\"的证据",
+      "lectureStart": "2026-11-26 15:30:00",
+      "lectureEnd": null,
+      "location": "大学城校园文二栋301会议室",
+      "speaker": "张凯亮",
+      "speakerTitle": "讲师",
+      "speakerAffiliation": "暨南大学",
+      "inviter": "",
+      "speakerBio": "张凯亮,会计学博士,暨南大学管理学院会计系讲师。博士毕业于复旦大学管理学院,耶鲁大学管理学院海外联合培养。主要研究领域是债务契约、债券市场、银行信贷与公司财务,相关论文发表于《管理世界》。主持首批国家自然科学基金青年学生基础研究项目(博士研究生)和国家自然科学基金青年科学基金项目(C类)。",
+      "organizer": "经济与管理学院",
+      "publishTime": null,
+      "publishTimeSource": "url_proxy",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "债券市场\"科技板\"是我国构建科技金融体制的关键举措,有助于债券市场服务国家创新驱动发展战略和产业转型升级。全球范围内,科技创新活动具有高风险与高不确定性,而我国科技创新债券(科创债券)的发行定价却呈现出\"高风险\"与\"低利率\"并存的独特现象。对此,本文探究了我国科创债券的发行定价机理与经济后果。研究发现,相较于非科创债券,科创债券具有显著更低的发行利差,并且这一现象主要集中在交易所债券市场,而非银行间债券市场。机制分析表明,交易所债券市场中活跃的科创债券做市和科创债券ETF交易制度有效提高了科创债券流动性,降低了科创债券流动性溢价,从而降低了科创债券发行利差。异质性分析表明,当债券发行人科创属性更强、地区科创水平更高及发行人信用风险更低时,科创债券流动性效应更加显著。经济后果检验发现,公司发行科创债券后,其研发投入水平显著提升,表明科创债券能够有效支持公司科技创新活动。本文从创新型交易制度设计视角为我国科创债券发行定价之谜提供了理论解释,揭示了市场流动性供给机制在科创债券定价中的关键作用,为我国进一步推动科技金融战略提供了重要的政策启示。",
+      "newsFilterBypass": true,
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle|speakerAffiliation",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "● 华师经管学术讲座第557期（管理）"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261124/8882.html",
