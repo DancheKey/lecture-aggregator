@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-20T16:04:30+08:00",
+  "updatedAt": "2026-11-20T16:43:41+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261218/8898.html",
@@ -28770,7 +28770,7 @@
       "campus": "汕尾",
       "title": "戏剧游戏在中小学课堂中的应用",
       "topic": "戏剧游戏在中小学课堂中的应用",
-      "lectureStart": "2024-11-27 08:00:00",
+      "lectureStart": "2024-11-27 00:00:00",
       "lectureEnd": null,
       "location": "南区教学楼302",
       "speaker": "罗乐瑜",
@@ -28784,7 +28784,7 @@
       "listTitle": "戏剧游戏在中小学课堂中的应用",
       "imageParseMethod": "vlm",
       "hasPosterImage": true,
-      "timeUnknown": true,
+      "timeUnknown": false,
       "images": [
         "http://statics.scnu.edu.cn/pics/xingzhi/2023/1218/20231218085801627.png",
         "http://statics.scnu.edu.cn/pics/xingzhi/2025/0227/1740623356857086.jpg",
@@ -50474,8 +50474,8 @@
       "campus": "汕尾",
       "title": "行知书院科学教育发展与创新训练营",
       "topic": "行知书院科学教育发展与创新训练营",
-      "lectureStart": "2023-05-31 08:00:00",
-      "lectureEnd": null,
+      "lectureStart": "2023-05-31 00:00:00",
+      "lectureEnd": "2023-06-02 00:00:00",
       "location": "汕尾校区南区教学楼",
       "speaker": "包雷",
       "speakerTitle": "双聘教授",
@@ -50488,7 +50488,7 @@
       "listTitle": "行知书院科学教育发展与创新训练营",
       "imageParseMethod": "vlm",
       "hasPosterImage": true,
-      "timeUnknown": true,
+      "timeUnknown": false,
       "images": [
         "http://statics.scnu.edu.cn/pics/xingzhi/2023/1218/20231218085801627.png",
         "http://statics.scnu.edu.cn/pics/xingzhi/2024/0304/1709541493331756.jpg",
