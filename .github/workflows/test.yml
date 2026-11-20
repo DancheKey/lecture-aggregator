@@ -142,6 +142,8 @@ jobs:
         run: python tests/test_speaker_latin_accents_20261116.py
       - name: Run F3 fallback + audit tripwire tests (2026-11-16)
         run: python tests/test_f3_fallback_tripwire_20261116.py
+      - name: Run competition title guard tests (2026-11-20)
+        run: python tests/test_competition_title_guard_20261120.py
       - name: Run mother-record guard tests
         run: python tests/test_mother_record_guard.py
       - name: Run stage function variable leak check

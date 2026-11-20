@@ -2530,7 +2530,19 @@ def is_non_lecture_title(title):
     if not title:
         return False
     if any(k in title for k in _NON_LECTURE_KW):
-        return True
+        # 比赛类词豁免（2026-11-20 xz/366 实测：「全国市场调研大赛写作指导讲座」
+        # 被「大赛」一票否决 → 整页丢弃 + 记入台账）。真赛事标题以「大赛/竞赛/比赛」
+        # **收尾**（如「研究生职业规划大赛」），而「XX大赛写作指导讲座」的比赛词后
+        # 仍有讲座词（LECTURE_KW 单一事实源）——后者是真讲座，放行。
+        # 保守：仅当唯一命中的非讲座词是比赛词、且比赛词之后仍有讲座词才豁免；
+        # 若同时命中喜讯/征文/答辩等其它非讲座词，照旧一票否决。
+        _comp = ('大赛', '竞赛', '比赛')
+        _comp_hit = [k for k in _comp if k in title]
+        _other_hit = [k for k in _NON_LECTURE_KW if k not in _comp and k in title]
+        _tail = title[max((title.find(k) for k in _comp_hit), default=-1) + 2:]
+        if not (_comp_hit and not _other_hit
+                and any(k in _tail for k in LECTURE_KW)):
+            return True
     # 行政申报/征集/评选类通知（非公开学术讲座）：须同时具备「关于…」框架与文末「通知/公告」，
     # 且仅在含明确行政动词（申报/征集/评选/招募/招新/遴选/选拔）时判为非讲座，避免误杀正文
     # 提及这些词的真实讲座预告（真实讲座标题不会以「关于…通知」框架收尾）。

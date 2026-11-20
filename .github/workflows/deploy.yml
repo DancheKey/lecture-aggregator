@@ -91,6 +91,7 @@ jobs:
             tests/test_review_fixes_20261114.py
             tests/test_speaker_latin_accents_20261116.py
             tests/test_f3_fallback_tripwire_20261116.py
+            tests/test_competition_title_guard_20261120.py
             tests/test_mother_record_guard.py
             tests/test_stage_var_leak.py
             tests/test_ledger.py

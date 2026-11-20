@@ -8,42 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261120/8897.html@danchekey.github.io
-DTSTAMP:20261119T142910Z
-DTSTART:20261120T020000Z
-DTEND:20261120T030000Z
-SUMMARY:勷勤数学•专家报告-李平｜Topological obstructions to g
- eometric positivity on Calabi-Yau manifolds
-LOCATION:数科院东楼401
-DESCRIPTION:题目：Topological obstructions to geometric positivity on C
- alabi-Yau manifolds\n主讲：李平（复旦大学）\n地点：数科
- 院东楼401\n主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261120/8897.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:https://physics.scnu.edu.cn/a/20261116/13432.html@danchekey.github.io
-DTSTAMP:20261119T142910Z
-DTSTART:20261120T020000Z
-DTEND:20261120T030000Z
-SUMMARY:物理学院学术报告（第61期）上海交通大学王佛泓
- ｜强关联费米子体系中的混态纠缠代理与量子临界性
-LOCATION:理6栋302
-DESCRIPTION:题目：强关联费米子体系中的混态纠缠代理与
- 量子临界性\n主讲：王佛泓（上海交通大学）\n地点：理
- 6栋302\n主办：物理学院
-URL:https://physics.scnu.edu.cn/a/20261116/13432.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://cs.scnu.edu.cn/a/20261118/6036.html@danchekey.github.io
 DTSTAMP:20261119T142910Z
 DTSTART:20261120T023000Z
