@@ -5,24 +5,13 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 20 Nov 2026 16:43:41 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 20 Nov 2026 22:04:54 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>勷勤数学•专家报告-赖柏顺｜Quantitative regularity to 3D Navier-Stokes system and applications</title>
-      <link>http://maths.scnu.edu.cn/a/20261120/8901.html</link>
-      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261120/8901.html</guid>
-      <pubDate>Fri, 20 Nov 2026 11:59:00 +0800</pubDate>
-      <category>数学科学学院</category>
-      <description>题目：Quantitative regularity to 3D Navier-Stokes system and applications
-主讲：赖柏顺（湖南师范大学）
-地点：数科院西楼111
-主办：数学科学学院</description>
-    </item>
     <item>
       <title>勷勤数学•专家报告-吴笛｜Linear inviscid instability of compressible boundary layer flow</title>
       <link>http://maths.scnu.edu.cn/a/20261122/8907.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261122/8907.html</guid>
-      <pubDate>Fri, 20 Nov 2026 16:20:15 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:41:28 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Linear inviscid instability of compressible boundary layer flow
 主讲：吴笛（华中师范大学）
@@ -33,7 +22,7 @@
       <title>勷勤数学•专家报告-张志朋｜On Rayleigh-Taylor problem in viscous incompressible fluids with internal capillarity</title>
       <link>http://maths.scnu.edu.cn/a/20261122/8908.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261122/8908.html</guid>
-      <pubDate>Fri, 20 Nov 2026 15:52:37 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:13:50 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：On Rayleigh-Taylor problem in viscous incompressible fluids with internal capillarity
 主讲：张志朋（中国海洋大学）
@@ -44,7 +33,7 @@
       <title>勷勤数学•专家报告-罗益龙｜Compressible Euler limit from Boltzmann equation in half space: Maxwell reflection boundary condition with small accommodation coefficients</title>
       <link>http://maths.scnu.edu.cn/a/20261122/8909.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261122/8909.html</guid>
-      <pubDate>Fri, 20 Nov 2026 16:23:30 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:44:43 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Compressible Euler limit from Boltzmann equation in half space: Maxwell reflection boundary condition with small accommodation coefficients
 主讲：罗益龙（湖南大学）
@@ -66,7 +55,7 @@
       <title>华师经管学术讲座第556期（管理）｜AI来了！供应链、数据标注与内容平台</title>
       <link>https://em.scnu.edu.cn/a/20261123/11261.html</link>
       <guid isPermaLink="false">https://em.scnu.edu.cn/a/20261123/11261.html</guid>
-      <pubDate>Fri, 20 Nov 2026 15:48:56 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:10:09 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：AI来了！供应链、数据标注与内容平台
 主讲：徐鸿雁（重庆大学经济与工商管理学院）
@@ -77,7 +66,7 @@
       <title>勷勤数学•专家报告-吕志｜Reduced characteristic number criteria for equivariant bordisms</title>
       <link>http://maths.scnu.edu.cn/a/20261123/8905.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261123/8905.html</guid>
-      <pubDate>Fri, 20 Nov 2026 15:53:03 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:14:16 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Reduced characteristic number criteria for equivariant bordisms
 主讲：吕志（复旦大学）
@@ -88,7 +77,7 @@
       <title>勷勤数学•专家报告-赵立璐｜关于二次型的Roth型定理的研究</title>
       <link>http://maths.scnu.edu.cn/a/20261124/8882.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261124/8882.html</guid>
-      <pubDate>Fri, 20 Nov 2026 16:39:05 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 22:00:18 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：关于二次型的Roth型定理的研究
 主讲：赵立璐（中国科学技术大学）
@@ -96,10 +85,21 @@
 主办：数学科学学院</description>
     </item>
     <item>
+      <title>贾江涌——以碰撞成像原子核：迈向核物理的统一范式｜以碰撞成像原子核:迈向核物理的统一范式</title>
+      <link>http://iqm.scnu.edu.cn/a/20261120/577.html</link>
+      <guid isPermaLink="false">http://iqm.scnu.edu.cn/a/20261120/577.html</guid>
+      <pubDate>Fri, 20 Nov 2026 17:08:00 +0800</pubDate>
+      <category>量子物质研究院</category>
+      <description>题目：以碰撞成像原子核:迈向核物理的统一范式
+主讲：贾江涌（美国石溪大学）
+地点：理8栋118学术报告厅
+主办：量子物质研究院</description>
+    </item>
+    <item>
       <title>华师经管实务讲座第105期（会计）｜学习生涯规划与求职准备</title>
       <link>https://em.scnu.edu.cn/a/20261124/11262.html</link>
       <guid isPermaLink="false">https://em.scnu.edu.cn/a/20261124/11262.html</guid>
-      <pubDate>Fri, 20 Nov 2026 15:49:06 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:10:19 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：学习生涯规划与求职准备
 主讲：许志鹏（广州中医药大学）
@@ -107,10 +107,21 @@
 主办：经济与管理学院</description>
     </item>
     <item>
+      <title>季向东——追光之旅——从爱因斯坦的思想实验到质子的内部世界</title>
+      <link>http://iqm.scnu.edu.cn/a/20261120/578.html</link>
+      <guid isPermaLink="false">http://iqm.scnu.edu.cn/a/20261120/578.html</guid>
+      <pubDate>Fri, 20 Nov 2026 17:19:00 +0800</pubDate>
+      <category>量子物质研究院</category>
+      <description>题目：追光之旅——从爱因斯坦的思想实验到质子的内部世界
+主讲：季向东（上海交通大学李政道研究所）
+地点：理8栋118学术报告厅
+主办：量子物质研究院</description>
+    </item>
+    <item>
       <title>华师经管学术讲座第557期（管理）｜中国科创债券的发行定价之谜——基于债券市场&quot;科技板&quot;的证据</title>
       <link>https://em.scnu.edu.cn/a/20261126/11260.html</link>
       <guid isPermaLink="false">https://em.scnu.edu.cn/a/20261126/11260.html</guid>
-      <pubDate>Fri, 20 Nov 2026 16:14:34 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:35:47 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：中国科创债券的发行定价之谜——基于债券市场&quot;科技板&quot;的证据
 主讲：张凯亮（暨南大学）
@@ -121,7 +132,7 @@
       <title>华师经管实务讲座第106期（会计）｜数字化审计实践:IT审计与数据分析</title>
       <link>https://em.scnu.edu.cn/a/20261127/11263.html</link>
       <guid isPermaLink="false">https://em.scnu.edu.cn/a/20261127/11263.html</guid>
-      <pubDate>Fri, 20 Nov 2026 15:51:29 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:12:42 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：数字化审计实践:IT审计与数据分析
 主讲：卢志凌（大信会计师事务所(特殊普通合伙)广州分所）
@@ -132,7 +143,7 @@
       <title>勷勤数学•专家报告-张文鹏｜A certain mean values involving Cochrane sums and their identities</title>
       <link>http://maths.scnu.edu.cn/a/20261203/8906.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261203/8906.html</guid>
-      <pubDate>Fri, 20 Nov 2026 16:14:15 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:35:28 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：A certain mean values involving Cochrane sums and their identities
 主讲：张文鹏（西北大学）
@@ -154,7 +165,7 @@
       <title>勷勤数学•专家报告-杨绮云｜Dimensional reduction for anyons in the average-field approximation</title>
       <link>http://maths.scnu.edu.cn/a/20261218/8898.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261218/8898.html</guid>
-      <pubDate>Fri, 20 Nov 2026 15:44:55 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 21:06:08 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Dimensional reduction for anyons in the average-field approximation
 主讲：杨绮云（Basque Center for Applied Mathematics (BCAM)）

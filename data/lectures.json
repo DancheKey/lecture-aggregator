@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-20T16:43:41+08:00",
+  "updatedAt": "2026-11-20T22:04:54+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261218/8898.html",
@@ -160,6 +160,36 @@
       "listTitle": "● 华师经管学术讲座第557期（管理）"
     },
     {
+      "sourceUrl": "http://iqm.scnu.edu.cn/a/20261120/578.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/iqm/2026/1120/1795166565402892.png"
+      ],
+      "college": "量子物质研究院",
+      "campus": "大学城",
+      "title": "季向东——追光之旅——从爱因斯坦的思想实验到质子的内部世界",
+      "topic": "追光之旅——从爱因斯坦的思想实验到质子的内部世界",
+      "lectureStart": "2026-11-25 10:00:00",
+      "lectureEnd": null,
+      "location": "理8栋118学术报告厅",
+      "speaker": "季向东",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "上海交通大学李政道研究所",
+      "inviter": "",
+      "speakerBio": "季向东 , 上海交通大学李政道研究所鸿文讲席教授,暗物质物理全国重点实验室常务副主任。1987年获 Drexel 大学博士学位。曾在加州理工学院,麻省理工学院和马里兰大学任职。主要从事量子色动力学( QCD )与核子结构的理论研究。引进了\"推广部分子分布函数\"描写质子的3D 结构,并用其来研究核子的质量、自旋和力学性质。发现并命名了一类新的物理过程—深虚康普顿散射—来进行质子成像,得到实验证实,成为下一代电子离子对撞机( EIC, EicC )的主要物理目标之一。他提出的大动量有效量子场论( LaMET )开创了用强相互作用第一性原理(格点 QCD )计算费曼( Feynman )部分子分布函数和核子光速运行性质的新领域。2009年起,在上海交通大学开创锦屏地下实验室 PandaX 暗物质与中微子液氙探测实验,推动我国液氙暗物质直接探测进入国际前沿,多次取得国际领先的实验成果。 获得的奖项和荣誉包括:美国物理学会会士 , 德国洪堡研究奖( Humbolt Research Award ),美国杰弗森科学协会杰出核物理学家奖,美国物理学会 Herman Feshbach 奖,教育部自然科学一等奖,上海交通大学睿远科技大奖之数学和物质科学奖。",
+      "organizer": "量子物质研究院",
+      "publishTime": "2026-11-20 17:19:00",
+      "publishTimeSource": "position",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "abstract": "爱因斯坦 \"如果追上一束光,你会看到什么？\"的思想实验,是狭义相对论诞生的原初动机之一。然而,如何建立一个能够描写光速运行体系的相对论量子理论,却成为此后百余年来物理学家不断探索的理论难题。历经狄拉克( Dirac )、温伯格( Weinberg )、费曼( Feynman )、威尔逊( Wilson )等人的持续探索,其中的理论困难逐渐明朗。大动量有效场理论( LaMET )应用威尔逊关于相变临界点的思想并结合他的非微扰格点量子场论的方法,首次建立了完整回答爱因斯坦问题的理论框架,使光速运行质子的夸克和胶子结构能够从量子色动力学第一性原理进行计算。大规模数值量子场论模拟的结果可以通过五十多年来高能实验的精确测量进行定量检验。",
+      "vlmExtracted": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "[2026年11月25日] 季向东——追光之旅——从爱因斯坦的思想实验到质子的内部世界"
+    },
+    {
       "sourceUrl": "https://em.scnu.edu.cn/a/20261124/11262.html",
       "images": [],
       "college": "经济与管理学院",
@@ -217,6 +247,36 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-赵立璐"
+    },
+    {
+      "sourceUrl": "http://iqm.scnu.edu.cn/a/20261120/577.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/iqm/2026/1120/1795165845328859.png"
+      ],
+      "college": "量子物质研究院",
+      "campus": "大学城",
+      "title": "贾江涌——以碰撞成像原子核：迈向核物理的统一范式",
+      "topic": "以碰撞成像原子核:迈向核物理的统一范式",
+      "lectureStart": "2026-11-24 15:00:00",
+      "lectureEnd": null,
+      "location": "理8栋118学术报告厅",
+      "speaker": "贾江涌",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "美国石溪大学",
+      "inviter": "",
+      "speakerBio": "贾江涌,纽约州立大学石溪分校(石溪大学)教授。现为 RHIC 上的 STAR 实验和 LHC 上的 ATLAS 实验合作组成员,曾为 RHIC 上的 PHENIX 实验合作组成员;研究兴趣广泛,涵盖高能核物理和粒子物理。其主要专长为从小碰撞系统到大碰撞系统中的集体流、流体力学和粒子关联。1997年获中国科学技术大学学士学位,2003年获石溪大学博士学位,随后在哥伦比亚大学从事博士后研究,2006年加入石溪大学。",
+      "organizer": "量子物质研究院",
+      "publishTime": "2026-11-20 17:08:00",
+      "publishTimeSource": "position",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "abstract": "由于强相互作用的非微扰性质,数十年来,核物理一直分为若干相对独立的研究方向 --从核子结构到原子核形变,再到夸克–胶子等离子体( QGP )的形成--彼此之间交流很少。本报告介绍\"碰撞成像\"( imaging-by-smashing )这一旨在实现统一的实验范式。该范式以原子核碰撞为跨尺度探针,将这些传统上相互分隔的领域连接起来。原子核以极端相对论速度相撞时,其结构信息(原子核形状、密度分布和部分子组态)会在碰撞的初始几何中留下印记,并历经 QGP 演化得以保留,最终体现在可测量的末态粒子分布中。报告还将概述结构信息编码与解码的概念框架,并讨论这一技术如何在核物理以往相互孤立的各领域之间,架起跨越从 MeV 到 TeV 能标的桥梁。",
+      "vlmExtracted": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "[2026年11月24日] 贾江涌——以碰撞成像原子核：迈向核物理的统一范式"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261123/8905.html",
