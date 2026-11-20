@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-20T22:04:54+08:00",
+  "updatedAt": "2026-11-21T06:45:01+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261218/8898.html",
@@ -308,6 +308,37 @@
       "listTitle": "勷勤数学•专家报告-吕志"
     },
     {
+      "sourceUrl": "http://life.scnu.edu.cn/a/20261118/6852.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/life/2026/1118/1794989824821076.jpg"
+      ],
+      "college": "生命科学学院",
+      "campus": "石牌",
+      "title": "学术讲座：Transcriptional execution of intracellular plant innate immunity",
+      "topic": "Transcriptional execution of intracellular plant innate immunity",
+      "lectureStart": "2026-11-23 15:00:00",
+      "lectureEnd": null,
+      "location": "生命科学学院138会议室",
+      "speaker": "Pingtao Ding",
+      "speakerTitle": "Assistant Professor",
+      "speakerAffiliation": "Leiden University",
+      "inviter": "",
+      "speakerBio": "Dr Pingtao Ding is an experienced molecular biologist and geneticist, and his group focus on understanding the molecular basis of plant disease resistance. Dr Ding obtained his PhD training from Prof. Yuelin Zhang and Prof. Xin Li at the National Institute of Biological Sciences (NIBS), Beijing and the Michael Smith Laboratories at the University of Columbia (UBC), Vancouver. He joined Prof. Jonathan Jones as a postdoc at the Sainsbury Laboratory (TSL), Norwich. At TSL, Dr Ding has been awarded a Marie Curie Individual Fellowship and a Biotechnology and Biological Sciences Research Council (BBSRC) Future Leader Fellowship to establish his independent research with the support of Prof. Jones. During his PhD and postdoc research, he has contributed multiple breakthrough discoveries in identifying key regulators and concepts in plant innate immunity. He has also contributed a few highly cited review articles in this field. Now, Dr Ding is leading an international research team as a tenure-track assistant professor at the Institute of Biology Leiden (IBL), Leiden University, with funding support from a European Research Council (ERC) Starting Grant, several other EU and Dutch (NWO) grants.",
+      "organizer": "生命科学学院",
+      "publishTime": "2026-11-18 16:14:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "speakerSource": "label",
+      "host": "赖建彬",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026年11月23日学术讲座：Transcriptional execution of intracellular plant innate immunity"
+    },
+    {
       "sourceUrl": "http://skc.scnu.edu.cn/a/20261106/1124.html",
       "images": [],
       "college": "社会科学处",
@@ -496,6 +527,37 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "勷勤数学•专家报告-赖柏顺"
+    },
+    {
+      "sourceUrl": "http://life.scnu.edu.cn/a/20261118/6851.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/life/2026/1118/1794989485740246.png"
+      ],
+      "college": "生命科学学院",
+      "campus": "石牌",
+      "title": "学术讲座：造血调控与药物发现",
+      "topic": "造血调控与药物发现",
+      "lectureStart": "2026-11-20 14:30:00",
+      "lectureEnd": null,
+      "location": "生命科学学院1102会议室",
+      "speaker": "张译月",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "华南理工大学医学院",
+      "inviter": "",
+      "speakerBio": "张译月教授，华南理工大学医学院",
+      "organizer": "生命科学学院",
+      "publishTime": "2026-11-18 16:10:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "host": "刘彦梅",
+      "qaGate": "speakerBio",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026年11月20日学术讲座：造血调控与药物发现"
     },
     {
       "sourceUrl": "http://cs.scnu.edu.cn/a/20261118/6036.html",
