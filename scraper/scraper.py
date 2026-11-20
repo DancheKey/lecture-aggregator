@@ -1157,6 +1157,138 @@ def report_ledger():
               f'（过期作废 {_LEDGER_STATS["expired"]} 条）')
 
 
+# ── 残记录重解析台账（2026-11-20）─────────────────────────────────────────
+# 病根：源站可能先发「只有标题+日期」的页面，爬虫据此入一条残缺记录（无主讲人、
+# 时间只有日期、无地点）；数日后源站才在**同一 URL** 补上海报。增量抓取对已入库
+# URL 由 existing_urls 直接跳过（1960 行），残缺值永久固化（xz 367~370 实测）。
+# 修法：增量收尾独立扫一遍残缺记录，重抓+重解析，只补全缺失字段。每 URL 有 7 天
+# 节流（记在本台账），避免「本来就无主讲人」的活动每轮重抓；每轮限总量防止爆炸。
+_REPARSE_INTERVAL_DAYS = 7
+_REPARSE_MAX_PER_RUN = 10
+_REPARSE_FILE = os.path.join(ROOT, 'data', 'reparse_ledger.json')
+
+
+def _reparse_enabled():
+    """SCNU_REPARSE=0 可关闭（回退对照 / 紧急排查），默认开启。"""
+    return env_flag('SCNU_REPARSE', default='1')
+
+
+def _is_incomplete_record(r):
+    """有海报却无主讲人或时间待定 —— 最可能「源站后补信息」的残缺记录。
+
+    判据刻意收窄：必须 hasPosterImage 或 images 非空（纯文本通知页本来就没海报，
+    重解析也补不出东西，不参与）。「无主讲人」与「timeUnknown」取或，覆盖本次
+    xz 367~370 的两种残缺形态（两者都缺 / 只时间待定）。
+    """
+    if not isinstance(r, dict):
+        return False
+    if not (r.get('hasPosterImage') or r.get('images')):
+        return False
+    return not (r.get('speaker') or '').strip() or r.get('timeUnknown') is True
+
+
+def _load_reparse_ledger():
+    """读 {canon_url: 'YYYY-MM-DD 上次重解析日'}；缺失/损坏退化为空。"""
+    try:
+        with open(_REPARSE_FILE, encoding='utf-8') as f:
+            doc = json.load(f)
+        if isinstance(doc, dict) and isinstance(doc.get('entries'), dict):
+            return doc['entries']
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f'[REPARSE] 台账读取失败，按空台账继续：{e}', file=sys.stderr)
+    return {}
+
+
+def _save_reparse_ledger(entries):
+    _atomic_write_json(_REPARSE_FILE, {'entries': entries})
+
+
+def reparse_incomplete_records(out):
+    """增量收尾：重解析残缺记录，只补缺失字段，就地更新 out。
+
+    sourceUrl 即来源页 URL；节流：距上次重解析 < 7 天跳过（成功补全的记录
+    自然不再命中残缺判据，无需特殊处理）。返回 (尝试数, 补全数)。
+    """
+    if not _reparse_enabled():
+        return 0, 0
+    today = datetime.date.today()
+    ledger = _load_reparse_ledger()
+    # 按发布时间倒序，优先新近的（源站补海报更可能发生在近期讲座）
+    cands = [r for r in out if _is_incomplete_record(r)]
+    cands.sort(key=lambda r: r.get('publishTime') or '', reverse=True)
+    tried = filled = 0
+    for r in cands:
+        if tried >= _REPARSE_MAX_PER_RUN:
+            break
+        url = r.get('sourceUrl') or ''
+        ckey = _canon_url_key(url)
+        if not ckey:
+            continue  # 无来源 URL：无法重抓，也不能往台账写空键
+        last = ledger.get(ckey)
+        if last:
+            try:
+                if (today - datetime.date.fromisoformat(last)).days < _REPARSE_INTERVAL_DAYS:
+                    continue
+            except (ValueError, TypeError):
+                pass  # 脏日期当作从未重解析
+        tried += 1
+        ledger[ckey] = today.isoformat()  # 先记，避免成功/失败都要重复写
+        try:
+            html = fetch(url, allowed_domains=['scnu.edu.cn'])
+            if not html:
+                continue
+            got = parse_detail(html, url, college=r.get('college') or '',
+                               campus=r.get('campus') or '',
+                               list_title=r.get('listTitle') or r.get('title') or '')
+            recs = got if isinstance(got, list) else ([got] if got else [])
+            if len(recs) != 1:
+                continue
+            new = recs[0]
+
+            def _missing(v):
+                """空值判据：兼容 str / list / None，bool False 视为已有值。"""
+                if v is None:
+                    return True
+                if isinstance(v, str):
+                    return not v.strip()
+                if isinstance(v, (list, tuple, dict)):
+                    return len(v) == 0
+                return False
+
+            # 只补缺失字段，不覆盖已有精修值（人工修正、跨源融合都要保住）。
+            # 后三项是海报重处理索引，必须与文本字段同步补齐，否则未来按
+            # imageParseMethod=vlm 筛重处理集合时仍会漏掉刚修好的记录。
+            changed = False
+            for k in ('speaker', 'speakerTitle', 'speakerAffiliation', 'speakerBio',
+                      'location', 'lectureEnd', 'abstract', 'images',
+                      'imageParseMethod', 'vlmExtracted'):
+                if _missing(r.get(k)) and not _missing(new.get(k)):
+                    r[k] = new[k]
+                    changed = True
+                elif k == 'vlmExtracted' and r.get(k) is False and new.get(k) is True:
+                    # False 是「当时没抽到」的旧状态，不是精修值；新管线抽到了就翻正，
+                    # 避免 speakerBio 已补、标记仍说没用 VLM 的自相矛盾。
+                    r[k] = new[k]
+                    changed = True
+            # 时间：只有「待定/00:00」占位时才用重解析的精确钟点替换
+            if r.get('timeUnknown') and new.get('lectureStart') and not new.get('timeUnknown'):
+                r['lectureStart'] = new['lectureStart']
+                r['timeUnknown'] = False
+                changed = True
+            if changed:
+                filled += 1
+                print(f'[REPARSE] 补全 {url} | speaker={r.get("speaker")} '
+                      f'| start={r.get("lectureStart")}')
+        except Exception as e:
+            print(f'[REPARSE] 重解析失败 {url}: {e}', file=sys.stderr)
+    if tried:
+        _save_reparse_ledger(ledger)
+        print(f'[REPARSE] 本轮重解析 {tried} 条残缺记录，补全 {filled} 条')
+    return tried, filled
+
+
 def _build_item_date_map(html, list_url, base, collect_mode):
     """一次遍历建立 {详情页URL: 'YYYY-MM-DD'} 映射：取每个条目所在容器文本里的日期。
 
@@ -2467,6 +2599,10 @@ def main():
         # 增量模式：基底(existing)原样锁定，仅对新增记录做同源去重后追加，
         # 不再对全量重跑 cross_source_dedup（避免每日增量退化/重组已有精修数据）。
         out = incremental_merge(existing, all_fetched)
+        # 残记录重解析（2026-11-20）：源站后补海报的 URL 已被 existing_urls 跳过，
+        # 增量管线自身补不回来。收尾独立重解析残缺记录，只补缺失字段。
+        # 必须在 incremental_merge 之后（基底已定型）、sort/写盘之前（改动能被快照捕获）。
+        reparse_incomplete_records(out)
     else:
         out = dedup(raw)
         # 多轮通知识别：同学院+同讲座日+去轮次标题 的多条记录只保留 publishTime 最晚的
