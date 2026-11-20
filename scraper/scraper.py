@@ -170,13 +170,18 @@ DEFAULT_ALLOWED_DOMAINS = ['scnu.edu.cn']
 MAX_REDIRECTS = 5
 
 
-def fetch(url, _retries=3, allowed_domains=None):
+def fetch(url, _retries=3, allowed_domains=None, status_out=None):
     """下载页面并鲁棒解码。
 
     网络层异常（连接重置 ECONNRESET / 超时 / 断流 等 requests.RequestException）
     做指数退避重试，避免偶发抖动被误判为死链而漏抓；死链（HTTP 4xx/5xx）
     返回 None，不重试（错误页无正文可解析）。重试耗尽仍失败返回 None
     （调用方按死链处理）。
+
+    status_out（可选 dict）：非 200 时把 HTTP 状态码写进 `status_out['code']`。
+    调用方据此区分「页面已删除（404/410，终态）」与「可重试故障（超时/5xx/403）」
+    ——404 当成失败会让 failed_sources 常年非空、冻结水位并让 gate 每班报红
+    （2026-11-20 计算机学院列表页残留 5 条老链接实测）。
 
     安全加固（2026-08-15，2026-10-14 补强 P1-3/P1-5）：
       - 响应大小上限 20MB（stream=True 限量读取），避免超大响应撑爆内存；
@@ -238,6 +243,8 @@ def fetch(url, _retries=3, allowed_domains=None):
             # 状态码校验：仅 200 视为成功，4xx/5xx 返回 None
             if r.status_code != 200:
                 r.close()
+                if status_out is not None:
+                    status_out['code'] = r.status_code
                 print(f'[WARN] fetch: HTTP {r.status_code} {url}', file=sys.stderr)
                 return None
 
@@ -1131,13 +1138,19 @@ def ledger_hit(canon_key):
     return bool(canon_key) and _ledger_enabled() and canon_key in _LEDGER
 
 
-def ledger_add(canon_key, verdict, item_date=''):
+def ledger_add(canon_key, verdict, item_date='', replace=False):
     """登记一条被拒 URL。已存在的不刷新时间戳：TTL 从首次记录起算，保证会周期性重判。
+
+    replace=True：已存在时改写判定并重置时间戳。仅用于**终态升级**——先按 failed
+    记过（7 天后重试）的页面，之后确认是 HTTP 404/410 已删除时，必须升级为 rejected，
+    否则每 7 天都会重抓一次死链；普通调用保持原语义（不刷新）。
 
     键形态不符（含空白/方括号/等号的脏 URL）一律不写：这类键运行时永远命中不了，
     写进去只会让「已判定」的条目静默失效（见 _LEDGER_KEY_RE 注释）。
     """
-    if not canon_key or not _ledger_enabled() or canon_key in _LEDGER:
+    if not canon_key or not _ledger_enabled():
+        return
+    if canon_key in _LEDGER and not replace:
         return
     if not _LEDGER_KEY_RE.match(canon_key):
         return
@@ -2004,6 +2017,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
     # 现与列表页失败同口径上报，由 main() 统一纳入水位闸门（不推进 + gate 告警）；
     # 瞬时故障下轮自动重抓同区间恢复，与 B8 的 fail-closed 哲学一致。
     detail_fails = []
+    # 已删除页（HTTP 404/410）：列表页残留死链，源站早已删文。这类是**确定性终态**，
+    # 不是取回故障——按失败记会让 failed_sources 常年非空、冻结本源水位，并让 gate
+    # 每班报红（2026-11-20 计算机学院 5 条 2023~2024 年老链接实测）。单独计数、
+    # 按 rejected 写台账后跳过，不参与失败判定。
+    gone_pages = []
     try:
         for lu in src.get('list_urls', []):
             if isinstance(lu, dict):
@@ -2131,8 +2149,18 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     if not _can_fetch(href, allowed_domains=['scnu.edu.cn']):
                         continue
-                    d = fetch(href, allowed_domains=['scnu.edu.cn'])
+                    _fs = {}
+                    d = fetch(href, allowed_domains=['scnu.edu.cn'], status_out=_fs)
                     if not d:
+                        if _fs.get('code') in (404, 410):
+                            # 源站已删该页（列表页残留死链）。404/410 是终态，重试
+                            # 无意义，也不该算本源失败——详见 gone_pages 注释。
+                            gone_pages.append(href)
+                            print(f'[GONE] {name} | 页面已删除(HTTP {_fs.get("code")}) {href}')
+                            ledger_add(_canon_url_key(href_norm), 'rejected',
+                                       (item_date_map or {}).get(_canon_url_key(href_norm), ''),
+                                       replace=True)
+                            continue
                         detail_fails.append(href)   # P0-2：策略放行后的取回失败才记账
                         # P1-4（2026-10-14）：记入台账（verdict='failed'，TTL 7 天），
                         # 下轮 fetch 前跳过——否则永久损坏页每轮都失败 →
@@ -2266,6 +2294,9 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
     # 因此水位只在**首次失败**时冻结一轮，之后自动放行；7 天后台账过期自动重试
     # （瞬时故障可恢复，永久故障重新登记）。此前不进台账 → 永久损坏页每轮都失败
     # → failed_sources 永远非空 → 全局水位永久冻结、整条增量管线停摆。
+    if gone_pages:
+        print(f'[GONE] {name} | 本轮 {len(gone_pages)} 页详情页已被源站删除'
+              f'（HTTP 404/410），按已判定跳过，不计入本源失败')
     if detail_fails:
         print(f'[DETAIL-FAIL] {name} | {len(detail_fails)} 页详情页取回/解析失败'
               f'（首个：{detail_fails[0]}）| 本次本源不推进水位', file=sys.stderr)

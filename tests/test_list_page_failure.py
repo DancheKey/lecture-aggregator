@@ -53,13 +53,16 @@ class _SourceRun:
     """跑一次 _process_source，桩掉 fetch/parse_detail/sleep，返回 (err, 记录数)。"""
 
     def __init__(self, mod, pages, existing_urls=None, is_incremental=False,
-                 parse_mode='ok', robots_denied=()):
+                 parse_mode='ok', robots_denied=(), status_codes=None):
         self.mod = mod
         self.pages = pages          # {url: html 或 None}；详情页不登记 → 视为取回失败
         self.fetched = []
         self.parsed = []
         self.parse_mode = parse_mode  # 'ok' | 'raise'（parse_detail 抛异常）| 'none'（返回 None=SKIP-NEWS）
         self.robots_denied = robots_denied  # 桩 _can_fetch 对这些 URL 返回 False
+        # 生产 fetch 2026-11-20 起支持 status_out：桩必须同步透传状态码，
+        # 否则「404 终态 vs 可重试故障」的分支在本套件里永远测不到。
+        self.status_codes = status_codes or {}
 
     def run(self, list_urls, **kw):
         m = self.mod
@@ -69,8 +72,10 @@ class _SourceRun:
         m._can_fetch = lambda url, allowed_domains=None: url not in self.robots_denied
         m.time.sleep = lambda *_a, **_k: None
 
-        def fake_fetch(url, _retries=3, allowed_domains=None):
+        def fake_fetch(url, _retries=3, allowed_domains=None, status_out=None):
             self.fetched.append(url)
+            if url in self.status_codes and status_out is not None:
+                status_out['code'] = self.status_codes[url]
             if url in self.pages:
                 return self.pages[url]
             # 详情页（路径形如 /a/YYYYMM/N.html）：不在 pages 里就按「取回成功、
@@ -324,6 +329,40 @@ class DetailPageFailureGateTest(unittest.TestCase):
         err, local = r.run([_lu(self.u_ok)])
         self.assertIsNone(err, 'robots 禁止属合规跳过，不得记为详情页失败')
         self.assertNotIn(detail, r.fetched, 'robots 禁止的 URL 不应发起 fetch')
+
+    def test_07_详情页404_不判失败_按已删除跳过(self):
+        """2026-11-20（计算机学院 5 条老链接实测）：HTTP 404/410 是确定性终态。
+
+        列表页会长期挂着已删文章的链接（2023~2024 年老讲座），抓取每轮必 404。
+        按失败记账 → failed_sources 常年非空 → 本源水位永不推进，且 gate 每班报红；
+        这正是甲方案（照抓历史存量）上线后首班暴露的问题。改为「记台账 rejected +
+        跳过」，不解析、不计失败。
+        """
+        saved = dict(P._LEDGER)
+        self.addCleanup(lambda: (P._LEDGER.clear(), P._LEDGER.update(saved)))
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE, self.detail: None},
+                       status_codes={self.detail: 404})
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNone(err, '404 是终态而非取回故障，不得判本源失败')
+        self.assertNotIn(self.detail, r.parsed, '已删除页不应再进入解析')
+        self.assertEqual(P._LEDGER.get(P._canon_url_key(self.detail), {}).get('v'),
+                         'rejected', '已删除页应按 rejected 记台账，避免下轮重抓')
+
+    def test_08_详情页410同样按已删除(self):
+        saved = dict(P._LEDGER)
+        self.addCleanup(lambda: (P._LEDGER.clear(), P._LEDGER.update(saved)))
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE, self.detail: None},
+                       status_codes={self.detail: 410})
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNone(err, '410 Gone 与 404 同义')
+
+    def test_09_详情页500_仍判失败(self):
+        """5xx 可重试，必须仍按失败上报——404 特例不得顺带放走真故障。"""
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE, self.detail: None},
+                       status_codes={self.detail: 500})
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNotNone(err, '500 是可重试故障，必须判本源失败')
+        self.assertIn('详情页取回/解析失败 1 页', err)
 
 
 class ListDateSwitchTest(unittest.TestCase):
