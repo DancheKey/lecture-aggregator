@@ -2214,6 +2214,117 @@ def _f3_fallback_to_vlm(result):
     return True
 
 
+# --- VLM 标题拆分守卫（2026-11-20，xz/377、368）-----------------------------
+# 纯海报页（正文一个字都没有）字段全靠 VLM 读图。海报标题两行排版、中间没有
+# 冒号时，VLM 会把同一条标题拆进 title/topic 两个字段，而且谁进哪个字段随机
+# ——377「土地与歌 / 中国民歌的地域风格」连跑两次结果正好颠倒，368 则是完整
+# 题目进 title、顺口溜主标题进 topic。title 恒取源页列表标题（方案A）不受影响，
+# 但 topic 的空位会被这个半截值抢占（见 _apply_vlm_to_result 的 fill-only），
+# 规则层后置提取发现 topic 非空便不再覆盖 → 卡片呈现「标题完整、题目半截」。
+#
+# 判据只认拿得准的两种形态，其余一律放行：
+#   A 互补：两段互不相等、都是源标题子串，且去掉分隔符后字符多重集恰好互补
+#          拼成整条源标题（377：土地与歌 + 中国民歌的地域风格）；
+#   B 全量：VLM title 已是整条源标题，topic 只是它的一个片段（368）。
+# 前置条件「源标题不含标签前缀/分隔符」是关键：源标题形如「学术讲座：XXX」
+# 「XX学院— XXX」「《XX》系列讲座一 导论」时，topic 只承载其中题目段落是正常
+# 设计（全库 topic⊂title 的 535 条绝大多数属此），不排除会把正常 topic 丢掉。
+_SPLIT_TITLE_MARK_RE = re.compile(r'[:：]|——|—|–|\||｜|系列讲座|学术讲座|工作坊')
+_TITLE_JOIN_STRIP_RE = re.compile(r'[\s：:—–\-·、،,．.（）()《》「」【】“”"\']')
+
+
+def _norm_title_chars(s):
+    """标题归一：去掉空白与各类分隔符，只留可见字符（用于多重集比较）。"""
+    return [ch for ch in (s or '') if not _TITLE_JOIN_STRIP_RE.match(ch)]
+
+
+def _vlm_topic_is_split_title(src_title, vlm_title, vlm_topic):
+    """VLM 是否把一条标题拆成了 title/topic 两半。
+
+    返回 '' 表示不拦（放行 VLM topic）；返回 'complement'/'full-title' 表示命中，
+    调用方应丢弃该 VLM topic，让规则层用完整源标题作题目。
+    """
+    src = (src_title or '').strip()
+    vt = (vlm_title or '').strip()
+    vp = (vlm_topic or '').strip()
+    if not (src and vt and vp) or vt == vp:
+        return ''
+    if _SPLIT_TITLE_MARK_RE.search(src):
+        return ''
+    # 子串判定走归一化串：VLM 常在两行标题之间补一个空格（368 返回
+    # 「科学提分 安全护航」，源标题是「科学提分安全护航」），用原文比较会漏。
+    src_n = _norm_title_chars(src)
+    vt_n, vp_n = _norm_title_chars(vt), _norm_title_chars(vp)
+    src_s, vt_s, vp_s = ''.join(src_n), ''.join(vt_n), ''.join(vp_n)
+    if vt_s == vp_s or vt_s not in src_s or vp_s not in src_s:
+        return ''
+    if sorted(vt_n + vp_n) == sorted(src_n):
+        return 'complement'
+    if sorted(vt_n) == sorted(src_n) and sorted(vp_n) != sorted(src_n):
+        return 'full-title'
+    return ''
+
+
+# 讲座内容引导词（段落级判据：只认明确的「这场讲座讲什么」表达，不用 C1 的
+# 宽表——C1 含「我们」这类弱词，在段落级会大面积误判）。
+_LEC_LEAD_RE = re.compile(
+    r'本次讲座|本场讲座|本期讲座|本次报告|本报告|讲座将|报告将|沙龙|分享会|'
+    r'主要内容|将围绕|将介绍|将结合|主题为')
+# 主体介绍特征（人/团体），只收强特征：「研究方向/现任/主编」这类词在学术摘要
+# 背景段里极常见（「XX 是重要的研究方向之一」），段落级判据用它们会误拆。
+_BIO_INTRO_RE = re.compile(
+    r'由.{0,15}(?:组建|成立|创办|发起)|擅长|毕业于|'
+    r'(?:曾|多次|先后)?获.{0,12}(?:奖|称号|基金)|代表作品|代表作')
+
+
+def _split_merged_abstract(abstract):
+    """把「主体介绍段 + 讲座内容段」合一的摘要按段落边界拆开。
+
+    病根（xz/378，2026-11-20）：纯海报页上海报有两段文字——一段介绍演出乐队
+    （「凌晨海岸乐队，由汕尾本地音乐人共同组建，擅长 R&B…」），一段介绍沙龙内容
+    （「本次讲座采用音乐交流沙龙形式…」）。VLM 把两段合在一起塞进 abstract，
+    speakerBio 留空。C1-UNIVERSAL 整段迁移守卫要求摘要「含履历词且不含任何讲座
+    特征词」，两段混杂时两个条件都不满足，守卫拒动 → 简介空、摘要混入履历。
+
+    判据（全部满足才拆，宁可不拆也不误拆——拆错等于把讲座内容写进主讲人简介）：
+      ① 至少 2 个非空段落（按换行切，空行视为段界）；
+      ② 存在切点：前段不含讲座引导词，后段至少一段含讲座引导词；
+      ③ 前段含主体介绍特征（由…组建/成立/创办、擅长、获…奖、毕业于、任教…），
+         且前后两段各自 ≥ 20 字（碎片不动）。
+
+    返回 (bio, abstract) 或 None。段落边界不清、语义不清一律返回 None，保持原样。
+    """
+    paras = [p.strip() for p in re.split(r'\n\s*\n|\n', abstract or '') if p.strip()]
+    if len(paras) < 2:
+        return None
+    for k in range(1, len(paras)):
+        head = '\n'.join(paras[:k])
+        tail = '\n'.join(paras[k:])
+        if _LEC_LEAD_RE.search(head) or not _LEC_LEAD_RE.search(tail):
+            continue
+        if len(head) < 20 or len(tail) < 20:
+            continue
+        if not _BIO_INTRO_RE.search(head):
+            continue
+        return head, tail
+    return None
+
+
+def _promote_merged_bio(rec):
+    """摘要里混着主体介绍段时，按段落拆出简介（就地修改）。
+
+    poster_only（纯海报页）记录不过 _extract_abstract_bio，故除正文路径外，
+    parse_detail 出口还要再兜一道。已是幂等的：简介非空即不动。
+    """
+    if not (rec.get('abstract') or '').strip() or (rec.get('speakerBio') or '').strip():
+        return False
+    sp = _split_merged_abstract(rec['abstract'])
+    if not sp:
+        return False
+    rec['speakerBio'], rec['abstract'] = sp
+    return True
+
+
 def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_year,
                           poster_only=False):
     """把 VLM 结构化字段填入 result（非空才填，不覆盖已有）。
@@ -2294,10 +2405,30 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
         ('location', 'location'), ('abstract', 'abstract'),
         ('speakerBio', 'speakerBio'),
     ]
+    # 源标题基准在循环前取：循环里 title 只在原值为空时才被 VLM 兜底填入，
+    # 若先读后写会把基准变成 VLM 自己的值，拆标题判据就自证成立了。
+    _src_title_for_split = (result.get('title') or '').strip()
+    _vlm_title_for_split = _clean_title((f.get('title') or '').strip())
     for src, dst in _MAP:
         v = (f.get(src) or '').strip()
         if dst in ('title', 'topic'):
             v = _clean_title(v)
+        # 标题拆分守卫（2026-11-20，xz/377、368）：VLM 把一条标题劈成 title/topic
+        # 两半时，topic 半截值会抢占空位并让规则层不再覆盖，详见判据函数 docstring。
+        if dst == 'topic' and v:
+            _split_kind = _vlm_topic_is_split_title(
+                _src_title_for_split, _vlm_title_for_split, v)
+            if _split_kind:
+                # 直接以源标题作题目，而不是「丢弃后交给规则层派生」：后者会在
+                # 派生时剥尾部通用词（parsers.py「去掉尾部通用词」分支），368 的
+                # 「…急救知识专题讲座」会被削成「…专题」，题目仍旧不完整。
+                if not result.get('topic'):
+                    result['topic'] = _src_title_for_split
+                print('[VLM-TOPIC-DROP] %s | %s | title=%r topic=%r -> %r'
+                      % (result.get('sourceUrl', ''), _split_kind,
+                         _vlm_title_for_split, v, _src_title_for_split),
+                      file=sys.stderr)
+                continue
         # VLM 未识别到主讲人时，其 speakerTitle/speakerAffiliation/speakerBio 常为
         # 「教授」等幻觉碎片（如 psy 2941），不可信，跳过。
         if dst in ('speakerTitle', 'speakerAffiliation', 'speakerBio') and not _vlm_speaker_valid:
@@ -4469,6 +4600,11 @@ def parse_detail(html, url, college, campus, default_year=None, list_title=None,
         # 主讲人姓名尾部职称/修饰词残片清理（覆盖 LLM 富化值「孙开佳 青年」）。
         if _r.get('speaker'):
             _r['speaker'] = _strip_speaker_title_tail(_r['speaker'])
+        # 段落级「简介/摘要」拆分兜底（2026-11-20，xz/378）：纯海报页不走
+        # _extract_abstract_bio，VLM 把团体介绍段与讲座内容段合进 abstract 时
+        # 上面两条路径都覆盖不到，只能在出口补一道。须在机构简介守卫之前——
+        # 拆出来的介绍段要一并受它约束。
+        _promote_merged_bio(_r)
         # 主讲人简介被填成「机构/团体介绍」时清空（xz 49/98、io 826/779/686）。
         # 同样必须放在出口：这类误填既可能来自正文路径的字段串位，也可能来自
         # LLM/VLM 填空，只有在出口统一判定才能两条路径同时覆盖。
@@ -7353,11 +7489,16 @@ def _extract_abstract_bio(_st, result, title, content_div, college,
                    '我们', '讲座将', '本次报告', '报告将', '现将')
     _abs_u = result.get('abstract') or ''
     _bio_u = result.get('speakerBio') or ''
-    if (_abs_u and not _bio_u
-            and any(s in _abs_u for s in _BIO_SIG_U)
-            and not any(s in _abs_u for s in _LEC_SIG_U)
-            and len(_abs_u) > 30):
-        result['speakerBio'] = result.pop('abstract', '')
+    if _abs_u and not _bio_u and len(_abs_u) > 30:
+        # 先试段落级拆分（2026-11-20，xz/378）：VLM 把「主体介绍段 + 讲座内容段」
+        # 合并塞进 abstract，两段语义混杂使下面的整段迁移守卫两个条件都不满足而
+        # 拒动（简介空、摘要混入履历）。段落边界清晰时按段切开归位，判据详见
+        # _split_merged_abstract 的 docstring；边界/语义不清一律不动。
+        if _promote_merged_bio(result):
+            pass
+        elif (any(s in _abs_u for s in _BIO_SIG_U)
+                and not any(s in _abs_u for s in _LEC_SIG_U)):
+            result['speakerBio'] = result.pop('abstract', '')
 
     # 地点系统级清理：剔除会议号/密码/议程/报名等噪声后缀、折叠数字内部空格。
     # 放在通用后处理（所有赋值路径之后）统一执行，覆盖 HTML 解析与 OCR 两条路径。

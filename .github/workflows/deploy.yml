@@ -93,6 +93,7 @@ jobs:
             tests/test_f3_fallback_tripwire_20261116.py
             tests/test_competition_title_guard_20261120.py
             tests/test_reparse_incomplete_20261120.py
+            tests/test_vlm_split_title_bio_20261120.py
             tests/test_mother_record_guard.py
             tests/test_stage_var_leak.py
             tests/test_ledger.py
