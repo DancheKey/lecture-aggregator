@@ -5,24 +5,13 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 19 Nov 2026 22:29:10 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 20 Nov 2026 13:35:58 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>第71期学术报告预告｜移动机器人视觉言语自主导航</title>
-      <link>http://cs.scnu.edu.cn/a/20261118/6036.html</link>
-      <guid isPermaLink="false">http://cs.scnu.edu.cn/a/20261118/6036.html</guid>
-      <pubDate>Wed, 18 Nov 2026 10:50:00 +0800</pubDate>
-      <category>计算机学院</category>
-      <description>题目：移动机器人视觉言语自主导航
-主讲：郑伟诗（中山大学计算机学院）
-地点：计算机学院东阶梯学术报告厅
-主办：计算机学院</description>
-    </item>
     <item>
       <title>勷勤数学•专家报告-赖柏顺｜Quantitative regularity to 3D Navier-Stokes system and applications</title>
       <link>http://maths.scnu.edu.cn/a/20261120/8901.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261120/8901.html</guid>
-      <pubDate>Thu, 19 Nov 2026 22:10:08 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 11:59:00 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Quantitative regularity to 3D Navier-Stokes system and applications
 主讲：赖柏顺（湖南师范大学）
@@ -44,7 +33,7 @@
       <title>勷勤数学•专家报告-吕志｜Reduced characteristic number criteria for equivariant bordisms</title>
       <link>http://maths.scnu.edu.cn/a/20261123/8905.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261123/8905.html</guid>
-      <pubDate>Thu, 19 Nov 2026 21:38:32 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 12:45:20 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Reduced characteristic number criteria for equivariant bordisms
 主讲：吕志（复旦大学）
@@ -55,7 +44,7 @@
       <title>勷勤数学•专家报告-赵立璐｜关于二次型的Roth型定理的研究</title>
       <link>http://maths.scnu.edu.cn/a/20261124/8882.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261124/8882.html</guid>
-      <pubDate>Thu, 19 Nov 2026 22:24:34 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 13:31:22 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：关于二次型的Roth型定理的研究
 主讲：赵立璐（中国科学技术大学）
@@ -66,7 +55,7 @@
       <title>华师经管学术讲座第557期（管理）｜中国科创债券的发行定价之谜——基于债券市场&quot;科技板&quot;的证据</title>
       <link>https://em.scnu.edu.cn/a/20261126/11260.html</link>
       <guid isPermaLink="false">https://em.scnu.edu.cn/a/20261126/11260.html</guid>
-      <pubDate>Thu, 19 Nov 2026 22:00:03 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 13:06:51 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：中国科创债券的发行定价之谜——基于债券市场&quot;科技板&quot;的证据
 主讲：张凯亮（暨南大学）
@@ -77,7 +66,7 @@
       <title>勷勤数学•专家报告-张文鹏｜A certain mean values involving Cochrane sums and their identities</title>
       <link>http://maths.scnu.edu.cn/a/20261203/8906.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261203/8906.html</guid>
-      <pubDate>Thu, 19 Nov 2026 21:59:44 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 13:06:32 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：A certain mean values involving Cochrane sums and their identities
 主讲：张文鹏（西北大学）
@@ -99,7 +88,7 @@
       <title>勷勤数学•专家报告-杨绮云｜Dimensional reduction for anyons in the average-field approximation</title>
       <link>http://maths.scnu.edu.cn/a/20261218/8898.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261218/8898.html</guid>
-      <pubDate>Thu, 19 Nov 2026 21:30:24 +0800</pubDate>
+      <pubDate>Fri, 20 Nov 2026 12:37:12 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Dimensional reduction for anyons in the average-field approximation
 主讲：杨绮云（Basque Center for Applied Mathematics (BCAM)）

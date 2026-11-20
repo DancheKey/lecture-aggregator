@@ -333,6 +333,10 @@ class ListDateSwitchTest(unittest.TestCase):
     想关掉过滤重放一遍，日志却打「过滤已开启」，排查者据此得出完全相反的结论。
     修法：开关值由 main() 下传为 _process_source 的 listdate_skip_enabled，
     真实跳过判据（_should_skip_by_item_date）与之联动。
+
+    甲方案（2026-11-20）后语义再变：条目日期不再决定「抓不抓」，只决定
+    「是否记为疑似历史存量」（日志可观测）。开关仍保留并继续下传，
+    但它对抓取行为已无影响——test_10 / test_11 现在两者都断言照抓。
     """
 
     U = 'http://t.scnu.edu.cn/list/'
@@ -348,16 +352,23 @@ class ListDateSwitchTest(unittest.TestCase):
         self.assertIsNone(err, f'本用例不测失败路径：{err}')
         return r, local
 
-    def test_10_开关开启_旧条目被跳过(self):
+    def test_10_开关开启_旧条目照抓_甲方案(self):
+        """甲方案（2026-11-20）：条目日期早于水位线，也不再跳过。
+
+        原行为（旧条目连详情页都不抓）正是 372/375 长期漏抓的机制：源站把
+        补录的旧讲座日期填成过去，一出现就早于水位线，每轮静默跳过且不记
+        台账 → 永久漏抓。改为照抓后，是否旧存量交给解析结果与台账收敛。
+        """
         r, local = self._run(True)
-        self.assertEqual(len(local), 0, '条目日期早于水位，开启过滤时不应解析')
-        self.assertEqual(r.parsed, [], f'不该抓到详情页：{r.parsed}')
+        self.assertEqual(len(local), 1, '甲方案：条目日期早于水位也应照抓')
+        self.assertEqual(r.parsed, ['http://t.scnu.edu.cn/a/202001/9.html'],
+                         f'应抓取详情页：{r.parsed}')
 
     def test_11_开关关闭_旧条目照抓(self):
-        """这是 B7 的核心断言：关闭必须真的关掉（旧版无论如何都照跳）。"""
+        """甲方案后开关不再影响抓取，此用例保留以锁住「不回退成跳过」。"""
         r, local = self._run(False)
         self.assertEqual(len(local), 1,
-                         'SCNU_LISTDATE_SKIP=0 必须让条目级过滤真的失效（回退对照）')
+                         'SCNU_LISTDATE_SKIP=0 时必须照抓（甲方案后与开启态一致）')
         self.assertEqual(r.parsed, ['http://t.scnu.edu.cn/a/202001/9.html'],
                          f'关闭过滤时详情页应被抓取并解析：{r.parsed}')
 
@@ -412,6 +423,73 @@ class ListDateSwitchTest(unittest.TestCase):
         sig = inspect.signature(P._process_source)
         self.assertIs(sig.parameters['listdate_skip_enabled'].default, True,
                       '默认值必须是 True，否则所有既有调用方的过滤行为会静默改变')
+
+
+class JiaBackfillGateTest(unittest.TestCase):
+    """甲方案（2026-11-20）：未入库条目不得被列表页日期截断。
+
+    实证（行知书院 372/375）：源站后期补录的旧讲座，日期字段填成 6 月，
+    一出现就早于水位线 → 每轮判为存量跳过且不记台账，永久漏抓。
+    本类锁住翻页级那一半：整页日期都早于基线时，只有整页**确实都已处理**
+    （已入库或台账已判）才允许停止翻页；只要还有未入库条目就必须继续翻。
+    """
+
+    U = 'http://t.scnu.edu.cn/list/'
+    U2 = 'http://t.scnu.edu.cn/list/2.html'
+    OLD = '2026-06-01'
+
+    def _page(self, pairs):
+        items = ''.join(f'<li><a href="{h}">学术讲座通知{i}</a><span>{d}</span></li>'
+                        for i, (h, d) in enumerate(pairs))
+        return f'<html><body>{items}</body></html>'
+
+    def _run(self, known_nums):
+        p1 = self._page([('/a/202606/1.html', self.OLD),
+                         ('/a/202606/2.html', self.OLD)])
+        p2 = self._page([('/a/202606/3.html', self.OLD)])
+        known = {(P._canon_url_key(f'http://t.scnu.edu.cn/a/202606/{n}.html'), None)
+                 for n in known_nums}
+        r = _SourceRun(P, {self.U: p1, self.U2: p2})
+        err, local = r.run([_lu(self.U)], existing_urls=known,
+                           is_incremental=True,
+                           cutoff_date_str='2026-11-18',
+                           src_latest_date='2026-11-16')
+        self.assertIsNone(err, f'本用例不测失败路径：{err}')
+        return r, local
+
+    def test_20_整页仍有人未入库_不得停止翻页(self):
+        """第 1 页尚有未入库条目 → 必须翻到第 2 页，否则后半页永久漏抓。"""
+        r, local = self._run({1})   # 只有第 1 条已入库，第 2 条未入库
+        self.assertIn(self.U2, r.fetched,
+                      '整页仍有未入库条目时不得停止翻页（否则第 2 页永久漏抓）')
+        self.assertIn('http://t.scnu.edu.cn/a/202606/3.html', r.parsed,
+                      '第 2 页的未入库条目必须被抓取解析')
+
+    def test_21_整页都已入库_停止翻页(self):
+        """整页都已处理 → 停。这是省流量的正当场景，不得被新判据废掉。"""
+        r, local = self._run({1, 2})
+        self.assertNotIn(self.U2, r.fetched,
+                         '整页均已入库时应停止翻页（省流量的正当场景）')
+
+    def test_22_多场讲座记录_lectureIndex非None也算已处理(self):
+        """多场讲座拆分记录只存 (url, lectureIndex)，不带 (url, None)。
+
+        若判据写成只查 (k, None)，这类页面永远算「还有未入库条目」，
+        每轮都白翻一页（main() 有意让它们每轮重抓，但那是抓本页、不是翻下一页）。
+        """
+        p1 = self._page([('/a/202606/1.html', self.OLD),
+                         ('/a/202606/2.html', self.OLD)])
+        p2 = self._page([('/a/202606/3.html', self.OLD)])
+        known = {(P._canon_url_key('http://t.scnu.edu.cn/a/202606/1.html'), 1),
+                 (P._canon_url_key('http://t.scnu.edu.cn/a/202606/2.html'), 2)}
+        r = _SourceRun(P, {self.U: p1, self.U2: p2})
+        err, local = r.run([_lu(self.U)], existing_urls=known,
+                           is_incremental=True,
+                           cutoff_date_str='2026-11-18',
+                           src_latest_date='2026-11-16')
+        self.assertIsNone(err, f'本用例不测失败路径：{err}')
+        self.assertNotIn(self.U2, r.fetched,
+                         '多场讲座记录（lectureIndex 非 None）也算已处理，应停止翻页')
 
 
 if __name__ == '__main__':

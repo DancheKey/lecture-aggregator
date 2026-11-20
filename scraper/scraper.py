@@ -2075,6 +2075,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                               _effective_listdate_cutoff(cutoff_date_str, src_latest_date))
                 listdate_skipped = 0
                 page_links = collect_links(html, base, list_url=cur, collect_mode=collect_mode)
+                # 本页全部链接的归一 key（供 PAGESTOP 判定「本页是否都已处理」）
+                _page_norm_keys = []
                 if page_links:
                     list_seen_ok += 1
                 else:
@@ -2088,6 +2090,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     if href_norm in seen:
                         continue
                     seen.add(href_norm)
+                    _page_norm_keys.append(_canon_url_key(href_norm))
                     new_count += 1
                     if is_incremental and (_canon_url_key(href_norm), None) in existing_urls:
                         continue
@@ -2095,13 +2098,23 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     if is_incremental and not force_full and ledger_hit(_canon_url_key(href_norm)):
                         _LEDGER_STATS['skipped'] += 1
                         continue
+                    # 甲方案（2026-11-20 修复）：这里**不再跳过**，只记账。
+                    # 原判据「条目日期早于水位线 → 连详情页都不抓」建立在
+                    # 「列表页日期可信」这一假设上，实测该假设不成立：
+                    # 行知书院 372/375 是源站后期补录的旧讲座（ID 372/375 大于
+                    # 10 月的 366，创建顺序在之后），日期字段却填成 6 月，一出现
+                    # 在列表页就被判为存量，每轮静默跳过且不记台账 → 永久漏抓
+                    # （11-17 日志「按条目日期跳过 2 条」正是这两条）。
+                    # 省流量的职责改由前面两道闸门承担：已入库的跳、台账已判的跳，
+                    # 剩下的一律抓详情页；抓完是否旧存量由 parse 结果与台账收敛
+                    # （解析成功入库 / 判回顾稿记 rejected / 失败记 failed）。
+                    # skip_itemdate 保留仅为兼容 SCNU_LISTDATE_SKIP 的回退对照语义。
                     if (skip_itemdate
                             and item_date_map
                             and _should_skip_by_item_date(_canon_url_key(href_norm),
                                                           item_date_map, eff_cutoff)):
                         listdate_skipped += 1
                         _LISTDATE_STATS['skipped'] += 1
-                        continue
                     if href_norm in exclude_urls or (global_exclude and href_norm in global_exclude):
                         print(f'[SKIP] {name} exclude {href}')
                         continue
@@ -2161,7 +2174,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         tag = f' (第{_li}期)' if _li is not None else ''
                         print(f'[OK] {name} | {r.get("lectureStart")} | {txt}{tag}')
                 if listdate_skipped:
-                    print(f'[LISTDATE] {name} | {cur} | 按条目日期跳过 {listdate_skipped} 条历史详情页')
+                    print(f'[LISTDATE] {name} | {cur} | 按条目日期判为历史存量 '
+                          f'{listdate_skipped} 条（甲方案：照抓，不跳过）')
                 # 翻页停止判据（2026-09-28）：仅增量生效。列表页严格时间倒序时，
                 # 若本页**整页**条目日期都早于该源已入库的最晚条目日期，说明本页
                 # 及其之后所有页全是早已入库的存量，继续翻纯属每轮重复枚举
@@ -2180,10 +2194,24 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         and not force_full):
                     _page_dates = list(item_date_map.values())
                     if _page_dates and max(_page_dates) < src_latest_date:
-                        _stop_paging = True
-                        print(f'[PAGESTOP] {name} | {cur} | 整页条目日期'
-                              f'(最晚 {max(_page_dates)}) 均早于本源已入库最新'
-                              f'({src_latest_date})，停止翻页')
+                        # 甲方案（2026-11-20）：日期判据只能算「疑似存量」，还要
+                        # 确认本页条目确实都处理过（已入库，或台账已判拒/判失败）。
+                        # 否则「日期被手填成旧日期」的补录条目会把本页后面尚未
+                        # 入库的内容一并截断——这正是 372/375 长期偏居列表页而
+                        # 无人察觉的机制。整页都处理过才停，多翻一页的成本很小。
+                        # existing_urls 的元素是 (归一URL, lectureIndex)，
+                        # 多场讲座拆分后 lectureIndex 为 1/2/3... 而非 None，
+                        # 故不能只查 (k, None)——否则这类页面永远判为「有未入库
+                        # 条目」，每轮都白翻一页。
+                        _known_url_keys = {k for (k, _idx) in existing_urls}
+                        _page_all_known = bool(_page_norm_keys) and all(
+                            (k in _known_url_keys) or ledger_hit(k)
+                            for k in _page_norm_keys)
+                        if _page_all_known:
+                            _stop_paging = True
+                            print(f'[PAGESTOP] {name} | {cur} | 整页条目日期'
+                                  f'(最晚 {max(_page_dates)}) 均早于本源已入库最新'
+                                  f'({src_latest_date})，且整页均已处理，停止翻页')
                 nxt = _next_page_url(html, cur) if html else None
                 sequential = False
                 if not nxt and new_count > 0:
@@ -2689,8 +2717,9 @@ def main():
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
           f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
     if _LISTDATE_STATS['skipped']:
-        print(f'[LISTDATE] 本轮共按列表页条目日期跳过 {_LISTDATE_STATS["skipped"]} 个历史详情页'
-              f'（未 fetch、未 parse，省下对应 LLM 开销）')
+        print(f'[LISTDATE] 本轮 {_LISTDATE_STATS["skipped"]} 个详情页的列表页条目日期'
+              f'早于水位线，已按下述策略处理：照抓不跳过（甲方案 2026-11-20），'
+              f'是否旧存量由解析结果与台账收敛')
     # 附件通道告警台账（2026-11-07）：本轮 [PDF-INLINE]/[ATTACH] 失败写进
     # data/attachment_health.json，供 scripts/audit_fields.py 的每日体检报告展示。
     # 新站点「附件拿不到」因此当天可见，而不是只留在 CI 日志里等人翻。
