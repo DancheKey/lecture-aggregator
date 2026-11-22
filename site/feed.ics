@@ -8,62 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261122/8907.html@danchekey.github.io
-DTSTAMP:20261120T224501Z
-DTSTART:20261122T010000Z
-DTEND:20261122T020000Z
-SUMMARY:勷勤数学•专家报告-吴笛｜Linear inviscid instability o
- f compressible boundary layer flow
-LOCATION:数科院西楼111
-DESCRIPTION:题目：Linear inviscid instability of compressible boundary 
- layer flow\n主讲：吴笛（华中师范大学）\n地点：数科院
- 西楼111\n主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261122/8907.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261122/8908.html@danchekey.github.io
-DTSTAMP:20261120T224501Z
-DTSTART:20261122T020000Z
-DTEND:20261122T030000Z
-SUMMARY:勷勤数学•专家报告-张志朋｜On Rayleigh-Taylor problem
-  in viscous incompressible fluids with internal capillarity
-LOCATION:数科院西楼111
-DESCRIPTION:题目：On Rayleigh-Taylor problem in viscous incompressible 
- fluids with internal capillarity\n主讲：张志朋（中国海洋大学
- ）\n地点：数科院西楼111\n主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261122/8908.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261122/8909.html@danchekey.github.io
-DTSTAMP:20261120T224501Z
-DTSTART:20261122T030000Z
-DTEND:20261122T040000Z
-SUMMARY:勷勤数学•专家报告-罗益龙｜Compressible Euler limit f
- rom Boltzmann equation in half space: Maxwell reflection boundary conditi
- on with small accommodation coefficients
-LOCATION:数科院西楼111
-DESCRIPTION:题目：Compressible Euler limit from Boltzmann equation in h
- alf space: Maxwell reflection boundary condition with small accommodation
-  coefficients\n主讲：罗益龙（湖南大学）\n地点：数科院
- 西楼111\n主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261122/8909.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1124.html@danchekey.github.io
 DTSTAMP:20261120T224501Z
 DTSTART:20261123T010000Z
