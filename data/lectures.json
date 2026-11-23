@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-21T06:45:01+08:00",
+  "updatedAt": "2026-11-23T15:44:53+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261218/8898.html",
@@ -160,6 +160,65 @@
       "listTitle": "● 华师经管学术讲座第557期（管理）"
     },
     {
+      "sourceUrl": "http://cs.scnu.edu.cn/a/20261123/6045.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/computer/2026/1123/1795408138244982.png"
+      ],
+      "college": "计算机学院",
+      "campus": "石牌",
+      "title": "第73期学术报告预告",
+      "topic": "探索知识追踪的跨域迁移及可解释性",
+      "lectureStart": "2026-11-26 15:00:00",
+      "lectureEnd": "2026-11-26 16:00:00",
+      "location": "计算机学院东阶梯学术报告厅",
+      "speaker": "吴正洋",
+      "speakerTitle": "",
+      "speakerAffiliation": "华南师范大学计算机学院",
+      "inviter": "",
+      "speakerBio": "吴正洋,教授,博士生导师,正高级工程师,中国计算机学会 (CCF) 杰出会员, CCF 协同计算专委会执行委员,广东省服务计算工程技术研究开发中心成员。主要从事数据挖掘,教育人工智能,社交网络分析等工作。主持国家自然科学基金面上项目,广东省社科基金、广东省高校特色创新项目,参与国家重点研发计划课题、省级重大项目、市科技计划项目等。在国际高水平期刊、国际学术会议发表论文50余篇,授权发明专利10项。",
+      "organizer": "计算机学院",
+      "publishTime": "2026-11-23 12:07:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "知识追踪是智能教育的核心技术,其目标是在学习者与题目的交互序列中动态建模知识状态并预测后续表现。然而,现有研究通常预设学习者拥有充足的学习交互数据,且模型多局限于单一课程域;现实中,往往面临新学科、新平台与冷启动等多重挑战,这一理想化假设与真实应用场景相去甚远。本讲座直面这一现实落差,围绕知识追踪跨域迁移中的若干关键问题,从迁移内容与迁移机制两个视角解析不同的解决途径;并进一步剖析跨域迁移场景下可解释性所面临的难题。",
+      "qaGate": "speakerBio",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026-11-23第73期学术报告预告"
+    },
+    {
+      "sourceUrl": "https://em.scnu.edu.cn/a/20261126/11267.html",
+      "images": [],
+      "college": "经济与管理学院",
+      "campus": "大学城",
+      "title": "华师经英Seminar第69期",
+      "topic": "Generative AI as a Competitor: Content Creation and Platform Strategy",
+      "lectureStart": "2026-11-26 12:30:00",
+      "lectureEnd": null,
+      "location": "大学城校园文2栋301会议室",
+      "speaker": "陈丽梅",
+      "speakerTitle": "青年英才",
+      "speakerAffiliation": "华南师范大学经济与管理学院",
+      "inviter": "",
+      "speakerBio": "陈丽梅,华南师范大学经济与管理学院青年英才,复旦大学经济学博士。主要研究领域为产业组织理论、契约理论、微观经济理论等,主要聚焦数字经济和数字平台等相关话题,具体包括平台激励机制设计、平台自我优待问题、平台数据使用等话题。研究成果发表在重要国际期刊,主持国家自然科学基金青年项目1项。",
+      "organizer": "经济与管理学院",
+      "publishTime": null,
+      "publishTimeSource": "url_proxy",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "With advances in generative AI, content platforms increasingly use creators' output as training data to supply their own AI-generated content, which can compete with those same creators for consumer attention. This paper therefore studies how a content platform manages human-content production under this tension by adjusting its revenue-sharing rule and choosing its AI strategy. We develop a game-theoretical model where a content platform hosts two creators and operates its own AI system, which learns from creators' output and competes with them. We obtain four main findings: First, revenue sharing shapes both creator investment and AI's competitive role, making the optimal rule regime-dependent. As AI learning capability increases, optimal sharing follows a discontinuous and nonmonotonic path across four regimes in the contested market: strict AI exclusion, boundary exclusion, active AI competition with both creators, and active AI competition with only one creator remaining. Second, AI supply can either improve or reduce human-content quality under optimal sharing, depending critically on AI capability. Average quality can be lowest at intermediate capability rather than when AI is strongest. Third, although supplying AI content is always beneficial, the platform may restrain AI capability to protect the human-content base and keep AI and both creators active in the contested market. Finally, allowing creators to defend their returns by reallocating investment toward audience relationships can prevent their exit from the contested market and give the platform scope to develop AI to the technological frontier.",
+      "newsFilterBypass": true,
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle|speakerAffiliation",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "● 华师经英Seminar第69期"
+    },
+    {
       "sourceUrl": "http://iqm.scnu.edu.cn/a/20261120/578.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/iqm/2026/1120/1795166565402892.png"
@@ -277,6 +336,35 @@
       "timeUnknownSource": "auto",
       "timeUnknown": false,
       "listTitle": "[2026年11月24日] 贾江涌——以碰撞成像原子核：迈向核物理的统一范式"
+    },
+    {
+      "sourceUrl": "http://cs.scnu.edu.cn/a/20261123/6044.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/computer/2026/1123/1795406673125730.png"
+      ],
+      "college": "计算机学院",
+      "campus": "石牌",
+      "title": "第72期学术报告预告",
+      "topic": "图数据智能:从基础理论到跨学科应用",
+      "lectureStart": "2026-11-24 14:30:00",
+      "lectureEnd": "2026-11-24 16:00:00",
+      "location": "计算机学院东阶梯学术报告厅",
+      "speaker": "贺超波",
+      "speakerTitle": "",
+      "speakerAffiliation": "华南师范大学计算机学院",
+      "inviter": "",
+      "speakerBio": "贺超波 ,教授,博士生导师,中国计算机学会( CCF )杰出会员,主要从事图数据挖掘、教育人工智能等方面的教学与科研工作。目前在 TPAMI 、 Artificial Intelligence 、 TKDE 、 TNNLS 、计算机学报、中国科学:信息科学、中国电化教育、 AAAI 、 ICML 、 SIGIR 等国内外知名学术刊物和会议发表论文100余篇,其中 CCF A/ 中科院1区 /Trans 类论文30余篇,连续2年入选全国高被引学者榜单;出版学术专著1部,主编教材2部;主持国家自然科学基金、教育部人文社会科学研究青年基金、省自然科学基金、省科技计划项目、省教育科学规划课题以及省高等教育教学改革项目等共计30余项 。",
+      "organizer": "计算机学院",
+      "publishTime": "2026-11-23 12:01:00",
+      "publishTimeSource": "label",
+      "hasPosterImage": true,
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label",
+      "abstract": "随着大数据与人工智能技术的快速发展,图数据作为刻画复杂对象及其关联关系的重要载体,已成为知识发现与智能决策的重要基础。本报告围绕图数据智能的基础理论、关键技术与跨学科应用展开。首先,介绍图数据的基本特征、图数据智能的核心概念及其研究价值;其次,梳理图数据智能的主要研究问题与技术发展脉络,重点介绍图表示学习、图神经网络、图基础模型及图与大语言模型融合等前沿技术;最后,结合教育、医疗、金融等典型领域,介绍图数据智能在复杂关系建模、知识发现与智能决策中的应用案例,探讨其在推动多学科交叉融合中的发展机遇与挑战。",
+      "qaGate": "speakerBio",
+      "timeUnknownSource": "auto",
+      "timeUnknown": false,
+      "listTitle": "2026-11-23第72期学术报告预告"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261123/8905.html",
