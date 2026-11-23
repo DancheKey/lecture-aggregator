@@ -8,44 +8,8 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261123/8905.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
-DTSTART:20261123T070000Z
-DTEND:20261123T080000Z
-SUMMARY:勷勤数学•专家报告-吕志｜Reduced characteristic number
-  criteria for equivariant bordisms
-LOCATION:数科院东楼401
-DESCRIPTION:题目：Reduced characteristic number criteria for equivarian
- t bordisms\n主讲：吕志（复旦大学）\n地点：数科院东楼40
- 1\n主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261123/8905.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://life.scnu.edu.cn/a/20261118/6852.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
-DTSTART:20261123T070000Z
-DTEND:20261123T080000Z
-SUMMARY:学术讲座：Transcriptional execution of intracellular plant in
- nate immunity
-LOCATION:生命科学学院138会议室
-DESCRIPTION:题目：Transcriptional execution of intracellular plant inna
- te immunity\n主讲：Pingtao Ding（Leiden University）\n地点：生
- 命科学学院138会议室\n主办：生命科学学院
-URL:http://life.scnu.edu.cn/a/20261118/6852.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://cs.scnu.edu.cn/a/20261123/6044.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261124T063000Z
 DTEND:20261124T080000Z
 SUMMARY:第72期学术报告预告｜图数据智能:从基础理论到跨
@@ -63,7 +27,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261124/8882.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261124T070000Z
 DTEND:20261124T080000Z
 SUMMARY:勷勤数学•专家报告-赵立璐｜关于二次型的Roth型
@@ -81,7 +45,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://iqm.scnu.edu.cn/a/20261120/577.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261124T070000Z
 DTEND:20261124T080000Z
 SUMMARY:贾江涌——以碰撞成像原子核：迈向核物理的统一
@@ -99,7 +63,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://em.scnu.edu.cn/a/20261124/11262.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261124T110000Z
 DTEND:20261124T120000Z
 SUMMARY:华师经管实务讲座第105期（会计）｜学习生涯规划
@@ -117,7 +81,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://iqm.scnu.edu.cn/a/20261120/578.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261125T020000Z
 DTEND:20261125T030000Z
 SUMMARY:季向东——追光之旅——从爱因斯坦的思想实验到
@@ -135,8 +99,45 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://life.scnu.edu.cn/a/20261123/6856.html@danchekey.github.io
+DTSTAMP:20261123T160222Z
+DTSTART:20261125T070000Z
+DTEND:20261125T080000Z
+SUMMARY:学术讲座：Epigenetic determinants of insect fecundity and gon
+ adotrophic cyclicity｜Epigenetic determinants of insect fecundity and go
+ nadotrophic cyclicality
+LOCATION:生命科学学院102会议室
+DESCRIPTION:题目：Epigenetic determinants of insect fecundity and gonad
+ otrophic cyclicality\n主讲：周树堂（河南大学）\n地点：生
+ 命科学学院102会议室\n主办：生命科学学院
+URL:http://life.scnu.edu.cn/a/20261123/6856.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:http://life.scnu.edu.cn/a/20261123/6855.html@danchekey.github.io
+DTSTAMP:20261123T160222Z
+DTSTART:20261125T080000Z
+DTEND:20261125T090000Z
+SUMMARY:学术讲座：WHY ARE THERE SO MANY  DIFFERENT SPECIES OF
+  INSECTS ?｜WHY ARE THERE SO MANY DIFFERENT SPECIES OF INSECTS ?
+LOCATION:生命科学学院102会议室
+DESCRIPTION:题目：WHY ARE THERE SO MANY DIFFERENT SPECIES OF INSECTS ?\
+ n主讲：Xavier Bellés（西班牙进化生物学研究所）\n地点
+ ：生命科学学院102会议室\n主办：生命科学学院
+URL:http://life.scnu.edu.cn/a/20261123/6855.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:https://em.scnu.edu.cn/a/20261126/11267.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261126T043000Z
 DTEND:20261126T053000Z
 SUMMARY:华师经英Seminar第69期｜Generative AI as a Competitor: Conte
@@ -155,7 +156,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://cs.scnu.edu.cn/a/20261123/6045.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261126T070000Z
 DTEND:20261126T080000Z
 SUMMARY:第73期学术报告预告｜探索知识追踪的跨域迁移及
@@ -172,8 +173,25 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:https://physics.scnu.edu.cn/a/20261123/13436.html@danchekey.github.io
+DTSTAMP:20261123T160222Z
+DTSTART:20261126T070000Z
+DTEND:20261126T080000Z
+SUMMARY:物理学院学术报告（第62期）华南理工大学黄学勤
+ 教授｜声学拓扑物态及其传输现象
+LOCATION:理6栋302
+DESCRIPTION:题目：声学拓扑物态及其传输现象\n主讲：黄学
+ 勤（华南理工大学）\n地点：理6栋302\n主办：物理学院
+URL:https://physics.scnu.edu.cn/a/20261123/13436.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:https://em.scnu.edu.cn/a/20261126/11260.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261126T073000Z
 DTEND:20261126T083000Z
 SUMMARY:华师经管学术讲座第557期（管理）｜中国科创债券
@@ -192,7 +210,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://em.scnu.edu.cn/a/20261127/11263.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261127T060000Z
 DTEND:20261127T070000Z
 SUMMARY:华师经管实务讲座第106期（会计）｜数字化审计实
@@ -210,8 +228,46 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:https://physics.scnu.edu.cn/a/20261123/13441.html@danchekey.github.io
+DTSTAMP:20261123T160222Z
+DTSTART:20261127T063000Z
+DTEND:20261127T073000Z
+SUMMARY:物理学院学术报告（第64期）香港星量智宇有限公
+ 司何敏权博士｜Neural-network-enhanced quantum simulation of the Sc
+ hwinger model
+LOCATION:理6栋302
+DESCRIPTION:题目：Neural-network-enhanced quantum simulation of the Sch
+ winger model\n主讲：何敏权（香港星量智宇有限公司）\n地
+ 点：理6栋302\n主办：物理学院
+URL:https://physics.scnu.edu.cn/a/20261123/13441.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:https://physics.scnu.edu.cn/a/20261123/13437.html@danchekey.github.io
+DTSTAMP:20261123T160222Z
+DTSTART:20261201T070000Z
+DTEND:20261201T080000Z
+SUMMARY:物理学院学术报告（第63期）南京大学杜灵杰至诚
+ 特聘教授｜分数量子霍尔效应中涌现的新物理——从"手
+ 性引力子"到"部分子"
+LOCATION:理6栋302
+DESCRIPTION:题目：分数量子霍尔效应中涌现的新物理——
+ 从"手性引力子"到"部分子"\n主讲：杜灵杰（南京大学）\
+ n地点：理6栋302\n主办：物理学院
+URL:https://physics.scnu.edu.cn/a/20261123/13437.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261203/8906.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261203T080000Z
 DTEND:20261203T090000Z
 SUMMARY:勷勤数学•专家报告-张文鹏｜A certain mean values invo
@@ -229,7 +285,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1125.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261210T060000Z
 DTEND:20261210T070000Z
 SUMMARY:华南师范大学砺儒讲坛第149讲： 预测人口的空间
@@ -247,7 +303,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261218/8898.html@danchekey.github.io
-DTSTAMP:20261123T074453Z
+DTSTAMP:20261123T160222Z
 DTSTART:20261218T020000Z
 DTEND:20261218T030000Z
 SUMMARY:勷勤数学•专家报告-杨绮云｜Dimensional reduction for 
