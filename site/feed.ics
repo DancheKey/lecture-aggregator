@@ -8,24 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:https://em.scnu.edu.cn/a/20261124/11262.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
-DTSTART:20261124T110000Z
-DTEND:20261124T120000Z
-SUMMARY:华师经管实务讲座第105期（会计）｜学习生涯规划
- 与求职准备
-LOCATION:大学城校园文二栋536国际学术报告厅
-DESCRIPTION:题目：学习生涯规划与求职准备\n主讲：许志鹏
- （广州中医药大学）\n地点：大学城校园文二栋536国际
- 学术报告厅\n主办：经济与管理学院
-URL:https://em.scnu.edu.cn/a/20261124/11262.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://iqm.scnu.edu.cn/a/20261120/578.html@danchekey.github.io
 DTSTAMP:20261124T095955Z
 DTSTART:20261125T020000Z
