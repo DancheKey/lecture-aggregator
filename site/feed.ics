@@ -8,64 +8,8 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:http://iqm.scnu.edu.cn/a/20261120/578.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
-DTSTART:20261125T020000Z
-DTEND:20261125T030000Z
-SUMMARY:季向东——追光之旅——从爱因斯坦的思想实验到
- 质子的内部世界
-LOCATION:理8栋118学术报告厅
-DESCRIPTION:题目：追光之旅——从爱因斯坦的思想实验到
- 质子的内部世界\n主讲：季向东（上海交通大学李政道
- 研究所）\n地点：理8栋118学术报告厅\n主办：量子物质
- 研究院
-URL:http://iqm.scnu.edu.cn/a/20261120/578.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://maths.scnu.edu.cn/a/20261125/8911.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
-DTSTART:20261125T023000Z
-DTEND:20261125T033000Z
-SUMMARY:勷勤数学•专家报告-李佳傲｜Bounded chromatic number o
- f graphs with small clique number and large minimum degree
-LOCATION:数科院东楼401
-DESCRIPTION:题目：Bounded chromatic number of graphs with small clique 
- number and large minimum degree\n主讲：李佳傲（南开大学）\n
- 地点：数科院东楼401\n主办：数学科学学院
-URL:http://maths.scnu.edu.cn/a/20261125/8911.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
-UID:http://life.scnu.edu.cn/a/20261123/6856.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
-DTSTART:20261125T070000Z
-DTEND:20261125T080000Z
-SUMMARY:学术讲座：Epigenetic determinants of insect fecundity and gon
- adotrophic cyclicity｜Epigenetic determinants of insect fecundity and go
- nadotrophic cyclicality
-LOCATION:生命科学学院102会议室
-DESCRIPTION:题目：Epigenetic determinants of insect fecundity and gonad
- otrophic cyclicality\n主讲：周树堂（河南大学）\n地点：生
- 命科学学院102会议室\n主办：生命科学学院
-URL:http://life.scnu.edu.cn/a/20261123/6856.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:http://life.scnu.edu.cn/a/20261123/6855.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261125T080000Z
 DTEND:20261125T090000Z
 SUMMARY:学术讲座：WHY ARE THERE SO MANY  DIFFERENT SPECIES OF
@@ -83,7 +27,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://em.scnu.edu.cn/a/20261126/11267.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261126T043000Z
 DTEND:20261126T053000Z
 SUMMARY:华师经英Seminar第69期｜Generative AI as a Competitor: Conte
@@ -102,7 +46,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://cs.scnu.edu.cn/a/20261123/6045.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261126T070000Z
 DTEND:20261126T080000Z
 SUMMARY:第73期学术报告预告｜探索知识追踪的跨域迁移及
@@ -120,7 +64,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261123/13436.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261126T070000Z
 DTEND:20261126T080000Z
 SUMMARY:物理学院学术报告（第62期）华南理工大学黄学勤
@@ -137,7 +81,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://em.scnu.edu.cn/a/20261126/11260.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261126T073000Z
 DTEND:20261126T083000Z
 SUMMARY:华师经管学术讲座第557期（管理）｜中国科创债券
@@ -155,8 +99,25 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:https://physics.scnu.edu.cn/a/20261125/13442.html@danchekey.github.io
+DTSTAMP:20261125T084102Z
+DTSTART:20261127T020000Z
+DTEND:20261127T030000Z
+SUMMARY:物理学院学术报告（第65期）上海交通大学郭政鑫
+ ｜真空诱导的库珀配对增强
+LOCATION:理6栋302
+DESCRIPTION:题目：真空诱导的库珀配对增强\n主讲：郭政鑫
+ （上海交通大学）\n地点：理6栋302\n主办：物理学院
+URL:https://physics.scnu.edu.cn/a/20261125/13442.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:https://em.scnu.edu.cn/a/20261127/11263.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261127T060000Z
 DTEND:20261127T070000Z
 SUMMARY:华师经管实务讲座第106期（会计）｜数字化审计实
@@ -175,7 +136,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261123/13441.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261127T063000Z
 DTEND:20261127T073000Z
 SUMMARY:物理学院学术报告（第64期）香港星量智宇有限公
@@ -193,8 +154,26 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://life.scnu.edu.cn/a/20261125/6860.html@danchekey.github.io
+DTSTAMP:20261125T084102Z
+DTSTART:20261127T070000Z
+DTEND:20261127T080000Z
+SUMMARY:学术讲座：Smelling to Survive: The Olfactory Neuroecology of 
+ Locusts
+LOCATION:生命科学学院102会议室
+DESCRIPTION:题目：Smelling to Survive: The Olfactory Neuroecology of Lo
+ custs\n主讲：常贺坦（中国农科院深圳基因组所）\n地点
+ ：生命科学学院102会议室\n主办：生命科学学院
+URL:http://life.scnu.edu.cn/a/20261125/6860.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261127/8910.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261127T073000Z
 DTEND:20261127T083000Z
 SUMMARY:勷勤数学•专家报告-许宝刚｜Optimal binding functions 
@@ -212,7 +191,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261127/8914.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261127T083000Z
 DTEND:20261127T093000Z
 SUMMARY:勷勤数学•领军学者报告-张晓岩｜时钟网络设计
@@ -229,8 +208,25 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://life.scnu.edu.cn/a/20261125/6859.html@danchekey.github.io
+DTSTAMP:20261125T084102Z
+DTSTART:20261127T083000Z
+DTEND:20261127T093000Z
+SUMMARY:学术讲座：Stem Cells and Two Niches
+LOCATION:生命科学学院102会议室
+DESCRIPTION:题目：Stem Cells and Two Niches\n主讲：解亭（香港
+ 大学）\n地点：生命科学学院102会议室\n主办：生命科学
+ 学院
+URL:http://life.scnu.edu.cn/a/20261125/6859.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261130/8912.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261130T013000Z
 DTEND:20261130T023000Z
 SUMMARY:勷勤数学•专家报告-黄皓｜Extremal Kt-intersecting grap
@@ -248,7 +244,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261130/8913.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261130T023000Z
 DTEND:20261130T033000Z
 SUMMARY:勷勤数学•领军学者报告-吴河辉｜The Product of Inter
@@ -266,7 +262,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261123/13437.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261201T070000Z
 DTEND:20261201T080000Z
 SUMMARY:物理学院学术报告（第63期）南京大学杜灵杰至诚
@@ -284,8 +280,27 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:https://physics.scnu.edu.cn/a/20261125/13443.html@danchekey.github.io
+DTSTAMP:20261125T084102Z
+DTSTART:20261202T063000Z
+DTEND:20261202T073000Z
+SUMMARY:物理学院学术报告（第66期）University of New South Wale
+ s，Prof. Dimitrie Culcer｜Orbital-geometric spin response: inter-band c
+ oherence versus orbital-to-spin conversion
+LOCATION:理6栋302
+DESCRIPTION:题目：Orbital-geometric spin response: inter-band coherence
+  versus orbital-to-spin conversion\n主讲：Dimitrie Culcer（University
+  of New South Wales）\n地点：理6栋302\n主办：物理学院
+URL:https://physics.scnu.edu.cn/a/20261125/13443.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261203/8906.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261203T080000Z
 DTEND:20261203T090000Z
 SUMMARY:勷勤数学•专家报告-张文鹏｜A certain mean values invo
@@ -303,7 +318,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261205/8915.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261205T010000Z
 DTEND:20261205T020000Z
 SUMMARY:勷勤数学•领军学者报告-吕广世｜The Product of Inter
@@ -321,7 +336,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1125.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261210T060000Z
 DTEND:20261210T070000Z
 SUMMARY:华南师范大学砺儒讲坛第149讲： 预测人口的空间
@@ -339,7 +354,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261218/8898.html@danchekey.github.io
-DTSTAMP:20261124T095955Z
+DTSTAMP:20261125T084102Z
 DTSTART:20261218T020000Z
 DTEND:20261218T030000Z
 SUMMARY:勷勤数学•专家报告-杨绮云｜Dimensional reduction for 
