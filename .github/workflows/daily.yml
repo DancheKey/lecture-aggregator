@@ -592,6 +592,7 @@ jobs:
       contents: read     # 仅检出已推送的产物
       pages: write       # 上传 Pages 产物
       id-token: write    # deploy-pages 的 OIDC 换取部署令牌
+      actions: read      # 确认 github-pages 构件已在接口可见（2026-11-25）
     steps:
       # 2026-09-28 修复：checkout 默认检出**触发本 run 时的 commit**（github.sha），
       # 而 scrape job 刚推送的新提交不在其中——当本轮触发后 main 有推进（尤其
@@ -610,6 +611,27 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: site
+
+      # 2026-11-25：构件上传成功后，GitHub 的构件目录有短暂延迟才列出它。
+      # deploy-pages@v5 在上传后 0.3 秒就去查目录，连续三班只看到先上传的
+      # 「字段体检报告」，误报 No artifacts named "github-pages" were found
+      # 并使整班变红（事后回查构件完好存在）。这里轮询到目录可见再部署。
+      - name: 等待 Pages 构件在接口可见
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for i in $(seq 1 24); do
+            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
+                 --jq '.artifacts[] | select(.name == "github-pages") | .id' | grep -q .; then
+              echo "构件 github-pages 已可见（第 $i 次查询），再缓冲 10 秒供内部接口同步"
+              sleep 10
+              exit 0
+            fi
+            echo "第 $i 次查询：构件尚未可见，5 秒后重试"
+            sleep 5
+          done
+          echo "等待 120 秒后构件仍未可见，终止部署" >&2
+          exit 1
 
       - name: 部署到 GitHub Pages
         id: deployment
