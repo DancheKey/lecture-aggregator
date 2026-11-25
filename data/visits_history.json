@@ -807,13 +807,13 @@
     },
     {
       "date": "2026-11-25",
-      "capturedAt": "2026-11-25T16:41:04+08:00",
-      "site_pv": 2151,
+      "capturedAt": "2026-11-25T23:38:36+08:00",
+      "site_pv": 2155,
       "site_uv": null,
       "page_pv": null,
       "page_uv": null,
       "uv_delta": null,
-      "pv_delta": 3,
+      "pv_delta": 7,
       "note": ""
     }
   ]
