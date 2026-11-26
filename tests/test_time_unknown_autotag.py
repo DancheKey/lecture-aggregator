@@ -3,8 +3,8 @@
 
 ## 背景
 
-`08:00` / `00:00` 是本项目的**占位约定**（源页只给日期时解析器统一填充），
-但确有讲座真在 8:00 开始。此前该区分全靠**人工**在 data/lectures.json 里打
+`08:00` 是本项目的**统一占位约定**（源页只给日期时解析器填充），
+但确有讲座真在 8:00 开始。`00:00` 是真实午夜，不再作为占位。此前该区分全靠**人工**在 data/lectures.json 里打
 `timeUnknown`——而爬虫根本不产出这个字段，于是**全量重抓会把这批标注全部丢失**，
 全部退回「一律时间待定」。
 
@@ -63,8 +63,25 @@ class TimeUnknownAutoTagTest(unittest.TestCase):
     def test_71_只有日期应标为未知(self):
         r = parse('时间：2026年5月20日')
         self.assertEqual(r.get('timeUnknown'), True,
-                         '源页只给日期、没给时刻，08:00/00:00 是占位填充值，'
+                         '源页只给日期、没给时刻，08:00 是占位填充值，'
                          '必须标为「时间未知」否则会向用户显示编造的时刻')
+        self.assertIn(' 08:00:00', r.get('lectureStart', ''))
+
+    def test_71b_真实八点应标为已知(self):
+        r = parse('时间：2026年5月20日 08:00')
+        self.assertEqual(r.get('timeUnknown'), False)
+        self.assertIn(' 08:00:00', r.get('lectureStart', ''))
+
+    def test_71c_真实午夜应标为已知(self):
+        r = parse('时间：2026年5月20日 00:00')
+        self.assertEqual(r.get('timeUnknown'), False)
+        self.assertIn(' 00:00:00', r.get('lectureStart', ''))
+
+    def test_71d_发布时间不能冒充讲座时钟(self):
+        r = parse('时间：2026年5月20日 发布时间：2026-05-20 10:28:00')
+        self.assertEqual(r.get('timeUnknown'), True)
+        self.assertIn(' 08:00:00', r.get('lectureStart', ''))
+        self.assertEqual(r.get('publishTime'), '2026-05-20 10:28:00')
 
     def test_72_完全没有时间信息应标为未知(self):
         r = parse('')
@@ -114,6 +131,11 @@ class TimeUnknownAutoTagTest(unittest.TestCase):
         parsers._mark_time_unknown(r)
         self.assertIs(r['timeUnknown'], True, '占位值上缺信号时应保守判为未知')
 
+        # 真实午夜不是占位 -> False
+        r_midnight = {'lectureStart': '2026-05-20 00:00:00'}
+        parsers._mark_time_unknown(r_midnight)
+        self.assertIs(r_midnight['timeUnknown'], False)
+
         # 明显不是占位的具体时刻 -> False
         r2 = {'lectureStart': '2026-05-20 14:30:00'}
         parsers._mark_time_unknown(r2)
@@ -125,7 +147,7 @@ class TimeUnknownAutoTagTest(unittest.TestCase):
         self.assertIs(r3['timeUnknown'], True)
 
     def test_77_有hasClock时以它为准(self):
-        """_hasClock=True 但时刻落在 00:00（理论矛盾）时，仍以 hasClock 为准。"""
+        """_hasClock=True 且时刻为 00:00 时，真实午夜仍应标为已知。"""
         r = {'lectureStart': '2026-05-20 00:00:00', '_hasClock': True}
         parsers._mark_time_unknown(r)
         self.assertIs(r['timeUnknown'], False, 'hasClock=True 应产出 False')
@@ -134,6 +156,27 @@ class TimeUnknownAutoTagTest(unittest.TestCase):
         r2 = {'lectureStart': '2026-05-20 08:00:00', '_hasClock': False}
         parsers._mark_time_unknown(r2)
         self.assertIs(r2['timeUnknown'], True, 'hasClock=False 应产出 True')
+
+    def test_78_VLM纯日期使用八点占位(self):
+        result = {}
+        t = parsers._apply_vlm_to_result(
+            result, {'lectureStart': '2026-05-20', 'lectureEnd': '2026-05-21'},
+            2026, None, 2026, 2026)
+        self.assertEqual(result['lectureStart'], '2026-05-20 08:00:00')
+        self.assertEqual(result['lectureEnd'], '2026-05-21 08:00:00')
+        self.assertIs(result['_hasClock'], False)
+        self.assertIs(t['has_time'], False)
+        parsers._mark_time_unknown(result)
+        self.assertIs(result['timeUnknown'], True)
+
+    def test_79_VLM明确八点仍是真实时间(self):
+        result = {}
+        parsers._apply_vlm_to_result(
+            result, {'lectureStart': '2026-05-20 08:00'}, 2026, None, 2026, 2026)
+        self.assertEqual(result['lectureStart'], '2026-05-20 08:00:00')
+        self.assertIs(result['_hasClock'], True)
+        parsers._mark_time_unknown(result)
+        self.assertIs(result['timeUnknown'], False)
 
 
 if __name__ == '__main__':

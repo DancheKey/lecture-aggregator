@@ -198,6 +198,9 @@ class TestTimeparseRangeEnd(unittest.TestCase):
             self.assertIsNotNone(r, s)
             self.assertEqual(str(r['start'])[:10], '2026-10-26', s)
             self.assertEqual(str(r['end'])[:10], '2026-10-29', s)
+            self.assertEqual(str(r['start'])[11:], '08:00:00', s)
+            self.assertEqual(str(r['end'])[11:], '08:00:00', s)
+            self.assertFalse(r['has_time'], s)
 
     def test_same_day_clock_range_not_overridden(self):
         r = TP.parse_cn_time('2026年10月26日 15:00-17:45', 2026)

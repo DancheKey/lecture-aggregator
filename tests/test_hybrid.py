@@ -1050,15 +1050,14 @@ class TestCitedJudgeTimeReachable(unittest.TestCase):
     def test_72_未force时保持占位守卫(self):
         """未 force（纯规则/rich 路径）行为不得改变：占位才采纳。
 
-        注：这里的「占位」只认 `00:00`（`_rule_has_time = not (h==0 and m==0 and s==0)`），
-        **不含 08:00**——后者在本模块守卫里被视为具体时刻（与 parsers 的
-        `isTimeTBD` 把 08:00 当占位是不同层的约定，此处按代码实际语义写用例）。
+        注：未标注的 `08:00` 是统一占位；`00:00` 是真实午夜，不得覆盖。
         """
-        result = {'lectureStart': '2026-03-05 00:00:00'}     # 00:00 为占位
+        result = {'lectureStart': '2026-03-05 08:00:00'}     # 08:00 为占位
         a = self._a('2026-03-05 14:30:00')
         self.hybrid._merge_a_into_result(result, a, body_text=self.body)
         self.assertEqual(result['lectureStart'], '2026-03-05 14:30:00',
-                         '占位时间（00:00）本就该被补全')
+                         '占位时间（08:00）本就该被补全')
+        self.assertIs(result['timeUnknown'], False)
 
         result2 = {'lectureStart': '2026-03-05 15:00:00'}    # 非占位
         a2 = self._a('2026-03-05 14:30:00')
@@ -1069,12 +1068,15 @@ class TestCitedJudgeTimeReachable(unittest.TestCase):
         result3 = {'lectureStart': '2026-03-05 08:00:00'}    # 08:00 = 占位约定
         a3 = self._a('2026-03-05 14:30:00')
         self.hybrid._merge_a_into_result(result3, a3, body_text=self.body)
-        # 2026-10-03 口径统一：08:00 与 00:00 **都**是解析器的占位填充值，
-        # 未标注 timeUnknown 时应视为占位、可被更精确的模型值补全——
-        # 这与前端 isTimeTBD 及 field_vocab.is_placeholder_time 完全一致。
-        # 此前本断言写的是「08:00 算具体时刻、不覆盖」，那正是与前端分叉的旧行为。
+        # 未标注 timeUnknown 时，08:00 是统一占位，可被更精确的模型值补全。
         self.assertEqual(result3['lectureStart'], '2026-03-05 14:30:00',
                          '未标注的 08:00 是占位（解析器填充值），应可被补全')
+
+        # 00:00 是真实午夜，未 force 时不得覆盖。
+        result_midnight = {'lectureStart': '2026-03-05 00:00:00'}
+        a_midnight = self._a('2026-03-05 14:30:00')
+        self.hybrid._merge_a_into_result(result_midnight, a_midnight, body_text=self.body)
+        self.assertEqual(result_midnight['lectureStart'], '2026-03-05 00:00:00')
 
         # 但人工标注 timeUnknown=False 后，08:00 就是**真实时间**，不得覆盖。
         result4 = {'lectureStart': '2026-03-05 08:00:00', 'timeUnknown': False}
@@ -1082,6 +1084,25 @@ class TestCitedJudgeTimeReachable(unittest.TestCase):
         self.hybrid._merge_a_into_result(result4, a4, body_text=self.body)
         self.assertEqual(result4['lectureStart'], '2026-03-05 08:00:00',
                          '已人工确认 08:00 为真实时间（真有 8 点讲座），不得被覆盖')
+
+    def test_72b_模型纯日期起止统一为八点占位(self):
+        body = '时间：2026-03-05至2026-03-06。'
+        result = {'lectureStart': '2026-03-05 08:00:00', 'timeUnknown': True}
+        a = self._a('2026-03-05', '2026-03-06')
+        self.hybrid._merge_a_into_result(result, a, body_text=body)
+        self.assertEqual(result['lectureStart'], '2026-03-05 08:00:00')
+        self.assertEqual(result['lectureEnd'], '2026-03-06 08:00:00')
+        self.assertIs(result['timeUnknown'], True)
+        self.assertEqual(result['timeUnknownSource'], 'auto')
+
+    def test_72c_模型全角冒号时钟仍标为已知(self):
+        body = '时间：2026-03-05 14：30-16：00。'
+        result = {'lectureStart': '2026-03-05 08:00:00', 'timeUnknown': True}
+        a = self._a('2026-03-05 14：30', '2026-03-05 16：00')
+        self.hybrid._merge_a_into_result(result, a, body_text=body)
+        self.assertEqual(result['lectureStart'], '2026-03-05 14:30:00')
+        self.assertEqual(result['lectureEnd'], '2026-03-05 16:00:00')
+        self.assertIs(result['timeUnknown'], False)
 
     def test_73_force也不能跨年(self):
         """年份不一致时即使 force 也不采纳——年份错比时刻错更严重。"""

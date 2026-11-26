@@ -101,7 +101,11 @@ ok(M.cleanFooter(cicpaBio) === cicpaBio, 'S4a 简介中的 CICPA/CISA/CIA 不被
 ok(M.cleanFooter('简介正文。ICP备20260001号 版权所有') === '简介正文。',
   'S4b 真实 ICP 备案号及版权页脚仍被清理');
 ok(M.cleanFooter('简介正文。ICP 12345') === '简介正文。', 'S4c 空格分隔的 ICP 编号仍被清理');
-ok(M.cleanFooter(null) === '', 'S4d 空简介不抛异常');
+ok(M.cleanFooter('简介正文。粤ICP备20260001号 版权所有') === '简介正文。',
+  'S4d 带省份前缀的 ICP 备案号整段清理，不残留省份字');
+ok(M.cleanFooter('简介正文。蒙ICP备20260001号') === '简介正文。',
+  'S4e 自治区缩写前缀同样清理');
+ok(M.cleanFooter(null) === '', 'S4f 空简介不抛异常');
 
 if (errs.length) {
   errs.forEach(e => console.error('  ✗ ' + e));

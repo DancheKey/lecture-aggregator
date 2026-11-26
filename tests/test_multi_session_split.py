@@ -470,7 +470,8 @@ class YjsyMultiLabelSplitTest(unittest.TestCase):
         self.assertIn('辩论大赛', r2['topic'])
         self.assertFalse(r2.get('speaker'), '赛事场次不得继承前一场主讲人')
         self.assertIn('模拟法庭', r2['location'])
-        self.assertEqual(r2['lectureStart'], '2026-10-14 00:00:00')
+        self.assertEqual(r2['lectureStart'], '2026-10-14 08:00:00')
+        self.assertIs(r2['timeUnknown'], True)
         # ③ AI赋能写作（10-14 15:00-17:00，教科院125室）
         r3 = recs[2]
         self.assertIn('人工智能赋能写作', r3['topic'])

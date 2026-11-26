@@ -98,10 +98,10 @@ Object.assign(APP_METHODS, {
     //   「08:00 且未标注 timeUnknown」的记录为 0 条才没出事——那是运气不是设计。
     //
     // 口径（顺序即优先级）：
-    //   1) timeUnknown === true  → 占位（人工标注：源页未给时刻）
-    //   2) timeUnknown === false → **不占位**（人工已确认是真时间，哪怕就是 08:00）
-    //   3) 未标注时，08:00 / 00:00 → 占位（解析器的填充约定，见 parsers.py「铁律占位」）
-    //   4) 其余                  → 不占位
+    //   1) timeUnknown === true  → 占位（已标注：源页未给时刻）
+    //   2) timeUnknown === false → **不占位**（已确认是真时间，哪怕就是 08:00）
+    //   3) 未标注时，08:00        → 占位（解析器的统一填充约定）
+    //   4) 其余                  → 不占位（00:00 视为真实午夜）
     //
     // 一致性由 tests/js/app_time_placeholder.js 锁定（两侧对同一批样例给出相同结论）。
     isTimeTBD(l) {
@@ -115,7 +115,8 @@ Object.assign(APP_METHODS, {
       const ms = this._bjMs(iso);
       if (isNaN(ms)) return true;
       const p = this._bjParts(ms);
-      return (p.hh === 8 || p.hh === 0) && p.mm === 0;
+      // 未标注的 08:00 按占位处理；00:00 是真实午夜，不再作为占位。
+      return p.hh === 8 && p.mm === 0;
     },
     // 时间置信度角标（2026-10-04 方案 A 第 5 步）。
     //
@@ -291,8 +292,9 @@ Object.assign(APP_METHODS, {
       return '';
     },
     cleanFooter(s) {
+      // 备案号常带省级简称（如粤ICP），前缀必须一并纳入匹配。
       return String(s == null ? '' : s)
-        .replace(/(Copyright|版权所有|备案号|ICP\s*[备证]?\s*\d{3,}|All Rights Reserved|Reserved)[\s\S]*/i, '')
+        .replace(/(Copyright|版权所有|备案号|(?:[京津沪渝冀晋辽吉黑苏浙皖闽赣鲁豫鄂湘粤琼川贵云陕甘青台蒙桂宁新藏港澳]\s*)?ICP\s*[备证]?\s*\d{3,}|All Rights Reserved|Reserved)[\s\S]*/i, '')
         .trim();
     },
     // 安全渲染 abstract 字段（已将内部技术标记过滤，可安全展示）

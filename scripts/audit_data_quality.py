@@ -411,7 +411,7 @@ def scan(recs, excluded=None):
                 # 现在只在「值是占位、且根本没打标注」时才报（单一事实源见
                 # field_vocab.is_placeholder_time）；标了 True 是正确标注，标了
                 # False 是人工裁定的真时刻，两者都不该告警。
-                if hm in ('00:00', '08:00') and r.get('timeUnknown') is None:
+                if hm == '08:00' and r.get('timeUnknown') is None:
                     issues.append(('时间', 'lectureStart', '中', f'占位时刻 {hm} 但未标记 timeUnknown', st, r))
             if en:
                 try:

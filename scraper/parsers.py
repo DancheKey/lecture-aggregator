@@ -1533,7 +1533,7 @@ VLM_PROMPT = """你是一个学术讲座海报信息提取助手。下面是一�
 - speaker: 主讲人姓名（只写姓名，不要含职称、单位、职务）。【同一场】讲座有多位主讲人【共用同一主题/题目、无各自独立题目】时，把全部主讲人姓名写进本字段，用「、」分隔（如「王红军、冯志旭」）——系统据此识别多主讲、只展示第一位并加「等」。【主持人不是主讲人】：海报每场标注的「主持人/Chair/评议人/评论人/与谈人」是本场活动的主持角色，绝不能写进 speaker——即使「主持人：X教授」紧贴在讲座题目旁边也一样；只提取标签为「主讲人/主讲嘉宾/报告人/演讲人」的人。系列讲座海报若只在顶部标注一位「主讲人」，则每一场的 speaker 都写这位主讲人，不得用各场主持人顶替。
 - speakerTitle: 主讲人职称（如 教授、研究员、副教授、博士、讲师）
 - speakerAffiliation: 主讲人单位（如 某某大学某某学院、某某研究院）。多位主讲人共用同一主题时，写【第一位】主讲人的单位。
-- lectureStart: 讲座开始时间，格式 "YYYY-MM-DD HH:MM"（若只有日期无钟点，钟点用 00:00）
+- lectureStart: 讲座开始时间，格式 "YYYY-MM-DD HH:MM"（若只有日期无钟点，钟点用 08:00）
 - lectureEnd: 讲座结束时间，格式同上，若无则留空字符串
 - location: 讲座地点（具体到楼栋+房间号，如 理1栋一楼讲学厅、教学楼102）
 - abstract: 讲座内容摘要（若海报只有主讲人简介而无独立摘要，则留空字符串）。只填海报上对讲座内容的介绍（研究背景、报告要点、课程内容等）；主办/承办单位落款、联系方式、二维码说明、装饰性文字（圆圈、边框、印章、logo 文字）一律不算摘要，宁缺毋滥
@@ -2472,22 +2472,23 @@ def _apply_vlm_to_result(result, f, default_year, publish_time, title_year, url_
     if ts:
         dt = _parse_vlm_datetime(ts, default_year, publish_time, title_year, url_year)
         if dt:
+            has_clock = bool(re.search(r'\d{1,2}\s*[:：]\s*\d{2}', ts))
+            if not has_clock:
+                dt = dt.replace(hour=8, minute=0, second=0, microsecond=0)
             result['lectureStart'] = dt.isoformat(sep=' ')
-            # VLM 从海报图像读出的时刻（2026-10-03）：海报上的「08:00」同样是
-            # 占位填充值还是真实时刻，无法从值本身区分，故以「VLM 是否读到时钟」
-            # 作为信号写入 _hasClock，供出口产出 timeUnknown。
-            # _parse_vlm_datetime 只在文本含 HH:MM 时才返回非 None，故有值即视为真实。
-            result['_hasClock'] = bool(re.search(r'\d{1,2}\s*[:：]\s*\d{2}', ts))
+            result['_hasClock'] = has_clock
             de = None
             if te:
                 de = _parse_vlm_datetime(te, default_year, publish_time, title_year, url_year)
                 if de:
+                    if not re.search(r'\d{1,2}\s*[:：]\s*\d{2}', te):
+                        de = de.replace(hour=8, minute=0, second=0, microsecond=0)
                     result['lectureEnd'] = de.isoformat(sep=' ')
             # 修复（2026-08-05 体检 严重-1）：end 必须随 t 一并返回。此前固定
             # t = {'start': dt, 'end': None}，导致 parse_detail 末尾归一化
             # （if t: result['lectureEnd'] = t['end']…）把刚写入的 VLM 结束时间
             # 无条件覆盖为 None——纯海报页的 lectureEnd 必然丢失。
-            t = {'start': dt, 'end': de, 'has_time': True}
+            t = {'start': dt, 'end': de, 'has_time': has_clock}
     return t
 
 
@@ -2530,7 +2531,7 @@ def is_news_record(rec, poster_page=False, same_day_grace=False):
       可抓住「当天讲座、当晚发回顾」的情况（原逻辑只比日期会漏）。
     - 若讲座时刻「占位」（源页只给日期）：占位与否由**单一事实源**
       field_vocab.is_placeholder_time 判定——timeUnknown 显式标注优先，
-      未标注时 00:00/08:00 视为铁律填充的占位；退化为「日期」比较：
+      未标注时 08:00 视为统一占位；退化为「日期」比较：
       仅当发布日期**严格晚于**讲座日期（隔天/更晚才发）才判新闻；但发布日期
       == 讲座日期且发布时刻在当晚(>=18:00) 时，仍判为新闻——当天发布且不知
       具体时刻、又拖到晚上才发，符合事后回顾稿特征（2026-08-01 用户裁定）。
@@ -2611,7 +2612,7 @@ def is_news_record(rec, poster_page=False, same_day_grace=False):
     # 此前这里把 00:00/08:00 写死、且不看 timeUnknown——一条**人工核实过的真实
     # 08:00 讲座**（timeUnknown=False）会被当成「时刻未知」退化为日期比，与
     # 前端 isTimeTBD、hybrid 时间守卫三套口径分叉（与 hybrid 历史问题同型）。
-    # 现在三条口径同源：timeUnknown 显式优先，其次按 00:00/08:00 填充约定。
+    # 现在三条口径同源：timeUnknown 显式优先，未标注时只认 08:00 占位。
     if not _fv.is_placeholder_time(rec):
         # 讲座时刻真实已知 → 用「时刻」比较（抓「当天讲座、当晚发回顾」）
         #
@@ -4445,9 +4446,9 @@ def _mark_time_unknown(rec):
 
     ## 为什么需要
 
-    `08:00` / `00:00` 在本项目是**占位约定**：源页面只给日期、不给几何时，
+    `08:00` 在本项目是**统一占位约定**：源页面只给日期、不给几何时，
     解析器统一填 08:00（见 timeparse / 本文件各处「铁律占位 08:00:00」注释）。
-    前端据此显示「时间待定」，避免把编造的 08:00 当真。
+    前端据此显示「时间待定」，避免把编造的 08:00 当真。`00:00` 是真实午夜。
 
     但确有讲座真在早上 8:00 开始。区分二者此前全靠**人工**在
     data/lectures.json 里打 `timeUnknown` 标记——而本文件（爬虫）根本不产出该
@@ -4458,7 +4459,7 @@ def _mark_time_unknown(rec):
 
     ## 判据（保守：宁可标 True 也不谎称已知）
 
-    仅当**解析器确实拿到了源页里的时钟**才标 False。占位填充值（08:00/00:00）
+    仅当**解析器确实拿到了源页里的时钟**才标 False。占位填充值（08:00）
     与真实时间用同一个数字表示，故只能靠「拿到时刻」这个事实来区分，
     不能靠「值等于 08:00」来判断——真讲座也可能正好 8:00（2026-10-03 核实到 2 例）。
 
@@ -4514,7 +4515,7 @@ def _mark_time_unknown(rec):
 
 
 # 占位填充时刻（与 field_vocab.PLACEHOLDER_HOURS 一致；此处不 import 以免循环依赖）
-_PLACEHOLDER_HOURS = (0, 8)
+_PLACEHOLDER_HOURS = (8,)
 
 
 def apply_exit_gate(out, url=''):
@@ -4656,7 +4657,7 @@ def _meta_time_conflicts_with_body(body_text, meta_text):
     身份压过正文 R2 的正确结果，落库旧值 02:30。
 
     裁决口径（两侧对称，同 default_year，不依赖 url/publish 参数）：
-      - 两侧都解析出**真时刻**（非 00:00 占位）且 datetime 不等 → 冲突，视作
+      - 两侧都解析出**真时刻**（has_time=True）且 datetime 不等 → 冲突，视作
         「摘要未同步」，正文为准，不追加 meta（正文是详情页主体）；
       - 任一侧缺日期/缺时刻（正文无时间、全靠 meta 的美术学院类页面属此类）
         → 不算冲突，照旧追加——此时追加正是既有功能，不得误伤。
@@ -4670,7 +4671,7 @@ def _meta_time_conflicts_with_body(body_text, meta_text):
     sm = tm.get('start')
     if not sb or not sm:
         return False
-    if (sb.hour, sb.minute) == (0, 0) or (sm.hour, sm.minute) == (0, 0):
+    if not tb.get('has_time') or not tm.get('has_time'):
         return False
     return sb != sm
 
@@ -5576,14 +5577,9 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
         _rt_start = datetime.datetime.fromisoformat(rt['start'])
         t = {'start': _rt_start,
              'end': datetime.datetime.fromisoformat(rt['end']) if rt.get('end') else None,
-             # ⚠ 2026-10-03 修正：原先无条件写死 has_time=True，但本路径下的 start
-             #   可能就是 00:00（timeparse 对「只有日期、无钟点」的文本必然返回
-             #   00:00）。写成 True 会让下游（timeUnknown 打标、hybrid 时间守卫、
-             #   OCR 覆盖条件）全都把 00:00 当成「时刻已知」。
-             #   resolve_lecture_time 返回的是 ISO 串、不透传 has_time（其内部
-             #   知道但丢在了返回结构外），故此处按 start 是否为 00:00 判定——
-             #   与 timeparse 的口径一致（解析到真实钟点必非 00:00）。
-             'has_time': not (_rt_start.hour == 0 and _rt_start.minute == 0)}
+             # 时钟真实性由 timeparse 透传，不能按小时值猜测：00:00 也可能是源页
+             # 明确给出的真实午夜；只有日期时则统一填 08:00 且 has_time=False。
+             'has_time': bool(rt.get('has_time'))}
         # 词表收敛到 {high, mid, low}（timeparse._cross_year 的规格，2026-10-04）：
         # 库里曾出现孤儿值 'mid' 之外的 'medium'（旧版某会议路径产出，现已无产方），
         # 而消费方 scripts/repair_backfill.py 用 startswith('high') 闸门，词表一散
@@ -5627,7 +5623,8 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
         if url_date:
             y, mo, d = url_date
             try:
-                t = {'start': datetime.datetime(y, mo, d, 0, 0), 'end': None}
+                t = {'start': datetime.datetime(y, mo, d, 8, 0), 'end': None,
+                     'has_time': False}
                 t_untrusted = True
             except ValueError:
                 t = None
@@ -6079,8 +6076,7 @@ def _extract_topic_location(_st, result, title, loc_times):
             result['location'] = _loc_fb
 
     # 把地点字段里分离出的时间区间回填到讲座时间：
-    #  - 若开始时刻是**占位**（00:00，或未标注为真时钟的 08:00），用分离出的
-    #    区间补全 start/end；
+    #  - 若开始时刻是**占位**（08:00 且未标注为真时钟），用分离出的区间补全 start/end；
     #  - 若 start 已是真实时刻但 end 缺失，用分离出的结束时间补全 end；
     # 这样海报中「地点: 南教-209教室14:30-17:00」式 OCR 能补全完整的起止时间。
     # 注意：回填必须在所有地点处理分支之后（loc_times 已完成填充）。
@@ -6095,7 +6091,8 @@ def _extract_topic_location(_st, result, title, loc_times):
         h0, m0, h1, m1 = loc_times[0]
         try:
             st = datetime.datetime.fromisoformat(result['lectureStart'])
-            _st_is_ph = ((st.hour == 0 and st.minute == 0)
+            _st_is_ph = ((st.hour == 0 and st.minute == 0
+                          and result.get('_hasClock') is not True)
                          or (_fv.is_placeholder_time(result)
                              and result.get('_hasClock') is not True))
             if _st_is_ph:
@@ -7732,7 +7729,8 @@ def _finalize_record(soup, url, title, list_title, _st, result,
             _txt, title=title, default_year=default_year,
             publish_time=(publish_time or _pub_year_hint),
             title_year=title_year, url_year=url_year, soup=soup, url=url,
-            base_start=_base_dt, base_end=_base_dt_end)
+            base_start=_base_dt, base_end=_base_dt_end,
+            base_has_clock=result.get('_hasClock'))
 
     _sessions_pre = _detect_sessions_on(_split_text)
     if _use_html_split and len(_sessions_pre or []) < 2:
@@ -8317,7 +8315,7 @@ def _detect_field_list_sessions(text, default_year=None, publish_time=None,
         if not dt or not dt.get('start'):
             continue
         st = dt['start']
-        if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
+        if not dt.get('has_time') and dt.get('end') is None:
             continue
         # 标题：该报告时间【之后最近】出现的报告题目（字段列表型中报告题目常排在
         # 报告时间之后与本场配套；之前可能是上一场的重复/目录标题，勿误取）。
@@ -8354,6 +8352,7 @@ def _detect_field_list_sessions(text, default_year=None, publish_time=None,
             if p == block_start:
                 _started = True
         cand.append({'topic': title, 'start': dt['start'], 'end': dt.get('end'),
+                     '_hasClock': bool(dt.get('has_time')),
                      'block': text[block_start:block_end],
                      'speaker': speaker, 'abstract': abstract, 'splitMode': 'field-list'})
     return cand
@@ -8361,7 +8360,7 @@ def _detect_field_list_sessions(text, default_year=None, publish_time=None,
 
 def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
                                     title_year=None, url_year=None, base_start=None,
-                                    base_end=None):
+                                    base_end=None, base_has_clock=None):
     """候选4：显式编号分场的多报告（cs 4268 / psy 1305/961/1226）。
 
     覆盖三种编号形态（编号与「题目标签」相邻，编号可前置亦可后置）：
@@ -8439,12 +8438,14 @@ def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
     # 拉成 1982 年，而页眉实为「2月23日 2:30-5:00」。
     _page_start = base_start
     _page_end = base_end
+    _page_has_clock = base_has_clock
     if not _page_start:
         _page_dt = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
                                  title_year=title_year, url_year=url_year)
         if _page_dt and _page_dt.get('start'):
             _page_start = _page_dt['start']
             _page_end = _page_dt.get('end')
+            _page_has_clock = bool(_page_dt.get('has_time'))
     _page_date_str = ''
     _page_date_only_str = ''
     if _page_start:
@@ -8490,22 +8491,25 @@ def _detect_numbered_topic_sessions(text, default_year=None, publish_time=None,
         #   ① 编号自带时间（「讲座一(15:00-16:15)」）→ 只解析编号本身 + 日期前缀；
         #   ② 编号无时间 → 用页眉共享区间（各场同一时段，对应 _numbered=True 豁免）。
         _clocked = bool(_LAB_CLOCK_RE.search(lab.group()))
+        _has_clock = _clocked or bool(_page_has_clock)
         _src = (_page_date_only_str + lab.group()) if _clocked else _page_date_str
         dt = parse_cn_time(_src, default_year=default_year,
                            publish_time=publish_time, title_year=title_year, url_year=url_year)
         if not dt or not dt.get('start'):
             continue
         st = dt['start']
-        if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
+        if not _has_clock and dt.get('end') is None:
             continue
         cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                     '_hasClock': _has_clock,
                      'block': block, '_numbered': True, 'splitMode': 'numbered-prefix'})
     return cand
 
 
 def _detect_numbered_reporter_sessions(text, default_year=None, publish_time=None,
                                        title_year=None, url_year=None,
-                                       base_start=None, base_end=None):
+                                       base_start=None, base_end=None,
+                                       base_has_clock=None):
     """候选8：编号挂在**报告人**上、标号报告人各带题目的多报告（cs 1932）。
 
     与候选4 互补——候选4 的编号挂在「题目」上（「题目1：…报告人1：…」），
@@ -8546,12 +8550,14 @@ def _detect_numbered_reporter_sessions(text, default_year=None, publish_time=Non
     _TAIL_CUT_RE = re.compile(r'答辩委员|时\s*间\s*[:：]|地\s*点\s*[:：]')
     _page_start = base_start
     _page_end = base_end
+    _page_has_clock = base_has_clock
     if not _page_start:
         _pd = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
                             title_year=title_year, url_year=url_year)
         if _pd and _pd.get('start'):
             _page_start = _pd['start']
             _page_end = _pd.get('end')
+            _page_has_clock = bool(_pd.get('has_time'))
     if not _page_start:
         return []
     # 逐次出现先算出题目，再按编号取「题目最完整」的那一次（见 docstring 要点①）
@@ -8585,6 +8591,7 @@ def _detect_numbered_reporter_sessions(text, default_year=None, publish_time=Non
         if tc:
             block = block[:tc.start()]
         cand.append({'topic': topic, 'start': _page_start, 'end': _page_end,
+                     '_hasClock': bool(_page_has_clock),
                      'block': block, '_numbered': True, 'splitMode': 'numbered-reporter'})
     return cand
 
@@ -8715,11 +8722,13 @@ def _detect_nth_field_sessions(text, default_year=None, publish_time=None,
                     _aff = _a
         if _spk:
             cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                         '_hasClock': bool(dt.get('has_time')),
                          'block': seg, '_no': mk.group(), '_numbered': True,
                          'speaker': _spk, 'affiliation': _aff or '',
                          'splitMode': 'nth-field'})
             continue
         cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                     '_hasClock': bool(dt.get('has_time')),
                      'block': seg, '_no': mk.group(), '_numbered': True,
                      'splitMode': 'nth-field'})
     if len(cand) < 2:
@@ -8883,6 +8892,7 @@ def _detect_agenda_slot_sessions(text, default_year=None, publish_time=None,
         # 'speaker' 键会被 split_record_by_sessions 直接采用（议程表无「主讲人:」标签，
         # 逐块解析取不到姓名，必须由候选显式给出；多人合报保留「刘愿、张磊」原样）。
         cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                     '_hasClock': bool(dt.get('has_time')),
                      'block': mk.group() + ' ' + seg, '_no': mk.group(),
                      'speaker': spk, 'affiliation': aff, 'splitMode': 'agenda-slot'})
     if len(cand) < 2:
@@ -8968,6 +8978,7 @@ def _detect_numbered_agenda_sessions(text, default_year=None, publish_time=None,
         if not dt or not dt.get('start'):
             continue
         cand.append({'topic': topic, 'start': dt['start'], 'end': None,
+                     '_hasClock': bool(dt.get('has_time')),
                      'block': text[mk.start():seg_end], '_no': mk.group('no'),
                      'speaker': name, 'affiliation': _clean_aff_token(mk.group('aff')),
                      '_numbered': True, 'splitMode': 'numbered-agenda'})
@@ -9063,6 +9074,7 @@ def _detect_numbered_slot_sessions(text, default_year=None, publish_time=None,
         if not topic or len(topic) < 2:
             continue
         out.append({'topic': topic, 'start': start, 'end': end,
+                    '_hasClock': True,
                     'block': mk.group() + seg, 'speaker': speaker,
                     'affiliation': '', 'splitMode': 'numbered-slot'})
     if len(out) < 2:
@@ -9110,10 +9122,11 @@ def _detect_plain_numbered_sessions(text, default_year=None, publish_time=None,
         if not dt or not dt.get('start'):
             continue
         st = dt['start']
-        # 仅认含时钟或结束时间的段（与候选1 守卫一致），避免把编号要点误当多场
-        if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
+        # 仅认含时钟或结束时间的段（与候选1守卫一致），避免把编号要点误当多场
+        if not dt.get('has_time') and dt.get('end') is None:
             continue
         cand.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                     '_hasClock': bool(dt.get('has_time')),
                      'block': seg, 'splitMode': 'numbered-list'})
     if len(cand) < 2:
         return []
@@ -9730,6 +9743,7 @@ def _detect_inline_topic_sessions(text, default_year=None, publish_time=None,
             'topic': topic,
             'start': _page_dt['start'],
             'end': _page_dt.get('end'),
+            '_hasClock': bool(_page_dt.get('has_time')),
             'block': block,
             'no': no_int,
             'splitMode': 'inline-topic-session',
@@ -9807,18 +9821,18 @@ def _ms_dedup_guard(sessions):
 
 def detect_multi_session(text, title='', default_year=None, publish_time=None,
                          title_year=None, url_year=None, soup=None, url=None,
-                         base_start=None, base_end=None):
+                         base_start=None, base_end=None, base_has_clock=None):
     """detect_multi_session 对外入口：各候选结果统一过 _ms_dedup_guard。"""
     sessions = _detect_multi_session_impl(
         text, title=title, default_year=default_year, publish_time=publish_time,
         title_year=title_year, url_year=url_year, soup=soup, url=url,
-        base_start=base_start, base_end=base_end)
+        base_start=base_start, base_end=base_end, base_has_clock=base_has_clock)
     return _ms_dedup_guard(sessions)
 
 
 def _detect_multi_session_impl(text, title='', default_year=None, publish_time=None,
                                title_year=None, url_year=None, soup=None, url=None,
-                               base_start=None, base_end=None):
+                               base_start=None, base_end=None, base_has_clock=None):
     """检测系列讲座公告（MS1-MS3）。
 
     返回 [] 表示单讲座；否则返回 session 列表（含块文本供拆分时逐块提取）：
@@ -9873,10 +9887,12 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         _bm = _best_cluster if len(_best_cluster) >= 2 else []
     if len(_bm) >= 2:
         _bs = base_start
+        _book_has_clock = base_has_clock
         if _bs is None:
             _pdt = parse_cn_time(text, default_year=default_year, publish_time=publish_time,
                                  title_year=title_year, url_year=url_year)
             _bs = _pdt['start'] if _pdt and _pdt.get('start') else None
+            _book_has_clock = bool(_pdt and _pdt.get('has_time'))
         if _bs:
             _book_sessions = []
             for _i, _m in enumerate(_bm):
@@ -9885,6 +9901,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 if not _looks_like_real_name(_nm):
                     continue
                 _book_sessions.append({'no': _i + 1, 'topic': _tp, 'start': _bs,
+                                       '_hasClock': bool(_book_has_clock),
                                        'end': None, 'block': _m.group(0),
                                        'splitMode': 'book-title', 'speaker': _nm})
             _book_sessions = _ms_gate_filter(_book_sessions)
@@ -9992,7 +10009,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         # 修订：仅当「全部候选都无时钟 且 日期全部相同」时才视为共享页日期/通知日、
         # 不拆分；若日期互异（≥2 个不同日期）即使无时钟也保留为独立场次。
         st = dt['start']
-        _has_clock = not (st.hour == 0 and st.minute == 0 and dt.get('end') is None)
+        _has_clock = bool(dt.get('has_time')) or dt.get('end') is not None
         # 多日区间标记（yjsy 10265「文法杯辩论大赛」10月14日至10月29日实测）：
         # parse_cn_time 不给纯日期区间补 end，此类块 _has_clock=False，但块内含显式
         # 「X月X日至X月X日」区间（常伴地点/赛程）的是真实场次（比赛/系列活动），
@@ -10025,7 +10042,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 sessions = []
             else:
                 for _r in sessions_raw:
-                    _r.pop('_has_clock', None)
+                    _r['_hasClock'] = _r.pop('_has_clock')
                     _r.pop('_multi_day', None)
                 sessions = _ms_gate_filter(sessions_raw)
         # 否则（全部无时钟且日期相同）→ 视为共享页日期，不拆分（维持原守卫语义）
@@ -10075,6 +10092,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                                           publish_time=publish_time,
                                           title_year=title_year, url_year=url_year)
             _d1 = _page_dt1['start'] if _page_dt1 and _page_dt1.get('start') else None
+            _d1_has_clock = bool(_page_dt1 and _page_dt1.get('has_time'))
             # 逐场时刻（2026-09-26 议程时刻修复）：源页无每场独立时刻时继承
             # 「环节窗」而非全场共用页眉时间（em/4169 曾 24 场全标发布钟点 11:33）。
             # 环节锚点 = 时段区间行（「9:00-10:20」「15:30-17:30」，含茶歇行）或
@@ -10095,6 +10113,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             _sess = []
             for s in _sp_cand:
                 st = None
+                has_clock = _d1_has_clock
                 if _d1 is not None:
                     _prev = None
                     for _p, _hh, _mm in _sec_clocks:
@@ -10110,15 +10129,16 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                             title_year=title_year, url_year=url_year)
                         if _dt and _dt.get('start'):
                             st = _dt['start']
+                            has_clock = bool(_dt.get('has_time'))
                 if st is None:
                     st = _d1
                 _sess.append({'topic': s['topic'], 'start': st, 'end': None,
+                              '_hasClock': has_clock,
                               'block': s['block'], 'speaker': s['speaker'],
                               'affiliation': s['affiliation'],
                               'splitMode': 'label-speakers', '_same_time_ok': True})
             # 时钟守卫（口径同旧逻辑）：无任何时钟的场剔除；剩 ≥2 场才拆
-            _sess = [s for s in _sess
-                     if s['start'] and not (s['start'].hour == 0 and s['start'].minute == 0)]
+            _sess = [s for s in _sess if s['start'] and s.get('_hasClock')]
             if len(_sess) >= 2:
                 sessions = _sess
     # 候选2（新增，CS / 心理学院等源）：离散「报告N/讲座N/学术讲座N」分场标记——
@@ -10180,9 +10200,10 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
             if not dt or not dt.get('start'):
                 continue
             st = dt['start']
-            if st.hour == 0 and st.minute == 0 and dt.get('end') is None:
+            if not dt.get('has_time') and dt.get('end') is None:
                 continue
             cand2.append({'topic': topic, 'start': dt['start'], 'end': dt.get('end'),
+                          '_hasClock': bool(dt.get('has_time')),
                           'block': seg, 'splitMode': 'report-n'})
         # 2026-09-27 二轮审计 P0-4：候选2 是唯一「替换型」候选（标记存在即覆盖上游），
         # 原写法 `sessions = _ms_gate_filter(cand2)` 在闸门判死时会把上游已正确拆出的
@@ -10206,7 +10227,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         cand4 = _detect_numbered_topic_sessions(
             text, default_year=default_year, publish_time=publish_time,
             title_year=title_year, url_year=url_year,
-            base_start=base_start, base_end=base_end)
+            base_start=base_start, base_end=base_end, base_has_clock=base_has_clock)
         if len(cand4) >= 2:
             sessions = _ms_gate_filter(cand4)
     # 候选5（兜底，abdn / 系列讲坛等）：用「第N讲/第N场」做分段标记。
@@ -10270,6 +10291,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                     continue
                 st5 = dt5['start']
                 cand5.append({'topic': topic5, 'start': dt5['start'],
+                              '_hasClock': bool(dt5.get('has_time')),
                               'end': dt5.get('end'), 'block': seg,
                               '_no': mk.group(), 'splitMode': 'nth-session'})
             if len(cand5) >= 2:
@@ -10282,12 +10304,14 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         _tk_marks = list(_TALK_RE.finditer(text))
         if len(_tk_marks) >= 2:
             _page_dt_t = base_start
+            _talk_has_clock = base_has_clock
             if not _page_dt_t:
                 _pdtt = parse_cn_time(text, default_year=default_year,
                                       publish_time=publish_time,
                                       title_year=title_year, url_year=url_year)
                 if _pdtt and _pdtt.get('start'):
                     _page_dt_t = _pdtt['start']
+                    _talk_has_clock = bool(_pdtt.get('has_time'))
             cand_t = []
             for _i, _mk in enumerate(_tk_marks):
                 _seg = text[_mk.end():
@@ -10301,7 +10325,8 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 _tp = _clean_session_topic(_tp)
                 if not _tp or len(_tp) < 5:
                     continue
-                cand_t.append({'topic': _tp, 'start': _page_dt_t, 'end': None,
+                cand_t.append({'topic': _tp, 'start': _page_dt_t,
+                               '_hasClock': bool(_talk_has_clock), 'end': None,
                                'block': _seg, '_numbered': True,
                                '_no': _mk.group(), 'splitMode': 'talk-n'})
             cand_t = _ms_gate_filter(cand_t)
@@ -10344,6 +10369,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
                 if not dt6 or not dt6.get('start'):
                     continue
                 cand6.append({'topic': topic6, 'start': dt6['start'],
+                              '_hasClock': bool(dt6.get('has_time')),
                               'end': dt6.get('end'), 'block': seg,
                               '_numbered': True, '_no': mk.group(),
                               'splitMode': 'bare-topic'})
@@ -10367,7 +10393,7 @@ def _detect_multi_session_impl(text, title='', default_year=None, publish_time=N
         cand8 = _detect_numbered_reporter_sessions(
             text, default_year=default_year, publish_time=publish_time,
             title_year=title_year, url_year=url_year,
-            base_start=base_start, base_end=base_end)
+            base_start=base_start, base_end=base_end, base_has_clock=base_has_clock)
         if len(cand8) >= 2:
             sessions = _ms_gate_filter(cand8)
     # 候选9（兜底，em 经管「华南经济论坛」等）：「第N场」后紧跟「题目:/主讲人:」字段块。
@@ -10753,18 +10779,19 @@ def split_record_by_sessions(base, sessions, full_text=''):
     for i, s in enumerate(sessions):
         rec = dict(base)
         rec['topic'] = s['topic']
-        rec['lectureStart'] = s['start'].isoformat(sep=' ')
-        rec['lectureEnd'] = s['end'].isoformat(sep=' ') if s.get('end') else None
-                # 各场次的时刻可信度（2026-10-03）。
-        # 依据：timeparse 解析「只有日期、无钟点」的文本时必然返回 00:00（has_time=False），
-        # 解析到真实钟点则保留该钟点。因此 **start 落在 00:00 即等价于「本页未给时刻」**，
-        # 这比看是否等于 08:00 可靠（真有讲座就在 8:00 开始，2026-10-03 核实到 2 例）。
-        # ⚠ 08:00 在此**不**作为占位判据：多场拆分时无法区分「段落写的 8:00」
-        #   与「解析器填的 8:00」，而误标成 timeUnknown=True 会让真实时间消失。
-        #   代价是极少数「只有日期且被填成 08:00」的场次会被标为已知——
-        #   该情形已由 detect_multi_session 侧把无钟点场次统一落为 00:00 覆盖。
-        _h, _m = s['start'].hour, s['start'].minute
-        rec['_hasClock'] = not (_h == 0 and _m == 0)
+        start = s['start']
+        has_clock = s.get('_hasClock')
+        if has_clock is None:
+            has_clock = bool(re.search(r'\d{1,2}\s*[:：]\s*\d{2}', s.get('block') or '')) \
+                or (start.hour, start.minute) != (8, 0)
+        if not has_clock and (start.hour, start.minute) == (0, 0):
+            start = start.replace(hour=8, minute=0)
+        rec['lectureStart'] = start.isoformat(sep=' ')
+        end = s.get('end')
+        if end and not has_clock and (end.hour, end.minute) == (0, 0):
+            end = end.replace(hour=8, minute=0)
+        rec['lectureEnd'] = end.isoformat(sep=' ') if end else None
+        rec['_hasClock'] = bool(has_clock)
         # title 保留原始列表标题/系列名，topic 存每场真实题目；不把 topic 拼进 title，
         # 避免破坏前端分组与统计（规则：title=listTitle/系列名，topic=单场题目）。
         rec['title'] = base_title

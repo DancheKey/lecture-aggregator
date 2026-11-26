@@ -1595,17 +1595,15 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
         try:
             _rs = datetime.datetime.fromisoformat(str(_rule_start))
             _rule_year = _rs.year
-            # 2026-10-03 口径统一：原先只把 00:00 当占位，08:00 被当成「真实时刻」，
-            # 与前端 isTimeTBD（08:00/00:00 都算占位）相反——同一份数据两套答案。
-            # 现改引 field_vocab.is_placeholder_time（单一事实源，两侧逐条一致）：
-            # 人工标注 timeUnknown 优先，其次按解析器的占位约定（08:00/00:00）判定。
+            # 占位统一为 08:00；未标注时由 field_vocab 判定，显式标注优先。
             _rule_has_time = not _fv.is_placeholder_time(result)
         except Exception:
             pass
     _ls_raw = a.get('lectureStart') or a.get('start')
     if _ls_raw and str(_ls_raw).strip() not in ('', 'null', 'None'):
         try:
-            _ls = datetime.datetime.fromisoformat(str(_ls_raw).replace('T', ' ').replace('Z', ''))
+            _ls = datetime.datetime.fromisoformat(
+                str(_ls_raw).replace('T', ' ').replace('Z', '').replace('：', ':'))
             _llm_year = _ls.year
             _now = datetime.datetime.now()
             _year_lo, _year_hi = 2018, _now.year + 2
@@ -1615,14 +1613,25 @@ def _merge_a_into_result(result, a, body_text, default_year=None, publish_time=N
                 # 年份不一致时 B 的 force 也不能覆盖——年份错比时刻错更严重
                 # （跨年讲座会被挪到另一年，且 A/B 都可能拿错场次）。
                 if _year_match and (_rule_is_placeholder or _force_time):
+                    _llm_has_clock = bool(re.search(
+                        r'\d{1,2}\s*[:：]\s*\d{2}', str(_ls_raw)))
+                    if not _llm_has_clock:
+                        _ls = _ls.replace(hour=8, minute=0, second=0, microsecond=0)
                     result['lectureStart'] = _ls.isoformat(sep=' ')
+                    result['_hasClock'] = _llm_has_clock
+                    result['timeUnknown'] = not _llm_has_clock
+                    result['timeUnknownSource'] = 'auto'
                     if 'lectureStart' not in adopted:
                         adopted.append('lectureStart')
                     _le_raw = a.get('lectureEnd') or a.get('end')
                     if _le_raw and str(_le_raw).strip() not in ('', 'null', 'None'):
                         try:
                             _le = datetime.datetime.fromisoformat(
-                                str(_le_raw).replace('T', ' ').replace('Z', ''))
+                                str(_le_raw).replace('T', ' ').replace('Z', '').replace('：', ':'))
+                            _le_has_clock = bool(re.search(
+                                r'\d{1,2}\s*[:：]\s*\d{2}', str(_le_raw)))
+                            if not _le_has_clock:
+                                _le = _le.replace(hour=8, minute=0, second=0, microsecond=0)
                             # end>start 守卫（2026-10-04）：此前只校验年份区间，
                             # 模型幻觉出「end==start 或 end 早于 start」可直接入库
                             # （库里曾积压 72 条 end==start）。不满足就不采纳，

@@ -50,7 +50,7 @@ with open(os.path.join(FIX, 'vlm_poster_10291.json'), encoding='utf-8') as _f:
 URL = VLM_DOC['sourceUrl']
 VLM_BY_URL = dict(zip(VLM_DOC['urls'], VLM_DOC['fields']))
 # 2026-11-11 固化值；改 VLM_PROMPT 任何一字都会让本套件红。
-VLM_PROMPT_SHA256 = '24da4af773e2559239d17cf6b0b868988261aa90aa6c0927efe812f93275b451'
+VLM_PROMPT_SHA256 = '18e052665fa59ede5632aaa3fde0cb1c24c5e909206e74e11dc503789c679d45'
 
 CONTENT_DIV = BeautifulSoup(HTML, 'html.parser').find('div', class_='article-content')
 

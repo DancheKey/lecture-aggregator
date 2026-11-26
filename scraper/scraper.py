@@ -805,7 +805,7 @@ def cross_source_dedup(records, preferred_primary_keys=None):
                 # 双保险防误并：
                 #   ① 单位必须相同（防同名不同人）；任一方缺单位则不启用 ——
                 #      宁可留一条重复，也不能把两个人误并成一场（误合并=丢数据）。
-                #   ② 排除占位时刻 00:00/08:00 —— 那只代表「同一天」，可能是两场。
+                #   ② 排除占位时刻 08:00 —— 那只代表「同一天」，可能是两场。
                 t16_a = (ri.get('lectureStart') or '')[:16]
                 t16_b = (rj.get('lectureStart') or '')[:16]
                 if (t16_a and t16_a == t16_b

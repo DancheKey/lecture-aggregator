@@ -5,19 +5,8 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 25 Nov 2026 16:41:02 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 26 Nov 2026 13:41:55 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
-    <item>
-      <title>华师经英Seminar第69期｜Generative AI as a Competitor: Content Creation and Platform Strategy</title>
-      <link>https://em.scnu.edu.cn/a/20261126/11267.html</link>
-      <guid isPermaLink="false">https://em.scnu.edu.cn/a/20261126/11267.html</guid>
-      <pubDate>Wed, 25 Nov 2026 16:29:38 +0800</pubDate>
-      <category>经济与管理学院</category>
-      <description>题目：Generative AI as a Competitor: Content Creation and Platform Strategy
-主讲：陈丽梅（华南师范大学经济与管理学院）
-地点：大学城校园文2栋301会议室
-主办：经济与管理学院</description>
-    </item>
     <item>
       <title>第73期学术报告预告｜探索知识追踪的跨域迁移及可解释性</title>
       <link>http://cs.scnu.edu.cn/a/20261123/6045.html</link>
@@ -44,7 +33,7 @@
       <title>华师经管学术讲座第557期（管理）｜中国科创债券的发行定价之谜——基于债券市场&quot;科技板&quot;的证据</title>
       <link>https://em.scnu.edu.cn/a/20261126/11260.html</link>
       <guid isPermaLink="false">https://em.scnu.edu.cn/a/20261126/11260.html</guid>
-      <pubDate>Wed, 25 Nov 2026 16:11:55 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 13:12:48 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：中国科创债券的发行定价之谜——基于债券市场&quot;科技板&quot;的证据
 主讲：张凯亮（暨南大学）
@@ -66,7 +55,7 @@
       <title>华师经管实务讲座第106期（会计）｜数字化审计实践:IT审计与数据分析</title>
       <link>https://em.scnu.edu.cn/a/20261127/11263.html</link>
       <guid isPermaLink="false">https://em.scnu.edu.cn/a/20261127/11263.html</guid>
-      <pubDate>Wed, 25 Nov 2026 15:48:50 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 12:49:43 +0800</pubDate>
       <category>经济与管理学院</category>
       <description>题目：数字化审计实践:IT审计与数据分析
 主讲：卢志凌（大信会计师事务所(特殊普通合伙)广州分所）
@@ -99,7 +88,7 @@
       <title>勷勤数学•专家报告-许宝刚｜Optimal binding functions of (even hole, cap)-free graphs</title>
       <link>http://maths.scnu.edu.cn/a/20261127/8910.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261127/8910.html</guid>
-      <pubDate>Wed, 25 Nov 2026 16:24:34 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 13:25:27 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Optimal binding functions of (even hole, cap)-free graphs
 主讲：许宝刚（南京师范大学）
@@ -110,7 +99,7 @@
       <title>勷勤数学•领军学者报告-张晓岩｜时钟网络设计的汇点聚类问题研究</title>
       <link>http://maths.scnu.edu.cn/a/20261127/8914.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261127/8914.html</guid>
-      <pubDate>Wed, 25 Nov 2026 16:17:51 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 13:18:44 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：时钟网络设计的汇点聚类问题研究
 主讲：张晓岩（南京师范大学）
@@ -132,7 +121,7 @@
       <title>勷勤数学•专家报告-黄皓｜Extremal Kt-intersecting graph families for large t</title>
       <link>http://maths.scnu.edu.cn/a/20261130/8912.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261130/8912.html</guid>
-      <pubDate>Wed, 25 Nov 2026 15:58:27 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 12:59:20 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Extremal Kt-intersecting graph families for large t
 主讲：黄皓（新加坡国立大学）
@@ -143,7 +132,7 @@
       <title>勷勤数学•领军学者报告-吴河辉｜The Product of Intersecting Families</title>
       <link>http://maths.scnu.edu.cn/a/20261130/8913.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261130/8913.html</guid>
-      <pubDate>Wed, 25 Nov 2026 16:11:58 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 13:12:51 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：The Product of Intersecting Families
 主讲：吴河辉（复旦大学）
@@ -176,7 +165,7 @@
       <title>勷勤数学•专家报告-张文鹏｜A certain mean values involving Cochrane sums and their identities</title>
       <link>http://maths.scnu.edu.cn/a/20261203/8906.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261203/8906.html</guid>
-      <pubDate>Wed, 25 Nov 2026 16:11:36 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 13:12:29 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：A certain mean values involving Cochrane sums and their identities
 主讲：张文鹏（西北大学）
@@ -187,7 +176,7 @@
       <title>勷勤数学•领军学者报告-吕广世｜The Product of Intersecting FamiliesOn the Hardy-Littlewood-Chowla conjecture</title>
       <link>http://maths.scnu.edu.cn/a/20261205/8915.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261205/8915.html</guid>
-      <pubDate>Wed, 25 Nov 2026 16:03:55 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 13:04:48 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：The Product of Intersecting FamiliesOn the Hardy-Littlewood-Chowla conjecture
 主讲：吕广世（山东大学）
@@ -209,7 +198,7 @@
       <title>勷勤数学•专家报告-杨绮云｜Dimensional reduction for anyons in the average-field approximation</title>
       <link>http://maths.scnu.edu.cn/a/20261218/8898.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261218/8898.html</guid>
-      <pubDate>Wed, 25 Nov 2026 15:42:16 +0800</pubDate>
+      <pubDate>Thu, 26 Nov 2026 12:43:09 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Dimensional reduction for anyons in the average-field approximation
 主讲：杨绮云（Basque Center for Applied Mathematics (BCAM)）

@@ -49,7 +49,7 @@ class ReparseIncompleteTest(unittest.TestCase):
             'college': '行知书院',
             'campus': '汕尾',
             'publishTime': '2026-10-15 15:00:00',
-            'lectureStart': '2026-10-20 00:00:00',
+            'lectureStart': '2026-10-20 08:00:00',
             'timeUnknown': True,
             'speaker': '',
             'speakerTitle': '',

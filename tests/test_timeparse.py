@@ -115,10 +115,16 @@ class TestNoMarkerSmallHourInference(unittest.TestCase):
             self.assertEqual(r['start'].strftime('%H:%M'), f'{hh:02d}:00',
                              f'{hh}:00 无标记应保持原值')
 
-    def test_zero_placeholder_untouched(self):
-        """00:00 是占位，不得被推断成 12:00。"""
+    def test_explicit_midnight_untouched(self):
+        """源页明确写 00:00 时保留真实午夜，不改成 08:00 占位。"""
         r = self._p('时间：2025年7月2日 00:00')
         self.assertEqual(r['start'].strftime('%H:%M'), '00:00')
+        self.assertTrue(r['has_time'])
+
+    def test_date_only_uses_tagged_8am_placeholder(self):
+        r = self._p('时间：2025年7月2日')
+        self.assertEqual(r['start'].strftime('%H:%M'), '08:00')
+        self.assertFalse(r['has_time'])
 
     def test_explicit_morning_small_hour_not_shifted(self):
         """「上午1:30」必须留 01:30——这是 period 三态不可合并的关键反例。

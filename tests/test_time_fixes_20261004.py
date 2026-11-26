@@ -125,12 +125,18 @@ class LocationBackfillPlaceholderTest(unittest.TestCase):
         self.assertEqual(r['lectureEnd'], '2026-05-20 17:00:00')
         self.assertIs(r['_hasClock'], True, '时刻来自地点原文 → 应置真时钟')
 
-    def test_02_00占位行为不变(self):
+    def test_02_旧版00占位仍可补全(self):
         r = {'lectureStart': '2026-05-20 00:00:00', 'lectureEnd': None,
              '_hasClock': False, 'topic': None, 'location': None}
         parsers._extract_topic_location(self._St(), r, '标题', [(14, 30, 17, 0)])
         self.assertEqual(r['lectureStart'], '2026-05-20 14:30:00')
         self.assertEqual(r['lectureEnd'], '2026-05-20 17:00:00')
+
+    def test_02b_真实午夜不被地点覆盖(self):
+        r = {'lectureStart': '2026-05-20 00:00:00', 'lectureEnd': None,
+             '_hasClock': True, 'topic': None, 'location': None}
+        parsers._extract_topic_location(self._St(), r, '标题', [(14, 30, 17, 0)])
+        self.assertEqual(r['lectureStart'], '2026-05-20 00:00:00')
 
     def test_03_真实08时钟不被覆盖(self):
         """_hasClock=True → 08:00 是源页真时刻，不得被地点区间改写 start。"""

@@ -46,8 +46,8 @@ def _apply_period(hh, period):
             hh = 12
     else:
         # 无时段标记：小时间按下午(+12)处理，避免把「2：30-4：00」误解析为
-        # 02:30-04:00（实为 14:30-16:00，ibc/2779）。6 点及以后、0 点占位保持原值，
-        # 避免误伤上午场与 00:00 占位。
+        # 02:30-04:00（实为 14:30-16:00，ibc/2779）。6 点及以后、0 点保持原值，
+        # 避免误伤上午场与源页明确给出的真实午夜。
         # 2026-09-30：本分支此前因调用方 period 初值为 0（非 None）而恒不可达。
         if 1 <= hh <= 5:
             hh += 12
@@ -62,7 +62,7 @@ def _cn_to_int(s):
     """将「三点 / 十二点 / 二十一点」等中文数字时刻转为 int（讲座时刻 ≤23）。
 
     2026-09-24 修复：旧「X点」正则只认阿拉伯数字（\\d{1,2}点），漏抓「下午三点」这类
-    中文数字时刻，导致时间退化为 00:00 占位（em5682 实证）。支持：单字 0–9、十、
+    中文数字时刻，导致时间退化为日期级占位（em5682 实证）。支持：单字 0–9、十、
     十一~十九、二十~九十九（讲座时刻上限 23，超界返回 None 交给 _valid 兜底）。
     """
     if not s:
@@ -161,7 +161,7 @@ def _build(m, seg, y, mo, d):
             if hh is not None:
                 raw_times.append((hh, mm, ''))
     if not raw_times:
-        return {'start': datetime(y_i, mo_i, d_i, 0, 0),
+        return {'start': datetime(y_i, mo_i, d_i, 8, 0),
                 'end': None, 'has_time': False}
     # 每个时间：优先用自身 am/pm 后缀/前缀，否则用中文 period（上午/下午…）
     def _final_hh(hh, suffix):
@@ -172,7 +172,7 @@ def _build(m, seg, y, mo, d):
         return 0 <= hh <= 23 and 0 <= mm <= 59
     h0_raw, m0_raw, s0 = raw_times[0]
     if not _valid(h0_raw, m0_raw):
-        return {'start': datetime(y_i, mo_i, d_i, 0, 0),
+        return {'start': datetime(y_i, mo_i, d_i, 8, 0),
                 'end': None, 'has_time': False}
     h0 = _final_hh(h0_raw, s0)
     start = datetime(y_i, mo_i, d_i, h0, m0_raw)
@@ -582,7 +582,7 @@ def _cross_year(res, publish_time, title, body_text, year, url_year, publish_yea
 
 def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
                          publish_level, default_year, list_title=None, page_text=None):
-    """R1–R6 编排层。返回 {'start':iso,'end':iso|None,'confidence','note'} 或 None。
+    """R1–R6 编排层。返回 {'start':iso,'end':iso|None,'has_time','confidence','note'} 或 None。
 
     Args:
         body_text: 正文区域文本（content_div 去噪后），R1/R2 仅扫此。
@@ -636,6 +636,7 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
             dt = primary['seg']
             return {'start': dt['start'].isoformat(sep=' '),
                     'end': dt['end'].isoformat(sep=' ') if dt.get('end') else None,
+                    'has_time': bool(dt.get('has_time')),
                     'confidence': 'high', 'note': 'authoritative-label'}
         # 仅月日：取高 Tier 月日，年份补年（优先借低 Tier 完整年 url/title 一致者）
         mo, dd = primary['md']
@@ -654,9 +655,11 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
                                          url_year, publish_year)
             return {'start': dt['start'].isoformat(sep=' '),
                     'end': dt['end'].isoformat(sep=' ') if dt.get('end') else None,
+                    'has_time': bool(dt.get('has_time')),
                     'confidence': conf, 'note': note}
         return {'start': dt['start'].isoformat(sep=' '),
                 'end': dt['end'].isoformat(sep=' ') if dt.get('end') else None,
+                'has_time': bool(dt.get('has_time')),
                 'confidence': 'high', 'note': 'monthday-nopublish'}
 
     # ---- R2：通用解析只扫正文 ----
@@ -691,6 +694,7 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
             # 完整日期直接采用，不触发 R6
             return {'start': g['start'].isoformat(sep=' '),
                     'end': g['end'].isoformat(sep=' ') if g.get('end') else None,
+                    'has_time': bool(g.get('has_time')),
                     'confidence': 'high', 'note': 'general-body-full'}
         # 仅月日：补年 + R6
         year = g['start'].year
@@ -699,9 +703,11 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
                                          url_year, publish_year)
             return {'start': g['start'].isoformat(sep=' '),
                     'end': g['end'].isoformat(sep=' ') if g.get('end') else None,
+                    'has_time': bool(g.get('has_time')),
                     'confidence': conf, 'note': note}
         return {'start': g['start'].isoformat(sep=' '),
                 'end': g['end'].isoformat(sep=' ') if g.get('end') else None,
+                'has_time': bool(g.get('has_time')),
                 'confidence': 'high', 'note': 'general-body-monthday-nopublish'}
 
     # ---- Fix B：整页文本兜底重试 ----
@@ -719,6 +725,7 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
             if gb.get('from_full'):
                 return {'start': gb['start'].isoformat(sep=' '),
                         'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                        'has_time': bool(gb.get('has_time')),
                         'confidence': 'mid', 'note': 'general-page-full'}
             year = gb['start'].year
             if publish_time:
@@ -726,9 +733,11 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
                                              url_year, publish_year)
                 return {'start': gb['start'].isoformat(sep=' '),
                         'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                        'has_time': bool(gb.get('has_time')),
                         'confidence': conf, 'note': note}
             return {'start': gb['start'].isoformat(sep=' '),
                     'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
+                    'has_time': bool(gb.get('has_time')),
                     'confidence': 'mid', 'note': 'general-page-monthday-nopublish'}
 
     # R2 回退：正文为空（纯海报且尚未 OCR）时返回 None，交由调用方走 OCR/URL 兜底

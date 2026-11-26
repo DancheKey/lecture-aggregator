@@ -85,7 +85,7 @@ class CrossUrlDupAuditTest(unittest.TestCase):
         recs = [
             _rec('http://a.edu.cn/6973.html', '谭春桥', '2019-05-09 14:15:00',
                  '基于谈判能力的旅游 O2O 供应链定价与服务策略研究'),
-            _rec('http://a.edu.cn/6966.html', '谭春桥', '2019-05-09 00:00:00',
+            _rec('http://a.edu.cn/6966.html', '谭春桥', '2019-05-09 08:00:00',
                  '基于谈判能力的旅游O2O供应链定价与服务策略研究'),
         ]
         issues = _dup_issues(recs)
@@ -127,10 +127,10 @@ class CrossUrlDupAuditTest(unittest.TestCase):
         self.assertEqual(len(_dup_issues([a, b])), 1)
 
     def test_placeholder_time_compared(self):
-        """一方占位时刻(00:00) + 另一方精确时刻 → 仍视为可重复（6966 实测形态）"""
+        """一方占位时刻(08:00) + 另一方精确时刻 → 仍视为可重复。"""
         recs = [
             _rec('http://a.edu.cn/1.html', '谭春桥', '2019-05-09 14:15:00', '同一题目研究'),
-            _rec('http://a.edu.cn/2.html', '谭春桥', '2019-05-09 00:00:00', '同一题目研究'),
+            _rec('http://a.edu.cn/2.html', '谭春桥', '2019-05-09 08:00:00', '同一题目研究'),
         ]
         self.assertEqual(len(_dup_issues(recs)), 1)
 
@@ -138,7 +138,7 @@ class CrossUrlDupAuditTest(unittest.TestCase):
         """同 URL 多场（多讲座页拆分）不算跨 URL 重复"""
         recs = [
             _rec('http://a.edu.cn/1.html', '谭春桥', '2019-05-09 09:00:00', '同一题目研究'),
-            _rec('http://a.edu.cn/1.html', '谭春桥', '2019-05-09 00:00:00', '同一题目研究'),
+            _rec('http://a.edu.cn/1.html', '谭春桥', '2019-05-09 08:00:00', '同一题目研究'),
         ]
         self.assertEqual(_dup_issues(recs), [])
 
@@ -179,7 +179,7 @@ class BaseHealDupTest(unittest.TestCase):
                       '基于谈判能力的旅游 O2O 供应链定价与服务策略研究',
                       lectureIndex=3, location='文科3栋501',
                       lectureEnd='2019-05-09 15:15:00')
-        b = _base_rec('http://a.edu.cn/6966.html', '谭春桥', '2019-05-09 00:00:00',
+        b = _base_rec('http://a.edu.cn/6966.html', '谭春桥', '2019-05-09 08:00:00',
                       '基于谈判能力的旅游O2O供应链定价与服务策略研究',
                       timeUnknown=True, speakerAffiliation='中南大学商学院',
                       speakerTitle='教授', speakerBio='谭春桥，男，中南大学商学院教授……')
@@ -195,7 +195,7 @@ class BaseHealDupTest(unittest.TestCase):
         """主记录必须是「有精确时刻」的那条，不能被 bio/单位更全的待定记录顶替"""
         a = _base_rec('http://a.edu.cn/6973.html', '谭春桥', '2019-05-09 14:15:00',
                       '同一题目研究', lectureIndex=3, location='文科3栋501')
-        b = _base_rec('http://a.edu.cn/6966.html', '谭春桥', '2019-05-09 00:00:00',
+        b = _base_rec('http://a.edu.cn/6966.html', '谭春桥', '2019-05-09 08:00:00',
                       '同一题目研究', timeUnknown=True,
                       speakerAffiliation='中南大学商学院', speakerTitle='教授',
                       speakerBio='谭春桥，男，中南大学商学院教授，博士生导师……')
@@ -262,7 +262,7 @@ class CrossSourceExactTimeGuardTest(unittest.TestCase):
     def test_placeholder_cannot_bridge_conflicting_precise_times(self):
         a = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00', '同一题目研究')
         b = _base_rec('http://a.edu.cn/2.html', '张三', '2026-11-25 14:00:00', '同一题目研究')
-        c = _base_rec('http://a.edu.cn/3.html', '张三', '2026-11-25 00:00:00',
+        c = _base_rec('http://a.edu.cn/3.html', '张三', '2026-11-25 08:00:00',
                       '同一题目研究', timeUnknown=True)
         out = S.cross_source_dedup([a, b, c])
         self.assertEqual(len(out), 2)
@@ -272,11 +272,11 @@ class CrossSourceExactTimeGuardTest(unittest.TestCase):
         records = [
             _base_rec('http://a.edu.cn/a1.html', '张三', '2026-11-25 09:00:00',
                       '同一题目研究', college='甲学院'),
-            _base_rec('http://a.edu.cn/a2.html', '张三', '2026-11-25 00:00:00',
+            _base_rec('http://a.edu.cn/a2.html', '张三', '2026-11-25 08:00:00',
                       '同一题目研究', college='甲学院', timeUnknown=True),
             _base_rec('http://b.edu.cn/b1.html', '张三', '2026-11-25 14:00:00',
                       '同一题目研究', college='乙学院'),
-            _base_rec('http://b.edu.cn/b2.html', '张三', '2026-11-25 00:00:00',
+            _base_rec('http://b.edu.cn/b2.html', '张三', '2026-11-25 08:00:00',
                       '同一题目研究', college='乙学院', timeUnknown=True),
         ]
         out = S.cross_source_dedup(records)
@@ -316,7 +316,7 @@ class CrossSourceExactTimeGuardTest(unittest.TestCase):
 
     def test_placeholder_time_does_not_conflict(self):
         a = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00', '同一题目研究')
-        b = _base_rec('http://b.edu.cn/2.html', '张三', '2026-11-25 00:00:00', '同一题目研究')
+        b = _base_rec('http://b.edu.cn/2.html', '张三', '2026-11-25 08:00:00', '同一题目研究')
         self.assertEqual(len(S.cross_source_dedup([a, b])), 1)
 
 
