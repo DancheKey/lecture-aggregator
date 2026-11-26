@@ -41,7 +41,7 @@ on:
 permissions:
   contents: read
 
-# 同一时间只跑一个抓取任务；新触发排队（不取消正在跑的），避免并发写冲突
+# 抓取与 Pages 发布分别串行；发布锁与 deploy.yml 共用 pages-deploy。
 concurrency:
   group: daily-scrape
   cancel-in-progress: false
@@ -62,6 +62,8 @@ concurrency:
 
 jobs:
   scrape:
+    outputs:
+      deploy_sha: ${{ steps.publish_sha.outputs.commit_sha }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     # job 级 permissions 覆盖工作流级设置：只给写回数据与告警 Issue 所需权限，
@@ -477,6 +479,7 @@ jobs:
             if ! git merge-base --is-ancestor origin/main HEAD; then
               echo "::warning::远端 main 已前进，按铁律放弃本轮数据提交（不做 rebase），下轮 cron 将重抓同区间"
               git reset --hard origin/main
+              git rev-parse HEAD > "$RUNNER_TEMP/publish_sha"
               exit 0
             fi
             echo "推送到 origin/main..."
@@ -496,11 +499,13 @@ jobs:
                 if ! git merge-base --is-ancestor origin/main HEAD; then
                   echo "::warning::远端已前进，放弃本轮数据提交（不做 rebase），下轮 cron 将重抓同区间"
                   git reset --hard origin/main
+                  git rev-parse HEAD > "$RUNNER_TEMP/publish_sha"
                   exit 0
                 fi
               fi
             done
             echo "推送成功"
+            git rev-parse HEAD > "$RUNNER_TEMP/publish_sha"
           fi
 
       #
@@ -555,6 +560,7 @@ jobs:
           for i in 1 2 3; do
             if git push origin main; then
               echo "状态文件已推送 (try $i)"
+              git rev-parse HEAD > "$RUNNER_TEMP/publish_sha"
               exit 0
             fi
             echo "::warning::状态文件 push 失败 (try $i)，5s 后重试..."
@@ -568,6 +574,16 @@ jobs:
           echo "::warning::状态文件 push 连续 3 次失败，已放弃（不影响本轮数据结论）"
           exit 0
 
+      - name: 输出发布提交 SHA
+        id: publish_sha
+        if: always()
+        run: |
+          sha="$GITHUB_SHA"
+          if [ -f "$RUNNER_TEMP/publish_sha" ]; then
+            read -r sha < "$RUNNER_TEMP/publish_sha"
+          fi
+          echo "commit_sha=$sha" >> "$GITHUB_OUTPUT"
+
       # 失败源告警（2026-08-05 体检修复 严重-3）：爬虫在有源失败时不推进增量水位，
       # 并把 failed_sources 写入 data/last_scrape.json（下次运行同区间自动补回）。
       # 此步放在提交/部署之后：成功抓到的数据照常上线，但工作流以红色结束，
@@ -579,8 +595,7 @@ jobs:
       #     这是「宁可误报不漏报」的有意取舍。
 
   # ---------------------------------------------------------------------
-  # deploy：只做 Pages 发布。数据已由 scrape 推上 origin/main，此处重新检出
-  # 即可拿到本轮产物，因此不需要 contents: write。
+  # deploy：只做 Pages 发布，固定检出 scrape 实际推送的数据提交。
   # 说明：本工作流用 GITHUB_TOKEN 推送的数据提交**不会**触发 deploy.yml，
   # 故仍需在此直接部署，保证每日新数据即时上线。
   # ---------------------------------------------------------------------
@@ -588,21 +603,30 @@ jobs:
     needs: scrape        # 爬虫/护栏失败时不发布（宁可不发，不发半成品）
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # 仅 Pages 发布与 deploy.yml 串行；新部署排队，不取消进行中的部署。
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     permissions:
       contents: read     # 仅检出已推送的产物
       pages: write       # 上传 Pages 产物
       id-token: write    # deploy-pages 的 OIDC 换取部署令牌
       actions: read      # 确认 github-pages 构件已在接口可见（2026-11-25）
     steps:
-      # 2026-09-28 修复：checkout 默认检出**触发本 run 时的 commit**（github.sha），
-      # 而 scrape job 刚推送的新提交不在其中——当本轮触发后 main 有推进（尤其
-      # workflow_dispatch 由旧 SHA 触发时），deploy 会把上一班的旧 last_run.json
-      # /旧切片发上线（实测：官网「更新于」停在 9-25，仓库里已是 9-28）。
-      # 显式检出 main 才能拿到 scrape job 刚推送的产物。
-      - name: 检出已推送的数据产物
+      - name: 校验发布 SHA
+        env:
+          DEPLOY_SHA: ${{ needs.scrape.outputs.deploy_sha }}
+        run: |
+          if [ -z "$DEPLOY_SHA" ]; then
+            echo "::error::缺少 scrape 发布 SHA，拒绝回退到触发提交"
+            exit 1
+          fi
+
+      # 固定到 scrape 实际推送的 SHA，避免发布旧触发提交或部署前的最新 main。
+      - name: 检出本次抓取产物
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ needs.scrape.outputs.deploy_sha }}
 
       - name: 配置 Pages
         uses: actions/configure-pages@v6
@@ -658,12 +682,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      # 同 deploy：显式检出 main，读到 scrape job 刚推送的本班 last_scrape.json
-      # （默认 github.sha 是触发时的旧 commit，本班失败源会被漏看）。
+      # 与 deploy 固定到同一数据快照，避免读到后续 run 推送的 last_scrape.json。
       - name: 检出数据
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ needs.scrape.outputs.deploy_sha || github.sha }}
 
       - name: 检查失败信息源（告警）
         run: |

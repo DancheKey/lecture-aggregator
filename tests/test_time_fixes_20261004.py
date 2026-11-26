@@ -310,11 +310,24 @@ class RestoreHumanTimeTest(unittest.TestCase):
         """静态锁：调用被挪出全量分支（或整段删掉）时这里会红。"""
         with open(os.path.join(ROOT, 'scraper', 'scraper.py'), encoding='utf-8') as f:
             src = f.read()
-        i_else = src.index('    else:\n        out = dedup(raw)')
-        i_call = src.index('restore_human_time_annotations(out, existing)')
+        i_else = src.index('    else:\n        # 人工标注必须先恢复')
+        i_restore = src.index('out = restore_human_time_annotations(raw, existing)')
+        i_dedup = src.index('out = dedup(out)', i_else)
+        i_cross = src.index('out = cross_source_dedup(', i_else)
         i_sort = src.index("out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)")
-        self.assertGreater(i_call, i_else, '回填调用不在全量分支内')
-        self.assertLess(i_call, i_sort, '回填必须发生在写盘/排序之前')
+        self.assertGreater(i_restore, i_else, '回填调用不在全量分支内')
+        self.assertLess(i_restore, i_dedup, '人工标注必须先于同源去重恢复')
+        self.assertLess(i_dedup, i_cross, '跨源去重必须看到已恢复的人工标注')
+        self.assertLess(i_cross, i_sort, '回填必须发生在写盘/排序之前')
+
+    def test_07_全量跨源合并保留存量主记录身份(self):
+        with open(os.path.join(ROOT, 'scraper', 'scraper.py'), encoding='utf-8') as f:
+            src = f.read()
+        i_keys = src.index('preferred_primary_keys = {')
+        i_call = src.index('out = cross_source_dedup(', i_keys)
+        self.assertIn('preferred_primary_keys=preferred_primary_keys',
+                      src[i_call:i_call + 160],
+                      '全量跨源合并没有接收存量 merged 身份，计数键可能被重选')
 
 
 class AuditNewRulesTest(unittest.TestCase):

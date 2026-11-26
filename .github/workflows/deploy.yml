@@ -12,11 +12,6 @@ permissions:
   pages: write
   id-token: write
 
-# 同一时间只跑一个部署；新触发排队，不取消正在跑的
-concurrency:
-  group: pages-deploy
-  cancel-in-progress: false
-
 jobs:
   # ---- 门禁：测试不绿就不许上线（2026-09-30 打通 CI 补）----
   # 此前 deploy.yml 是单 job、无 needs，与 test.yml 互不阻塞 →
@@ -203,6 +198,10 @@ jobs:
     needs: gate
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # 仅发布阶段与 daily.yml 共用 Pages 锁；新部署排队，不取消进行中的部署。
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     permissions:
       contents: read
       pages: write

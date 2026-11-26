@@ -15,9 +15,11 @@ r"""回归：跨 URL 同一讲座的存量重复检测 + 「报告人：」履�
       期刊名（Fuzzy Sets and Systems…）误截，表现为「单位 = and Systems、IEEE
       Transactions on Fuzzy S」。补「报告人(?=：姓名，)」分支后 bio 正常提取。
 """
+import io
 import os
 import sys
 import unittest
+from contextlib import redirect_stdout
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
@@ -97,6 +99,32 @@ class CrossUrlDupAuditTest(unittest.TestCase):
             _rec('http://a.edu.cn/2.html', '谭春桥', '2019-05-09 14:00:00', '同一题目研究'),
         ]
         self.assertEqual(_dup_issues(recs), [])
+
+    def test_real_placeholder_hours_with_explicit_annotation_not_reported(self):
+        """真实 00:00/08:00 有精确标注时，不能因小时值被误判为占位。"""
+        for hour in ('00:00', '08:00'):
+            with self.subTest(hour=hour):
+                a = _rec('http://a.edu.cn/1.html', '谭春桥',
+                         '2019-05-09 %s:00' % hour, '同一题目研究')
+                b = _rec('http://a.edu.cn/2.html', '谭春桥',
+                         '2019-05-09 14:00:00', '同一题目研究')
+                a['timeUnknown'] = False
+                a['timeUnknownSource'] = 'auto'
+                b['timeUnknown'] = False
+                b['timeUnknownSource'] = 'auto'
+                self.assertEqual(_dup_issues([a, b]), [])
+
+    def test_explicit_unknown_08_still_reported(self):
+        """08:00 + timeUnknown=True 仍是占位，应与精确时间记录一起报重复。"""
+        a = _rec('http://a.edu.cn/1.html', '谭春桥',
+                 '2019-05-09 08:00:00', '同一题目研究')
+        b = _rec('http://a.edu.cn/2.html', '谭春桥',
+                 '2019-05-09 14:00:00', '同一题目研究')
+        a['timeUnknown'] = True
+        a['timeUnknownSource'] = 'human'
+        b['timeUnknown'] = False
+        b['timeUnknownSource'] = 'auto'
+        self.assertEqual(len(_dup_issues([a, b])), 1)
 
     def test_placeholder_time_compared(self):
         """一方占位时刻(00:00) + 另一方精确时刻 → 仍视为可重复（6966 实测形态）"""
@@ -193,6 +221,242 @@ class BaseHealDupTest(unittest.TestCase):
         b = _base_rec('http://a.edu.cn/2.html', '谭春桥', '2019-05-09 14:00:00', '同一题目研究')
         out = S.incremental_merge([a, b], [])
         self.assertEqual(len(out), 2)
+
+
+class CrossSourceExactTimeGuardTest(unittest.TestCase):
+    def test_real_four_sessions_preserved(self):
+        records = [
+            _base_rec('http://em.scnu.edu.cn/a/20171202/5980.html', '晏智杰',
+                      '2017-12-02 15:30:00', '坚持市场化改革方向,建设现代化经济体系',
+                      college='经济与管理学院', lectureIndex=2,
+                      location='石牌校区行政楼七楼第一会议室'),
+            _base_rec('http://em.scnu.edu.cn/a/20171202/5980.html', '张曙光',
+                      '2017-12-02 14:30:00', '宏观经济运行及其分析20年',
+                      college='经济与管理学院', lectureIndex=1,
+                      location='石牌校区行政楼七楼第一会议室第二场'),
+            _base_rec('http://em.scnu.edu.cn/a/20171202/5983.html', '张曙光',
+                      '2017-12-02 10:10:00', '新经济对经济学理论的挑战',
+                      college='经济与管理学院', lectureIndex=1,
+                      location='图书馆后栋一楼国际会议厅'),
+            _base_rec('http://em.scnu.edu.cn/a/20171202/5983.html', '晏智杰',
+                      '2017-12-02 10:10:00', '坚持市场化改革方向,建设现代化经济体系',
+                      college='经济与管理学院', lectureIndex=2,
+                      location='图书馆后栋一楼国际会议厅'),
+        ]
+        records[0]['title'] = '著名经济学家张曙光和晏智杰教授学术讲座通知'
+        records[1]['title'] = '著名经济学家张曙光和晏智杰教授学术讲座通知'
+        records[2]['title'] = '2017岭南经济论坛'
+        records[3]['title'] = '2017岭南经济论坛'
+        out = S.cross_source_dedup(records)
+        self.assertEqual(len(out), 4)
+        self.assertEqual({(r['speaker'], r['lectureStart'][11:16]) for r in out}, {
+            ('晏智杰', '15:30'), ('晏智杰', '10:10'),
+            ('张曙光', '14:30'), ('张曙光', '10:10'),
+        })
+
+    def test_same_topic_different_precise_times_not_merged(self):
+        a = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00', '同一题目研究')
+        b = _base_rec('http://a.edu.cn/2.html', '张三', '2026-11-25 14:00:00', '同一题目研究')
+        self.assertEqual(len(S.cross_source_dedup([a, b])), 2)
+
+    def test_placeholder_cannot_bridge_conflicting_precise_times(self):
+        a = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00', '同一题目研究')
+        b = _base_rec('http://a.edu.cn/2.html', '张三', '2026-11-25 14:00:00', '同一题目研究')
+        c = _base_rec('http://a.edu.cn/3.html', '张三', '2026-11-25 00:00:00',
+                      '同一题目研究', timeUnknown=True)
+        out = S.cross_source_dedup([a, b, c])
+        self.assertEqual(len(out), 2)
+        self.assertEqual({r['lectureStart'][11:16] for r in out}, {'09:00', '14:00'})
+
+    def test_two_sessions_with_placeholder_pages_preserved(self):
+        records = [
+            _base_rec('http://a.edu.cn/a1.html', '张三', '2026-11-25 09:00:00',
+                      '同一题目研究', college='甲学院'),
+            _base_rec('http://a.edu.cn/a2.html', '张三', '2026-11-25 00:00:00',
+                      '同一题目研究', college='甲学院', timeUnknown=True),
+            _base_rec('http://b.edu.cn/b1.html', '张三', '2026-11-25 14:00:00',
+                      '同一题目研究', college='乙学院'),
+            _base_rec('http://b.edu.cn/b2.html', '张三', '2026-11-25 00:00:00',
+                      '同一题目研究', college='乙学院', timeUnknown=True),
+        ]
+        out = S.cross_source_dedup(records)
+        self.assertEqual(len(out), 2)
+        self.assertEqual({r['lectureStart'][11:16] for r in out}, {'09:00', '14:00'})
+
+    def test_same_lecture_index_different_precise_times_not_merged(self):
+        a = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00',
+                      '供应链定价研究', lectureIndex=3)
+        b = _base_rec('http://a.edu.cn/2.html', '张三', '2026-11-25 14:00:00',
+                      '博弈论与行为决策', lectureIndex=3)
+        self.assertEqual(len(S.cross_source_dedup([a, b])), 2)
+
+    def test_same_location_fallback_different_precise_times_not_merged(self):
+        a = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00',
+                      '学术报告', college='甲学院', location='一号厅')
+        b = _base_rec('http://b.edu.cn/2.html', '张三', '2026-11-25 14:00:00',
+                      'Seminar', college='乙学院', location='一号厅')
+        self.assertEqual(len(S.cross_source_dedup([a, b])), 2)
+
+    def test_new_vs_existing_different_precise_times_not_merged(self):
+        old = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00',
+                        '同一题目研究', lectureIndex=3)
+        new = _base_rec('http://b.edu.cn/2.html', '张三', '2026-11-25 14:00:00',
+                        '同一题目研究', lectureIndex=3)
+        index = {(S._normalize_speaker('张三'), '2026-11-25'): [old]}
+        self.assertIsNone(S._cross_source_dup_with_existing(new, index))
+
+    def test_same_precise_time_still_merged(self):
+        a = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00',
+                      '同一题目研究', college='甲学院')
+        b = _base_rec('http://b.edu.cn/2.html', '张三', '2026-11-25 09:00:00',
+                      '同一题目研究', college='乙学院')
+        self.assertEqual(len(S.cross_source_dedup([a, b])), 1)
+        index = {(S._normalize_speaker('张三'), '2026-11-25'): [a]}
+        self.assertIs(S._cross_source_dup_with_existing(b, index), a)
+
+    def test_placeholder_time_does_not_conflict(self):
+        a = _base_rec('http://a.edu.cn/1.html', '张三', '2026-11-25 09:00:00', '同一题目研究')
+        b = _base_rec('http://b.edu.cn/2.html', '张三', '2026-11-25 00:00:00', '同一题目研究')
+        self.assertEqual(len(S.cross_source_dedup([a, b])), 1)
+
+
+class TimeUpgradeAndIdentityTest(unittest.TestCase):
+    def test_real_08_conflicts_with_real_09(self):
+        a = _base_rec('http://a.edu.cn/1.html', '杨健夫', '2026-11-08 08:00:00',
+                      '同一题目研究', timeUnknown=False, timeUnknownSource='auto')
+        b = _base_rec('http://b.edu.cn/2.html', '杨健夫', '2026-11-08 09:00:00',
+                      '同一题目研究', timeUnknown=False, timeUnknownSource='auto')
+        self.assertEqual(len(S.cross_source_dedup([a, b])), 2)
+
+    def test_rich_placeholder_primary_still_upgrades_to_exact_time(self):
+        placeholder = _base_rec(
+            'http://a.edu.cn/1.html', '史丹', '2024-11-26 08:00:00', '同一题目研究',
+            timeUnknown=True, timeUnknownSource='legacy', abstract='长摘要' * 100)
+        exact = _base_rec(
+            'http://b.edu.cn/2.html', '史丹', '2024-11-26 14:30:00', '同一题目研究',
+            timeUnknown=False, timeUnknownSource='auto', lectureEnd='2024-11-26 16:00:00')
+        out = S.cross_source_dedup([placeholder, exact])
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['lectureStart'], '2024-11-26 14:30:00')
+        self.assertEqual(out[0]['lectureEnd'], '2024-11-26 16:00:00')
+        self.assertIs(out[0]['timeUnknown'], False)
+        self.assertEqual(out[0]['timeUnknownSource'], 'auto')
+
+    def test_human_placeholder_yields_to_exact_time(self):
+        placeholder = _base_rec(
+            'http://a.edu.cn/1.html', '史丹', '2024-11-26 08:00:00', '同一题目研究',
+            timeUnknown=True, timeUnknownSource='human')
+        exact = _base_rec(
+            'http://b.edu.cn/2.html', '史丹', '2024-11-26 14:30:00', '同一题目研究',
+            timeUnknown=False, timeUnknownSource='auto')
+        out = S.cross_source_dedup([placeholder, exact])
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['lectureStart'], '2024-11-26 14:30:00')
+        self.assertIs(out[0]['timeUnknown'], False)
+        self.assertEqual(out[0]['timeUnknownSource'], 'auto')
+
+    def test_human_upgrade_logs_old_and_evidence_source(self):
+        placeholder = _base_rec(
+            'http://a.edu.cn/1.html', '史丹', '2024-11-26 08:00:00', '同一题目研究',
+            timeUnknown=True, timeUnknownSource='human')
+        exact = _base_rec(
+            'http://b.edu.cn/2.html', '史丹', '2024-11-26 14:30:00', '同一题目研究',
+            timeUnknown=False, timeUnknownSource='auto')
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertTrue(S._upgrade_time_fields(placeholder, [exact]))
+            self.assertFalse(S._upgrade_time_fields(placeholder, [exact]))
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertIn('[TIME-UPGRADE]', lines[0])
+        self.assertIn('url=http://a.edu.cn/1.html', lines[0])
+        self.assertIn('start=2024-11-26 08:00:00->2024-11-26 14:30:00', lines[0])
+        self.assertIn('timeUnknown=True->False', lines[0])
+        self.assertIn('source=human->auto', lines[0])
+        self.assertIn('evidence=http://b.edu.cn/2.html', lines[0])
+
+    def test_upgrade_discards_invalid_old_end(self):
+        placeholder = _base_rec(
+            'http://a.edu.cn/1.html', '史丹', '2024-11-26 08:00:00', '同一题目研究',
+            timeUnknown=True, lectureEnd='2024-11-26 09:00:00')
+        exact = _base_rec(
+            'http://b.edu.cn/2.html', '史丹', '2024-11-26 14:30:00', '同一题目研究',
+            timeUnknown=False, lectureEnd='2024-11-26 13:00:00')
+        out = S.cross_source_dedup([placeholder, exact])
+        self.assertEqual(out[0]['lectureStart'], '2024-11-26 14:30:00')
+        self.assertIsNone(out[0]['lectureEnd'])
+
+    def test_actual_skc_case_keeps_primary_url_and_gains_1430(self):
+        topic = '新质生产力、新型工业化与我国的战略机遇'
+        skc_url = 'http://skc.scnu.edu.cn/a/20241125/924.html'
+        em_url = 'http://em.scnu.edu.cn/a/20241126/10432.html'
+        skc = _base_rec(
+            skc_url, '史丹', '2024-11-26 08:00:00', topic,
+            college='社会科学处', location='大学城校园经济与管理学院536会议室',
+            timeUnknown=True, timeUnknownSource='legacy', speakerBio='史丹简介')
+        em = _base_rec(
+            em_url, '史丹', '2024-11-26 14:30:00', topic,
+            college='经济与管理学院', location='大学城校园经济与管理学院536会议室',
+            timeUnknown=False, timeUnknownSource='auto', abstract='完整摘要' * 100)
+        out = S.cross_source_dedup(
+            [skc, em], preferred_primary_keys={(skc_url, None)})
+        self.assertEqual(len(out), 1)
+        rec = out[0]
+        self.assertEqual(rec['sourceUrl'], skc_url)
+        self.assertEqual(rec['lectureStart'], '2024-11-26 14:30:00')
+        self.assertIs(rec['timeUnknown'], False)
+        self.assertEqual(rec['timeUnknownSource'], 'auto')
+        self.assertEqual([s['sourceUrl'] for s in rec['sources']], [em_url])
+
+    def test_incremental_upgrade_precedes_idempotency_return(self):
+        primary_url = 'http://a.edu.cn/1.html'
+        new_url = 'http://b.edu.cn/2.html'
+        primary = _base_rec(
+            primary_url, '史丹', '2024-11-26 08:00:00', '同一题目研究',
+            timeUnknown=True, timeUnknownSource='human', lectureEnd='2024-11-26 09:00:00',
+            sources=[{'sourceUrl': new_url, 'college': '经济与管理学院',
+                      'campus': '大学城', 'title': '同一题目研究'}],
+            merged=True, sourceCount=2)
+        new = _base_rec(
+            new_url, '史丹', '2024-11-26 14:30:00', '同一题目研究',
+            timeUnknown=False, timeUnknownSource='auto', lectureEnd='2024-11-26 16:00:00')
+        S._merge_record_into(new, primary)
+        self.assertEqual(primary['lectureStart'], '2024-11-26 14:30:00')
+        self.assertEqual(primary['lectureEnd'], '2024-11-26 16:00:00')
+        self.assertIs(primary['timeUnknown'], False)
+        self.assertEqual(primary['timeUnknownSource'], 'auto')
+        S._merge_record_into(new, primary)
+        self.assertEqual(primary['lectureStart'], '2024-11-26 14:30:00')
+        self.assertEqual(primary['lectureEnd'], '2024-11-26 16:00:00')
+        self.assertEqual(len(primary['sources']), 1)
+
+    def test_preferred_primary_does_not_override_latest_round(self):
+        old_url = 'http://a.edu.cn/round1.html'
+        new_url = 'http://a.edu.cn/round2.html'
+        old = _base_rec(old_url, '张三', '2026-11-25 09:00:00', '同一题目研究',
+                        college='甲学院', title='同一会议第一轮通知',
+                        publishTime='2026-11-20 09:00:00')
+        new = _base_rec(new_url, '张三', '2026-11-25 14:00:00', '同一题目研究',
+                        college='甲学院', title='同一会议第二轮通知',
+                        publishTime='2026-11-21 09:00:00')
+        latest = S._multi_round_replace([old, new])
+        out = S.cross_source_dedup(latest, preferred_primary_keys={(old_url, None)})
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['sourceUrl'], new_url)
+        self.assertEqual(out[0]['lectureStart'], '2026-11-25 14:00:00')
+
+    def test_real_08_exact_time_fallback_merges(self):
+        a = _base_rec('http://a.edu.cn/1.html', '杨健夫', '2026-11-08 08:00:00',
+                      '偏微分方程专题', college='数学科学学院',
+                      speakerAffiliation='江西师范大学', location='西楼二楼',
+                      timeUnknown=False, timeUnknownSource='auto')
+        b = _base_rec('http://a.edu.cn/2.html', '杨健夫', '2026-11-08 08:00:00',
+                      '椭圆方程基态集中', college='数学科学学院',
+                      speakerAffiliation='江西师范大学', location='数学会议室',
+                      timeUnknown=False, timeUnknownSource='auto')
+        self.assertEqual(len(S.cross_source_dedup([a, b])), 1)
+        index = {(S._normalize_speaker('杨健夫'), '2026-11-08'): [a]}
+        self.assertIs(S._cross_source_dup_with_existing(b, index), a)
 
 
 _ONE_HEAD = """<html><head><title>学术讲座</title></head><body>

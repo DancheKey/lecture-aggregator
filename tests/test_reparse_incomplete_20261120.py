@@ -109,7 +109,8 @@ class ReparseIncompleteTest(unittest.TestCase):
 
     # ── 字段补全 ──────────────────────────────────────────────────────────
     def test_02_补全缺失字段并纠正待定时间(self):
-        r = self.rec()
+        r = self.rec(lectureEnd='2026-10-20 09:00:00',
+                     timeUnknownSource='human')
         with patch.object(S, 'fetch', return_value='<html></html>') as f, \
              patch.object(S, 'parse_detail', return_value=self.new_fields()) as p:
             tried, filled = S.reparse_incomplete_records([r])
@@ -126,11 +127,25 @@ class ReparseIncompleteTest(unittest.TestCase):
         self.assertEqual(r['abstract'], '讲座内容')
         self.assertEqual(r['lectureStart'], '2026-10-20 15:00:00')
         self.assertFalse(r['timeUnknown'])
+        self.assertEqual(r['timeUnknownSource'], 'auto')
         self.assertEqual(r['images'], ['http://xz.scnu.edu.cn/poster.jpg'])
         self.assertEqual(r['imageParseMethod'], 'vlm')
         self.assertTrue(r['vlmExtracted'])
         self.assertEqual(self.read_ledger(),
                          {CKEY: datetime.date.today().isoformat()})
+
+    def test_02b_精确时间缺失结束时清除旧结束时间(self):
+        r = self.rec(lectureEnd='2026-10-20 09:00:00',
+                     timeUnknownSource='legacy')
+        new = self.new_fields(lectureEnd='')
+        with patch.object(S, 'fetch', return_value='<html></html>'), \
+             patch.object(S, 'parse_detail', return_value=new):
+            tried, filled = S.reparse_incomplete_records([r])
+        self.assertEqual((tried, filled), (1, 1))
+        self.assertEqual(r['lectureStart'], '2026-10-20 15:00:00')
+        self.assertIsNone(r['lectureEnd'])
+        self.assertIs(r['timeUnknown'], False)
+        self.assertEqual(r['timeUnknownSource'], 'auto')
 
     def test_03_只补缺失字段不覆盖已有精修值(self):
         r = self.rec(speaker='人工李四', speakerTitle='人工职称',

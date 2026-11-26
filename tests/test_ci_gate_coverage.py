@@ -29,6 +29,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WF_DIR = os.path.join(ROOT, '.github', 'workflows')
 TEST_YML = os.path.join(WF_DIR, 'test.yml')
 DEPLOY_YML = os.path.join(WF_DIR, 'deploy.yml')
+DAILY_YML = os.path.join(WF_DIR, 'daily.yml')
 TESTS_DIR = os.path.join(ROOT, 'tests')
 
 # 本测试自身必须在两侧清单里（它是防漂移的那一个）
@@ -67,6 +68,40 @@ def _gate_env_list():
             if m:
                 out.append(m.group(1).replace('\\', '/'))
     return out
+
+
+def _job_block(path, job):
+    """截取 jobs.<job> 块，沿用本测试的标准库行扫描，不引第三方 YAML。"""
+    with open(path, encoding='utf-8') as f:
+        lines = f.readlines()
+    start = next((i + 1 for i, line in enumerate(lines)
+                  if re.match(r'^  %s:[ \t]*(?:#.*)?$' % re.escape(job), line)), None)
+    if start is None:
+        return ''
+    out = []
+    for line in lines[start:]:
+        if line.strip() and len(line) - len(line.lstrip(' ')) <= 2:
+            break
+        out.append(line)
+    return ''.join(out)
+
+
+def _job_concurrency(path, job):
+    """返回指定 job 的 concurrency group 与 cancel-in-progress 字面值。"""
+    block = _job_block(path, job)
+    m = re.search(r'^    concurrency:[ \t]*$', block, re.M)
+    if not m:
+        return None, None
+    conf = []
+    for line in block[m.end():].splitlines():
+        if line.strip() and len(line) - len(line.lstrip(' ')) <= 4:
+            break
+        conf.append(line)
+    conf = '\n'.join(conf)
+    group = re.search(r'^[ \t]+group:[ \t]*([^\s#]+)', conf, re.M)
+    cancel = re.search(r'^[ \t]+cancel-in-progress:[ \t]*(true|false)\b', conf, re.M)
+    return (group.group(1) if group else None,
+            cancel.group(1) if cancel else None)
 
 
 def _all_test_files():
@@ -321,6 +356,56 @@ class CronDocConsistencyTest(unittest.TestCase):
                           f'页面文案写「{t}」与 daily.yml 推出的北京时间 {sorted(want)} 不符')
         for t in want:
             self.assertIn(t, found, f'页面文案缺少班次时刻 {t}')
+
+
+class PagesDeployContractTest(unittest.TestCase):
+    """锁住 Pages 发布快照与跨工作流互斥，防止 P0 部署竞态回归。"""
+
+    def test_53_daily_deploy固定检出抓取产物SHA(self):
+        scrape = _job_block(DAILY_YML, 'scrape')
+        self.assertIn('deploy_sha: ${{ steps.publish_sha.outputs.commit_sha }}', scrape)
+        self.assertIn('id: publish_sha', scrape)
+        self.assertIn('git rev-parse HEAD > "$RUNNER_TEMP/publish_sha"', scrape)
+        block = _job_block(DAILY_YML, 'deploy')
+        self.assertTrue(block, 'daily.yml 里找不到 deploy job')
+        steps = re.split(r'(?m)^      - ', block)[1:]
+        checkouts = [step for step in steps
+                     if re.search(r'(?m)^        uses:[ \t]*actions/checkout@', step)]
+        self.assertEqual(len(checkouts), 1,
+                         'daily deploy 必须且只能有一个 checkout，避免混入浮动 ref')
+        guards = [step for step in steps
+                  if 'run:' in step and 'needs.scrape.outputs.deploy_sha' in step
+                  and 'exit 1' in step]
+        self.assertEqual(len(guards), 1, 'daily deploy 必须在 checkout 前显式拒绝空发布 SHA')
+        self.assertIn('DEPLOY_SHA', guards[0])
+        self.assertLess(steps.index(guards[0]), steps.index(checkouts[0]),
+                        'SHA 非空守卫必须先于 checkout 执行')
+        self.assertRegex(
+            checkouts[0],
+            r"(?m)^[ \t]+ref:[ \t]*['\"]?\$\{\{[ \t]*needs\.scrape\.outputs\.deploy_sha(?:[ \t]*\|\|[ \t]*github\.sha)?[ \t]*\}\}['\"]?[ \t]*(?:#.*)?$",
+            'daily deploy 必须固定到 scrape 实际推送的 SHA；允许可选 github.sha 兜底，不得浮动 main')
+
+    def test_54_两个Pages部署共用并发组(self):
+        groups = {}
+        for name, path in (('daily', DAILY_YML), ('deploy', DEPLOY_YML)):
+            group, _ = _job_concurrency(path, 'deploy')
+            self.assertIsNotNone(group, f'{name}.yml 的 deploy job 未设置 job 级 concurrency')
+            groups[name] = group
+        self.assertEqual(groups['daily'], groups['deploy'],
+                         'daily.yml 与 deploy.yml 的 Pages 部署必须跨工作流互斥')
+        self.assertEqual(groups['daily'], 'pages-deploy',
+                         'Pages 发布应保留统一的 pages-deploy 并发组')
+
+    def test_55_两个Pages部署均不取消进行中的部署(self):
+        for name, path in (('daily', DAILY_YML), ('deploy', DEPLOY_YML)):
+            _, cancel = _job_concurrency(path, 'deploy')
+            self.assertEqual(cancel, 'false',
+                             f'{name}.yml 的 Pages deploy 必须设置 cancel-in-progress: false')
+
+    def test_56_告警闸门固定到同一数据快照(self):
+        block = _job_block(DAILY_YML, 'gate')
+        self.assertIn('ref: ${{ needs.scrape.outputs.deploy_sha || github.sha }}', block)
+        self.assertNotIn('ref: main', block)
 
 
 class RunnerImagePinTest(unittest.TestCase):

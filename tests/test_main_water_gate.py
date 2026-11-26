@@ -27,6 +27,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -207,6 +208,70 @@ class MainWaterGateTest(unittest.TestCase):
         last = self._read_last()
         self.assertEqual(last.get('last_scrape'), '2026-08-01T00:00:00+08:00',
                          '显式 --since 且全部源失败时，水位必须沿用传入值')
+
+    # ---------- ⑥ 致命错误必须以非零状态码退出 ----------
+    def test_09_未知源退出码为1(self):
+        self._patch_scrape_ledger_cfg()
+        self._patch_sources_cfg(self._two_sources())
+        with self.assertRaises(SystemExit) as cm:
+            self._run_main(['scraper.py', '--source', '不存在'])
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_10_损坏存量退出码为1(self):
+        self._patch_scrape_ledger_cfg()
+        self._patch_sources_cfg(self._two_sources())
+        p = os.path.join(self.data_dir, 'lectures.json')
+        with open(p, 'w', encoding='utf-8', newline='\n') as f:
+            f.write('{ invalid json')
+        with self.assertRaises(SystemExit) as cm:
+            self._run_main(['scraper.py'])
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_11_全库缩水退出码为1(self):
+        self._patch_scrape_ledger_cfg()
+        self._patch_sources_cfg(self._two_sources())
+        existing = []
+        for name in ('A学院', 'B学院'):
+            for _ in range(5):
+                existing.append({
+                    'sourceUrl': '%s/a.html' % name,
+                    'title': 'T', 'lectureStart': '2026-01-01 10:00:00',
+                    'college': name, 'campus': '石牌',
+                })
+        p = os.path.join(self.data_dir, 'lectures.json')
+        with open(p, 'w', encoding='utf-8', newline='\n') as f:
+            json.dump({'data': existing}, f, ensure_ascii=False)
+        self._stub_sources([('A学院', None), ('B学院', None)])
+        with self.assertRaises(SystemExit) as cm:
+            self._run_main(['scraper.py', '--full'])
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_12_局部全量归零退出码为1(self):
+        self._patch_scrape_ledger_cfg()
+        self._patch_sources_cfg(self._two_sources())
+        p = os.path.join(self.data_dir, 'lectures.json')
+        with open(p, 'w', encoding='utf-8', newline='\n') as f:
+            json.dump({'data': [{
+                'sourceUrl': 'A学院/a.html', 'title': 'T',
+                'lectureStart': '2026-01-01 10:00:00',
+                'college': 'A学院', 'campus': '石牌',
+            }]}, f, ensure_ascii=False)
+        self.s._process_source = lambda *a, **k: ({}, None)
+        with self.assertRaises(SystemExit) as cm:
+            self._run_main(['scraper.py', '--full', '--source', 'A学院'])
+        self.assertEqual(cm.exception.code, 1)
+
+
+class MainAbortSubprocessTest(unittest.TestCase):
+    def test_unknown_source_process_exit_code(self):
+        proc = subprocess.run(
+            [sys.executable, os.path.join(ROOT, 'scraper', 'scraper.py'),
+             '--source', '__不存在的源__'],
+            cwd=ROOT, capture_output=True, text=True, encoding='utf-8',
+            env=dict(os.environ, PYTHONIOENCODING='utf-8'), timeout=30,
+        )
+        self.assertEqual(proc.returncode, 1, proc.stderr)
+        self.assertIn('[ERROR]', proc.stderr)
 
 
 class MainWaterGateSourceShapeTest(unittest.TestCase):

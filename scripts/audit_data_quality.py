@@ -554,8 +554,8 @@ def scan(recs, excluded=None):
                 _s1 = get(_a, 'lectureStart') or ''
                 _s2 = get(_b, 'lectureStart') or ''
                 if (len(_s1) >= 16 and len(_s2) >= 16
-                        and _s1[11:16] not in ('00:00', '08:00')
-                        and _s2[11:16] not in ('00:00', '08:00')
+                        and not _fv.is_placeholder_time(_a)
+                        and not _fv.is_placeholder_time(_b)
                         and _s1[:16] != _s2[:16]):
                     continue
                 issues.append(('重复', 'sourceUrl', '高',

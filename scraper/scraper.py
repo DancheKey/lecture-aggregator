@@ -594,21 +594,46 @@ def _same_org(a, b):
     return bool(oa) and bool(ob) and oa == ob
 
 
-def _is_placeholder_time(t):
-    """时刻是否为「弱时间」：占位值（00:00 / 08:00）或只有日期没有时刻。
-
-    弱时间不能作为「开始时间精确到分」的强信号：两条同为弱时间的记录
-    只说明「同一天」，可能是同一天的两场不同讲座。
-
-    2026-09-10 补强：原判据只覆盖 00:00/08:00，漏了「仅日期、无时刻」——
-    此时 str(t)[11:16] 为空串，比 00:00 更弱的时间反倒被当成强信号。
-    完整时间戳形如 'YYYY-MM-DD HH:MM:SS'（长 19），故长度 < 16 即视为无完整时刻。
-    """
-    s = str(t or '')
-    return len(s) < 16 or s[11:16] in ('00:00', '08:00')
+def _has_exact_time_conflict(a, b):
+    """同日两场讲座的硬否决：双方时刻精确到分且不同。"""
+    ta = (a.get('lectureStart') or '')[:16]
+    tb = (b.get('lectureStart') or '')[:16]
+    return (len(ta) == 16 and len(tb) == 16
+            and ta[:10] == tb[:10]
+            and ta[11:16] != tb[11:16]
+            and not field_vocab.is_placeholder_time(a)
+            and not field_vocab.is_placeholder_time(b))
 
 
-def cross_source_dedup(records):
+def _upgrade_time_fields(primary, others):
+    """占位主记录采纳精确时间；四个时间字段整体更新且重复调用幂等。"""
+    if not field_vocab.is_placeholder_time(primary):
+        return False
+    for other in others:
+        if field_vocab.is_placeholder_time(other):
+            continue
+        start = other.get('lectureStart')
+        if not start:
+            continue
+        end = other.get('lectureEnd')
+        old_start = primary.get('lectureStart')
+        old_end = primary.get('lectureEnd')
+        old_unknown = primary.get('timeUnknown')
+        old_source = primary.get('timeUnknownSource')
+        primary['lectureStart'] = start
+        primary['lectureEnd'] = end if end and end > start else None
+        primary['timeUnknown'] = False
+        primary['timeUnknownSource'] = other.get('timeUnknownSource')
+        print('[TIME-UPGRADE] url=%s start=%s->%s end=%s->%s '
+              'timeUnknown=%s->False source=%s->%s evidence=%s'
+              % (primary.get('sourceUrl') or '', old_start, start, old_end,
+                 primary['lectureEnd'], old_unknown, old_source,
+                 primary['timeUnknownSource'], other.get('sourceUrl') or ''))
+        return True
+    return False
+
+
+def cross_source_dedup(records, preferred_primary_keys=None):
     """跨源去重：不同学院发布的同一讲座合并为一条。
 
     判定规则（三层）：
@@ -620,6 +645,7 @@ def cross_source_dedup(records):
 
     合并策略：
       - 保留字段更完整的记录作为主记录（primary）
+      - preferred_primary_keys 命中时保留存量 merged 身份，避免计数键随重选漂移
       - 其他记录变为 sources 数组中的条目：{sourceUrl, college, campus, title}
       - 主记录设置 merged=True, sourceCount=len(sources)+1（含自身）
 
@@ -634,6 +660,7 @@ def cross_source_dedup(records):
       题目相似度不足而漏合并留下重复），且主记录优先选「listTitle 期号与自身场次
       匹配」的那条（即该页正是讲这期），使每讲归属其当期页、标题正确；不标记 merged。
     """
+    preferred_primary_keys = set(preferred_primary_keys or ())
     _CN_NUM = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7,
                '八': 8, '九': 9, '十': 10, '零': 0, '两': 2}
 
@@ -682,6 +709,7 @@ def cross_source_dedup(records):
         n = len(group)
         # union-find 简化版：parent[i]=i 表示独立，否则指向主记录索引
         parent = list(range(n))
+        cluster_members = {i: [i] for i in range(n)}
 
         def find(x):
             while parent[x] != x:
@@ -691,8 +719,14 @@ def cross_source_dedup(records):
 
         def union(a, b):
             ra, rb = find(a), find(b)
-            if ra != rb:
-                parent[rb] = ra
+            if ra == rb:
+                return
+            # 簇级否决防止占位时刻把两场精确时间不同的讲座桥接起来。
+            if any(_has_exact_time_conflict(group[x], group[y])
+                   for x in cluster_members[ra] for y in cluster_members[rb]):
+                return
+            parent[rb] = ra
+            cluster_members[ra].extend(cluster_members.pop(rb))
 
         for i in range(n):
             for j in range(i + 1, n):
@@ -701,6 +735,9 @@ def cross_source_dedup(records):
                 ri, rj = group[i], group[j]
                 # 不同源才考虑合并（同源重复已由 dedup 处理）
                 if ri.get('sourceUrl', '').rstrip('/') == rj.get('sourceUrl', '').rstrip('/'):
+                    continue
+                # 精确时间冲突先于所有合并信号，避免同日两场讲座被误并。
+                if _has_exact_time_conflict(ri, rj):
                     continue
                 # 同单位（同学院）系列分期：同一张系列海报分期发布，同主讲同日、
                 # 且题目足够相似（≥0.25）才视为同一报告的系列预告/更新而合并。
@@ -772,7 +809,8 @@ def cross_source_dedup(records):
                 t16_a = (ri.get('lectureStart') or '')[:16]
                 t16_b = (rj.get('lectureStart') or '')[:16]
                 if (t16_a and t16_a == t16_b
-                        and not _is_placeholder_time(ri.get('lectureStart'))
+                        and not field_vocab.is_placeholder_time(ri)
+                        and not field_vocab.is_placeholder_time(rj)
                         and _same_org(ri, rj)):
                     union(i, j)
 
@@ -807,12 +845,21 @@ def cross_source_dedup(records):
                     score += 5
                 return score
 
-            primary_idx = max(members, key=lambda idx: (
+            def _identity(r):
+                return (_norm_url(r.get('sourceUrl')), r.get('lectureIndex'))
+
+            preferred_members = [
+                idx for idx in members
+                if _identity(group[idx]) in preferred_primary_keys
+            ]
+            primary_idx = max(preferred_members or members, key=lambda idx: (
                 _primary_score(group[idx]),
                 len(group[idx].get('abstract') or ''),
                 len(group[idx].get('speakerBio') or ''),
             ))
             primary = group[primary_idx]
+            _upgrade_time_fields(
+                primary, [group[idx] for idx in members if idx != primary_idx])
 
             primary_college = primary.get('college', '')
             seen_colleges = set()
@@ -1275,7 +1322,7 @@ def reparse_incomplete_records(out):
             # imageParseMethod=vlm 筛重处理集合时仍会漏掉刚修好的记录。
             changed = False
             for k in ('speaker', 'speakerTitle', 'speakerAffiliation', 'speakerBio',
-                      'location', 'lectureEnd', 'abstract', 'images',
+                      'location', 'abstract', 'images',
                       'imageParseMethod', 'vlmExtracted'):
                 if _missing(r.get(k)) and not _missing(new.get(k)):
                     r[k] = new[k]
@@ -1285,11 +1332,20 @@ def reparse_incomplete_records(out):
                     # 避免 speakerBio 已补、标记仍说没用 VLM 的自相矛盾。
                     r[k] = new[k]
                     changed = True
-            # 时间：只有「待定/00:00」占位时才用重解析的精确钟点替换
-            if r.get('timeUnknown') and new.get('lectureStart') and not new.get('timeUnknown'):
-                r['lectureStart'] = new['lectureStart']
+            # 时间四字段必须一起更新，避免新 start 配旧 end 造成倒挂。
+            new_start = new.get('lectureStart')
+            if r.get('timeUnknown') and new_start and not new.get('timeUnknown'):
+                new_end = new.get('lectureEnd')
+                r['lectureStart'] = new_start
+                r['lectureEnd'] = new_end if new_end and new_end > new_start else None
                 r['timeUnknown'] = False
+                r['timeUnknownSource'] = 'auto'
                 changed = True
+            elif not r.get('timeUnknown') and _missing(r.get('lectureEnd')):
+                new_end = new.get('lectureEnd')
+                if new_end and (not r.get('lectureStart') or new_end > r['lectureStart']):
+                    r['lectureEnd'] = new_end
+                    changed = True
             if changed:
                 filled += 1
                 print(f'[REPARSE] 补全 {url} | speaker={r.get("speaker")} '
@@ -1465,6 +1521,8 @@ def _cross_source_dup_with_existing(rec, existing_index, no_speaker_index=None):
         for r2 in rivals:
             if _norm_url(r2.get('sourceUrl')) == u1:
                 continue  # 同 URL 由 seen 处理，不在此判
+            if _has_exact_time_conflict(rec, r2):
+                continue
             if rec.get('college', '') and rec.get('college') == r2.get('college'):
                 # 同单位系列分期强信号：同主讲、同日、同 lectureIndex 才强制视为重复
                 #（与 cross_source_dedup 一致；同单位同日也可能是两场不同讲座，
@@ -1490,7 +1548,8 @@ def _cross_source_dup_with_existing(rec, existing_index, no_speaker_index=None):
             t16_a = (rec.get('lectureStart') or '')[:16]
             t16_b = (r2.get('lectureStart') or '')[:16]
             if (t16_a and t16_a == t16_b
-                    and not _is_placeholder_time(rec.get('lectureStart'))
+                    and not field_vocab.is_placeholder_time(rec)
+                    and not field_vocab.is_placeholder_time(r2)
                     and _same_org(rec, r2)):
                 return r2
         return None
@@ -1527,6 +1586,7 @@ def _merge_record_into(r_new, r_primary):
     不翻转 primary）：
       - 用 r_new 的非空字段补全 r_primary 的空字段（含 location：主记录已有则不覆盖，
         杜绝 B 的错误地点污染 A 的正确地点——用户/Mimo 铁律）；
+      - r_primary 为占位时间时，在幂等守卫前原子采纳 r_new 的精确时间；
       - r_new 的 {sourceUrl,college,campus,title} 追加进 r_primary['sources']；
       - 标记 merged=True, sourceCount=len(sources)+1。
     幂等守卫：若 r_primary['sources'] 已含 r_new 的 sourceUrl，则跳过（每日增量会
@@ -1536,6 +1596,7 @@ def _merge_record_into(r_new, r_primary):
     """
     new_url = (r_new.get('sourceUrl') or '').rstrip('/')
     sources = r_primary.get('sources') or []
+    _upgrade_time_fields(r_primary, [r_new])
     # 幂等守卫：sources 已含该 URL → 已融合过，跳过（不重复补全/追加）
     if any((s.get('sourceUrl') or '').rstrip('/') == new_url for s in sources):
         return
@@ -1675,12 +1736,7 @@ def _strict_dup_pair(a, b):
         return False
     if _topic_similarity(ta, tb) < 0.9:
         return False
-    s1 = a.get('lectureStart') or ''
-    s2 = b.get('lectureStart') or ''
-    if (len(s1) >= 16 and len(s2) >= 16
-            and s1[11:16] not in ('00:00', '08:00')
-            and s2[11:16] not in ('00:00', '08:00')
-            and s1[:16] != s2[:16]):
+    if _has_exact_time_conflict(a, b):
         return False
     return True
 
@@ -1722,10 +1778,10 @@ def _heal_base_dups(base_map, existing_index):
                     # 「时间待定」那条即使 bio/单位更全也不该当主——它只能提供
                     # 字段补全），其次比字段完整度。实测：6966 有 bio+单位+职称，
                     # 若只比完整度会把 14:15 精确时间换成 00:00 待定，属于倒退。
-                    if _is_placeholder_time(a.get('lectureStart')) != \
-                            _is_placeholder_time(b.get('lectureStart')):
-                        primary, other = (a, b) if not _is_placeholder_time(
-                            a.get('lectureStart')) else (b, a)
+                    a_placeholder = field_vocab.is_placeholder_time(a)
+                    b_placeholder = field_vocab.is_placeholder_time(b)
+                    if a_placeholder != b_placeholder:
+                        primary, other = (b, a) if a_placeholder else (a, b)
                     elif _completeness(a) >= _completeness(b):
                         primary, other = a, b
                     else:
@@ -2398,7 +2454,7 @@ def main():
             before_snapshot = json.dumps(existing, ensure_ascii=False, sort_keys=True)
         except Exception as e:
             print(f'[ABORT] 读取 data/lectures.json 失败：{e}。为避免覆盖丢失数据，已中止。', file=sys.stderr)
-            return
+            raise SystemExit(1)
     # 已抓 URL 集合：(sourceUrl, lectureIndex) 元组。
     # ⚠ 第一项存的是 **归一化键**（_canon_url_key），不是原 URL：同一篇文章的
     #   两种 URL 形态（em 旧 / module 新）须命中同一键，否则增量轮会把已入库的
@@ -2447,7 +2503,7 @@ def main():
         sources = [s for s in sources if s.get('name') == args.source]
         if not sources:
             print(f'[ERROR] 未找到信息源「{args.source}」', file=sys.stderr)
-            return
+            raise SystemExit(1)
 
     # ---- 2026-10-10 改造 1：新源强制全量 -------------------------------------
     # 场景：某学院官网改版/迁移 → 加了新地址进来。此时该源在库里**一条历史都
@@ -2562,14 +2618,14 @@ def main():
     if not args.out and not is_incremental:
         raw = _protect_sources_from_shrink(raw, existing, abort_single=args.source)
         if raw is None:          # --source 目标源产出 0 条 → 中止整轮（保持既有语义）
-            return
+            raise SystemExit(1)
         # 总量兜底：existing 加载失败时 json.load 异常会被吞掉 → existing=[]，
         # 用（近乎）空的产出覆盖全库。--source 模式早有此闸门，全库模式同样需要。
         if existing and len(raw) < len(existing) * 0.5:
             print(f'[ABORT] 全库产出 {len(raw)} 条 < 现有 {len(existing)} 条的 50%，'
                   f'疑似现有数据未正确加载或大面积抓取失败，拒绝覆盖 data/lectures.json。',
                   file=sys.stderr)
-            return
+            raise SystemExit(1)
     # 2026-09-27 二轮审计 P0-2：增量（含 --source 局部增量）一律走
     # incremental_merge——prefill 已含全部 existing，--source 只是缩小抓取范围；
     # 走全量分支会对整库跑 cross_source_dedup/_multi_round_replace，违反承诺。
@@ -2663,7 +2719,9 @@ def main():
         # 必须在 incremental_merge 之后（基底已定型）、sort/写盘之前（改动能被快照捕获）。
         reparse_incomplete_records(out)
     else:
-        out = dedup(raw)
+        # 人工标注必须先恢复，后续同源/跨源去重才看得到并参与时间取舍。
+        out = restore_human_time_annotations(raw, existing)
+        out = dedup(out)
         # 多轮通知识别：同学院+同讲座日+去轮次标题 的多条记录只保留 publishTime 最晚的
         # 一条（最新一轮），避免「第一轮/第二轮」并存。须在 cross_source_dedup 之前，
         # 否则两轮同主讲会被合并/保留旧轮。
@@ -2671,10 +2729,13 @@ def main():
         # 跨源去重：不同学院发布的同一讲座合并为一条（同主讲+同日期+topic相似）。
         # --out 模式由各源独立写出、最后由驱动脚本统一合并，故此处跳过跨源去重避免重复。
         if not args.out:
-            out = cross_source_dedup(out)
-        # 全量从空 dict 重建，人工标注不会自己跟过来 → 显式合并回盘上的人工判断。
-        # 增量分支以 existing 为基底，天然带着，不需要也不应该走这里。
-        out = restore_human_time_annotations(out, existing)
+            preferred_primary_keys = {
+                (_norm_url(r.get('sourceUrl')), r.get('lectureIndex'))
+                for r in existing
+                if r.get('merged') and r.get('sourceUrl')
+            }
+            out = cross_source_dedup(
+                out, preferred_primary_keys=preferred_primary_keys)
     out.sort(key=lambda x: x.get('lectureStart') or '', reverse=True)
     # 用北京时间（Asia/Shanghai）记录更新时间，避免 GitHub Runner 默认 UTC 导致日期差一天
     try:
