@@ -234,5 +234,41 @@ class TestNoMarkerInvertedIntervalFixed(unittest.TestCase):
                                             f'{h0}:00-{h1}:00 倒挂')
 
 
+class TestMalformedDayRecovery(unittest.TestCase):
+    def test_extra_day_digit_recovers_with_weekday(self):
+        r = parse_cn_time('【时间】2026年11月614日（周六）18:30-20:30', 2026)
+        self.assertIsNotNone(r)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d %H:%M'), '2026-11-14 18:30')
+        self.assertEqual(r['end'].strftime('%Y-%m-%d %H:%M'), '2026-11-14 20:30')
+        self.assertTrue(r['has_time'])
+
+    def test_unique_calendar_candidate_recovers_without_weekday(self):
+        r = parse_cn_time('时间：2026年11月614日18:30-20:30', 2026)
+        self.assertIsNotNone(r)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2026-11-14')
+
+    def test_weekday_disambiguates_multiple_calendar_candidates(self):
+        r = parse_cn_time('时间：2026年11月114日（周六）18:30-20:30', 2026)
+        self.assertIsNotNone(r)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2026-11-14')
+
+    def test_ambiguous_calendar_candidates_without_weekday_not_guessed(self):
+        self.assertIsNone(parse_cn_time('时间：2026年11月114日18:30', 2026))
+
+    def test_later_weekday_not_used_to_disambiguate(self):
+        self.assertIsNone(parse_cn_time('时间：2026年11月114日18:30，本周六有活动', 2026))
+
+    def test_mismatched_weekday_rejects_recovery(self):
+        self.assertIsNone(parse_cn_time('时间：2026年11月614日（周五）18:30', 2026))
+
+    def test_invalid_calendar_candidate_not_recovered(self):
+        self.assertIsNone(parse_cn_time('时间：2026年2月399日18:30', 2026))
+
+    def test_normal_chinese_date_unchanged(self):
+        r = parse_cn_time('时间：2026年11月14日（周六）18:30-20:30', 2026)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d %H:%M'), '2026-11-14 18:30')
+        self.assertEqual(r['end'].strftime('%Y-%m-%d %H:%M'), '2026-11-14 20:30')
+
+
 if __name__ == '__main__':
     unittest.main()

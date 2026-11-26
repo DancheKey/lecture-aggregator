@@ -291,6 +291,29 @@ def _attach_range_end(r, seg, y):
     return r
 
 
+def _cn_date_with_malformed_day(m, seg):
+    """日数字多一位时，仅在合法日期唯一或与星期几一致时恢复。"""
+    day_text = m.group(3)
+    if len(day_text) <= 2:
+        return _build(m, seg, m.group(1), m.group(2), day_text)
+    candidates = {}
+    weekday = re.match(r'[（(\[【]?(?:星期|周)([一二三四五六日天])', seg[m.end():])
+    expected = None
+    if weekday:
+        expected = '一二三四五六日'.find(weekday.group(1))
+        if expected == -1:
+            expected = 6
+    for drop in range(len(day_text)):
+        day = day_text[:drop] + day_text[drop + 1:]
+        result = _build(m, seg, m.group(1), m.group(2), day)
+        if not result:
+            continue
+        if expected is not None and result['start'].weekday() != expected:
+            continue
+        candidates[result['start'].date()] = result
+    return next(iter(candidates.values())) if len(candidates) == 1 else None
+
+
 def _parse_segment(seg, default_year, publish_time):
     """在单段文本里找第一个日期。完整日期用其显式年；仅月日用 default_year 补年。
 
@@ -303,9 +326,10 @@ def _parse_segment(seg, default_year, publish_time):
     y = default_year
 
     # 1) 完整中文日期（含中文年）：最可靠，优先使用显式年份。
-    m = re.search(r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]', seg)
+    m = re.search(
+        r'(?<!\d)(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,3})(?!\d)\s*[日号]', seg)
     if m:
-        r = _build(m, seg, m.group(1), m.group(2), m.group(3))
+        r = _cn_date_with_malformed_day(m, seg)
         if not r:
             return None
         r['from_full'] = True

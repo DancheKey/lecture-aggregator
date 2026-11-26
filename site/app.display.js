@@ -291,7 +291,9 @@ Object.assign(APP_METHODS, {
       return '';
     },
     cleanFooter(s) {
-      return String(s == null ? '' : s).replace(/(Copyright|版权所有|备案|ICP|All Rights Reserved|Reserved)[\s\S]*/i, '').trim();
+      return String(s == null ? '' : s)
+        .replace(/(Copyright|版权所有|备案号|ICP\s*[备证]?\s*\d{3,}|All Rights Reserved|Reserved)[\s\S]*/i, '')
+        .trim();
     },
     // 安全渲染 abstract 字段（已将内部技术标记过滤，可安全展示）
     abstractOf(l) {

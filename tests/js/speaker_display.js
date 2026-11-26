@@ -94,9 +94,18 @@ ok(/isMultiSpeaker\(l\)/.test(INDEX_HTML) && /' 等'/.test(INDEX_HTML),
   'S3b 主讲主行「等」前空格三元在位（无单位时补空格）');
 ok(/speakerDisplayName\(r\)/.test(INDEX_HTML), 'S3c 论坛场次清单用 speakerDisplayName(r)');
 
+// ---- S4 简介页脚清理 ----
+const cicpaBio = '卢志凌,大信会计师事务所广州分所IT审计负责人,中国注册会计师(CICPA)、'
+  + '注册信息系统审计师(CISA)、国际注册内部审计师(CIA),曾任职于普华永道、德勤。';
+ok(M.cleanFooter(cicpaBio) === cicpaBio, 'S4a 简介中的 CICPA/CISA/CIA 不被 ICP 规则截断');
+ok(M.cleanFooter('简介正文。ICP备20260001号 版权所有') === '简介正文。',
+  'S4b 真实 ICP 备案号及版权页脚仍被清理');
+ok(M.cleanFooter('简介正文。ICP 12345') === '简介正文。', 'S4c 空格分隔的 ICP 编号仍被清理');
+ok(M.cleanFooter(null) === '', 'S4d 空简介不抛异常');
+
 if (errs.length) {
   errs.forEach(e => console.error('  ✗ ' + e));
   console.error('speaker_display: ' + errs.length + ' 项失败');
   process.exit(1);
 }
-console.log('speaker_display: 单讲者原样 / 多讲者取首+等 / 空格规则 / 模板接线 全部 pass');
+console.log('speaker_display: 单讲者原样 / 多讲者取首+等 / 空格规则 / 模板接线 / 简介页脚清理 全部 pass');

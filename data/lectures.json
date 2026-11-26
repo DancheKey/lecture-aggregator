@@ -2324,7 +2324,7 @@
       "campus": "大学城",
       "title": "寰宇问道·名师讲座 第12期",
       "topic": "从工作流到协同流:以AI重塑企业人才发展与组织进化",
-      "lectureStart": "2026-11-10 10:16:00",
+      "lectureStart": "2026-11-14 18:30:00",
       "lectureEnd": "2026-11-14 20:30:00",
       "location": "大学城校园文三栋407室",
       "speaker": "马一鸣",
@@ -2350,11 +2350,13 @@
         "topic": "从工作流到协同流:以AI重塑企业人才发展与组织进化",
         "title": "寰宇问道·名师讲座 第12期"
       },
-      "llmAdopted": "speakerTitle|speakerAffiliation|lectureStart|lectureEnd",
+      "llmAdopted": "speakerTitle|speakerAffiliation",
       "qaGate": "topic|abstract:emptied",
       "timeUnknownSource": "auto",
-      "timeUnknown": true,
-      "listTitle": "● 寰宇问道·名师讲座 第12期"
+      "timeUnknown": false,
+      "listTitle": "● 寰宇问道·名师讲座 第12期",
+      "timeConfidence": "high",
+      "timeNote": "authoritative-label"
     },
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261110/8886.html",
