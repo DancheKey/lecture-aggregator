@@ -8,25 +8,6 @@ X-WR-TIMEZONE:Asia/Shanghai
 X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
-UID:https://em.scnu.edu.cn/a/20261126/11260.html@danchekey.github.io
-DTSTAMP:20261126T082449Z
-DTSTART:20261126T073000Z
-DTEND:20261126T083000Z
-SUMMARY:华师经管学术讲座第557期（管理）｜中国科创债券
- 的发行定价之谜——基于债券市场"科技板"的证据
-LOCATION:大学城校园文二栋301会议室
-DESCRIPTION:题目：中国科创债券的发行定价之谜——基于
- 债券市场"科技板"的证据\n主讲：张凯亮（暨南大学）\n
- 地点：大学城校园文二栋301会议室\n主办：经济与管理
- 学院
-URL:https://em.scnu.edu.cn/a/20261126/11260.html
-BEGIN:VALARM
-TRIGGER:-PT30M
-ACTION:DISPLAY
-DESCRIPTION:讲座即将开始
-END:VALARM
-END:VEVENT
-BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261125/13442.html@danchekey.github.io
 DTSTAMP:20261126T082449Z
 DTSTART:20261127T020000Z
