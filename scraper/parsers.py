@@ -5537,7 +5537,12 @@ def _resolve_time_init_result(soup, content_div, url, title, list_title,
                 partial['vlmExtracted'] = True
                 partial['imageParseMethod'] = 'vlm'
                 partial['hasPosterImage'] = True
-                partial['splitMode'] = 'vlm-poster'
+                # 2026-11-27：VLM 单场列表结果不得留拆分标记。此前无条件写
+                # 'vlm-poster'，单场海报（aoe/2812）以 isMultiLecture=False +
+                # splitMode 残留入库，命中门禁8「单场页不得带 splitMode」。
+                # splitMode 只描述「同一页拆成多场」，单场结果与普通单场页同构。
+                if len(applied) > 1:
+                    partial['splitMode'] = 'vlm-poster'
                 # 题目单字互校（同单场分支，2026-10-25 方案A）：各场 topic 与
                 # 源页 title 属抄写关系时以源页文本校正形近字。
                 if poster_only and partial.get('topic'):

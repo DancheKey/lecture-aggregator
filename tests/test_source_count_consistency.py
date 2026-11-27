@@ -24,7 +24,10 @@
   ③ D 类：合并去重按 URL——同一学院两个不同 URL 的来源都要保留，
      同一 URL 重复出现只算一次；
   ④ A/D 类存量：主库不得存在「sources 内重复 URL」或「merged 记录
-     sourceCount != 1 + len(唯一 sources URL)」。
+     sourceCount != 1 + len(唯一 sources URL)」；
+  ⑤ 2026-11-27 新增：VLM 单场海报结果不得残留 splitMode（多场仍须保留）。
+     aoe/2812 曾以 isMultiLecture=False + splitMode='vlm-poster' 命中本套件
+     的单场页红线，使 daily 门禁8 失败、整班数据不上线。
 
 运行：python tests/test_source_count_consistency.py
 """
@@ -33,6 +36,7 @@ import json
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
@@ -163,6 +167,66 @@ class SingleFallbackTest(unittest.TestCase):
                       '单场回退分支缺少 sourceCount 补漏（回归 2026-10-08 缺陷）')
         self.assertIn("kept[0].pop('splitMode', None)", block,
                       '单场回退分支缺少 splitMode 清理（回归 2026-10-08 缺陷）')
+
+
+class VlmSingleSplitModeTest(unittest.TestCase):
+    """⑤ VLM 出口的单/多场 splitMode 语义（2026-11-27 门禁8 失败根因）。
+
+    与上面 C 类的 MS5 回退不同，本类是**另一条活路径**：VLM 返回 list 时，
+    单元素列表也是一次「读图提取」，不是「拆页」。单场结果必须与普通单场页
+    同构——不得带 splitMode；多场结果仍要保留 'vlm-poster' 供统计分桶。
+    用真实海报 fixture + 桩 VLM 返回做端到端断言，不查源码字符串。
+    """
+
+    FIXTURE = os.path.join(ROOT, 'tests', 'fixtures', 'html', 'xz377.html')
+    URL = 'http://xz.scnu.edu.cn/a/20261103/377.html'
+    LIST_TITLE = '土地与歌 中国民歌的地域风格'
+
+    @staticmethod
+    def _vlm_field(topic, start):
+        return {
+            'sessionNumber': '', 'title': '', 'topic': topic,
+            'speaker': '万钟如', 'speakerTitle': '',
+            'speakerAffiliation': '华师音乐学院',
+            'lectureStart': start, 'lectureEnd': '', 'location': '',
+            'abstract': '', 'speakerBio': '',
+        }
+
+    def _parse(self, fields):
+        with open(self.FIXTURE, encoding='utf-8') as f:
+            html = f.read()
+        with patch.object(P, '_img_to_text', return_value=''), \
+                patch.object(P, '_vlm_extract_fields', return_value=fields):
+            out = P.parse_detail(html, self.URL, '行知书院', '汕尾校区',
+                                 default_year=2026, list_title=self.LIST_TITLE)
+        return out if isinstance(out, list) else [out]
+
+    def test_01_单场VLM不得带splitMode(self):
+        """aoe/2812 根因：单元素 VLM 列表结果不得残留拆分标记。"""
+        recs = self._parse([self._vlm_field(self.LIST_TITLE,
+                                            '2026-11-20 14:00:00')])
+        self.assertEqual(len(recs), 1)
+        r = recs[0]
+        self.assertFalse(r.get('isMultiLecture'))
+        self.assertNotIn(
+            'splitMode', r,
+            'VLM 单场结果残留 splitMode 会让单场页混进多场拆分统计桶，'
+            '并直接触发门禁8「单场页不得带 splitMode」（aoe/2812 实测）')
+        # 反向锁：不能为了清标记把 VLM 身份字段一起删掉
+        self.assertTrue(r.get('vlmExtracted'))
+        self.assertEqual(r.get('imageParseMethod'), 'vlm')
+        self.assertTrue(r.get('hasPosterImage'))
+
+    def test_02_多场VLM仍须保留splitMode(self):
+        """反例：真多场海报必须继续写 'vlm-poster'，防止一刀切删除。"""
+        recs = self._parse([
+            self._vlm_field('民歌地域风格', '2026-11-20 14:00:00'),
+            self._vlm_field('民歌传承', '2026-11-21 15:00:00'),
+        ])
+        self.assertEqual(len(recs), 2)
+        for r in recs:
+            self.assertTrue(r.get('isMultiLecture'))
+            self.assertEqual(r.get('splitMode'), 'vlm-poster')
 
 
 class MergeDedupByUrlTest(unittest.TestCase):
