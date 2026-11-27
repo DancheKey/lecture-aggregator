@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-27T00:48:16+00:00",
+  "updatedAt": "2026-11-27T11:22:34+00:00",
   "ttlDays": 180,
   "note": "被拒 URL 台账：抓过且判定不入库（新闻报道/回溯稿/历史旧讲座）的详情页，增量轮 fetch 前直接跳过，避免每轮重复抓取。SCNU_LEDGER_SKIP=0 可临时关闭。",
   "entries": {
@@ -438,6 +438,46 @@
       "v": "rejected",
       "d": "2026-06-11",
       "t": "2026-11-20"
+    },
+    "http://aoe.scnu.edu.cn/a/20261127/2808.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
+    },
+    "http://aoe.scnu.edu.cn/a/20261127/2809.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
+    },
+    "http://aoe.scnu.edu.cn/a/20261127/2810.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
+    },
+    "http://aoe.scnu.edu.cn/a/20261127/2811.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
+    },
+    "http://aoe.scnu.edu.cn/a/20261127/2813.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
+    },
+    "http://aoe.scnu.edu.cn/a/20261127/2814.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
+    },
+    "http://aoe.scnu.edu.cn/a/20261127/2815.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
+    },
+    "http://aoe.scnu.edu.cn/a/20261127/2816.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
     },
     "http://aol.scnu.edu.cn/a/20251203/1385.html": {
       "v": "old",
@@ -1704,6 +1744,11 @@
       "d": "2026-11-06",
       "t": "2026-11-09"
     },
+    "http://life.scnu.edu.cn/a/20261111/6868.html": {
+      "v": "old",
+      "d": "",
+      "t": "2026-11-27"
+    },
     "http://life.scnu.edu.cn/a/20261118/6850.html": {
       "v": "rejected",
       "d": "2026-11-13",
@@ -1713,6 +1758,11 @@
       "v": "rejected",
       "d": "2026-10-28",
       "t": "2026-11-20"
+    },
+    "http://life.scnu.edu.cn/a/20261127/6867.html": {
+      "v": "rejected",
+      "d": "2026-11-11",
+      "t": "2026-11-27"
     },
     "http://lswh.scnu.edu.cn/a/20141124/5.html": {
       "v": "old",
@@ -2343,6 +2393,11 @@
       "v": "rejected",
       "d": "2026-11-16",
       "t": "2026-11-16"
+    },
+    "http://wxy.scnu.edu.cn/keyanxinxi/xueshuhuodong/2026/1127/4178.html": {
+      "v": "rejected",
+      "d": "2026-11-27",
+      "t": "2026-11-27"
     },
     "http://xz.scnu.edu.cn/a/20261009/371.html": {
       "v": "rejected",

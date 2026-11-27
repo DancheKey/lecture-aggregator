@@ -5,13 +5,13 @@
     <link>https://danchekey.github.io/lecture-aggregator/</link>
     <description>汇集华南师范大学各学院与部处的学术讲座，自动抓取 53 个信息源，每天更新。</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 27 Nov 2026 08:48:16 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 27 Nov 2026 19:22:34 +0800</lastBuildDate>
     <atom:link href="https://danchekey.github.io/lecture-aggregator/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
       <title>勷勤数学•专家报告-黄皓｜Extremal Kt-intersecting graph families for large t</title>
       <link>http://maths.scnu.edu.cn/a/20261130/8912.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261130/8912.html</guid>
-      <pubDate>Fri, 27 Nov 2026 08:05:41 +0800</pubDate>
+      <pubDate>Fri, 27 Nov 2026 18:39:59 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Extremal Kt-intersecting graph families for large t
 主讲：黄皓（新加坡国立大学）
@@ -22,7 +22,7 @@
       <title>勷勤数学•领军学者报告-吴河辉｜The Product of Intersecting Families</title>
       <link>http://maths.scnu.edu.cn/a/20261130/8913.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261130/8913.html</guid>
-      <pubDate>Fri, 27 Nov 2026 08:19:12 +0800</pubDate>
+      <pubDate>Fri, 27 Nov 2026 18:53:30 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：The Product of Intersecting Families
 主讲：吴河辉（复旦大学）
@@ -55,7 +55,7 @@
       <title>勷勤数学•专家报告-张文鹏｜A certain mean values involving Cochrane sums and their identities</title>
       <link>http://maths.scnu.edu.cn/a/20261203/8906.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261203/8906.html</guid>
-      <pubDate>Fri, 27 Nov 2026 08:18:50 +0800</pubDate>
+      <pubDate>Fri, 27 Nov 2026 18:53:08 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：A certain mean values involving Cochrane sums and their identities
 主讲：张文鹏（西北大学）
@@ -66,10 +66,43 @@
       <title>勷勤数学•领军学者报告-吕广世｜The Product of Intersecting FamiliesOn the Hardy-Littlewood-Chowla conjecture</title>
       <link>http://maths.scnu.edu.cn/a/20261205/8915.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261205/8915.html</guid>
-      <pubDate>Fri, 27 Nov 2026 08:11:09 +0800</pubDate>
+      <pubDate>Fri, 27 Nov 2026 18:45:27 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：The Product of Intersecting FamiliesOn the Hardy-Littlewood-Chowla conjecture
 主讲：吕广世（山东大学）
+地点：数科院东楼401
+主办：数学科学学院</description>
+    </item>
+    <item>
+      <title>勷勤数学•专家报告-吴楚芬｜Sharp minimal wave speed in a nonlocal lattice nutrient-prey-predator system with nutrient recycling and mixotrophy</title>
+      <link>http://maths.scnu.edu.cn/a/20261205/8917.html</link>
+      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261205/8917.html</guid>
+      <pubDate>Fri, 27 Nov 2026 18:47:37 +0800</pubDate>
+      <category>数学科学学院</category>
+      <description>题目：Sharp minimal wave speed in a nonlocal lattice nutrient-prey-predator system with nutrient recycling and mixotrophy
+主讲：吴楚芬（佛山大学）
+地点：数科院东楼401
+主办：数学科学学院</description>
+    </item>
+    <item>
+      <title>勷勤数学•专家报告-谢佳佑｜Global existence of weak solutions to a parabolic attraction-repulsion chemotaxis model in three dimensions</title>
+      <link>http://maths.scnu.edu.cn/a/20261205/8918.html</link>
+      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261205/8918.html</guid>
+      <pubDate>Fri, 27 Nov 2026 18:48:19 +0800</pubDate>
+      <category>数学科学学院</category>
+      <description>题目：Global existence of weak solutions to a parabolic attraction-repulsion chemotaxis model in three dimensions
+主讲：谢佳佑（中山大学）
+地点：数科院东楼401
+主办：数学科学学院</description>
+    </item>
+    <item>
+      <title>勷勤数学•专家报告-罗永｜Estimates on lifespan of semi-linear heat equations</title>
+      <link>http://maths.scnu.edu.cn/a/20261205/8919.html</link>
+      <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261205/8919.html</guid>
+      <pubDate>Fri, 27 Nov 2026 18:56:34 +0800</pubDate>
+      <category>数学科学学院</category>
+      <description>题目：Estimates on lifespan of semi-linear heat equations
+主讲：罗永（吉林大学）
 地点：数科院东楼401
 主办：数学科学学院</description>
     </item>
@@ -88,7 +121,7 @@
       <title>勷勤数学•专家报告-杨绮云｜Dimensional reduction for anyons in the average-field approximation</title>
       <link>http://maths.scnu.edu.cn/a/20261218/8898.html</link>
       <guid isPermaLink="false">http://maths.scnu.edu.cn/a/20261218/8898.html</guid>
-      <pubDate>Fri, 27 Nov 2026 07:49:30 +0800</pubDate>
+      <pubDate>Fri, 27 Nov 2026 18:23:48 +0800</pubDate>
       <category>数学科学学院</category>
       <description>题目：Dimensional reduction for anyons in the average-field approximation
 主讲：杨绮云（Basque Center for Applied Mathematics (BCAM)）

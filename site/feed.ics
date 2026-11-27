@@ -9,7 +9,7 @@ X-WR-CALDESC:汇集华南师范大学各学院与部处的学术讲座，
  自动抓取 53 个信息源，每天更新。
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261130/8912.html@danchekey.github.io
-DTSTAMP:20261127T004816Z
+DTSTAMP:20261127T112234Z
 DTSTART:20261130T013000Z
 DTEND:20261130T023000Z
 SUMMARY:勷勤数学•专家报告-黄皓｜Extremal Kt-intersecting grap
@@ -27,7 +27,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261130/8913.html@danchekey.github.io
-DTSTAMP:20261127T004816Z
+DTSTAMP:20261127T112234Z
 DTSTART:20261130T023000Z
 DTEND:20261130T033000Z
 SUMMARY:勷勤数学•领军学者报告-吴河辉｜The Product of Inter
@@ -45,7 +45,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261123/13437.html@danchekey.github.io
-DTSTAMP:20261127T004816Z
+DTSTAMP:20261127T112234Z
 DTSTART:20261201T070000Z
 DTEND:20261201T080000Z
 SUMMARY:物理学院学术报告（第63期）南京大学杜灵杰至诚
@@ -64,7 +64,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:https://physics.scnu.edu.cn/a/20261125/13443.html@danchekey.github.io
-DTSTAMP:20261127T004816Z
+DTSTAMP:20261127T112234Z
 DTSTART:20261202T063000Z
 DTEND:20261202T073000Z
 SUMMARY:物理学院学术报告（第66期）University of New South Wale
@@ -83,7 +83,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261203/8906.html@danchekey.github.io
-DTSTAMP:20261127T004816Z
+DTSTAMP:20261127T112234Z
 DTSTART:20261203T080000Z
 DTEND:20261203T090000Z
 SUMMARY:勷勤数学•专家报告-张文鹏｜A certain mean values invo
@@ -101,7 +101,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261205/8915.html@danchekey.github.io
-DTSTAMP:20261127T004816Z
+DTSTAMP:20261127T112234Z
 DTSTART:20261205T010000Z
 DTEND:20261205T020000Z
 SUMMARY:勷勤数学•领军学者报告-吕广世｜The Product of Inter
@@ -118,8 +118,66 @@ DESCRIPTION:讲座即将开始
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
+UID:http://maths.scnu.edu.cn/a/20261205/8917.html@danchekey.github.io
+DTSTAMP:20261127T112234Z
+DTSTART:20261205T063000Z
+DTEND:20261205T073000Z
+SUMMARY:勷勤数学•专家报告-吴楚芬｜Sharp minimal wave speed i
+ n a nonlocal lattice nutrient-prey-predator system with nutrient recyclin
+ g and mixotrophy
+LOCATION:数科院东楼401
+DESCRIPTION:题目：Sharp minimal wave speed in a nonlocal lattice nutrie
+ nt-prey-predator system with nutrient recycling and mixotrophy\n主讲：
+ 吴楚芬（佛山大学）\n地点：数科院东楼401\n主办：数学
+ 科学学院
+URL:http://maths.scnu.edu.cn/a/20261205/8917.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:http://maths.scnu.edu.cn/a/20261205/8918.html@danchekey.github.io
+DTSTAMP:20261127T112234Z
+DTSTART:20261205T073000Z
+DTEND:20261205T083000Z
+SUMMARY:勷勤数学•专家报告-谢佳佑｜Global existence of weak s
+ olutions to a parabolic attraction-repulsion chemotaxis model in three di
+ mensions
+LOCATION:数科院东楼401
+DESCRIPTION:题目：Global existence of weak solutions to a parabolic att
+ raction-repulsion chemotaxis model in three dimensions\n主讲：谢佳
+ 佑（中山大学）\n地点：数科院东楼401\n主办：数学科学
+ 学院
+URL:http://maths.scnu.edu.cn/a/20261205/8918.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:http://maths.scnu.edu.cn/a/20261205/8919.html@danchekey.github.io
+DTSTAMP:20261127T112234Z
+DTSTART:20261205T083000Z
+DTEND:20261205T093000Z
+SUMMARY:勷勤数学•专家报告-罗永｜Estimates on lifespan of semi
+ -linear heat equations
+LOCATION:数科院东楼401
+DESCRIPTION:题目：Estimates on lifespan of semi-linear heat equations\n
+ 主讲：罗永（吉林大学）\n地点：数科院东楼401\n主办：
+ 数学科学学院
+URL:http://maths.scnu.edu.cn/a/20261205/8919.html
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:讲座即将开始
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
 UID:http://skc.scnu.edu.cn/a/20261106/1125.html@danchekey.github.io
-DTSTAMP:20261127T004816Z
+DTSTAMP:20261127T112234Z
 DTSTART:20261210T060000Z
 DTEND:20261210T070000Z
 SUMMARY:华南师范大学砺儒讲坛第149讲： 预测人口的空间
@@ -137,7 +195,7 @@ END:VALARM
 END:VEVENT
 BEGIN:VEVENT
 UID:http://maths.scnu.edu.cn/a/20261218/8898.html@danchekey.github.io
-DTSTAMP:20261127T004816Z
+DTSTAMP:20261127T112234Z
 DTSTART:20261218T020000Z
 DTEND:20261218T030000Z
 SUMMARY:勷勤数学•专家报告-杨绮云｜Dimensional reduction for 
