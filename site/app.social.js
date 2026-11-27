@@ -475,6 +475,8 @@ Object.assign(APP_METHODS, {
     },
     // 点击卡片上的学院/校区 Tag → 直接筛选该维度
     onTagClick(field, val) {
+      this.showLikedOnly = false;
+      this.showWantedOnly = false;
       if (field === 'college') this.college = val;
       else this.campus = val;
       window.scrollTo({ top: 0, behavior: 'smooth' });

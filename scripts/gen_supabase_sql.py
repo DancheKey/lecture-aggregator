@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-# 生成 Supabase 迁移 SQL：列兜底 + 值域约束 + RPC 增量函数 + RLS。
-# 用法：
-#   python scripts/gen_supabase_sql.py                 # 仅结构（默认，不含存量导入）
-#   python scripts/gen_supabase_sql.py --with-existing # 额外导入本地 data/lecture_stats.json
-# 然后在 Supabase 控制台 SQL Editor 粘贴执行（一次即可，幂等）。
-# 说明：存量导入用 on conflict do nothing，绝不覆盖云端已产生的真实增量；
-# 2026-10-17 用户决策：云端从零积累，默认不带存量。
+# -*- coding: utf-8 -*-
+"""生成 Supabase 迁移 SQL：白名单、列兜底、值域约束、RPC 与 RLS。
+
+用法：
+  python scripts/gen_supabase_sql.py                  # 完整补丁（含当前讲座白名单）
+  python scripts/gen_supabase_sql.py --whitelist-only # 仅同步后续新增的讲座键
+  python scripts/gen_supabase_sql.py --with-existing  # 额外导入本地 data/lecture_stats.json
+"""
 import json
 import os
+import re
 import sys
 
-# Windows 上 stdout 文本模式会把 \n 翻译成 \r\n，重定向出的 SQL 带 CRLF；
-# git 入库虽会 normalize，但消除写盘时的 CRLF 可免去每次 commit 的行尾警告。
-# encoding='utf-8'：SQL 注释含 ⚠ 等非 GBK 字符，Windows 默认 cp936 下 print 直接
-# UnicodeEncodeError 崩溃（2026-10-18 实测，test_04/test_09 本地红）；控制台路径
-# 不受影响（WindowsConsoleIO 走 WriteConsoleW 原生 Unicode）。
 try:
     sys.stdout.reconfigure(newline='\n', encoding='utf-8')
 except Exception:
@@ -22,63 +19,35 @@ except Exception:
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATS_PATH = os.path.join(ROOT, 'data', 'lecture_stats.json')
+LECTURES_PATH = os.path.join(ROOT, 'site', 'lectures.json')
 
-# 值域上限：单讲座计数天花板（防刷兜底；显示层另有 capDisplay 300+ 封顶）
 CAP_VISITS = 1_000_000
-# 2026-10-17 深夜修复：原值 100_000 太松——anon key 公开下，直接灌 p_delta=99999
-# 实测可把 likes/wants 刷到 99999（函数只做了 greatest 下钳）。降至 1000：仍远超
-# 校园讲座真实量级，又与显示层 300+ 封顶留足余量，刷的成本收益比骤降。
 CAP_LIKES = 1_000
 CAP_WANTS = 1_000
-# 2026-10-20（三按钮统一）：日历「加入次数」累计上限，与点赞/想听同量级。
-# 语义是「多少人把这条讲座加进了日历」——比点赞更强的兴趣信号，故量级一致。
 CAP_CALS = 1_000
-# 2026-10-18 修复（审查报告 S2）：visit 的单次增量上钳。前端每次只 +1、CI 快照
-# 只读、存量导入走 SQL 不经过 RPC——单次钳到 100 对真实用量零影响；而原值
-# 100 万意味着一次 curl 就能把页脚 PV（无 capDisplay）刷成门面事故。
-# 注意与 CAP_VISITS 的分工：本常量钳**单次 delta**，CAP_VISITS 钳**累计总量**。
-#
-# 2026-10-19（B1/S1/S5 修复）：单次步长统一收敛到 1。
-#   S5：visit 100 → 1。前端每次只 +1，一次请求=一次真实访问，刷量成本回到真实量级。
-#   S1：like/want 此前**没有**独立步长，直接复用累计上限 1000 当单次上钳——
-#       一次 curl 即可把某条讲座顶到 1000。现补 CAP_STEP_LIKES/WANTS=1。
-#   B1：取消点赞必须能真正 -1。此前 greatest(p_delta, 0) 把 -1 钳成 0，
-#       「取消」是空操作（数字不降），且 likedUrls 已删键 → 再点又 +1，可反复刷高。
-#       现改为 greatest(p_delta, -1)：允许 -1，仍拒绝 -2 及更小的批量减。
-#       已知取舍：匿名者可对他人计数 -1（恶意清零）。相比「可无限刷高 + 取消无效」，
-#       这是止血阶段更可接受的一侧；彻底方案见 B1 设备级点赞表（独立迭代）。
 CAP_STEP_VISITS = 1
 CAP_STEP_LIKES = 1
 CAP_STEP_WANTS = 1
-# 日历加入是单向动作（下载了就不存在「取消下载」），单次只允许 +1，负增量钳成 0。
 CAP_STEP_CALS = 1
-# like/want 允许的最小单次增量：-1 = 取消。比 -1 更小的批量减一律钳成 -1。
 CAP_STEP_NEG = -1
-# p_url 校验规则（审查报告 S1，2026-10-18 复查加强）：增量 RPC 此前对 p_url
-# 零校验，anon 持 key 者实测可建空键行与 8000 字符行——既污染表（fetchAll 全表
-# 拉取被拖慢），也让表行数可被无限灌高。现入口两道校验，越界一律 400 拒绝：
-#   ① 长度 1..MAX_URL_LEN 字符（真实键 = 源页 URL 或 URL~场次序号，最长 71）
-#   ② 前缀必须 http(s):// 或 __（保留键族，如 __site__ 页脚 PV；与前端
-#      fetchAll 的 /^__/ 过滤同口径）——只查长度挡不住「p_url='a'/'b'…」
-#      批量造行：每个都合法，行数照样能灌到触发分页截断。
 MAX_URL_LEN = 300
+SITE_KEY = '__site__'
+LECTURE_ACTIONS = ('visit', 'like', 'want', 'cal')
 
 HEADER = """-- ============================================================
--- 讲座聚合站 · Supabase 迁移 SQL（2026-10-18 修订，可重复执行）
+-- 讲座聚合站 · Supabase 迁移 SQL（2026-11-26 修订，可重复执行）
 -- 执行位置：Supabase 控制台 → SQL Editor → 粘贴整段运行
--- 前置：已建表 lecture_stats(url text PK, visits int8, likes int8, wants int8) 且已开 RLS
+-- 前置：已建表 public.lecture_stats(url text PK, visits int8, likes int8, wants int8)
+-- 安全边界：anon key 公开，所有写操作只走白名单 RPC；表级写权限显式关闭。
 -- ============================================================
 
--- ① 列兜底：2026-10-17 实测踩坑——建表时未设默认值的列会让 RPC 插入新 URL 时
---   违反 not-null（报 23502）。此处统一补默认值 0、清空存量 null、补 not-null；
---   已正确的库重复执行无副作用。
-update lecture_stats set visits = 0 where visits is null;
-update lecture_stats set likes = 0 where likes is null;
-update lecture_stats set wants = 0 where wants is null;
--- cal_downloads（2026-10-20 新增：日历「加入次数」）：新列先幂等建列，再兜底默认值/非空。
-alter table lecture_stats add column if not exists cal_downloads int8;
-update lecture_stats set cal_downloads = 0 where cal_downloads is null;
-alter table lecture_stats
+-- ① 列兜底：默认值 0 + not null；存量 null 先归零，避免插入新键时 23502。
+update public.lecture_stats set visits = 0 where visits is null;
+update public.lecture_stats set likes = 0 where likes is null;
+update public.lecture_stats set wants = 0 where wants is null;
+alter table public.lecture_stats add column if not exists cal_downloads int8;
+update public.lecture_stats set cal_downloads = 0 where cal_downloads is null;
+alter table public.lecture_stats
   alter column visits set default 0,
   alter column likes set default 0,
   alter column wants set default 0,
@@ -88,45 +57,56 @@ alter table lecture_stats
   alter column wants set not null,
   alter column cal_downloads set not null;
 
--- ② 值域约束（粗粒度防刷兜底，脚本最多刷到这里就被数据库拦住）
-alter table lecture_stats drop constraint if exists lecture_stats_visits_range;
-alter table lecture_stats drop constraint if exists lecture_stats_likes_range;
-alter table lecture_stats drop constraint if exists lecture_stats_wants_range;
-alter table lecture_stats drop constraint if exists lecture_stats_cals_range;
-alter table lecture_stats
+-- ② 值域约束：单条讲座的累计天花板，防止异常增量击穿计数。
+alter table public.lecture_stats drop constraint if exists lecture_stats_visits_range;
+alter table public.lecture_stats drop constraint if exists lecture_stats_likes_range;
+alter table public.lecture_stats drop constraint if exists lecture_stats_wants_range;
+alter table public.lecture_stats drop constraint if exists lecture_stats_cals_range;
+alter table public.lecture_stats
   add constraint lecture_stats_visits_range check (visits between 0 and {cap_v}),
   add constraint lecture_stats_likes_range check (likes between 0 and {cap_l}),
   add constraint lecture_stats_wants_range check (wants between 0 and {cap_w}),
   add constraint lecture_stats_cals_range check (cal_downloads between 0 and {cap_c});
 
--- ③ RPC 增量函数：前端只能 +/-1，写不了任意值（security definer = 以所有者权限跑，
---    anon 无需表级 INSERT/UPDATE 权限；表级写权限保持关闭，只走函数这一道闸门）。
---    insert 必须显式写全相关列——只填目标列会依赖列默认值，缺默认值的表直接 23502。
---    ⚠ 2026-10-17 深夜修复：update 与 insert 两条路径都必须 least 上钳——此前
---    like/want 只有 greatest(...,0) 下钳，实测灌 p_delta=99999 可直接刷爆计数。
---    ⚠ 2026-10-18 修订（两项，均有实测依据）：
---       S1 p_url 守卫：此前对 p_url 零校验，anon 实测可建空键行与 8000 字符行
---          （拖慢 fetchAll 全表拉取，并让表行数可被无限灌高）。现入口两道
---          校验：长度 1..300，且前缀必须 http(s):// 或 __（保留键族，与前端
---          fetchAll 的 /^__/ 过滤同口径）——只限长度挡不住「p_url='a'/'b'…」
---          批量造行，行数灌到触发分页截断后部分讲座计数会静默读不到。
---          越界一律抛 22023（PostgREST 400，前端 catch 后静默降级，对正常
---          调用零影响——真实键最长 71 字符，且 100% 是 http(s) 地址）。
---       S2 visit 单次上钳 100 万→100：原值下一次 curl 就能把页脚 PV（无 capDisplay）
---          刷成门面事故。d 变量统一承载「钳过的单次增量」，insert 与 on conflict
---          两条路径共用同一个 d，杜绝两路上钳值漂移；累计总量仍由 {cap_v} 兜底。
---    ⚠ 2026-10-19 修订（B1/S1/S5，三项缺陷同源）：
---       B1 取消无效：like/want 原为 greatest(p_delta, 0)，前端取消传 -1 被钳成 0，
---          「取消点赞」实际不减——界面 toast 报已取消、数字却被云端权威值弹回原值；
---          且本地 likedUrls 已删键，再点一次又 +1，同一用户可反复刷高（上限 {cap_l}）。
---          现改为 greatest(p_delta, {step_neg})：允许 -1，仍拒绝 -2 及更小的批量减。
---          已知取舍：匿名者可对他人计数 -1；彻底方案是设备级点赞表（独立迭代）。
---       S1 单次步长：like/want 此前直接用累计上限 {cap_l} 当单次上钳，一次 curl 即可
---          顶满。现独立为 {step_l}/{step_w}，与累计上限 {cap_l}/{cap_w} 分离。
---       S5 visit 步长 100 → {step_v}：一次请求 = 一次真实访问。
-create or replace function increment_like(p_url text, p_delta int)
-returns json language plpgsql security definer as $$
-declare v lecture_stats; d int;
+-- ③ 统计键白名单：前端 url=in. 只是查询过滤，不能作为安全边界。
+--    每个讲座键允许四种动作；__site__ 只允许 visit。表不开放给 anon/authenticated，
+--    后续由受信任的 SQL Editor 或 service_role 同步，匿名用户不能自行扩表。
+create table if not exists public.lecture_allowed_keys (
+  url text primary key,
+  allowed_actions text[] not null,
+  constraint lecture_allowed_keys_url_shape
+    check (length(url) between 1 and {max_len} and url ~* '^(https?://|__)'),
+  constraint lecture_allowed_keys_actions
+    check (cardinality(allowed_actions) > 0
+           and allowed_actions <@ array['visit','like','want','cal']::text[])
+);
+alter table public.lecture_allowed_keys enable row level security;
+revoke all on table public.lecture_allowed_keys from public, anon, authenticated;
+grant all on table public.lecture_allowed_keys to service_role;
+"""
+
+BODY = """
+-- ④ 白名单探测函数：只供 security definer RPC 内部使用，撤销 PUBLIC/anon/authenticated 执行权。
+create or replace function public.lecture_stat_key_allowed(p_url text, p_action text)
+returns boolean language sql stable security definer
+set search_path = pg_catalog, public
+as $$
+  select exists (
+    select 1
+    from public.lecture_allowed_keys k
+    where k.url = p_url
+      and p_action = any(k.allowed_actions)
+  );
+$$;
+revoke all on function public.lecture_stat_key_allowed(text, text) from public, anon, authenticated;
+
+-- ⑤ 增量 RPC：所有关系名显式指定 public，搜索路径固定；null 增量直接拒绝。
+--    like/want 保留 -1 取消语义；visit/cal 为单向动作，负增量仍钳成 0。
+create or replace function public.increment_like(p_url text, p_delta int)
+returns json language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+declare v public.lecture_stats%rowtype; d int;
 begin
   if p_url is null or length(p_url) = 0 or length(p_url) > {max_len} then
     raise exception 'p_url must be 1..{max_len} chars' using errcode = 22023;
@@ -134,19 +114,25 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
+  if p_delta is null then
+    raise exception 'p_delta must not be null' using errcode = 22023;
+  end if;
+  if not public.lecture_stat_key_allowed(p_url, 'like') then
+    raise exception 'stat key is not allowed for like' using errcode = 22023;
+  end if;
   d := least(greatest(p_delta, {step_neg}), {step_l});
-  insert into lecture_stats (url, visits, likes, wants)
-    -- greatest(d, 0)：取消一个云端还不存在的行（本地 likedUrls 有残留、云端被清过）
-    -- 时 d = -1，直接插会违反 check (likes >= 0) → 400；插 0 则是无害的幂等空操作。
+  insert into public.lecture_stats (url, visits, likes, wants)
     values (p_url, 0, greatest(d, 0), 0)
   on conflict (url) do update set likes = least(greatest(lecture_stats.likes + d, 0), {cap_l})
   returning * into v;
-  return to_jsonb(v) - 'url';
+  return pg_catalog.to_jsonb(v) - 'url';
 end $$;
 
-create or replace function increment_want(p_url text, p_delta int)
-returns json language plpgsql security definer as $$
-declare v lecture_stats; d int;
+create or replace function public.increment_want(p_url text, p_delta int)
+returns json language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+declare v public.lecture_stats%rowtype; d int;
 begin
   if p_url is null or length(p_url) = 0 or length(p_url) > {max_len} then
     raise exception 'p_url must be 1..{max_len} chars' using errcode = 22023;
@@ -154,17 +140,25 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
+  if p_delta is null then
+    raise exception 'p_delta must not be null' using errcode = 22023;
+  end if;
+  if not public.lecture_stat_key_allowed(p_url, 'want') then
+    raise exception 'stat key is not allowed for want' using errcode = 22023;
+  end if;
   d := least(greatest(p_delta, {step_neg}), {step_w});
-  insert into lecture_stats (url, visits, likes, wants)
+  insert into public.lecture_stats (url, visits, likes, wants)
     values (p_url, 0, 0, greatest(d, 0))
   on conflict (url) do update set wants = least(greatest(lecture_stats.wants + d, 0), {cap_w})
   returning * into v;
-  return to_jsonb(v) - 'url';
+  return pg_catalog.to_jsonb(v) - 'url';
 end $$;
 
-create or replace function increment_visit(p_url text, p_delta int)
-returns json language plpgsql security definer as $$
-declare v lecture_stats; d int;
+create or replace function public.increment_visit(p_url text, p_delta int)
+returns json language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+declare v public.lecture_stats%rowtype; d int;
 begin
   if p_url is null or length(p_url) = 0 or length(p_url) > {max_len} then
     raise exception 'p_url must be 1..{max_len} chars' using errcode = 22023;
@@ -172,20 +166,25 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
+  if p_delta is null then
+    raise exception 'p_delta must not be null' using errcode = 22023;
+  end if;
+  if not public.lecture_stat_key_allowed(p_url, 'visit') then
+    raise exception 'stat key is not allowed for visit' using errcode = 22023;
+  end if;
   d := least(greatest(p_delta, 0), {step_v});
-  insert into lecture_stats (url, visits, likes, wants)
+  insert into public.lecture_stats (url, visits, likes, wants)
     values (p_url, d, 0, 0)
   on conflict (url) do update set visits = least(greatest(lecture_stats.visits + d, 0), {cap_v})
   returning * into v;
-  return to_jsonb(v) - 'url';
+  return pg_catalog.to_jsonb(v) - 'url';
 end $$;
 
--- 日历「加入次数」增量（2026-10-20 三按钮统一）：把讲座导出成 .ics 加进日历。
--- 与 like/want 的唯一区别是**单向**：greatest(p_delta, 0) 把取消（-1）钳成 0，
--- 「下载日历」不存在取消语义，故不允许 -1（不像点赞取消需要真的减）。
-create or replace function increment_cal(p_url text, p_delta int)
-returns json language plpgsql security definer as $$
-declare v lecture_stats; d int;
+create or replace function public.increment_cal(p_url text, p_delta int)
+returns json language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+declare v public.lecture_stats%rowtype; d int;
 begin
   if p_url is null or length(p_url) = 0 or length(p_url) > {max_len} then
     raise exception 'p_url must be 1..{max_len} chars' using errcode = 22023;
@@ -193,67 +192,112 @@ begin
   if p_url !~* '^(https?://|__)' then
     raise exception 'p_url must be an http(s) URL or __-prefixed key' using errcode = 22023;
   end if;
+  if p_delta is null then
+    raise exception 'p_delta must not be null' using errcode = 22023;
+  end if;
+  if not public.lecture_stat_key_allowed(p_url, 'cal') then
+    raise exception 'stat key is not allowed for cal' using errcode = 22023;
+  end if;
   d := least(greatest(p_delta, 0), {step_c});
-  insert into lecture_stats (url, visits, likes, wants, cal_downloads)
+  insert into public.lecture_stats (url, visits, likes, wants, cal_downloads)
     values (p_url, 0, 0, 0, greatest(d, 0))
   on conflict (url) do update set cal_downloads = least(greatest(lecture_stats.cal_downloads + d, 0), {cap_c})
   returning * into v;
-  return to_jsonb(v) - 'url';
+  return pg_catalog.to_jsonb(v) - 'url';
 end $$;
 
--- ④ RLS：先确保行级安全真的开着——policy 存在但 RLS 关闭 = 完全裸奔。
---    ⚠ 2026-10-18 复查补：原 SQL 只有 create policy，漏了 enable。Supabase 对
---    新表默认给 anon 全表 ALL 权限，RLS 未开启时 policy 形同虚设，匿名可绕过
---    RPC 直接 INSERT/UPDATE 任意值（本库实测 RLS 已开，此句是幂等兜底，
---    防止照本 SQL 重建库时漏开）。enable 重复执行无副作用。
-alter table lecture_stats enable row level security;
-drop policy if exists "anon read" on lecture_stats;
-create policy "anon read" on lecture_stats for select using (true);
-grant execute on function increment_like(text, int) to anon;
-grant execute on function increment_want(text, int) to anon;
-grant execute on function increment_visit(text, int) to anon;
-grant execute on function increment_cal(text, int) to anon;
+-- ⑥ RLS 与最小权限：即使将来误开写策略，anon/authenticated 也没有表级写权限。
+alter table public.lecture_stats enable row level security;
+drop policy if exists "anon read" on public.lecture_stats;
+create policy "anon read" on public.lecture_stats for select using (true);
+revoke all on table public.lecture_stats from public, anon, authenticated;
+grant select on table public.lecture_stats to anon, authenticated;
+grant all on table public.lecture_stats to service_role;
 
--- ⑤ 存量导入：默认不生成（2026-10-17 决策：云端从零积累）。
---   启用方式：python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql
---   即使用户启用，也用 on conflict do nothing——重复执行不得把云端已产生的
---   真实增量覆盖回本地旧值；需要校准请人工核对后单独处理。
+revoke all on function public.increment_like(text, int) from public;
+revoke all on function public.increment_want(text, int) from public;
+revoke all on function public.increment_visit(text, int) from public;
+revoke all on function public.increment_cal(text, int) from public;
+grant execute on function public.increment_like(text, int) to anon, authenticated, service_role;
+grant execute on function public.increment_want(text, int) to anon, authenticated, service_role;
+grant execute on function public.increment_visit(text, int) to anon, authenticated, service_role;
+grant execute on function public.increment_cal(text, int) to anon, authenticated, service_role;
+
+-- ⑦ 存量导入默认关闭；启用后只补本地历史计数，不覆盖云端真实增量。
+--    运行：python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql
+--    新讲座发布后同步白名单：python scripts/gen_supabase_sql.py --whitelist-only
+--    生成的 SQL 在 SQL Editor 执行；自动同步需另行配置受信任的 service_role secret。
 """
 
 
-def sql_str(s):
-    return "'" + str(s).replace("'", "''") + "'"
+def sql_str(value):
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def load_allowed_keys():
+    if not os.path.exists(LECTURES_PATH):
+        sys.exit('找不到 ' + LECTURES_PATH)
+    with open(LECTURES_PATH, encoding='utf-8') as f:
+        raw = json.load(f)
+    items = raw.get('data', []) if isinstance(raw, dict) else []
+    keys = {SITE_KEY}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        key = item.get('ck')
+        if not key:
+            continue
+        if not isinstance(key, str) or len(key) > MAX_URL_LEN or not re.match(r'^(https?://|__)', key, re.I):
+            sys.exit('非法讲座统计键：' + repr(key))
+        keys.add(key)
+    return sorted(keys)
+
+
+def print_whitelist():
+    print('-- 当前前端讲座键白名单（由 site/lectures.json 确定性生成，按 URL 排序）。')
+    print('insert into public.lecture_allowed_keys (url, allowed_actions) values')
+    rows = []
+    for key in load_allowed_keys():
+        actions = ('visit',) if key == SITE_KEY else LECTURE_ACTIONS
+        values = ','.join(sql_str(action) for action in actions)
+        rows.append(f'  ({sql_str(key)}, array[{values}]::text[])')
+    print(',\n'.join(rows))
+    print('on conflict (url) do update set allowed_actions = excluded.allowed_actions;')
 
 
 def main():
-    with_existing = '--with-existing' in sys.argv
-    if with_existing and not os.path.exists(STATS_PATH):
-        sys.exit('找不到 ' + STATS_PATH)
-    print(HEADER.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS,
-                        cap_c=CAP_CALS,
-                        step_v=CAP_STEP_VISITS, step_l=CAP_STEP_LIKES,
-                        step_w=CAP_STEP_WANTS, step_c=CAP_STEP_CALS,
-                        step_neg=CAP_STEP_NEG,
-                        max_len=MAX_URL_LEN))
-    if not with_existing:
-        print('-- ⑤ 存量导入：未启用（默认）。如需导入本地历史计数，')
-        print('--    运行 python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql')
+    args = set(sys.argv[1:])
+    unknown = args - {'--with-existing', '--whitelist-only'}
+    if unknown:
+        sys.exit('未知参数：' + ' '.join(sorted(unknown)))
+    if '--whitelist-only' in args and '--with-existing' in args:
+        sys.exit('--whitelist-only 不能与 --with-existing 同用')
+    if '--whitelist-only' in args:
+        print_whitelist()
         return
+    sys.stdout.write(HEADER.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS,
+                                   cap_c=CAP_CALS, max_len=MAX_URL_LEN))
+    print_whitelist()
+    sys.stdout.write(BODY.format(cap_v=CAP_VISITS, cap_l=CAP_LIKES, cap_w=CAP_WANTS,
+                                 cap_c=CAP_CALS, max_len=MAX_URL_LEN,
+                                 step_v=CAP_STEP_VISITS, step_l=CAP_STEP_LIKES,
+                                 step_w=CAP_STEP_WANTS, step_c=CAP_STEP_CALS,
+                                 step_neg=CAP_STEP_NEG))
+    if '--with-existing' not in sys.argv:
+        return
+    if not os.path.exists(STATS_PATH):
+        sys.exit('找不到 ' + STATS_PATH)
     with open(STATS_PATH, encoding='utf-8') as f:
-        raw = json.load(f)
-    # 兼容两种形态：裸 dict（url→统计）或 {stats: {...}} 包装
-    items = raw.get('stats', raw) if isinstance(raw, dict) else {}
+        raw_stats = json.load(f)
+    items = raw_stats.get('stats', raw_stats) if isinstance(raw_stats, dict) else {}
     rows = 0
-    for url, st in sorted(items.items()):
-        v = int(st.get('visits', 0) or 0)
-        l = int(st.get('likes', 0) or 0)
-        w = int(st.get('wants', 0) or 0)
-        print('insert into lecture_stats (url, visits, likes, wants) values '
-              '({}, {}, {}, {}) on conflict (url) do nothing;'
-              .format(sql_str(url), v, l, w))
+    for url, stats in sorted(items.items()):
+        visits = int(stats.get('visits', 0) or 0)
+        likes = int(stats.get('likes', 0) or 0)
+        wants = int(stats.get('wants', 0) or 0)
+        print('insert into public.lecture_stats (url, visits, likes, wants) values '
+              f'({sql_str(url)}, {visits}, {likes}, {wants}) on conflict (url) do nothing;')
         rows += 1
-    if rows == 0:
-        print('-- （本地无存量，跳过导入）')
     print('-- 完成：{} 条存量。'.format(rows), file=sys.stderr)
 
 

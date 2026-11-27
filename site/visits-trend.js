@@ -234,28 +234,50 @@ function renderTable() {
     tb.appendChild(tr);
   });
   var btn = document.getElementById('toggleRows');
+  btn.setAttribute('aria-expanded', EXPANDED ? 'true' : 'false');
+  btn.setAttribute('aria-pressed', EXPANDED ? 'true' : 'false');
   if (rows.length > 7) {
-    btn.style.display = '';
+    btn.hidden = false;
     btn.textContent = EXPANDED ? '收起（仅显示最近 7 条）' : '展开全部 ' + rows.length + ' 条';
   } else {
-    btn.style.display = 'none';
+    btn.hidden = true;
   }
   document.getElementById('tcount').textContent = rows.length;
+}
+
+function currentRangeLabel() {
+  var label = '近 7 天';
+  document.querySelectorAll('.ranges button').forEach(function (b) {
+    if (b.getAttribute('data-range') === String(RANGE)) label = b.textContent;
+  });
+  return label;
+}
+
+function trendStatus(msg) {
+  var status = document.getElementById('trend-status');
+  if (status) status.textContent = msg;
 }
 
 document.querySelectorAll('.ranges button').forEach(function (b) {
   b.addEventListener('click', function () {
     RANGE = Number(b.getAttribute('data-range'));
     document.querySelectorAll('.ranges button').forEach(function (x) {
-      x.classList.toggle('on', x === b);
+      var active = x === b;
+      x.classList.toggle('on', active);
+      x.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
     renderChart();
     renderTable();
+    trendStatus('当前显示' + b.textContent + '，共 ' + inRange(SNAPS, RANGE).length + ' 条快照。');
   });
 });
 document.getElementById('toggleRows').addEventListener('click', function () {
   EXPANDED = !EXPANDED;
   renderTable();
+  var total = inRange(SNAPS, RANGE).length;
+  trendStatus(EXPANDED
+    ? '快照明细已展开，显示 ' + total + ' 条记录。'
+    : '快照明细已收起，仅显示最近 ' + Math.min(total, 7) + ' 条记录。');
 });
 
 // 数据加载（2026-10-02：原先数据内联在页面脚本里，为收紧 CSP 的 script-src 改为 fetch）。
@@ -270,6 +292,7 @@ function showLoadError(msg) {
   }
   var chart = document.getElementById('chart');
   if (chart) clear(chart);
+  trendStatus('访问量数据加载失败，请稍后刷新重试。');
 }
 
 fetch('visits-trend-data.json', { cache: 'no-store' })
@@ -283,6 +306,7 @@ fetch('visits-trend-data.json', { cache: 'no-store' })
     if (!SNAPS.length) throw new Error('数据为空');
     renderChart();
     renderTable();
+    trendStatus('访问量数据已加载，共 ' + SNAPS.length + ' 条快照，当前显示' + currentRangeLabel() + '。');
     // 实时校正先于数据文件到达时，applyLivePv 只缓存了 _livePv 未生效——
     // 此处补挂一次（竞态收口的另一半，见 applyLivePv 注释）。
     if (_livePv) {

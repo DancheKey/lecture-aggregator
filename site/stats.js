@@ -197,55 +197,45 @@ createApp({
       return list;
     },
 
-    // 每年合计：受校区筛选影响；count 来自矩阵累加，visits/likes/wants 动态叠加。
-    // 矩阵在选中校区时已是该校区口径，无需再按学院集合过滤。
+    // 年度合计与当前表格行完全同源，学院名和校区筛选不会遗漏。
     yearTotals() {
-      const counts = {};
-      Object.entries(this.matrix).forEach(([college, yearMap]) => {
-        Object.entries(yearMap).forEach(([y, c]) => { counts[y] = (counts[y] || 0) + (c.count || 0); });
-      });
       const totals = {};
-      this.years.forEach(y => { totals[y] = { year: y, count: counts[y] || 0, visits: 0, likes: 0, wants: 0 }; });
-      const lectures = (this.summary && this.summary.lectures) || [];
-      // 讲座级校区命中（与 matrix() 叠加段同口径）：任一归属单位的归口 ∪ 实际举办。
-      const cmapAll = (this.summary && this.summary.campusMap) || {};
-      const amapAll = (this.summary && this.summary.campusActualMap) || {};
-      const cf = this.campusFilter;
-      lectures.forEach(l => {
-        // 2026-10-18：索引键由 u（源页 URL）改为 k（讲座级计数键）——同一源页
-        // 拆出的 N 场各有其键，逐条累加不再把一份计数放大 N 倍。
-        const st = this.lectureStats[l.k || l.u] || { visits: 0, likes: 0, wants: 0 };
-        // 三个指标全为 0 才跳过（2026-10-19：漏判 wants 会让「只想听、没访问没点赞」
-        // 的讲座整条被丢掉，想听数恒为 0）。
-        if (!st.visits && !st.likes && !st.wants) return;
-        const y = l.y || UNKNOWN_YEAR;
-        // 与 matrix 同口径——按讲座归属的全部单位（cs）展开、逐单位过校区筛选。
-        // 主学院不在当前校区、次学院在时，列里计入了、合计行却漏掉，
-        // 「按访问数/点赞数」模式下合计行小于各列之和。
-        const cs = (l.cs && l.cs.length) ? l.cs : [l.c || '未分类'];
-        if (cf) {
-          let hit = false;
-          cs.forEach(c => {
-            if (cmapAll[c] === cf) hit = true;
-            const al = amapAll[c];
-            if (Array.isArray(al) && al.includes(cf)) hit = true;
-          });
-          if (!hit) return;
-        }
-        cs.forEach(c => {
-          const t = totals[y] || { year: y, count: 0, visits: 0, likes: 0, wants: 0 };
-          t.visits += (st.visits || 0);
-          t.likes += (st.likes || 0);
-          t.wants += (st.wants || 0);
-          totals[y] = t;
+      this.years.forEach(y => {
+        totals[y] = { year: y, count: 0, visits: 0, likes: 0, wants: 0 };
+      });
+      this.rows.forEach(row => {
+        row.cells.forEach((cell, idx) => {
+          const t = totals[this.years[idx]];
+          t.count += cell.count || 0;
+          t.visits += cell.visits || 0;
+          t.likes += cell.likes || 0;
+          t.wants += cell.wants || 0;
         });
       });
-      return this.years.map(y => totals[y] || { year: y, count: 0, visits: 0, likes: 0, wants: 0 });
+      return this.years.map(y => totals[y]);
     },
 
     // 当前筛选（校区 + 学院名）下的学院/部处（单位）数量
     filteredCollegeCount() {
       return this.rows.length;
+    },
+
+    // 常驻 live status 使用的中文指标名，与 displayMode 四态保持同源。
+    metricLabel() {
+      return { count: '讲座数', visits: '访问数', likes: '点赞数', wants: '想听数' }[this.displayMode] || '讲座数';
+    },
+    sortLabel() {
+      const names = { college: '学院名', total: '总数', visits: '访问数', likes: '点赞数', wants: '想听数' };
+      const key = names[this.sortBy.key] || (this.sortBy.key + ' 年');
+      return key + (this.sortBy.order === 'asc' ? '升序' : '降序');
+    },
+    liveStatus() {
+      if (this.loading) return '统计数据加载中。';
+      if (this.loadError) return this.loadError;
+      if (!this.summary || !this.lectureCount) return '暂无统计数据。';
+      const campus = this.campusFilter ? this.campusFilter + '校区' : '全部校区';
+      const college = this.collegeFilter ? `，学院筛选“${this.collegeFilter}”` : '';
+      return `已显示${campus}${college}的 ${this.rows.length} 个单位，按${this.sortLabel}排序，当前显示${this.metricLabel}。`;
     },
 
     // 总合计

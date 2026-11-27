@@ -307,12 +307,73 @@ class RestoreHumanTimeTest(unittest.TestCase):
         self.assertIs(out[0]['timeUnknown'], True, '场次 1 的标注被场次 2 覆盖')
         self.assertIs(out[1]['timeUnknown'], False, '场次 2 的标注被场次 1 覆盖')
 
-    def test_05_空基底安全(self):
+    def test_05_scheme_change_keeps_unique_annotation(self):
+        existing = [{'sourceUrl': 'http://a/5.html', 'lectureIndex': None,
+                     'timeUnknown': True, 'timeUnknownSource': 'legacy'}]
+        new = [{'sourceUrl': 'https://a/5.html', 'lectureIndex': None,
+                'timeUnknown': True, 'timeUnknownSource': 'auto'}]
+        out = self.s.restore_human_time_annotations(new, existing)
+        self.assertIs(out[0]['timeUnknown'], True)
+        self.assertEqual(out[0]['timeUnknownSource'], 'legacy')
+
+    def test_06_scheme_change_keeps_multi_session_indices_separate(self):
+        existing = [
+            {'sourceUrl': 'http://a/6.html', 'lectureIndex': 1,
+             'timeUnknown': True, 'timeUnknownSource': 'human'},
+            {'sourceUrl': 'http://a/6.html', 'lectureIndex': 2,
+             'timeUnknown': False, 'timeUnknownSource': 'human'},
+        ]
+        new = [
+            {'sourceUrl': 'https://a/6.html', 'lectureIndex': 1,
+             'timeUnknown': False, 'timeUnknownSource': 'auto'},
+            {'sourceUrl': 'https://a/6.html', 'lectureIndex': 2,
+             'timeUnknown': True, 'timeUnknownSource': 'auto'},
+        ]
+        out = self.s.restore_human_time_annotations(new, existing)
+        self.assertEqual([(r['timeUnknown'], r['timeUnknownSource']) for r in out],
+                         [(True, 'human'), (False, 'human')])
+
+    def test_07_single_old_record_not_applied_to_split_page(self):
+        existing = [{'sourceUrl': 'http://a/7.html', 'lectureIndex': None,
+                     'timeUnknown': True, 'timeUnknownSource': 'human'}]
+        new = [
+            {'sourceUrl': 'https://a/7.html', 'lectureIndex': 1,
+             'timeUnknown': False, 'timeUnknownSource': 'auto'},
+            {'sourceUrl': 'https://a/7.html', 'lectureIndex': 2,
+             'timeUnknown': False, 'timeUnknownSource': 'auto'},
+        ]
+        out = self.s.restore_human_time_annotations(new, existing)
+        self.assertEqual([r['timeUnknownSource'] for r in out], ['auto', 'auto'])
+
+    def test_08_ambiguous_page_fallback_does_not_guess(self):
+        existing = [
+            {'sourceUrl': 'http://a/8.html', 'lectureIndex': None,
+             'timeUnknown': True, 'timeUnknownSource': 'human'},
+            {'sourceUrl': 'https://a/8.html', 'lectureIndex': None,
+             'timeUnknown': False, 'timeUnknownSource': 'human'},
+        ]
+        new = [{'sourceUrl': 'https://a:443/8.html/', 'lectureIndex': None,
+                'timeUnknown': False, 'timeUnknownSource': 'auto'}]
+        out = self.s.restore_human_time_annotations(new, existing)
+        self.assertIs(out[0]['timeUnknown'], False)
+        self.assertEqual(out[0]['timeUnknownSource'], 'auto')
+
+    def test_09_path_and_query_are_not_collapsed(self):
+        existing = [{'sourceUrl': 'http://a/9.html?v=1', 'lectureIndex': None,
+                     'timeUnknown': True, 'timeUnknownSource': 'human'}]
+        for url in ('https://a/9.html?v=2', 'https://a/9.html'):
+            new = [{'sourceUrl': url, 'lectureIndex': None,
+                    'timeUnknown': False, 'timeUnknownSource': 'auto'}]
+            out = self.s.restore_human_time_annotations(new, existing)
+            self.assertIs(out[0]['timeUnknown'], False, url)
+            self.assertEqual(out[0]['timeUnknownSource'], 'auto', url)
+
+    def test_10_空基底安全(self):
         self.assertEqual(
             self.s.restore_human_time_annotations([{'sourceUrl': 'u'}], []),
             [{'sourceUrl': 'u'}])
 
-    def test_06_全量分支确实调用了回填(self):
+    def test_11_全量分支确实调用了回填(self):
         """静态锁：调用被挪出全量分支（或整段删掉）时这里会红。"""
         with open(os.path.join(ROOT, 'scraper', 'scraper.py'), encoding='utf-8') as f:
             src = f.read()
@@ -326,7 +387,7 @@ class RestoreHumanTimeTest(unittest.TestCase):
         self.assertLess(i_dedup, i_cross, '跨源去重必须看到已恢复的人工标注')
         self.assertLess(i_cross, i_sort, '回填必须发生在写盘/排序之前')
 
-    def test_07_全量跨源合并保留存量主记录身份(self):
+    def test_12_全量跨源合并保留存量主记录身份(self):
         with open(os.path.join(ROOT, 'scraper', 'scraper.py'), encoding='utf-8') as f:
             src = f.read()
         i_keys = src.index('preferred_primary_keys = {')

@@ -49,6 +49,7 @@ const sandbox = {
     isSecureContext: false,
   },
   document: {
+    activeElement: null,
     documentElement: { style: {} },
     querySelectorAll: () => [],
     addEventListener: noop, removeEventListener: noop,
@@ -137,8 +138,9 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 //   _warmHayCache（空闲分批预建静态段，消除首搜 326ms）/ _idle（空闲调度），144 → 147）
 // （2026-11-05：评审 #35 —— _isSaveDataOrSlowNetwork（saveData / 2G·3G 时跳过
 //   空闲全量预取 1.6MB，app.data.js），147 → 148）
+// （2026-11-26：#20 无障碍 —— closeMenu / reportFocusables / onReportKeydown，148 → 151）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 148) errs.push(`方法数 ${nMethods} != 148`);
+if (nMethods !== 151) errs.push(`方法数 ${nMethods} != 151`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');
@@ -152,6 +154,78 @@ else {
 // 抽查跨文件引用：display 分片里用到 core 的常量
 const hasConst = vm.runInContext("typeof COUNT_CAP !== 'undefined' && typeof LIKED_KEY !== 'undefined'", ctx);
 if (!hasConst) errs.push('core 常量未跨文件可见');
+
+// #20：报告弹窗的初始焦点、Tab 圈定、Esc 关闭与焦点返回（用真实 APP_METHODS）。
+{
+  const ticks = [];
+  const focusLog = [];
+  const focusable = name => ({
+    isConnected: true, tabIndex: 0, getAttribute: () => null,
+    focus() { focusLog.push(name); sandbox.document.activeElement = this; },
+  });
+  const trigger = focusable('trigger');
+  const menuButton = focusable('menu-button');
+  const first = focusable('first-input');
+  const last = focusable('last-action');
+  const app = {
+    showReport: false, showMenu: true,
+    $refs: {
+      reportUnit: first, menuButton,
+      reportModal: { querySelectorAll: () => [first, last] },
+    },
+    $nextTick(fn) { ticks.push(fn); },
+    openReport: methods.openReport,
+    closeReport: methods.closeReport,
+    closeMenu: methods.closeMenu,
+    reportFocusables: methods.reportFocusables,
+    onReportKeydown: methods.onReportKeydown,
+  };
+  const flush = () => { while (ticks.length) ticks.shift()(); };
+  const key = (name, shift = false) => ({
+    key: name, shiftKey: shift, defaultPrevented: false,
+    preventDefault() { this.defaultPrevented = true; },
+  });
+
+  app.openReport(trigger);
+  if (!app.showReport) errs.push('openReport 未打开弹窗');
+  flush();
+  if (sandbox.document.activeElement !== first) errs.push('报告弹窗打开后未聚焦首个输入框');
+
+  let event = key('Tab');
+  sandbox.document.activeElement = last;
+  app.onReportKeydown(event);
+  if (!event.defaultPrevented || sandbox.document.activeElement !== first) {
+    errs.push('报告弹窗末尾 Tab 未圈回首个控件');
+  }
+  event = key('Tab', true);
+  sandbox.document.activeElement = first;
+  app.onReportKeydown(event);
+  if (!event.defaultPrevented || sandbox.document.activeElement !== last) {
+    errs.push('报告弹窗首个控件 Shift+Tab 未圈到末尾');
+  }
+  event = key('Escape');
+  app.onReportKeydown(event);
+  flush();
+  if (app.showReport || !event.defaultPrevented || sandbox.document.activeElement !== trigger) {
+    errs.push('报告弹窗 Esc 未关闭并返回触发者焦点');
+  }
+
+  app.closeMenu(true);
+  flush();
+  if (app.showMenu || sandbox.document.activeElement !== menuButton) {
+    errs.push('移动更多菜单 Esc 关闭后未聚焦菜单开关');
+  }
+
+  app.$refs.reportModal = { querySelectorAll: () => [] };
+  app.openReport(trigger);
+  flush();
+  event = key('Tab');
+  app.onReportKeydown(event);
+  if (!event.defaultPrevented) errs.push('弹窗无可聚焦控件时 Tab 应被阻止');
+  app.closeReport();
+  flush();
+  if (!focusLog.includes('trigger')) errs.push('焦点返回路径未实际执行');
+}
 
 console.log(`方法 ${nMethods}；状态字段 ${Object.keys(state).length}；computed ${Object.keys(computed).length}；mount=${mounted && mounted.sel}`);
 if (errs.length) { console.log('[FAIL]'); errs.forEach(e => console.log(' -', e)); process.exit(1); }

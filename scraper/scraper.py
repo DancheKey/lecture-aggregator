@@ -19,7 +19,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scripts'))
 from parsers import (parse_detail, is_lecture, is_news_record,  # noqa: E402
-                     get_attachment_events, clear_attachment_events)
+                     get_attachment_events, clear_attachment_events,
+                     safe_request)
+from timeparse import current_year  # noqa: E402
 from excluded_urls import load_excluded, canon_url_key as _canon_url_key  # noqa: E402
 from env_flags import flag as env_flag  # noqa: E402  开关真值判定的单一事实源
 import field_vocab  # noqa: E402  讲者归一/职称词表单一事实源（B6 口径收敛）
@@ -113,6 +115,17 @@ def _decode_html(raw):
 # ② 抖动：每次成功抓取后随机延迟 0.2~0.6s，避免对源站的规律性高频请求。
 _ROBOTS_CACHE = {}
 _ROBOTS_LOCK = threading.Lock()
+_ROBOTS_MAX_BYTES = 512 * 1024
+
+
+def _allowed_host(url, allowed_domains):
+    try:
+        parts = urlparse(url)
+        host = (parts.hostname or '').lower().rstrip('.')
+    except ValueError:
+        return False
+    return any(host == d.lower().rstrip('.') or host.endswith('.' + d.lower().rstrip('.'))
+               for d in allowed_domains)
 
 
 def _can_fetch(url, allowed_domains=None):
@@ -126,32 +139,51 @@ def _can_fetch(url, allowed_domains=None):
     一次无谓打扰。robots 查询按host 缓存，同 host 只花一次，故影响面有限，
     但白名单判据本就在函数开头、无任何成本，不该排在网络请求之后。
     """
-    host = urlparse(url).netloc
-    scheme = urlparse(url).scheme or 'https'
+    try:
+        parts = urlparse(url)
+        host = (parts.hostname or '').lower().rstrip('.')
+        port = parts.port
+    except ValueError:
+        return True
+    scheme = parts.scheme or 'https'
+    netloc = '[' + host + ']' if ':' in host else host
+    if port is not None and port != (443 if scheme == 'https' else 80):
+        netloc += ':' + str(port)
     # 白名单前置：不在白名单直接返回「无需再查」——调用方随后会自行拒绝该 URL。
     # 这里返回 True（视为「未禁止」）而非 False，因为拒绝理由是白名单而非 robots，
     # 交给调用方统一判定可避免日志里出现误导性的「robots 禁止」。
-    if allowed_domains and not any(host == d or host.endswith('.' + d)
-                                    for d in allowed_domains):
+    if allowed_domains and not _allowed_host(url, allowed_domains):
         return True
     with _ROBOTS_LOCK:
-        rp = _ROBOTS_CACHE.get(host)
+        rp = _ROBOTS_CACHE.get(netloc)
     if rp is None:
         rp = False  # False = 「robots 不可达，默认允许」的哨兵
+        r = None
         try:
-            r = requests.get(f'{scheme}://{host}/robots.txt', headers=HEADERS,
-                             timeout=10, proxies={'http': None, 'https': None})
-            if r.status_code == 200 and r.text.strip():
-                rp = urllib.robotparser.RobotFileParser()
-                rp.parse(r.text.splitlines())
+            r = safe_request('GET', f'{scheme}://{netloc}/robots.txt',
+                             headers=HEADERS, timeout=10, stream=True,
+                             max_redirects=0)
+            if r.status_code == 200:
+                body = bytearray()
+                for chunk in r.iter_content(chunk_size=65536):
+                    body.extend(chunk)
+                    if len(body) > _ROBOTS_MAX_BYTES:
+                        raise ValueError('robots.txt 超过 512KB 上限')
+                text = bytes(body).decode('utf-8', 'replace')
+                if text.strip():
+                    rp = urllib.robotparser.RobotFileParser()
+                    rp.parse(text.splitlines())
         except Exception as e:
             # 不静默：曾因漏写 import urllib.robotparser，AttributeError 被此 except 吞掉，
             # 导致 robots 合规长期静默失效而无人察觉。失败必须留下痕迹。
             print(f'[WARN] robots.txt 解析失败，按「默认允许」处理 {host}: '
                   f'{type(e).__name__}: {e}', file=sys.stderr)
             rp = False
+        finally:
+            if r is not None:
+                r.close()
         with _ROBOTS_LOCK:
-            _ROBOTS_CACHE[host] = rp
+            _ROBOTS_CACHE[netloc] = rp
     if rp is False or rp is None:
         return True
     return rp.can_fetch('*', url)
@@ -213,13 +245,12 @@ def fetch(url, _retries=3, allowed_domains=None, status_out=None):
                 if not _can_fetch(cur, allowed):
                     print(f'[WARN] fetch: robots.txt 禁止 {cur}', file=sys.stderr)
                     return None
-                host = urlparse(cur).netloc
-                if not any(host == d or host.endswith('.' + d) for d in allowed):
+                if not _allowed_host(cur, allowed):
                     print(f'[WARN] fetch: 域名不在白名单 {cur}', file=sys.stderr)
                     return None
 
-                r = requests.get(cur, headers=HEADERS, timeout=TIMEOUT,
-                                 stream=True, allow_redirects=False)
+                r = safe_request('GET', cur, headers=HEADERS, timeout=TIMEOUT,
+                                 stream=True, max_redirects=0)
 
                 if r.status_code not in (301, 302, 303, 307, 308):
                     break
@@ -234,8 +265,13 @@ def fetch(url, _retries=3, allowed_domains=None, status_out=None):
                           f'{cur}', file=sys.stderr)
                     return None
                 nxt = urljoin(cur, loc)
-                if urlparse(nxt).scheme not in ('http', 'https'):
+                next_scheme = urlparse(nxt).scheme
+                if next_scheme not in ('http', 'https'):
                     print(f'[WARN] fetch: 重定向目标 scheme 不允许 {nxt}',
+                          file=sys.stderr)
+                    return None
+                if urlparse(cur).scheme == 'https' and next_scheme != 'https':
+                    print(f'[WARN] fetch: 拒绝 HTTPS 降级重定向 {nxt}',
                           file=sys.stderr)
                     return None
                 cur = nxt
@@ -264,7 +300,7 @@ def fetch(url, _retries=3, allowed_domains=None, status_out=None):
             last_err = e
             # 重试前释放未读完的 stream 响应：iter_content 中途断流时 r 仍持有
             # 连接，不 close 只能等 GC——多轮重试会同时挂着多条僵尸连接。
-            # （requests.get 本身失败时 r 尚未赋值，NameError 一并吞掉。）
+            # （safe_request 本身失败时 r 尚未赋值，NameError 一并吞掉。）
             try:
                 r.close()
             except Exception:
@@ -1047,6 +1083,8 @@ _LEDGER_TTL_DAYS = 180
 _LEDGER_TTL_BY_VERDICT = {'failed': 7}   # P1-4：失败条目短 TTL，到期重试
 _LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0, 'dirty': 0}
 _LEDGER = {}  # {canon_url_key: {'v': 'rejected'|'old'|'failed', 'd': 条目日期, 't': 首次记录日}}
+_LEDGER_RETRY_KEYS = set()      # 本轮已到期、允许重试的 failed URL
+_RETRY_RECOVERED_KEYS = set()   # 本轮重试且已成功解析的 URL，供增量时间门豁免
 
 # 键形态白名单：必须是 _canon_url_key 的两种产出之一——普通 URL，或 vsb 站点组的
 # `vsb::代表域名::文章ID`。加这道闸是因为台账键一旦带杂质（空白、方括号、=），
@@ -1087,9 +1125,10 @@ def _ledger_is_fresh(entry):
 
 def load_ledger(path=None):
     """读台账并就地做过期清理。缺失/损坏一律退化为空台账——只影响耗时，不影响正确性。"""
-    global _LEDGER
+    global _LEDGER, _LEDGER_RETRY_KEYS
     path = path or _ledger_file()
     entries = {}
+    retry_keys = set()
     try:
         with open(path, encoding='utf-8') as f:
             raw = json.load(f)
@@ -1108,12 +1147,15 @@ def load_ledger(path=None):
             continue
         # TTL 判定统一走 _ledger_is_fresh（与 save_ledger 写侧同一判据，见其注释）
         if not _ledger_is_fresh(v):
+            if isinstance(v, dict) and v.get('v') == 'failed':
+                retry_keys.add(k)
             expired += 1
             continue
         kept[k] = v
     _LEDGER_STATS['expired'] = expired
     _LEDGER_STATS['dirty'] = dirty
     _LEDGER = kept
+    _LEDGER_RETRY_KEYS = retry_keys
     if dirty:
         print(f'[LEDGER] 台账中剔除 {dirty} 条形态异常的键'
               f'（含空白/方括号/等号，运行时永不命中）', file=sys.stderr)
@@ -1979,8 +2021,9 @@ def restore_human_time_annotations(new_records, existing):
     于是人工标注整体丢失。而全量并非罕见路径：`--full` 手动执行，或
     `data/last_scrape.json` 读取失败时 main() 会静默退化为全量。
 
-    键与 incremental_merge 一致：(sourceUrl, lectureIndex)，多讲座页靠
-    lectureIndex 区分场次，不会互相覆盖。
+    优先按 (sourceUrl, lectureIndex) 精确匹配；URL 仅 scheme/默认端口/尾斜杠
+    变化时，按同页同 lectureIndex 且旧新均唯一回退。多讲座页仍按 lectureIndex
+    区分，单场旧记录不会套到重新拆分后的多场页面。
 
     :param new_records: 本轮全量产出的记录列表（原地修改并返回）
     :param existing: 写盘前的旧数据（data/lectures.json）
@@ -1988,7 +2031,25 @@ def restore_human_time_annotations(new_records, existing):
     """
     if not existing:
         return new_records
+
+    def page_identity(u):
+        if not isinstance(u, str) or not u:
+            return None
+        try:
+            parts = urlparse(u)
+            host = (parts.hostname or '').lower()
+            if parts.scheme not in ('http', 'https') or not host:
+                return None
+            port = parts.port
+            default_port = 80 if parts.scheme == 'http' else 443
+            if port == default_port:
+                port = None
+        except ValueError:
+            return None
+        return (host, port, parts.path.rstrip('/'), parts.query)
+
     index = {}
+    page_index = {}
     for r in existing:
         if not isinstance(r, dict):
             continue
@@ -1999,13 +2060,33 @@ def restore_human_time_annotations(new_records, existing):
         u = r.get('sourceUrl')
         if not u:
             continue
-        index[(u, r.get('lectureIndex'))] = r
+        idx = r.get('lectureIndex')
+        index[(u, idx)] = r
+        page = page_identity(u)
+        if page is not None:
+            page_index.setdefault((page, idx), []).append(r)
+
+    new_page_counts = {}
+    for rec in new_records:
+        if not isinstance(rec, dict):
+            continue
+        page = page_identity(rec.get('sourceUrl'))
+        if page is not None:
+            key = (page, rec.get('lectureIndex'))
+            new_page_counts[key] = new_page_counts.get(key, 0) + 1
 
     restored = 0
     for rec in new_records:
         if not isinstance(rec, dict):
             continue
-        old = index.get((rec.get('sourceUrl'), rec.get('lectureIndex')))
+        idx = rec.get('lectureIndex')
+        old = index.get((rec.get('sourceUrl'), idx))
+        if old is None:
+            page = page_identity(rec.get('sourceUrl'))
+            key = (page, idx) if page is not None else None
+            candidates = page_index.get(key, []) if key is not None else []
+            if len(candidates) == 1 and new_page_counts.get(key) == 1:
+                old = candidates[0]
         if old is None:
             continue
         if rec.get('timeUnknown') == old.get('timeUnknown') \
@@ -2068,6 +2149,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
     list_policy_skipped = []
     list_empty_ok = []
     list_seen_ok = 0
+    paging_fetch_fail = []
     # P0-2（2026-10-10）：详情页取回/解析失败的记账。此前循环内两处 continue
     # 静默跳过、不进 failed_sources → 单场讲座漏抓无任何告警（外部审查发现）。
     # 现与列表页失败同口径上报，由 main() 统一纳入水位闸门（不推进 + gate 告警）；
@@ -2091,10 +2173,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
             #   ① 配置里写死的 list_url（人工维护，404 确实是故障）
             #   ② _next_page_url / _sequential_candidate **推导**出来的下一页
             #       （形如 list/2.html，是「猜」的；源站没有第 2 页时 404 属正常）
-            # ⚠ 只有 ① 取不回才判本源失败。② 取不回只是「没有下一页」，
-            #    若也算失败，则几乎所有源都会因猜出的 /2.html 404 而被判失败
-            #    → 全局水位永久冻结（实测：正常源会被误判成
-            #    「列表页取回失败 1/2」，已由 tests/test_list_page_failure.py 锁住）。
+            #   ⚠ ① 取不回判本源失败。② 仅 404/410 是确定的「无下一页」；
+            #     5xx/429/超时/断连是不确定故障，必须冻结水位下次重试。
             on_entry_page = True
             while cur and cur.rstrip('/') not in visited_pages:
                 visited_pages.add(cur.rstrip('/'))
@@ -2108,7 +2188,8 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     print(f'[LIST-POLICY] {name} | {cur} | robots 明确禁止，'
                           f'按预期过滤（不判本源失败）', file=sys.stderr)
                     break
-                html = fetch(cur, allowed_domains=['scnu.edu.cn'])
+                _ls = {}
+                html = fetch(cur, allowed_domains=['scnu.edu.cn'], status_out=_ls)
                 new_count = 0
                 # 列表页取不到正文：此前**无守卫静默空转**——collect_links(None) 返回 []、
                 # 循环体一次都不进、函数末尾 return local, None（= 成功），
@@ -2121,8 +2202,14 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         print(f'[LIST-FAIL] {name} | {cur} | 列表页取回失败'
                               f'（本次本源不推进水位）', file=sys.stderr)
                     else:
-                        print(f'[PAGE-404] {name} | {cur} | 推导出的翻页页取回失败，'
-                              f'视作「无下一页」（不判本源失败）', file=sys.stderr)
+                        if _ls.get('code') in (404, 410):
+                            print(f'[PAGE-END] {name} | {cur} | 推导出的翻页页不存在'
+                                  f'(HTTP {_ls.get("code")})，视为「无下一页」', file=sys.stderr)
+                        else:
+                            paging_fetch_fail.append(cur)
+                            print(f'[PAGE-FAIL] {name} | {cur} | 推导翻页页取回失败'
+                                  f'（状态={_ls.get("code", "无")}），下次重试，本次不推进水位',
+                                  file=sys.stderr)
                     # 与既有逻辑一致：取不到页面就到此为止（_next_page_url(None) 本就返回 None）
                     break
                 # 列表页条目日期映射。两种用途，故与 LISTDATE 开关解耦：
@@ -2242,6 +2329,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         continue
                     if not isinstance(recs, list):
                         recs = [recs]
+                    if recs:
+                        _retry_key = _canon_url_key(href_norm)
+                        if _retry_key in _LEDGER_RETRY_KEYS:
+                            _RETRY_RECOVERED_KEYS.add(_retry_key)
+                            _LEDGER_RETRY_KEYS.discard(_retry_key)
                     for r in recs:
                         r['listTitle'] = txt
                         # 多讲座拆分后多条共享同一 sourceUrl，需用 期号 区分 key 防覆盖
@@ -2334,6 +2426,11 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                       f'{list_seen_ok} 页有内容、{len(list_empty_ok)} 页无条目', file=sys.stderr)
             return local, (f'{name}: 列表页取回失败 {len(list_fetch_fail)}/{total_cfg}'
                            f'（首个：{list_fetch_fail[0]}）')
+        if paging_fetch_fail:
+            print(f'[PAGE-FAIL] {name} | {len(paging_fetch_fail)} 个推导翻页页取回失败'
+                  f'（首个：{paging_fetch_fail[0]}）| 本次本源不推进水位', file=sys.stderr)
+            return local, (f'{name}: 推导翻页页取回失败 {len(paging_fetch_fail)} 页'
+                           f'（首个：{paging_fetch_fail[0]}）')
         if list_empty_ok and not list_seen_ok:
             print(f'[LIST-EMPTY] {name} | {len(list_empty_ok)} 个列表页取回成功但 0 条讲座条目'
                   f'（栏目真空或改版，按成功处理；如长期为 0 请人工确认源是否已迁移）', file=sys.stderr)
@@ -2387,7 +2484,7 @@ def main():
     cfg_path = os.path.join(ROOT, 'scraper', 'sources.yaml')
     with open(cfg_path, encoding='utf-8') as f:
         cfg = yaml.safe_load(f)
-    year = time.localtime().tm_year
+    year = current_year()
 
     # 决定抓取模式：有 --since 且非 --full → 增量；否则全量
     last_scrape_path = os.path.join(ROOT, 'data', 'last_scrape.json')
@@ -2564,6 +2661,7 @@ def main():
         max_workers = 3
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
+    _RETRY_RECOVERED_KEYS.clear()
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # ⚠ 第 8 个实参必须是**本源自己**的最晚条目日期（字符串），不是整张
         # {源名: 日期} 字典。传错类型会让 _process_source 里的
@@ -2666,6 +2764,11 @@ def main():
                               f'（水位早于全局 since={cutoff.date()}，下限 {GATE_FLOOR_DAYS} 天）')
             kept, dropped = [], 0
             dropped_keys, kept_keys = set(), set()
+            _retry_recovered = ({_canon_url_key(r.get('sourceUrl')) for r in all_fetched}
+                                & _RETRY_RECOVERED_KEYS)
+            if _retry_recovered:
+                print(f'[RETRY-RECOVERED] {len(_retry_recovered)} 个失败条目重试成功，'
+                      f'本轮豁免增量时间门（不再改写为 180 天 old 台账）')
             for r in all_fetched:
                 # 2026-10-10 补漏：新源豁免时间门。
                 # 改造 1 只放开了**列表页侧**三道闸门（水位线条目跳过 / 被拒台账 /
@@ -2676,6 +2779,10 @@ def main():
                 # 判据用 college 名：_process_source 里 src['name'] 原样写进
                 # rec['college']，与 main() 识别新源时用的键完全一致。
                 if r.get('college') in new_source_names:
+                    kept.append(r)
+                    kept_keys.add(_canon_url_key(r.get('sourceUrl')))
+                    continue
+                if _canon_url_key(r.get('sourceUrl')) in _retry_recovered:
                     kept.append(r)
                     kept_keys.add(_canon_url_key(r.get('sourceUrl')))
                     continue

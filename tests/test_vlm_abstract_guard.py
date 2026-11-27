@@ -112,23 +112,23 @@ class Ctld4021EndToEndTest(unittest.TestCase):
     def setUpClass(cls):
         if not os.path.exists(FIXTURE):
             raise unittest.SkipTest('缺少 fixture：tests/fixtures/html/ctld4021.html')
-        # 纯规则路径：清 key + 掐断 requests，避免测试依赖网络与外部模型。
+        # 纯规则路径：清 key + 掐断安全出站，避免测试依赖网络与外部模型。
         # 只清 key 不够——代码仍会发请求并等满 timeout，单次用例要 60s+。
         import requests
         for k in ('AGNES_API_KEY', 'ZHIPU_API_KEY'):
             os.environ.pop(k, None)
-        cls._orig_post = requests.post
+        cls._orig_post = P.safe_request
 
         def _no_net(*a, **k):
             raise requests.exceptions.ConnectionError('test: network disabled')
 
-        requests.post = _no_net
+        P.safe_request = _no_net
         try:
             html = io.open(FIXTURE, encoding='utf-8').read()
             out = P.parse_detail(html, URL, '教师发展中心', '校级', default_year=2022)
             cls.rec = out if isinstance(out, dict) else out[0]
         finally:
-            requests.post = cls._orig_post
+            P.safe_request = cls._orig_post
 
     def test_主讲人简介被提取(self):
         bio = self.rec.get('speakerBio') or ''

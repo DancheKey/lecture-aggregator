@@ -76,7 +76,7 @@ if (!/\.sitebar\{[^}]*border-bottom/.test(css)) {
   errs.push('缺顶部站点栏样式（.sitebar 无 border-bottom）——'
             + '与首页/统计页的白色表头不一致');
 }
-if (!/<header class="sitebar">[\s\S]*?<nav class="topnav">/.test(html)) {
+if (!/<header class="sitebar">[\s\S]*?<nav class="topnav"(?:\s[^>]*)?>/.test(html)) {
   errs.push('导航未放进站点栏（<header class="sitebar"> 内找不到 <nav class="topnav">）');
 }
 if (!/\.topnav\{[^}]*margin:0 0 0 auto/.test(css)) {
@@ -114,9 +114,9 @@ const data = JSON.parse(
 // site_uv/uv_delta，它们在新快照里恒为 null，表格会变成整列「—」的死数据。
 // 注：页脚说明里解释「为什么不统计访客数」是允许的，故只禁字段引用与表头列名。
 for (const [label, src, bad] of [
-  ['趋势页 HTML 表头', html, /<th>(累计|日新增)访客/],
+  ['趋势页 HTML 表头', html, /<th(?:\s[^>]*)?>(累计|日新增)访客/],
   ['visits-trend.js 渲染', js, /s\.site_uv|s\.uv_delta/],
-  ['生成脚本模板', genSrc, /fmt\(s\.site_uv\)|fmt\(s\.uv_delta\)|<th>累计访客数/],
+  ['生成脚本模板', genSrc, /fmt\(s\.site_uv\)|fmt\(s\.uv_delta\)|<th(?:\s[^>]*)?>累计访客数/],
 ]) {
   if (bad.test(src)) errs.push(`${label} 仍在体现 UV（${bad}）——UV 已于 2026-10-18 下线`);
 }
@@ -152,9 +152,28 @@ for (const [label, src, bad] of [
 function mkNode(tag) {
   return {
     tagName: tag, children: [], attrs: {}, _text: '', className: '',
-    style: {}, hidden: false,
-    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
-    addEventListener() {}, removeEventListener() {},
+    style: {}, hidden: false, _listeners: {},
+    classList: {
+      toggle(name, force) {
+        const names = new Set(this.owner.className.split(/\s+/).filter(Boolean));
+        const on = force === undefined ? !names.has(name) : !!force;
+        if (on) names.add(name); else names.delete(name);
+        this.owner.className = [...names].join(' ');
+        return on;
+      },
+      add(name) { this.owner.classList.toggle(name, true); },
+      remove(name) { this.owner.classList.toggle(name, false); },
+      contains(name) { return this.owner.className.split(/\s+/).includes(name); },
+    },
+    addEventListener(type, fn) {
+      (this._listeners[type] || (this._listeners[type] = [])).push(fn);
+    },
+    removeEventListener(type, fn) {
+      this._listeners[type] = (this._listeners[type] || []).filter(x => x !== fn);
+    },
+    dispatch(type, event) {
+      (this._listeners[type] || []).forEach(fn => fn.call(this, event || { type }));
+    },
     get firstChild() { return this.children[0] || null; },
     get textContent() { return this._text; },
     set textContent(v) { this._text = String(v); this.children = []; },
@@ -166,8 +185,20 @@ function mkNode(tag) {
     querySelectorAll() { return []; },
   };
 }
+function bindClassList(node) { node.classList.owner = node; return node; }
 const byId = {};
-['chart', 'tbody', 'tcount', 'toggleRows', 'load-err'].forEach(id => { byId[id] = mkNode('div'); });
+['chart', 'tbody', 'tcount', 'toggleRows', 'load-err', 'trend-status'].forEach(id => {
+  byId[id] = bindClassList(mkNode('div'));
+});
+const ranges = [
+  ['7', '近 7 天'], ['30', '近 30 天'], ['0', '全部'],
+].map(([value, label]) => {
+  const node = bindClassList(mkNode('button'));
+  node.setAttribute('data-range', value);
+  node.setAttribute('aria-pressed', value === '7' ? 'true' : 'false');
+  node.textContent = label;
+  return node;
+});
 
 const sandbox = {
   console,
@@ -177,7 +208,7 @@ const sandbox = {
     createElementNS: (ns, t) => mkNode(t),
     createDocumentFragment: () => mkNode('#fragment'),
     createTextNode: t => ({ nodeType: 3, textContent: String(t) }),
-    querySelectorAll: () => [],
+    querySelectorAll: selector => selector === '.ranges button' ? ranges : [],
     addEventListener() {},
     documentElement: { style: {} },
   },
@@ -217,6 +248,51 @@ vm.createContext(sandbox);
     if (svg.children.length === 0) {
       errs.push('svg 内无任何图形元素——DOM 化时可能漏了 appendChild');
     }
+  }
+
+  // #20：范围/展开按钮状态与常驻 live status 必须随交互同步。
+  if (!byId['trend-status']._text.includes('数据已加载')) {
+    errs.push('数据加载完成后 trend-status 未播报结果');
+  }
+  const toggle = byId['toggleRows'];
+  if (toggle.getAttribute('aria-expanded') !== 'false'
+      || toggle.getAttribute('aria-pressed') !== 'false'
+      || toggle.hidden !== true) {
+    errs.push('展开按钮初始 aria-expanded/aria-pressed 应为 false，7 条以内应隐藏');
+  }
+  ranges[2].dispatch('click'); // 全部：样本够多，才能验证展开态。
+  if (ranges[2].getAttribute('aria-pressed') !== 'true'
+      || ranges[0].getAttribute('aria-pressed') !== 'false'
+      || ranges[1].getAttribute('aria-pressed') !== 'false') {
+    errs.push('切换范围后 aria-pressed 未互斥更新');
+  }
+  if (!byId['trend-status']._text.includes('全部')
+      || !byId['trend-status']._text.includes(String(data.snaps.length))) {
+    errs.push('范围切换后 trend-status 未播报范围和快照数');
+  }
+  toggle.dispatch('click');
+  if (toggle.getAttribute('aria-expanded') !== 'true'
+      || toggle.getAttribute('aria-pressed') !== 'true'
+      || byId['tbody'].children.length !== data.snaps.length
+      || !byId['trend-status']._text.includes('已展开')) {
+    errs.push('展开全部后按钮状态、表格行数与 live status 未同步');
+  }
+  toggle.dispatch('click');
+  if (toggle.getAttribute('aria-expanded') !== 'false'
+      || toggle.getAttribute('aria-pressed') !== 'false'
+      || byId['tbody'].children.length !== 7
+      || !byId['trend-status']._text.includes('已收起')) {
+    errs.push('收起后按钮状态、表格行数与 live status 未同步');
+  }
+  ranges[1].dispatch('click');
+  if (!byId['trend-status']._text.includes('近 30 天') || toggle.hidden !== false) {
+    errs.push('近 30 天范围切换未播报或展开按钮未恢复可见');
+  }
+  vm.runInContext('showLoadError', sandbox)('测试错误');
+  if (byId['load-err'].hidden !== false
+      || !byId['load-err']._text.includes('测试错误')
+      || !byId['trend-status']._text.includes('加载失败')) {
+    errs.push('加载失败时可见错误与 live status 均未播报');
   }
 
   console.log(`svg=${svgCount} 说明段=${capCount} 表格行=${trCount} `

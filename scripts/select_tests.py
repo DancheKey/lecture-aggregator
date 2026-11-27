@@ -57,7 +57,8 @@ GROUPS = [
     {'name': 'cloud', 'pats': ['site/app.cloud.js', 'site/footer-counter.js',
                                'site/supabase-config.json', 'scripts/gen_supabase_sql.py',
                                'scripts/gen_supabase_patch.py', 'scripts/fetch_visits_snapshot.py',
-                               'supabase-migration.sql', 'supabase-patch-current.sql'],
+                               'supabase-migration.sql', 'supabase-patch-current.sql',
+                               'supabase-verify-current.sql'],
      'tests': ['tests/test_supabase_migration.py']},
     # 趋势页（node 门禁 visits_trend_render.js + 资产门禁 test_site_assets：
     # 本页的 icon/og meta 在 gen_visits_trend.py 的模板里，产物会被次日 CI 覆盖，
@@ -104,7 +105,7 @@ GROUPS = [
                'tests/test_llm_text_replay.py',
                'tests/test_hallucination_guard.py', 'tests/test_stage_var_leak.py',
                'tests/test_listdate.py', 'tests/test_module_compile.py',
-               'tests/test_pdf_inline.py',
+               'tests/test_pdf_inline.py', 'tests/test_safe_http.py',
                'tests/test_attachment_channel.py',
                'tests/test_numbered_slot_sessions.py',
                'tests/test_multi_poster_vlm.py',
@@ -142,7 +143,8 @@ GROUPS = [
                'tests/test_reparse_incomplete_20261120.py',
                'tests/test_source_count_consistency.py', 'tests/test_ledger.py',
                'tests/test_listdate.py', 'tests/test_llm_cache.py',
-               'tests/test_module_compile.py', 'tests/test_env_flags.py']},
+               'tests/test_module_compile.py', 'tests/test_safe_http.py',
+               'tests/test_env_flags.py']},
     # 主数据（data/ 每日增量都在变；只有人工改 data/ 才值得跑对账组）。
     # scripts/test_invariants.py 是对账被测脚本（被 test_data_reconciliation 调用）
     {'name': 'data', 'pats': ['data/', 'scripts/test_invariants.py'],

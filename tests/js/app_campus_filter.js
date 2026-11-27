@@ -249,6 +249,22 @@ const titles = cm => cm.filtered.map(l => l.title).sort().join(',');
   ok(cm2.showLikedOnly === false, 'T13f toggleLikedFilter 再点恢复');
 }
 
+// ---------- T14：卡片 Tag 与「只看已赞/已想听」互斥（2026-11-26） ----------
+{
+  for (const field of ['college', 'campus']) {
+    const cm = makeCtx({
+      showLikedOnly: true, showWantedOnly: false,
+      campus: '石牌', college: '文学院', year: '2026',
+    });
+    methods.onTagClick.call(cm, field, field === 'college' ? '数学院' : '大学城');
+    ok(cm.showLikedOnly === false && cm.showWantedOnly === false,
+       `T14 ${field} Tag 应清空 liked/wanted 两种互斥筛选`);
+    ok(cm[field] === (field === 'college' ? '数学院' : '大学城'),
+       `T14 ${field} Tag 应写入对应筛选维度`);
+    ok(cm.year === '2026', `T14 ${field} Tag 不应顺手清空年份（与 setCollege/setCampus 同口径）`);
+  }
+}
+
 // ---------- 汇总 ----------
 if (errs.length) {
   console.log(`[FAIL] ${errs.length} 项`);

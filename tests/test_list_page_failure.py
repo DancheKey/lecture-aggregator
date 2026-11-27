@@ -83,6 +83,11 @@ class _SourceRun:
             # 是守卫造成的）。推导出的翻页页仍返回 None。
             if re.search(r'/a/\d{6}/\d+\.html?$', url):
                 return f'<html><body>{url}</body></html>'
+            # 旧用例里“猜出的数字翻页不存在”默认按 404 终态建模；需要覆盖超时/
+            # 断连时显式传 status_codes={url: None}，保留无状态码故障语义。
+            if (url not in self.status_codes and status_out is not None
+                    and re.search(r'/[^/]+/\d+\.html?$', url)):
+                status_out['code'] = 404
             return None
 
         def fake_parse_detail(d, href, name, campus, year, list_title='', **kwargs):
@@ -184,7 +189,8 @@ class ListPageFailureAccountingTest(unittest.TestCase):
         若分母误含推导页会得到 1/3，报错会让人误以为「有三页、坏了两个」。
         """
         u1, u2 = 'http://t.scnu.edu.cn/p1/', 'http://t.scnu.edu.cn/p2/'
-        r = _SourceRun(P, {u1: GOOD_PAGE, u2: None})
+        r = _SourceRun(P, {u1: GOOD_PAGE, u2: None},
+                       status_codes={u2: 404, 'http://t.scnu.edu.cn/p1/2.html': 404})
         err, local = r.run([_lu(u1), _lu(u2)])
         self.assertIsNotNone(err, '配置页 p2 取回失败须判本源失败')
         self.assertIn('1/2', err, f'分母应只数配置页（推导页404 不计入）：{err}')
@@ -196,20 +202,49 @@ class ListPageFailureAccountingTest(unittest.TestCase):
         self.assertIsNotNone(err)
         self.assertEqual(len(local), 1, '失败源仍应返回已抓到的部分结果')
 
-    def test_06_推导出的翻页页失败不判本源失败(self):
-        """第 2 页（由 _sequential_candidate **猜**出来的 /list/2.html）取回失败属正常。
+    def test_06_推导出的翻页页404不判本源失败(self):
+        """第 2 页（由 _sequential_candidate **猜**出来的 /list/2.html）404 属正常。
 
-        源站本来就没有第 2 页时它必然 404。若把它算作失败，几乎所有源都会被判失败
-        → 全局水位永久冻结。test_00已锁「正常源不被误判」，这里锁反向：
-        正常源判成功后，日志里应当出现过 [PAGE-404]（证明确实尝试过翻页）。
+        源站本来就没有第 2 页时它必然 404。只有确定终态 404/410 才能视为「无下一页」；
+        其它取回失败必须在下方单独用例里判为不确定故障。
         """
-        r = _SourceRun(P, {self.u_ok: GOOD_PAGE})
+        next_page = 'http://t.scnu.edu.cn/list/2.html'
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE}, status_codes={next_page: 404})
         err, local = r.run([_lu(self.u_ok)])
-        self.assertIsNone(err, f'仅翻页页取回失败不得判本源失败：{err}')
+        self.assertIsNone(err, f'仅翻页页 404 不得判本源失败：{err}')
         self.assertEqual(len(local), 1, '首页内容应正常入库')
-        # 确实尝试过猜出的下一页（否则本用例就没测到东西）
-        self.assertIn('http://t.scnu.edu.cn/list/2.html', r.fetched,
+        self.assertIn(next_page, r.fetched,
                       '未尝试推导翻页页——桩的行为变了，本用例失去意义')
+
+    def test_06b_推导翻页410是确定终态(self):
+        next_page = 'http://t.scnu.edu.cn/list/2.html'
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE}, status_codes={next_page: 410})
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNone(err)
+        self.assertEqual(len(local), 1)
+
+    def test_06c_推导翻页500必须冻结水位(self):
+        next_page = 'http://t.scnu.edu.cn/list/2.html'
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE}, status_codes={next_page: 500})
+        err, local = r.run([_lu(self.u_ok)])
+        self.assertIsNotNone(err, '5xx 不等于没有下一页，必须重试')
+        self.assertIn('推导翻页页取回失败', err)
+        self.assertIn(next_page, err)
+        self.assertEqual(len(local), 1, '已成功页的数据仍应保留')
+
+    def test_06d_推导翻页429必须冻结水位(self):
+        next_page = 'http://t.scnu.edu.cn/list/2.html'
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE}, status_codes={next_page: 429})
+        err, _ = r.run([_lu(self.u_ok)])
+        self.assertIsNotNone(err, '限流是临时故障，不能当作翻页终点')
+
+    def test_06e_推导翻页超时或断连必须冻结水位(self):
+        next_page = 'http://t.scnu.edu.cn/list/2.html'
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE, next_page: None},
+                       status_codes={next_page: None})
+        err, _ = r.run([_lu(self.u_ok)])
+        self.assertIsNotNone(err, '无状态码的取回失败不是确定终态，必须下次重试')
+        self.assertIn(next_page, err)
 
     def test_07_失败不触发无限重试_pagination(self):
         """失败页不得被 _next_page_url/_sequential_candidate 反复重试。"""
@@ -363,6 +398,63 @@ class DetailPageFailureGateTest(unittest.TestCase):
         err, local = r.run([_lu(self.u_ok)])
         self.assertIsNotNone(err, '500 是可重试故障，必须判本源失败')
         self.assertIn('详情页取回/解析失败 1 页', err)
+
+
+class FailedRetryRecoveryTest(unittest.TestCase):
+    """失败条目到期重试成功后，必须保留来源，避免再被时间门锁成 old。"""
+
+    def setUp(self):
+        self.saved = (dict(P._LEDGER), dict(P._LEDGER_STATS),
+                      set(P._LEDGER_RETRY_KEYS), set(P._RETRY_RECOVERED_KEYS))
+        P._LEDGER = {}
+        P._LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0, 'dirty': 0}
+        P._LEDGER_RETRY_KEYS = set()
+        P._RETRY_RECOVERED_KEYS = set()
+        self.u_ok = 'http://t.scnu.edu.cn/list/'
+        self.detail = 'http://t.scnu.edu.cn/a/202609/123.html'
+        self.key = P._canon_url_key(self.detail)
+
+    def tearDown(self):
+        (P._LEDGER, P._LEDGER_STATS,
+         P._LEDGER_RETRY_KEYS, P._RETRY_RECOVERED_KEYS) = self.saved
+
+    def test_successful_retry_is_marked_recovered(self):
+        P._LEDGER_RETRY_KEYS = {self.key}
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE})
+        err, local = r.run([_lu(self.u_ok)], is_incremental=True)
+        self.assertIsNone(err)
+        self.assertEqual(len(local), 1)
+        self.assertIn(self.key, P._RETRY_RECOVERED_KEYS)
+        self.assertNotIn(self.key, P._LEDGER_RETRY_KEYS)
+
+    def test_successful_first_fetch_is_not_retry_recovery(self):
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE})
+        err, local = r.run([_lu(self.u_ok)], is_incremental=True)
+        self.assertIsNone(err)
+        self.assertEqual(len(local), 1)
+        self.assertEqual(P._RETRY_RECOVERED_KEYS, set())
+
+    def test_fresh_failed_entry_is_skipped_not_recovered(self):
+        import datetime
+        P._LEDGER[self.key] = {
+            'v': 'failed', 'd': '',
+            't': datetime.date.today().isoformat(),
+        }
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE})
+        err, local = r.run([_lu(self.u_ok)], is_incremental=True)
+        self.assertIsNone(err)
+        self.assertEqual(local, {})
+        self.assertNotIn(self.detail, r.fetched)
+        self.assertEqual(P._RETRY_RECOVERED_KEYS, set())
+
+    def test_failed_retry_is_not_marked_recovered(self):
+        P._LEDGER_RETRY_KEYS = {self.key}
+        r = _SourceRun(P, {self.u_ok: GOOD_PAGE, self.detail: None})
+        err, local = r.run([_lu(self.u_ok)], is_incremental=True)
+        self.assertIsNotNone(err)
+        self.assertEqual(local, {})
+        self.assertEqual(P._RETRY_RECOVERED_KEYS, set())
+        self.assertEqual(P._LEDGER[self.key]['v'], 'failed')
 
 
 class ListDateSwitchTest(unittest.TestCase):

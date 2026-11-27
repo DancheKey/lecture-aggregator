@@ -17,6 +17,7 @@ import json
 import time
 import atexit
 import hmac
+import ipaddress
 import secrets
 import socket
 import threading
@@ -24,6 +25,7 @@ import subprocess
 import yaml           # 仅用于读取其它 yaml（如给 scraper 用的辅助脚本）；sources.yaml 走 ruamel
 import ruamel.yaml
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit, urlunsplit
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SITE_DIR = os.path.join(ROOT, 'site')
@@ -44,6 +46,29 @@ from frontend_fields import strip_frontend_fields
 # 本地 /api/lectures 与公网静态切片必须给出相同的 vf 标记。
 from generate_frontend_data import forum_group_key, venue_blocked_groups
 import field_vocab as _fv
+
+
+def _canonical_lecture_url(value):
+    """统一统计 URL 身份；path 保持大小写，count key 的 ~N 后缀原样保留。"""
+    if not isinstance(value, str):
+        return ''
+    text = value.strip()
+    if not text or any(ord(ch) < 32 for ch in text):
+        return ''
+    try:
+        parts = urlsplit(text)
+        scheme = parts.scheme.lower()
+        host = (parts.hostname or '').lower()
+        port = parts.port
+    except (TypeError, ValueError):
+        return ''
+    if scheme not in ('http', 'https') or not host or parts.username is not None:
+        return ''
+    if ':' in host:
+        host = '[' + host + ']'
+    if port is not None and port != (80 if scheme == 'http' else 443):
+        host += ':' + str(port)
+    return urlunsplit((scheme, host, parts.path.rstrip('/'), parts.query, ''))
 
 
 def _is_allowed_source_url(u):
@@ -124,6 +149,8 @@ WANT_THROTTLE = 3                      # 同一 IP / 同一讲座 3 秒内相同
 #   LIKE_CAP  = 1000 → 本地 /api 单条累计上限，到顶返回 capped 不再 +1；
 #   云端 SQL 1000    → lecture_stats.likes 的 check 约束 + RPC 累计钳位。
 LIKE_CAP = 1000
+WANT_CAP = 1000
+LECTURE_VISIT_CAP = 1_000_000
 MAX_BODY_BYTES = 1_000_000             # 请求体上限 1MB（本地 API 的 body 都是几十字节的小 JSON）
 MAX_SOURCES = 500                      # 信息源条数上限（当前 53 条。防POST 循环写入把yaml 撑成几万条，
                                         # 且每个源都会被 daily.yml 真实抓取——几百个源会让CI 跑一整天。
@@ -191,36 +218,44 @@ _IS_LOOPBACK_RE = re.compile(r'^127\.0\.0\.1$|^::1$|^\[::1\]$')
 #   带 Host（浏览器一定会发），故「缺 Host → 放行、带错 Host → 拒绝」既能挡住
 #   攻击又不伤正常路径。
 _ALLOWED_HOSTS = frozenset(('127.0.0.1', 'localhost', '::1', '[::1]'))
-
-# 是否执行 Host 校验（默认 True；main() 会在绑定非回环地址时改写为 False）。
-# 只在**绑定回环**时强制校验：DNS 重绑定的攻击形态是「让浏览器解析出回环地址
-# 连到本机」，回环绑定是它的唯一前提；且白名单只有回环名——若 HOST=0.0.0.0
-# 仍强制，LAN 客户端用 http://<本机IP>:8000 访问会全部 403，把文档支持的
-# 局域网模式直接打挂（2026-10-10 实测发现）。局域网模式本就按「自担风险」
-# 开放（见 main() 注释），且管理 token 发放另有 client IP 回环检查兜底。
+_ALLOWED_BIND_HOSTS = frozenset()
+_ALLOW_IP_LITERAL_HOSTS = False
 _ENFORCE_HOST = True
 
 
-def _host_allowed(host_header):
-    """Host 头是否可信。缺 Host 视为放行（见上方注释）；带 Host 则必须命中白名单。
+def _configure_host_policy(host):
+    """局域网绑定只额外放行 IP 字面量/绑定主机名，绝不关闭恶意域名校验。"""
+    global _ALLOWED_BIND_HOSTS, _ALLOW_IP_LITERAL_HOSTS, _ENFORCE_HOST
+    loopback = host in ('127.0.0.1', 'localhost', '::1', '[::1]', '')
+    normalized = host.strip().lower()
+    if normalized.startswith('[') and ']' in normalized:
+        normalized = normalized[1:normalized.index(']')]
+    _ALLOWED_BIND_HOSTS = frozenset({normalized}) if normalized and not loopback else frozenset()
+    _ALLOW_IP_LITERAL_HOSTS = not loopback
+    _ENFORCE_HOST = True
+    return loopback
 
-    归一化：去掉端口、IPv6 的方括号、小写化。`[::1]:8000` 与 `::1` 都应放行。
-    """
+
+def _host_allowed(host_header):
+    """缺 Host 放行；其余仅接受回环名、绑定主机名或局域网模式的 IP 字面量。"""
     if host_header is None:
-        return True                      # 无 Host：非浏览器客户端，放行
+        return True
     h = str(host_header).strip().lower()
     if not h:
         return True
-    if h.startswith('['):                # [::1]:8000 → ::1
+    if h.startswith('['):
         h = h[1:h.index(']')] if ']' in h else h[1:]
-    elif ':' in h:
-        # 多个冒号 = 裸 IPv6（::1 / ::1:8000 这类无方括号写法），
-        # 不能按第一个冒号切——否则 '::1' 会被切成空串而误拒。
-        # 只有一个冒号才是 host:port（127.0.0.1:8000 → 127.0.0.1）。
-        if h.count(':') > 1:
-            return h.split(':', 1)[0] in _ALLOWED_HOSTS or h in _ALLOWED_HOSTS
+    elif h.count(':') == 1:
         h = h.split(':', 1)[0]
-    return h in _ALLOWED_HOSTS
+    if h in _ALLOWED_HOSTS or h in _ALLOWED_BIND_HOSTS:
+        return True
+    if _ALLOW_IP_LITERAL_HOSTS:
+        try:
+            ipaddress.ip_address(h)
+            return True
+        except ValueError:
+            pass
+    return False
 
 
 def _check_admin(self):
@@ -300,40 +335,113 @@ def _attach_unit_types(data):
     return out
 
 
+def _normalize_site_visits(raw):
+    if not isinstance(raw, dict):
+        return None
+    total = raw.get('total', 0)
+    by_day = raw.get('by_day', {})
+    if type(total) is not int or total < 0 or not isinstance(by_day, dict):
+        return None
+    days = {}
+    for day, count in by_day.items():
+        if not isinstance(day, str) or type(count) is not int or count < 0:
+            return None
+        try:
+            parsed = time.strptime(day, '%Y-%m-%d')
+        except ValueError:
+            return None
+        if time.strftime('%Y-%m-%d', parsed) != day:
+            return None
+        days[day] = count
+    return {'total': total, 'by_day': days}
+
+
+def _normalize_lecture_stats(raw):
+    if not isinstance(raw, dict):
+        return None
+    merged = {}
+    for raw_key, values in raw.items():
+        key = _canonical_lecture_url(raw_key)
+        if not key or not isinstance(values, dict):
+            return None
+        counts = {}
+        for field, cap in (('visits', LECTURE_VISIT_CAP),
+                           ('likes', LIKE_CAP), ('wants', WANT_CAP)):
+            value = values.get(field, 0)
+            if type(value) is not int or value < 0:
+                return None
+            counts[field] = min(value, cap)
+        current = merged.setdefault(key, {'visits': 0, 'likes': 0, 'wants': 0})
+        current['visits'] = min(LECTURE_VISIT_CAP, current['visits'] + counts['visits'])
+        current['likes'] = max(current['likes'], counts['likes'])
+        current['wants'] = max(current['wants'], counts['wants'])
+    return merged
+
+
+def _quarantine_stat_file(path):
+    target = path + '.corrupt-' + str(time.time_ns())
+    try:
+        os.replace(path, target)
+    except OSError as e:
+        _warn(f'损坏统计文件隔离失败（{path}）：{type(e).__name__}: {e}')
+        return False
+    _warn(f'损坏统计文件已保留为 {target}')
+    return True
+
+
+def _load_stat_json(path, normalize, default, label):
+    failed = []
+    for candidate in (path, path + '.bak'):
+        if not os.path.exists(candidate):
+            continue
+        try:
+            with open(candidate, encoding='utf-8') as f:
+                raw = json.load(f)
+            value = normalize(raw)
+            if value is None:
+                raise ValueError('统计结构或字段类型不合法')
+        except (OSError, ValueError, TypeError) as e:
+            failed.append(candidate)
+            _warn(f'{label}读取失败（{candidate}）：{type(e).__name__}: {e}')
+            continue
+        dirty = candidate != path or value != raw or bool(failed)
+        for broken in failed:
+            _quarantine_stat_file(broken)
+        return value, dirty
+    for broken in failed:
+        _quarantine_stat_file(broken)
+    return default, bool(failed)
+
+
 def _load_stat_files():
-    """启动时把磁盘上的统计状态读入内存（若不存在则用默认值）。"""
+    """启动时校验统计文件；主文件损坏时恢复有效 .bak，并隔离损坏原件。"""
     global _site_visits, _lecture_stats
-    try:
-        if os.path.exists(VISITS_PATH):
-            with open(VISITS_PATH, encoding='utf-8') as f:
-                _site_visits = json.load(f) or {'total': 0}
-    except Exception as e:
-        _warn(f'站点访问量加载失败，本次从 0 开始（{VISITS_PATH}）：{type(e).__name__}: {e}')
-        _site_visits = {'total': 0}
-    # 兼容旧格式（仅有 total，无 by_day 按日明细）；旧值仍保留为「历史遗留总数」
-    if not isinstance(_site_visits.get('by_day'), dict):
-        _site_visits['by_day'] = {}
-    try:
-        if os.path.exists(LECTURE_STATS_PATH):
-            with open(LECTURE_STATS_PATH, encoding='utf-8') as f:
-                _lecture_stats = json.load(f) or {}
-    except Exception as e:
-        _warn(f'讲座统计加载失败，点赞/想听计数将全部归零（{LECTURE_STATS_PATH}）：'
-              f'{type(e).__name__}: {e}')
-        _lecture_stats = {}
+    _site_visits, visits_dirty = _load_stat_json(
+        VISITS_PATH, _normalize_site_visits, {'total': 0, 'by_day': {}}, '站点访问量')
+    _lecture_stats, lectures_dirty = _load_stat_json(
+        LECTURE_STATS_PATH, _normalize_lecture_stats, {}, '讲座统计')
+    _stats_dirty['visits'] = visits_dirty
+    _stats_dirty['lectures'] = lectures_dirty
 
 
-def _atomic_write_json(path, obj):
-    """原子写 JSON：先写 .tmp 再 os.replace，避免中途崩溃留下半份文件。
-
-    indent=2 与 scraper/scraper.py::_atomic_write_json 保持一致（diff 可读）。
-    newline='\\n'（AGENTS.md §1 写盘铁律，2026-11-14 复核）：Windows 文本模式
-    默认把 \\n 落成 \\r\\n——实测 sources.yaml 334/334 行全 CRLF 即源于
-    本函数与 _save_sources。
-    """
+def _atomic_write_json(path, obj, backup_validator=None):
+    """原子写 JSON；统计文件在替换前把仍有效的主文件留作 .bak。"""
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
+    if backup_validator is not None and os.path.exists(path):
+        try:
+            with open(path, encoding='utf-8') as f:
+                previous = json.load(f)
+            if backup_validator(previous) is None:
+                raise ValueError('现有统计文件无效，不覆盖last-known-good备份')
+        except (OSError, ValueError, TypeError):
+            pass
+        else:
+            backup_tmp = path + '.bak.tmp'
+            with open(backup_tmp, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump(previous, f, ensure_ascii=False, indent=2)
+            os.replace(backup_tmp, path + '.bak')
     os.replace(tmp, path)
 
 
@@ -359,6 +467,9 @@ def _mark_dirty(kind):
     _stats_dirty[kind] = True
 
 
+_load_stat_files()
+
+
 def _flush_stats():
     """锁外落盘：把置脏的统计写回磁盘。可安全并发调用（内部 try-lock）。"""
     if not (_stats_dirty['visits'] or _stats_dirty['lectures']):
@@ -379,7 +490,7 @@ def _flush_stats():
 
 def _save_visits():
     try:
-        _atomic_write_json(VISITS_PATH, _site_visits)
+        _atomic_write_json(VISITS_PATH, _site_visits, _normalize_site_visits)
     except Exception as e:
         _warn(f'站点访问量写盘失败（{VISITS_PATH}）：{type(e).__name__}: {e}')
         # 落盘失败必须把标记放回去，否则这次变更永远不会被重试
@@ -388,7 +499,7 @@ def _save_visits():
 
 def _save_lecture_stats():
     try:
-        _atomic_write_json(LECTURE_STATS_PATH, _lecture_stats)
+        _atomic_write_json(LECTURE_STATS_PATH, _lecture_stats, _normalize_lecture_stats)
     except Exception as e:
         _warn(f'讲座统计写盘失败（{LECTURE_STATS_PATH}）：{type(e).__name__}: {e}')
         _stats_dirty['lectures'] = True
@@ -432,22 +543,22 @@ def _known_lecture_urls():
                 raw = json.load(f)
             rows = raw.get('data', []) if isinstance(raw, dict) else (raw if isinstance(raw, list) else [])
             for r in rows:
-                u = r.get('sourceUrl')
-                if u:
-                    src = str(u)
-                    urls.add(src.rstrip('/'))
-                    # 讲座级计数键（B2，2026-10-19）：与 count_key 同一规则。
-                    idx = r.get('lectureIndex')
-                    if idx is not None:
-                        urls.add(f'{src}~{idx}'.rstrip('/'))
+                if not isinstance(r, dict):
+                    continue
+                src = _canonical_lecture_url(r.get('sourceUrl'))
+                if not src:
+                    continue
+                urls.add(src)
+                idx = r.get('lectureIndex')
+                if idx is not None:
+                    raw_src = str(r.get('sourceUrl') or '').strip()
+                    urls.add(_canonical_lecture_url(f'{raw_src}~{idx}'))
+                    urls.add(_canonical_lecture_url(f'{src}~{idx}'))
         except Exception as e:
             _warn(f'讲座 URL 集合解析失败，「未知讲座」校验会降级：{type(e).__name__}: {e}')
         _lecture_urls_cache['mtime'] = mt
         _lecture_urls_cache['urls'] = frozenset(urls)
     return _lecture_urls_cache['urls']
-
-
-_load_stat_files()
 
 
 def _find_scraper_python():
@@ -497,6 +608,54 @@ def _find_scraper_python():
 # 本地 API 的正常交互都是几十字节的请求 + 立即响应，15 秒绰绰有余；
 # 超时后线程自行退出回收，不影响其它请求。
 SOCKET_TIMEOUT = 15
+MAX_CONNECTIONS = 64
+
+
+class BoundedThreadingHTTPServer(ThreadingHTTPServer):
+    """在创建线程前限制并发连接，超限连接直接返回 503。"""
+
+    daemon_threads = True
+    request_queue_size = 128
+
+    def __init__(self, server_address, handler_class, max_connections=MAX_CONNECTIONS):
+        if type(max_connections) is not int or max_connections < 1:
+            raise ValueError('max_connections 必须是正整数')
+        self._connection_slots = threading.BoundedSemaphore(max_connections)
+        super().__init__(server_address, handler_class)
+
+    def process_request(self, request, client_address):
+        if not self._connection_slots.acquire(blocking=False):
+            try:
+                request.settimeout(1)
+                request.sendall(b'HTTP/1.1 503 Service Unavailable\r\n'
+                                b'Connection: close\r\nRetry-After: 1\r\n'
+                                b'Content-Length: 0\r\n\r\n')
+                try:
+                    request.shutdown(socket.SHUT_WR)
+                except OSError:
+                    pass
+                try:
+                    request.setblocking(False)
+                    while request.recv(4096):
+                        pass
+                except OSError:
+                    pass
+            except OSError:
+                pass
+            finally:
+                request.close()
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._connection_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._connection_slots.release()
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -862,7 +1021,7 @@ class Handler(SimpleHTTPRequestHandler):
         v = (body or {}).get('url')
         if not isinstance(v, str):
             return ''
-        return v.strip()
+        return _canonical_lecture_url(v)
 
     def _api_lecture_visit_post(self):
         """记录一次讲座访问：同一 (IP, url) 3 分钟内只计 1 次。"""
@@ -870,20 +1029,26 @@ class Handler(SimpleHTTPRequestHandler):
         url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
-        if url.rstrip('/') not in _known_lecture_urls():
+        if url not in _known_lecture_urls():
             return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
         ip = self._client_ip()
         now = time.time()
         with _stat_lock:
             key = (ip, url)
             last = _recent_lecture.get(key, 0)
+            capped = False
             if now - last >= VISIT_THROTTLE:
                 st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
-                st['visits'] = st.get('visits', 0) + 1
+                if st.get('visits', 0) >= LECTURE_VISIT_CAP:
+                    capped = True
+                else:
+                    st['visits'] = st.get('visits', 0) + 1
+                    _mark_dirty('lectures')
                 _recent_lecture[key] = now
-                _mark_dirty('lectures')
             cur = _lecture_stats.get(url, {'visits': 0, 'likes': 0, 'wants': 0})
             payload = {'ok': True, 'visits': cur.get('visits', 0)}
+            if capped:
+                payload['capped'] = True
         _flush_stats()   # 锁外落盘（2026-10-02，见 _flush_stats）
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
@@ -897,7 +1062,7 @@ class Handler(SimpleHTTPRequestHandler):
         url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
-        if url.rstrip('/') not in _known_lecture_urls():
+        if url not in _known_lecture_urls():
             return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
         ip = self._client_ip()
         now = time.time()
@@ -931,7 +1096,7 @@ class Handler(SimpleHTTPRequestHandler):
         url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
-        if url.rstrip('/') not in _known_lecture_urls():
+        if url not in _known_lecture_urls():
             return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
         ip = self._client_ip()
         now = time.time()
@@ -959,7 +1124,7 @@ class Handler(SimpleHTTPRequestHandler):
         url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
-        if url.rstrip('/') not in _known_lecture_urls():
+        if url not in _known_lecture_urls():
             return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
         ip = self._client_ip()
         now = time.time()
@@ -971,10 +1136,13 @@ class Handler(SimpleHTTPRequestHandler):
                 payload = {'ok': True, 'wants': cur.get('wants', 0), 'throttled': True}
             else:
                 st = _lecture_stats.setdefault(url, {'visits': 0, 'likes': 0, 'wants': 0})
-                st['wants'] = st.get('wants', 0) + 1
-                _recent_want_action[key] = (now, 'want')
-                _mark_dirty('lectures')
-                payload = {'ok': True, 'wants': st.get('wants', 0)}
+                if st.get('wants', 0) >= WANT_CAP:
+                    payload = {'ok': True, 'wants': st.get('wants', 0), 'capped': True}
+                else:
+                    st['wants'] = st.get('wants', 0) + 1
+                    _recent_want_action[key] = (now, 'want')
+                    _mark_dirty('lectures')
+                    payload = {'ok': True, 'wants': st.get('wants', 0)}
         _flush_stats()   # 锁外落盘（2026-10-02，见 _flush_stats）
         return self._send_json(payload)  # 锁外发响应（中等-16）
 
@@ -987,7 +1155,7 @@ class Handler(SimpleHTTPRequestHandler):
         url = self._url_from_body(body)
         if not url:
             return self._send_json({'ok': False, 'message': 'url 必填'}, 400)
-        if url.rstrip('/') not in _known_lecture_urls():
+        if url not in _known_lecture_urls():
             return self._send_json({'ok': False, 'message': '未知讲座'}, 400)
         ip = self._client_ip()
         now = time.time()
@@ -1258,17 +1426,14 @@ def main():
     # 安全默认：仅绑定本机回环地址，避免把带写操作（/api/scrape、/api/sources 增删改）
     # 的后台意外暴露到局域网/公网。如确需局域网访问，显式设置 HOST=0.0.0.0（自担风险）。
     host = os.environ.get('HOST', '127.0.0.1')
-    # Host 头校验只在回环绑定时强制（见 _ENFORCE_HOST 注释）：非回环绑定时白名单
-    # 会把 LAN 客户端全部 403 掉，故显式关闭；关闭时打印醒目告警，不静默降级。
-    global _ENFORCE_HOST
-    _loopback_bind = host in ('127.0.0.1', 'localhost', '::1', '[::1]', '')
+    # 非回环绑定追加允许 IP 字面量/绑定主机名，仍拒绝 evil.com 等 DNS 重绑定 Host。
+    _loopback_bind = _configure_host_policy(host)
     if not _loopback_bind:
-        _ENFORCE_HOST = False
-        print(f'[server] ⚠ 已绑定非回环地址 {host}：Host 头校验关闭（DNS 重绑定'
-              f'防护失效），管理 token 发放仍有 client IP 回环检查兜底', file=sys.stderr)
+        print(f'[server] ⚠ 已绑定非回环地址 {host}：Host 校验保持开启，'
+              f'仅额外允许 IP 字面量与绑定主机名', file=sys.stderr)
     # 启动防刷字典清理线程（守护线程，随主进程退出）
     threading.Thread(target=_prune_throttles, daemon=True).start()
-    srv = ThreadingHTTPServer((host, port), Handler)
+    srv = BoundedThreadingHTTPServer((host, port), Handler)
     print(f'[server] 华师讲座聚合已启动：http://localhost:{port}  （Ctrl+C 退出）')
     try:
         srv.serve_forever()

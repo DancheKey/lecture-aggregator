@@ -20,13 +20,27 @@ const SITE = path.join(__dirname, '..', '..', 'site');
 
 function makeCtx(fetchImpl) {
   const calls = [];
+  const timers = new Map();
+  let nextTimer = 1;
   const wrapped = (url, opts) => { calls.push({ url, opts }); return fetchImpl(url, opts); };
   const sandbox = {
     console, fetch: wrapped,
     location: { hostname: 'example.com' },
+    AbortController,
+    setTimeout: (fn, ms) => {
+      const id = nextTimer++;
+      timers.set(id, { fn, ms });
+      return id;
+    },
+    clearTimeout: id => timers.delete(id),
   };
   sandbox.globalThis = sandbox;
-  return { ctx: vm.createContext(sandbox), calls };
+  const expireTimers = () => {
+    const pending = Array.from(timers.values());
+    timers.clear();
+    pending.forEach(t => t.fn());
+  };
+  return { ctx: vm.createContext(sandbox), calls, timers, expireTimers };
 }
 
 function jsonResp(body, ok = true, status = 200) {
@@ -34,18 +48,22 @@ function jsonResp(body, ok = true, status = 200) {
 }
 
 function loadCloud(fetchImpl) {
-  const { ctx, calls } = makeCtx(fetchImpl);
+  const { ctx, calls, timers, expireTimers } = makeCtx(fetchImpl);
   vm.runInContext(fs.readFileSync(path.join(SITE, 'app.cloud.js'), 'utf-8'), ctx,
     { filename: 'app.cloud.js' });
   // const 声明不挂 sandbox 对象，但进入 context 的 global 词法环境，
   // 后续 runInContext 表达式可读取（与现有测试取 APP_METHODS 同手法）。
-  return { cloud: vm.runInContext('LectureCloud', ctx), calls };
+  return { cloud: vm.runInContext('LectureCloud', ctx), calls, timers, expireTimers };
 }
 
 // 跨 vm realm 的对象不能直接 deepStrictEqual（prototype 不同源会假红，
 // 与 tests/js/stats_quota_guard.js 同因），比对序列化结果——只关心字段值语义。
 function sameJson(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function flushMicrotasks() {
+  return new Promise(resolve => setImmediate(resolve));
 }
 
 async function run() {
@@ -173,7 +191,86 @@ async function run() {
     console.log('T8 fetchAll 分页形态（order/limit/offset）  pass');
   }
 
-  console.log('cloud_stats: 8/8 pass');
+  // T9：配置请求网络层挂起 → 定时中止并降级，不永久卡住调用方。
+  {
+    let signal = null;
+    const { cloud, calls, timers, expireTimers } = loadCloud((url, opts) => {
+      signal = opts.signal;
+      return new Promise(() => {});
+    });
+    const pending = cloud.bump('like', 'http://a/1', 1);
+    await flushMicrotasks();
+    assert.strictEqual(calls.length, 1, 'T9 应已发出配置请求');
+    assert.strictEqual(timers.size, 1, 'T9 应设置超时');
+    assert.strictEqual(Array.from(timers.values())[0].ms, 8000, 'T9 超时预算应为 8 秒');
+    expireTimers();
+    assert.strictEqual(await pending, null, 'T9 配置挂起必须降级 null');
+    assert.strictEqual(signal.aborted, true, 'T9 超时必须 abort 原请求');
+    assert.strictEqual(timers.size, 0, 'T9 结束后必须清定时器');
+    console.log('T9 配置请求挂起超时降级  pass');
+  }
+
+  // T10：响应头已到但 JSON body 永久挂起，同样受同一预算保护。
+  {
+    const { cloud, timers, expireTimers } = loadCloud(() =>
+      Promise.resolve({ ok: true, status: 200, json: () => new Promise(() => {}) }));
+    const pending = cloud.fetchAll();
+    await flushMicrotasks();
+    assert.strictEqual(timers.size, 1, 'T10 body 挂起仍应有超时');
+    expireTimers();
+    assert.strictEqual(await pending, null, 'T10 body 挂起必须降级 null');
+    console.log('T10 JSON body 挂起超时降级  pass');
+  }
+
+  // T11：RPC 写请求挂起 → 返回 null；调用方据此走本机降级，不自动重试写。
+  {
+    let signal = null;
+    const { cloud, timers, expireTimers } = loadCloud((url, opts) => {
+      if (url === 'supabase-config.json') {
+        return jsonResp({ url: 'https://x.supabase.co', anonKey: 'k' });
+      }
+      signal = opts.signal;
+      return new Promise(() => {});
+    });
+    const pending = cloud.bump('want', 'http://a/1', 1);
+    await flushMicrotasks();
+    await Promise.resolve();
+    assert.strictEqual(timers.size, 1, 'T11 RPC 应设置超时');
+    expireTimers();
+    assert.strictEqual(await pending, null, 'T11 RPC 挂起必须降级 null');
+    assert.strictEqual(signal.aborted, true, 'T11 RPC 超时必须 abort');
+    console.log('T11 RPC 挂起超时降级且不重试  pass');
+  }
+
+  // T12：REST 任一批挂起 → 整体 null，不返回半套计数。
+  {
+    const { cloud, timers, expireTimers } = loadCloud((url) => {
+      if (url === 'supabase-config.json') {
+        return jsonResp({ url: 'https://x.supabase.co', anonKey: 'k' });
+      }
+      return new Promise(() => {});
+    });
+    const pending = cloud.fetchAll();
+    await flushMicrotasks();
+    await Promise.resolve();
+    assert.strictEqual(timers.size, 1, 'T12 REST 应设置超时');
+    expireTimers();
+    assert.strictEqual(await pending, null, 'T12 REST 挂起必须整体降级 null');
+    console.log('T12 REST 挂起整体降级  pass');
+  }
+
+  // T13：成功路径必须清掉定时器，避免请求完成后仍触发无效 abort。
+  {
+    const { cloud, calls, timers } = loadCloud((url) => url === 'supabase-config.json'
+      ? jsonResp({ url: 'https://x.supabase.co', anonKey: 'k' })
+      : jsonResp({ visits: 1, likes: 1, wants: 0 }));
+    assert.ok(await cloud.bump('like', 'http://a/1', 1), 'T13 成功请求应有返回值');
+    assert.strictEqual(timers.size, 0, 'T13 成功后不得残留定时器');
+    assert.strictEqual(calls[1].opts.signal.aborted, false, 'T13 成功后不得 abort');
+    console.log('T13 成功路径清理超时定时器  pass');
+  }
+
+  console.log('cloud_stats: 13/13 pass');
 }
 
 run().catch(e => { console.error(e); process.exit(1); });

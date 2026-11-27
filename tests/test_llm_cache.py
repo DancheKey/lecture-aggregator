@@ -27,6 +27,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
@@ -220,14 +221,14 @@ class LlmFailureWarnTest(unittest.TestCase):
         import llm_provider
         p = llm_provider.AgnesProvider(api_key='test-key', model='test-model')
         llm_provider.time.sleep = lambda *a: None  # 跳过重试退避
-        orig = llm_provider.requests.post
-        llm_provider.requests.post = fake_post
+        orig = llm_provider.safe_request
+        llm_provider.safe_request = fake_post
         buf = io.StringIO()
         try:
             with contextlib.redirect_stderr(buf):
                 result = p._post([{'role': 'user', 'content': 'x'}], 0.0)
         finally:
-            llm_provider.requests.post = orig
+            llm_provider.safe_request = orig
         return result, buf.getvalue()
 
     def test_59_鉴权失败告警且返回None(self):
@@ -356,28 +357,18 @@ class TransientWriteFailureTest(unittest.TestCase):
 
 
 class VlmCacheKeyTest(unittest.TestCase):
-    """VLM 缓存键纳入模型名（2026-10-14）。
+    """VLM 缓存键必须随真实请求身份变化，不能只看 URL。"""
 
-    背景：文本通道缓存键早已含模型名（llm_provider.py:468/:593），换模型自动
-    全量失效重抽；VLM 通道键不含模型名，模型升级（如 glm-4v-flash→glm-4v-plus）
-    后旧结果仍被命中、锁死，表现为「改了模型没效果」。
-    本类锁：① 换模型产生不同键（动态，走真实 _vlm_extract_fields）；
-    ② 同模型同 URL 键稳定（幂等）；③ 多 provider 时键含全部模型名。
-    """
-
-    def _capture_keys(self, img_urls, cfgs):
-        """调用真实 _vlm_extract_fields，捕获其计算的缓存键。
-
-        桩掉缓存读写与网络调用（_vlm_img_b64 / _vlm_try_one_provider），
-        仅让键计算路径执行——锁的是生产代码本身，不是复刻副本。
-        """
+    def _capture_keys(self, img_urls, cfgs, image_map=None):
+        """调用真实 _vlm_extract_fields，捕获其计算的缓存键。"""
         import parsers as P
         captured = []
+        image_map = image_map or {}
         orig = (P._vlm_cache_get, P._vlm_cache_set,
                 P._vlm_img_b64, P._vlm_try_one_provider)
         P._vlm_cache_get = lambda key: captured.append(key) or None
         P._vlm_cache_set = lambda key, val: None
-        P._vlm_img_b64 = lambda u: None          # 图片下载失败 → 提前返 None，不触网
+        P._vlm_img_b64 = lambda u: image_map.get(u, 'image:' + u)
         P._vlm_try_one_provider = lambda *a, **k: (None, False)
         try:
             P._vlm_extract_fields(img_urls, cfgs)
@@ -387,34 +378,89 @@ class VlmCacheKeyTest(unittest.TestCase):
         return captured
 
     def test_70_换模型产生不同键(self):
-        """换模型必须产生不同缓存键（否则旧结果锁死、改模型没效果）。"""
         keys = self._capture_keys(['http://x/a.jpg'], [{'model': 'm1'}])
         keys2 = self._capture_keys(['http://x/a.jpg'], [{'model': 'm2'}])
         self.assertEqual(len(keys), 1)
         self.assertEqual(len(keys2), 1)
-        self.assertNotEqual(keys[0], keys2[0],
-                            '换模型必须产生不同缓存键')
-        self.assertTrue(keys[0].startswith('vlm:m1:'), keys[0])
-        self.assertTrue(keys2[0].startswith('vlm:m2:'), keys2[0])
+        self.assertNotEqual(keys[0], keys2[0], '换模型必须产生不同缓存键')
+        self.assertTrue(keys[0].startswith('vlm:v2:m1:'), keys[0])
+        self.assertTrue(keys2[0].startswith('vlm:v2:m2:'), keys2[0])
 
-    def test_71_同模型同URL键稳定(self):
-        """URL 顺序无关（sorted），同模型同 URL 键必须稳定（重跑幂等）。"""
+    def test_71_同模型同内容键稳定(self):
         k1 = self._capture_keys(['http://x/b.jpg', 'http://x/a.jpg'],
                                 [{'model': 'm'}])
-        k2 = self._capture_keys(['http://x/a.jpg', 'http://x/b.jpg'],
+        k2 = self._capture_keys(['http://x/b.jpg', 'http://x/a.jpg'],
                                 [{'model': 'm'}])
-        self.assertEqual(k1, k2, 'URL 顺序不得影响缓存键')
+        self.assertEqual(k1, k2, '相同请求必须稳定命中')
 
     def test_72_多provider键含全部模型(self):
-        """agnes+zhipu 双通道时，键须含两个模型名（任一换模型都应失效）。"""
         keys = self._capture_keys(
             ['http://x/c.jpg'],
             [{'model': 'agnes-3.0-flash'}, {'model': 'glm-4v-flash'}])
         self.assertEqual(len(keys), 1)
         self.assertIn('agnes-3.0-flash', keys[0])
         self.assertIn('glm-4v-flash', keys[0])
-        self.assertTrue(keys[0].startswith('vlm:agnes-3.0-flash|glm-4v-flash:'),
+        self.assertTrue(keys[0].startswith('vlm:v2:agnes-3.0-flash|glm-4v-flash:'),
                         keys[0])
+
+    def test_73_同URL换图必须失效(self):
+        url = 'http://x/same.jpg'
+        old = self._capture_keys([url], [{'model': 'm'}], {url: 'old-image'})
+        new = self._capture_keys([url], [{'model': 'm'}], {url: 'new-image'})
+        self.assertNotEqual(old, new, 'URL 未变但海报内容变了，不得复用旧答案')
+
+    def test_74_换URL但内容相同可命中(self):
+        old = self._capture_keys(['http://x/old.jpg'], [{'model': 'm'}],
+                                 {'http://x/old.jpg': 'same-image'})
+        new = self._capture_keys(['http://x/new.jpg'], [{'model': 'm'}],
+                                 {'http://x/new.jpg': 'same-image'})
+        self.assertEqual(old, new, '缓存身份应取实际发送内容，而非未发送的 URL')
+
+    def test_75_图片顺序进入键(self):
+        urls = ['http://x/a.jpg', 'http://x/b.jpg']
+        forward = self._capture_keys(urls, [{'model': 'm'}])
+        reverse = self._capture_keys(list(reversed(urls)), [{'model': 'm'}])
+        self.assertNotEqual(forward, reverse, '多图输入顺序会改变模型语义')
+
+    def test_76_第三张图未发送不进键(self):
+        urls = ['http://x/a.jpg', 'http://x/b.jpg', 'http://x/c.jpg']
+        two = self._capture_keys(urls[:2], [{'model': 'm'}])
+        three = self._capture_keys(urls, [{'model': 'm'}])
+        self.assertEqual(two, three, '只发送前两张，未发送的第三张不应影响缓存')
+
+    def test_77_prompt与提取器版本进入键(self):
+        import parsers as P
+        urls, cfgs = ['http://x/a.jpg'], [{'model': 'm'}]
+        base = self._capture_keys(urls, cfgs)
+        with mock.patch.object(P, 'VLM_PROMPT', 'changed'):
+            prompt = self._capture_keys(urls, cfgs)
+        with mock.patch.object(P, 'VLM_EXTRACTOR_VERSION', P.VLM_EXTRACTOR_VERSION + 1):
+            extractor = self._capture_keys(urls, cfgs)
+        self.assertNotEqual(base, prompt, '提示词变化必须重抽')
+        self.assertNotEqual(base, extractor, '提取/校验逻辑版本变化必须重抽')
+
+    def test_78_请求参数与provider端点进入键(self):
+        import parsers as P
+        urls = ['http://x/a.jpg']
+        base_cfg = {'name': 'p', 'model': 'm', 'base_url': 'https://x/v1'}
+        base = self._capture_keys(urls, [base_cfg])
+        changed_cfg = dict(base_cfg, base_url='https://y/v1')
+        endpoint = self._capture_keys(urls, [changed_cfg])
+        with mock.patch.object(P, '_VLM_TEMPERATURE', 0.2):
+            temperature = self._capture_keys(urls, [base_cfg])
+        self.assertNotEqual(base, endpoint, '换端点必须失效')
+        self.assertNotEqual(base, temperature, '采样参数变化必须失效')
+
+    def test_79_api_key不进入缓存身份(self):
+        urls = ['http://x/a.jpg']
+        a = {'name': 'p', 'model': 'm', 'base_url': 'https://x/v1', 'api_key': 'a'}
+        b = dict(a, api_key='b')
+        self.assertEqual(self._capture_keys(urls, [a]), self._capture_keys(urls, [b]),
+                         '密钥轮换不应清空结果缓存')
+
+    def test_80_图片全失败时不查缓存(self):
+        self.assertEqual(self._capture_keys(['http://x/a.jpg'], [{'model': 'm'}],
+                                            {'http://x/a.jpg': None}), [])
 
 
 if __name__ == '__main__':

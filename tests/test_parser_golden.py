@@ -18,8 +18,8 @@ golden-case 回归测试（Q3）——锁定 parser 关键案例，防止改候�
 
   ⚠️ 新增 requires_vlm 用例时必须同步录制响应，否则 CI 必红。录制步骤：
     1) 本机配置真实 VLM key（.env 的 ZHIPU_API_KEY），正常跑一次解析让响应
-       落入生产缓存 data/.vlm_cache.json（缓存键 = 'vlm:' + 模型名 + ':' +
-       图片 URL 集合的 md5，2026-10-14 起纳入模型名，对齐文本通道）；
+       落入生产缓存 data/.vlm_cache.json（缓存键含实际图片内容、提示词、
+       提取器版本、模型端点与采样参数）；
   2) 用探测脚本找出该用例命中的缓存键（monkeypatch _vlm_cache_get 记录 key），
      把对应条目追加进 tests/fixtures/vlm_cache.json 并提交。
 - OCR 同构「录制回放」（2026-10-16）：海报 OCR 响应固化在
@@ -69,9 +69,14 @@ import field_vocab as _fv  # noqa: E402  # is_online_lecture 派生判据（math
 # VLM 密封化：provider 配置打桩为「存在但不可达」（.invalid 为 RFC 6761 保留、永不解析）。
 # 配合缓存夹具：命中缓存直接返回（真实路径），缓存未命中才会请求该地址并快速失败。
 # name 键必需：_vlm_try_one_provider 用 cfg['name'] 做限速分桶，缺失会 KeyError。
-P._load_vlm_configs = lambda: [{'name': 'golden', 'model': 'golden-replay',
-                                'api_key': 'unused',
-                                'base_url': 'http://golden-test.invalid/vlm'}]
+# 配置同时供 snapshot 复用，保证缓存键中的 provider 身份完全一致。
+def _vlm_test_configs():
+    return [{'name': 'golden', 'model': 'golden-replay',
+             'api_key': 'unused',
+             'base_url': 'http://golden-test.invalid/vlm'}]
+
+
+P._load_vlm_configs = _vlm_test_configs
 P._vlm_cache_path = lambda: VLM_CACHE_FIXTURE      # 只读仓库内夹具，不依赖/不污染本机生产缓存
 P._vlm_cache_set = lambda key, val: None           # 测试期不落盘新缓存
 # ⚠ 2026-10-02：缓存读写收敛到 scraper/llm_cache.py 后，parsers 与 llm_provider
@@ -170,12 +175,13 @@ def _flush_ocr_record():
 
 atexit.register(_flush_ocr_record)
 
-# VLM 缓存未命中时 _vlm_extract_fields 会先 _vlm_img_b64 下载图片（在 provider
-# 调用之前，本地有 VLM key 时即发生活网络，CI 因 cfgs=[] 不触发）。golden 的
-# VLM 密封只要「缓存命中即回放」（4391 在此桩之前就命中返回），未命中一律
-# None——桩掉图片下载让未命中零网络早退，与无 key 态等价（负标记写入本就被
-# 上面的 _vlm_cache_set 空桩拦掉，无行为损失）。
-P._vlm_img_b64 = lambda u: None
+# VLM 缓存键现在按实际发送的图片内容计算，因此即使命中回放也必须有确定性图片桩。
+# 固定内容避免下载网络；换图/顺序等身份语义由 test_llm_cache 的专项用例覆盖。
+def _vlm_test_image(url):
+    return hashlib.sha256(url.encode('utf-8')).hexdigest()
+
+
+P._vlm_img_b64 = _vlm_test_image
 
 # 垃圾 topic 特征（历史上由表格/页眉误读产生）：如 '0- 17' / '0 -12' / 纯序号
 _FORBIDDEN_TOPIC = ('0-', '0 -', '0—')

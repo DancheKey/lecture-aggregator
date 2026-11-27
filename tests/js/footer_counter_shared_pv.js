@@ -20,6 +20,8 @@ const vm = require('vm');
 const SITE = path.join(__dirname, '..', '..', 'site');
 const js = fs.readFileSync(path.join(SITE, 'footer-counter.js'), 'utf-8');
 const errs = [];
+const unhandled = [];
+process.on('unhandledRejection', err => unhandled.push(err));
 
 function mkEl() {
   return {
@@ -34,10 +36,10 @@ async function runScenario(opts) {
   const store = {};
   if (o.cached !== undefined) {
     store['lecture_site_count_value'] = String(o.cached);
-    store['lecture_site_count_ts'] = String(Date.now());
+    store['lecture_site_count_ts'] = String(o.cacheTs === undefined ? Date.now() : o.cacheTs);
   }
   const byId = { site_pv_value: mkEl() };
-  const counts = { bump: 0, fetch: 0 };
+  const counts = { bump: 0, fetch: 0, write: 0 };
   const sandbox = {
     console,
     Promise, Date, Math, Number, String, JSON, parseInt, isNaN,
@@ -48,8 +50,15 @@ async function runScenario(opts) {
       addEventListener() {},
     },
     localStorage: {
-      getItem: k => (k in store ? store[k] : null),
-      setItem: (k, v) => { store[k] = String(v); },
+      getItem: k => {
+        if (o.readError) throw new Error('SecurityError');
+        return k in store ? store[k] : null;
+      },
+      setItem: (k, v) => {
+        counts.write++;
+        if (o.writeError) throw new Error('QuotaExceededError');
+        store[k] = String(v);
+      },
       removeItem: k => { delete store[k]; },
     },
     fetch: () => {
@@ -60,6 +69,7 @@ async function runScenario(opts) {
       });
     },
   };
+  if (o.noStorage) delete sandbox.localStorage;
   if (!o.noCloud) {
     sandbox.LectureCloud = {
       bump: () => {
@@ -147,7 +157,49 @@ async function runScenario(opts) {
     errs.push(`无云端层页脚应显示快照 2019，实得 "${d.byId.site_pv_value._text}"`);
   }
 
-  console.log('场景 ①首次bump ②缓存零请求 ③云端降级 ④无云端层'
+  // ⑤ 成对缓存损坏：时间戳有效但计数非法时必须刷新，不能静默显示 null/旧值。
+  for (const cached of ['oops', '12junk', '-1', '0', '9007199254740992']) {
+    const e = await runScenario({ cached, bumpResult: { visits: 2027 } });
+    const value = await e.sandbox.window.LectureSitePv.get();
+    if (e.counts.bump !== 1 || value !== 2027 || e.byId.site_pv_value._text !== '2027') {
+      errs.push(`损坏计数缓存 ${JSON.stringify(cached)} 应触发一次云端刷新，实际 bump=${e.counts.bump} value=${value}`);
+    }
+  }
+
+  // ⑥ 未来时间戳不是有效新鲜度；负数/超长/截断数字也同样不可信。
+  {
+    const e = await runScenario({ cached: 2020, cacheTs: Date.now() + 10 * 60 * 1000 });
+    const value = await e.sandbox.window.LectureSitePv.get();
+    if (e.counts.bump !== 1 || value !== 2027) {
+      errs.push(`未来时间戳应视为缓存失效，实际 bump=${e.counts.bump} value=${value}`);
+    }
+  }
+
+  // ⑦ localStorage 被浏览器禁用/抛 SecurityError：共享 Promise 仍应解析云端权威值。
+  for (const opts of [{ readError: true }, { noStorage: true }]) {
+    const e = await runScenario(Object.assign({ bumpResult: { visits: 2027 } }, opts));
+    let value, rejected = false;
+    try { value = await e.sandbox.window.LectureSitePv.get(); }
+    catch (_) { rejected = true; }
+    if (rejected || e.counts.bump !== 1 || value !== 2027 || e.byId.site_pv_value._text !== '2027') {
+      errs.push(`localStorage 不可用时应降级到云端，实际 rejected=${rejected} bump=${e.counts.bump} value=${value}`);
+    }
+  }
+
+  // ⑧ 缓存写入失败不能吞掉云端权威值，也不应误走静态快照回退。
+  {
+    const e = await runScenario({ writeError: true, bumpResult: { visits: 2027 }, archivePv: 2019 });
+    const value = await e.sandbox.window.LectureSitePv.get();
+    if (value !== 2027 || e.byId.site_pv_value._text !== '2027' || e.counts.fetch !== 0) {
+      errs.push(`缓存写失败应继续返回云端 2027，实际 value=${value} fetch=${e.counts.fetch}`);
+    }
+  }
+
+  if (unhandled.length) {
+    errs.push(`localStorage 异常产生了 ${unhandled.length} 个未处理 Promise 拒绝`);
+  }
+
+  console.log('场景 ①首次bump ②缓存零请求 ③云端降级 ④无云端层 ⑤损坏缓存 ⑥未来时间戳 ⑦存储不可用 ⑧写入失败'
     + (errs.length ? '' : ' 全部通过'));
   if (errs.length) {
     console.log('[FAIL]');

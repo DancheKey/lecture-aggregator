@@ -169,10 +169,10 @@ class RobotsBeforeAllowlistTest(unittest.TestCase):
         spec.loader.exec_module(S)
         calls = []
 
-        def fake_get(u, **kw):
+        def fake_request(method, u, **kw):
             calls.append(u)
             raise RuntimeError('network')
-        S.requests.get = fake_get
+        S.safe_request = fake_request
         S._ROBOTS_CACHE.clear()
         try:
             S.fetch(url, _retries=1, allowed_domains=allowed)
@@ -221,7 +221,7 @@ class RobotsBeforeAllowlistTest(unittest.TestCase):
 
         chain: [{'status': 302, 'location': '...'}, {'status': 200, 'body': '...'}]
         item 可带 'raise_iter': True —— iter_content 读到一半抛断流异常。
-        返回 (calls, result, resps)：calls 为全部 requests.get 的 URL 序列
+        返回 (calls, result, resps)：calls 为全部 safe_request 的 URL 序列
         （含 robots）；resps 为页面响应对象列表（可查 .closed）。
         与 _fetch_with_recorder 的区别：桩不抛异常，而是按序列返回响应，
         用于验证重定向跟随/拒绝路径的真实行为。
@@ -236,7 +236,7 @@ class RobotsBeforeAllowlistTest(unittest.TestCase):
         resps = []
         seq = list(chain)
 
-        def fake_get(u, **kw):
+        def fake_request(method, u, **kw):
             calls.append(u)
             if u.endswith('/robots.txt'):
                 return _FakeRedirectResp(200)
@@ -251,15 +251,15 @@ class RobotsBeforeAllowlistTest(unittest.TestCase):
             resps.append(resp)
             return resp
 
-        # requests.get 是模块级共享属性：桩后必须还原，否则污染同进程
+        # safe_request 是模块级共享属性：桩后必须还原，否则污染同进程
         # 后续测试（_fetch_with_recorder 未还原是既有陋习，此处不延续）。
-        orig_get = S.requests.get
-        S.requests.get = fake_get
+        orig_request = S.safe_request
+        S.safe_request = fake_request
         S._ROBOTS_CACHE.clear()
         try:
             result = S.fetch(url, _retries=retries, allowed_domains=allowed)
         finally:
-            S.requests.get = orig_get
+            S.safe_request = orig_request
         return calls, result, resps
 
     def test_63_302跳白名单外零第二跳(self):
@@ -302,6 +302,14 @@ class RobotsBeforeAllowlistTest(unittest.TestCase):
                          f'应在第 6 个页面处停止，实际请求 {len(page_calls)} 次：'
                          f'{page_calls}')
 
+    def test_68_拒绝https降级重定向(self):
+        calls, result, _resps = self._fetch_with_chain(
+            'https://a.scnu.edu.cn/x.html',
+            [{'status': 302, 'location': 'http://a.scnu.edu.cn/y.html'}])
+        self.assertIsNone(result)
+        page_calls = [c for c in calls if 'robots.txt' not in c]
+        self.assertEqual(page_calls, ['https://a.scnu.edu.cn/x.html'])
+
     def test_67_断流重试前关闭未读完响应(self):
         """iter_content 中途断流：重试前必须 close（连接不能留给 GC）。
 
@@ -316,6 +324,51 @@ class RobotsBeforeAllowlistTest(unittest.TestCase):
         self.assertIn('重试后正文', result or '', '断流后应重试并成功取回正文')
         self.assertTrue(resps[0].closed,
                         '断流的响应未被 close——连接泄漏给 GC 回收')
+
+
+class RobotsResponseBoundTest(unittest.TestCase):
+    @staticmethod
+    def _load():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            '_scr_robots_bound', os.path.join(ROOT, 'scraper', 'scraper.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module._ROBOTS_CACHE.clear()
+        return module
+
+    def test_69_robots_is_streamed_parsed_and_closed(self):
+        module = self._load()
+        response = _FakeRedirectResp(200, body='User-agent: *\nDisallow: /private\n')
+        calls = []
+
+        def request(method, url, **kwargs):
+            calls.append((method, url, kwargs))
+            return response
+
+        module.safe_request = request
+        self.assertFalse(module._can_fetch('https://a.scnu.edu.cn/private',
+                                           ['scnu.edu.cn']))
+        self.assertTrue(response.closed)
+        self.assertEqual(calls[0][2]['stream'], True)
+        self.assertEqual(calls[0][2]['max_redirects'], 0)
+
+    def test_70_oversized_robots_is_bounded_and_defaults_to_allow(self):
+        module = self._load()
+        response = _FakeRedirectResp(200, body=b'x' * (module._ROBOTS_MAX_BYTES + 1))
+        module.safe_request = lambda *args, **kwargs: response
+        self.assertTrue(module._can_fetch('https://b.scnu.edu.cn/x', ['scnu.edu.cn']))
+        self.assertTrue(response.closed)
+        self.assertIs(module._ROBOTS_CACHE['b.scnu.edu.cn'], False)
+
+    def test_71_interrupted_robots_is_closed_and_defaults_to_allow(self):
+        module = self._load()
+        response = _FakeRedirectResp(200)
+        response.raise_on_iter = True
+        module.safe_request = lambda *args, **kwargs: response
+        self.assertTrue(module._can_fetch('https://c.scnu.edu.cn/x', ['scnu.edu.cn']))
+        self.assertTrue(response.closed)
+        self.assertIs(module._ROBOTS_CACHE['c.scnu.edu.cn'], False)
 
 
 class ScriptEntrypointTest(unittest.TestCase):
@@ -420,7 +473,9 @@ class ScriptEntrypointTest(unittest.TestCase):
 
         上一条锁「不得在导入期改写全局状态」，本条兜住漏网：直接比对夹具内容与
         仓库基线——即使污染发生在别的路径（如某个脚本误写），也会在此变红。
+        缓存版本升级允许整批 key 加 ``vlm:vN:`` 前缀，但录制值必须逐项不变。
         """
+        import re
         import subprocess
         rel = 'tests/fixtures/vlm_cache.json'
         cur = os.path.join(ROOT, rel)
@@ -435,10 +490,24 @@ class ScriptEntrypointTest(unittest.TestCase):
             b = json.loads(self._read(rel))
         except ValueError:
             self.skipTest('夹具非合法 JSON，交由其它用例报错')
-        self.assertEqual(set(b.keys()), set(a.keys()),
+        head_keys, cur_keys = set(a), set(b)
+        if head_keys == cur_keys:
+            return
+        versioned = re.compile(r'^vlm:v\d+:')
+        if (head_keys and cur_keys
+                and all(not versioned.match(k) for k in head_keys)
+                and all(versioned.match(k) for k in cur_keys)):
+            old_values = sorted(json.dumps(v, ensure_ascii=False, sort_keys=True)
+                                for v in a.values())
+            new_values = sorted(json.dumps(v, ensure_ascii=False, sort_keys=True)
+                                for v in b.values())
+            self.assertEqual(new_values, old_values,
+                             f'{rel} 升级缓存版本时不得改动录制值')
+            return
+        self.assertEqual(cur_keys, head_keys,
                          f'{rel} 的键集与 HEAD 不一致——'
-                         f'新增 {sorted(set(b) - set(a))[:3]}、'
-                         f'缺失 {sorted(set(a) - set(b))[:3]}。'
+                         f'新增 {sorted(cur_keys - head_keys)[:3]}、'
+                         f'缺失 {sorted(head_keys - cur_keys)[:3]}。'
                          f'该文件是 git 跟踪的测试夹具，'
                          f'本机有模型 key 时测试会把真实调用结果写进来。'
                          f'修法：git checkout -- {rel}，并检查缓存写入路径是否被打桩。')

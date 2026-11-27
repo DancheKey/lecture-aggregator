@@ -10,7 +10,34 @@
 // 真正的闸门在数据库侧——RLS + RPC 增量函数内钳值域（见迁移 SQL 注释），
 // 前端只能 +/-1、写不了任意值；显示封顶在 app.social.js 的 capDisplay。
 const LectureCloud = (function () {
+    const REQUEST_TIMEOUT_MS = 8000;
     let configPromise = null;
+
+    function fetchJson(url, options, failurePrefix) {
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        const request = () => {
+            const opts = controller
+                ? Object.assign({}, options, { signal: controller.signal })
+                : options;
+            return fetch(url, opts)
+                .then(r => {
+                    if (!r.ok) throw new Error(failurePrefix + '-' + r.status);
+                    return r.json();
+                });
+        };
+        if (typeof setTimeout !== 'function' || typeof clearTimeout !== 'function') {
+            return Promise.resolve().then(request);
+        }
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+                if (controller) controller.abort();
+                reject(new Error('cloud-timeout'));
+            }, REQUEST_TIMEOUT_MS);
+        });
+        return Promise.race([Promise.resolve().then(request), timeout])
+            .finally(() => clearTimeout(timer));
+    }
 
     // 本地开发环境短路（2026-10-18）：本机（localhost / 127.0.0.1 / [::1] / ::1 / file:）
     // 默认不打云端，防止本地反复刷新把公网真实计数刷虚高。短路时 loadConfig 直接
@@ -34,8 +61,7 @@ const LectureCloud = (function () {
         if (!configPromise) {
             configPromise = isLocalDev()
                 ? Promise.resolve(null)   // 本地开发：一个云端请求都不发
-                : fetch('supabase-config.json', { cache: 'no-store' })
-                    .then(r => { if (!r.ok) throw new Error('config-' + r.status); return r.json(); })
+                : fetchJson('supabase-config.json', { cache: 'no-store' }, 'config')
                     .then(j => (j && j.url && j.anonKey)
                         ? { url: String(j.url).replace(/\/+$/, ''), anonKey: String(j.anonKey) }
                         : null)
@@ -74,8 +100,7 @@ const LectureCloud = (function () {
                 const base = cfg.url + '/rest/v1/lecture_stats'
                     + '?select=url,visits,likes,wants,cal_downloads&order=url&limit=' + PAGE + '&offset=';
                 const onePage = (offset) =>
-                    fetch(base + offset, { cache: 'no-store', headers: headers(cfg) })
-                        .then(r => { if (!r.ok) throw new Error('stats-' + r.status); return r.json(); })
+                    fetchJson(base + offset, { cache: 'no-store', headers: headers(cfg) }, 'stats')
                         .then(rows => {
                             const list = rows || [];
                             for (const row of list) {
@@ -105,11 +130,10 @@ const LectureCloud = (function () {
         bump(kind, url, delta) {
             return loadConfig().then(cfg => {
                 if (!cfg) return null;
-                return fetch(cfg.url + '/rest/v1/rpc/increment_' + kind, {
+                return fetchJson(cfg.url + '/rest/v1/rpc/increment_' + kind, {
                     method: 'POST', cache: 'no-store', headers: headers(cfg),
                     body: JSON.stringify({ p_url: url, p_delta: delta }),
-                })
-                    .then(r => { if (!r.ok) throw new Error('rpc-' + r.status); return r.json(); })
+                }, 'rpc')
                     .then(j => (j && typeof j === 'object') ? j : null)
                     .catch(() => null);
             });

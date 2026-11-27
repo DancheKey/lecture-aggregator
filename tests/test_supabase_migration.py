@@ -42,6 +42,7 @@ SQL_PATH = os.path.join(ROOT, 'supabase-migration.sql')
 GEN_PATH = os.path.join(ROOT, 'scripts', 'gen_supabase_sql.py')
 PATCH_PATH = os.path.join(ROOT, 'supabase-patch-current.sql')
 PATCH_GEN = os.path.join(ROOT, 'scripts', 'gen_supabase_patch.py')
+VERIFY_PATH = os.path.join(ROOT, 'supabase-verify-current.sql')
 LECTURES_JSON = os.path.join(ROOT, 'site', 'lectures.json')
 
 FUNCS = ('increment_like', 'increment_want', 'increment_visit', 'increment_cal')
@@ -49,10 +50,21 @@ FUNCS = ('increment_like', 'increment_want', 'increment_visit', 'increment_cal')
 
 def _func_body(sql, name):
     """截取 create or replace function <name>(...) ... $$; $$ 之间的函数体。"""
-    m = re.search(r'create or replace function ' + name + r'\(.*?\$\$(.*?)\$\$;',
+    m = re.search(r'create or replace function (?:public\.)?' + name + r'\(.*?\$\$(.*?)\$\$;',
                   sql, re.S)
     assert m, 'SQL 中找不到函数 ' + name
     return m.group(1)
+
+
+def _func_def(sql, name):
+    m = re.search(r'create or replace function (?:public\.)?' + name + r'\(.*?\$\$;',
+                  sql, re.S)
+    assert m, 'SQL 中找不到函数定义 ' + name
+    return m.group(0)
+
+
+def _sql_str(value):
+    return "'" + str(value).replace("'", "''") + "'"
 
 
 class TestSupabaseMigrationSql(unittest.TestCase):
@@ -69,9 +81,34 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         else:
             cls.patch = None
 
-    def test_00_三函数齐全(self):
+    def test_00_四函数齐全(self):
         for n in FUNCS:
-            self.assertIn('function ' + n + '(', self.sql, '缺增量函数 ' + n)
+            self.assertIn('function public.' + n + '(', self.sql, '缺增量函数 ' + n)
+
+    def test_00b_白名单表覆盖当前讲座且不公开(self):
+        self.assertIn('create table if not exists public.lecture_allowed_keys', self.sql)
+        self.assertIn('alter table public.lecture_allowed_keys enable row level security;', self.sql)
+        self.assertIn('revoke all on table public.lecture_allowed_keys from public, anon, authenticated;', self.sql)
+        self.assertIn("('__site__', array['visit']::text[])", self.sql,
+                      '__site__ 只能记访问，不能点赞/想听/日历')
+        if not os.path.exists(LECTURES_JSON):
+            self.skipTest('site/lectures.json 不存在')
+        with open(LECTURES_JSON, encoding='utf-8') as f:
+            items = json.load(f).get('data', [])
+        keys = {x.get('ck') for x in items if isinstance(x, dict) and x.get('ck')}
+        self.assertTrue(keys, 'lectures.json 里读不到任何 ck')
+        for key in keys:
+            self.assertIn(_sql_str(key), self.sql, f'当前讲座键未进入云端白名单：{key}')
+        self.assertIn("array['visit','like','want','cal']::text[]", self.sql,
+                      '讲座键应允许访问、点赞、想听和日历四种动作')
+
+    def test_00c_whitelist_only可独立同步(self):
+        r = subprocess.run([sys.executable, GEN_PATH, '--whitelist-only'],
+                           capture_output=True, text=True, encoding='utf-8')
+        self.assertEqual(r.returncode, 0, '白名单生成器运行失败: ' + r.stderr[-300:])
+        self.assertIn('insert into public.lecture_allowed_keys', r.stdout)
+        self.assertNotIn('create or replace function', r.stdout,
+                         '--whitelist-only 只应输出键同步，不能顺带重写函数')
 
     def test_01_两路径双钳(self):
         """insert 与 on conflict 都必须 least(greatest(...))——当晚漏洞即缺此。
@@ -113,7 +150,7 @@ class TestSupabaseMigrationSql(unittest.TestCase):
                           f'PostgREST 需 4xx 才能让前端 catch 后静默降级')
             # 守卫必须位于函数体入口（任何建行语句之前），否则先建行后拒绝
             guard_at = body.index('length(p_url) = 0')
-            insert_at = body.index('insert into lecture_stats')
+            insert_at = body.index('insert into public.lecture_stats')
             self.assertLess(guard_at, insert_at,
                             f'{n} 的 p_url 守卫在 insert 之后——空/超长键仍会先建行')
 
@@ -160,12 +197,11 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         RLS 未开启时 policy 形同虚设——照本 SQL 重建库 = 匿名可绕过 RPC 直写
         整表，所有钳制全部失效。本库实测 RLS 已开，此句是幂等兜底 + 防重建库漏开。
         """
-        self.assertIn(
-            'alter table lecture_stats enable row level security;',
-            self.sql, '缺 enable row level security——policy 在但 RLS 关着 = 完全裸奔')
+        self.assertIn('alter table public.lecture_stats enable row level security;',
+                      self.sql, '缺 enable row level security——policy 在但 RLS 关着 = 完全裸奔')
         # 语义顺序：先开 RLS 再建策略（反过来也能跑，但先开后建才是正意）
-        enable_at = self.sql.index('enable row level security')
-        policy_at = self.sql.index('create policy "anon read"')
+        enable_at = self.sql.index('alter table public.lecture_stats enable row level security')
+        policy_at = self.sql.index('create policy "anon read" on public.lecture_stats')
         self.assertLess(enable_at, policy_at, 'enable RLS 应早于 create policy')
 
     def test_08_p_url前缀守卫(self):
@@ -181,7 +217,7 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             self.assertIn("p_url !~* '^(https?://|__)'", body,
                           f'{n} 缺 p_url 前缀守卫——只限长度挡不住批量造行')
             guard_at = body.index("p_url !~* '^(https?://|__)'")
-            insert_at = body.index('insert into lecture_stats')
+            insert_at = body.index('insert into public.lecture_stats')
             self.assertLess(guard_at, insert_at,
                             f'{n} 的前缀守卫在 insert 之后——非法键仍会先建行')
 
@@ -215,6 +251,40 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         self.assertLessEqual(
             longest, 300,
             f'最长真实 ck 达 {longest} 字符，超过 MAX_URL_LEN=300——放行后该讲座点赞会静默失败')
+
+    def test_08c_rpc只接受白名单动作且拒绝空增量(self):
+        actions = {'increment_like': 'like', 'increment_want': 'want',
+                   'increment_visit': 'visit', 'increment_cal': 'cal'}
+        for name, action in actions.items():
+            body = _func_body(self.sql, name)
+            guard = f"public.lecture_stat_key_allowed(p_url, '{action}')"
+            self.assertIn(guard, body, f'{name} 未校验 {action} 白名单')
+            self.assertLess(body.index(guard), body.index('insert into public.lecture_stats'),
+                            f'{name} 的白名单校验晚于写入')
+            self.assertIn('p_delta is null then', body, f'{name} 未拒绝 null 增量')
+            self.assertLess(body.index('p_delta is null then'),
+                            body.index('insert into public.lecture_stats'),
+                            f'{name} 必须先拒绝 null 增量再写行')
+
+    def test_08d_函数固定搜索路径且撤销PUBLIC执行权(self):
+        for name in FUNCS:
+            definition = _func_def(self.sql, name)
+            self.assertIn('security definer', definition)
+            self.assertIn('set search_path = pg_catalog, public', definition)
+            self.assertIn(
+                f'revoke all on function public.{name}(text, int) from public;', self.sql,
+                f'{name} 未撤销 PUBLIC 的默认执行权')
+        helper = _func_def(self.sql, 'lecture_stat_key_allowed')
+        self.assertIn('security definer', helper)
+        self.assertIn('set search_path = pg_catalog, public', helper)
+        self.assertIn(
+            'revoke all on function public.lecture_stat_key_allowed(text, text) from public, anon, authenticated;',
+            self.sql, '白名单探测函数不得暴露给匿名或登录用户')
+
+    def test_08e_统计表显式关闭匿名写权限(self):
+        self.assertIn('revoke all on table public.lecture_stats from public, anon, authenticated;', self.sql)
+        self.assertIn('grant select on table public.lecture_stats to anon, authenticated;', self.sql)
+        self.assertNotRegex(self.sql, r'grant\s+(?:insert|update|delete|all)[^;]*on table public\.lecture_stats[^;]*to (?:anon|authenticated)')
 
     def test_09_云端补丁与生成器同源(self):
         """P3-8（2026-10-18 复查）：补丁必须由 gen_supabase_patch.py 产出。
@@ -251,11 +321,23 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             self.assertIn(f'alter column {col} set default 0', self.sql)
             self.assertIn(f'alter column {col} set not null', self.sql)
         # RLS 只读 + 函数授权；表级写权限一律不授（写入只走 RPC）
-        self.assertIn('create policy "anon read" on lecture_stats for select using (true)',
+        self.assertIn('create policy "anon read" on public.lecture_stats for select using (true)',
                       self.sql, 'RLS 只读策略缺失')
         for n in FUNCS:
-            self.assertIn(f'grant execute on function {n}(text, int) to anon;', self.sql,
-                          f'{n} 未授 anon 执行权')
+            self.assertIn(f'grant execute on function public.{n}(text, int) to anon, authenticated, service_role;', self.sql,
+                          f'{n} 未授 anon/authenticated/service_role 执行权')
+
+    def test_04b_核查SQL保持只读(self):
+        if not os.path.exists(VERIFY_PATH):
+            self.skipTest('supabase-verify-current.sql 不存在')
+        with open(VERIFY_PATH, encoding='utf-8') as f:
+            raw = f.read()
+        sql = re.sub(r'--[^\n]*', '', raw)
+        self.assertNotRegex(
+            sql, r'(?is)^\s*(insert|update|delete|alter|create|drop|truncate|grant|revoke)\b',
+            '核查 SQL 只能查询，不能修改线上数据库')
+        self.assertIn('pg_get_functiondef', sql, '核查 SQL 应读取线上真实函数定义')
+        self.assertIn('pg_class', sql, '核查 SQL 应检查 RLS 状态')
 
     def test_04_入库SQL与生成器一致(self):
         """单一事实源：手改 SQL 会被本测试抓住（生成器重新产出比对）。"""

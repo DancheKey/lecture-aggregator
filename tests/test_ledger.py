@@ -41,6 +41,8 @@ def _reset(entries=None):
     """把模块级台账恢复到已知状态（模块级可变状态，测试间必须重置）。"""
     S._LEDGER = dict(entries or {})
     S._LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0, 'dirty': 0}
+    S._LEDGER_RETRY_KEYS = set()
+    S._RETRY_RECOVERED_KEYS = set()
 
 
 class LedgerBasicsTest(unittest.TestCase):
@@ -203,6 +205,45 @@ class LedgerFailedVerdictTest(unittest.TestCase):
         S.ledger_add(U, 'failed', '2026-10-14')
         self.assertTrue(S.ledger_hit(U))
         self.assertEqual(S._LEDGER[U]['v'], 'failed')
+
+    def test_expired_failed_entry_marks_retry_candidate(self):
+        stale = (datetime.date.today() - datetime.timedelta(days=8)).isoformat()
+        fresh = (datetime.date.today() - datetime.timedelta(days=6)).isoformat()
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            with open(p, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump({'entries': {
+                    U: {'v': 'failed', 'd': '', 't': stale},
+                    U2: {'v': 'failed', 'd': '', 't': fresh},
+                }}, f, ensure_ascii=False)
+            S.load_ledger(p)
+        self.assertNotIn(U, S._LEDGER)
+        self.assertIn(U2, S._LEDGER)
+        self.assertEqual(S._LEDGER_RETRY_KEYS, {U},
+                         '只有过期的 failed 条目需要保留重试来源')
+
+    def test_expired_non_failure_does_not_mark_retry_candidate(self):
+        stale = (datetime.date.today() - datetime.timedelta(days=TTL + 1)).isoformat()
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'scrape_ledger.json')
+            with open(p, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump({'entries': {
+                    U: {'v': 'old', 'd': '', 't': stale},
+                    U2: {'v': 'rejected', 'd': '', 't': stale},
+                }}, f, ensure_ascii=False)
+            S.load_ledger(p)
+        self.assertEqual(S._LEDGER_RETRY_KEYS, set())
+
+    def test_missing_or_corrupt_load_clears_retry_candidates(self):
+        for contents in (None, '{ broken json'):
+            S._LEDGER_RETRY_KEYS = {U}
+            with tempfile.TemporaryDirectory() as d:
+                p = os.path.join(d, 'scrape_ledger.json')
+                if contents is not None:
+                    with open(p, 'w', encoding='utf-8', newline='\n') as f:
+                        f.write(contents)
+                S.load_ledger(p)
+            self.assertEqual(S._LEDGER_RETRY_KEYS, set())
 
 
 class LedgerIoTest(unittest.TestCase):

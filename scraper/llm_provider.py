@@ -26,9 +26,8 @@ import sys
 import threading
 import time
 
-import requests
-
 import field_vocab as _fv
+from parsers import safe_request
 
 
 def _llm_warn(name, msg):
@@ -428,15 +427,11 @@ class AgnesProvider(ModelProvider):
         _throttle(channel=self.name)
         payload = {"model": self.model, "messages": messages, "temperature": temperature}
         headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
-        # 不显式构造 proxies 字典：交给 requests 按标准环境变量解析，
-        # HTTP_PROXY/HTTPS_PROXY/NO_PROXY 均生效。本地若代理访问国内 LLM 异常，
-        # 可设 NO_PROXY=open.bigmodel.cn,api.agnes-ai.cn 让其直连绕过坏节点。
-        # （GitHub CI 不设任何代理变量，天然直连，不受影响。）
-        proxies = None
+        # 统一安全直连并逐跳固定 IP；不使用环境代理，避免 DNS 校验与连接目标分叉。
         for attempt in range(3):
             try:
-                r = requests.post(self.base_url, headers=headers, json=payload,
-                                  timeout=60, proxies=proxies)
+                r = safe_request('POST', self.base_url, headers=headers, json=payload,
+                                 timeout=60)
                 if r.status_code in (401, 403):
                     _llm_warn(self.name,
                               '鉴权失败 HTTP %d（API key 无效/过期，重试无意义）'
@@ -556,15 +551,11 @@ class ZhipuProvider(ModelProvider):
         _throttle(channel=self.name)
         payload = {"model": self.model, "messages": messages, "temperature": temperature}
         headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
-        # 不显式构造 proxies 字典：交给 requests 按标准环境变量解析，
-        # HTTP_PROXY/HTTPS_PROXY/NO_PROXY 均生效。本地若代理访问国内 LLM 异常，
-        # 可设 NO_PROXY=open.bigmodel.cn,api.agnes-ai.cn 让其直连绕过坏节点。
-        # （GitHub CI 不设任何代理变量，天然直连，不受影响。）
-        proxies = None
+        # 统一安全直连并逐跳固定 IP；不使用环境代理，避免 DNS 校验与连接目标分叉。
         for attempt in range(3):
             try:
-                r = requests.post(self.base_url, headers=headers, json=payload,
-                                  timeout=60, proxies=proxies)
+                r = safe_request('POST', self.base_url, headers=headers, json=payload,
+                                 timeout=60)
                 if r.status_code in (401, 403):
                     return None
                 if r.status_code == 429 and attempt < 2:

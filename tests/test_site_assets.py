@@ -129,6 +129,186 @@ def _site_base_url():
     return m.group(1)
 
 
+def _opening_tags(html, name):
+    """取真实起始标签；先去注释，避免把注释里的示例算进去。"""
+    clean = re.sub(r'<!--.*?-->', '', html, flags=re.S)
+    return re.findall(r'<%s\b[^>]*>' % re.escape(name), clean, flags=re.I)
+
+
+class TestAccessibility(unittest.TestCase):
+    """#20 无障碍修复的静态回归门禁（不替代人工键盘/读屏验收）。"""
+
+    def test_三页都有可见跳转链接与主内容锚点(self):
+        targets = {
+            'index.html': 'main-content',
+            'stats.html': 'stats-main',
+            'visits-trend.html': 'trend-main',
+        }
+        for page, target in targets.items():
+            html = _read(page)
+            with self.subTest(page=page):
+                self.assertRegex(
+                    html,
+                    r'<a\b(?=[^>]*class="skip-link")(?=[^>]*href="#%s")[^>]*>'
+                    % re.escape(target),
+                    f'{page} 缺 skip link 或 href 不对')
+                self.assertRegex(
+                    html,
+                    r'<main\b(?=[^>]*id="%s")(?=[^>]*tabindex="-1")[^>]*>'
+                    % re.escape(target),
+                    f'{page} 缺可聚焦的 main 锚点')
+        index_css = '\n'.join(
+            re.findall(r'<style[^>]*>(.*?)</style>', _read('index.html'), re.S))
+        stats_css = '\n'.join(
+            re.findall(r'<style[^>]*>(.*?)</style>', _read('stats.html'), re.S))
+        for css in (index_css, stats_css, _read('visits-trend.css')):
+            self.assertIn('.skip-link:focus', css, 'skip link 聚焦时必须有可见样式')
+
+    def test_三页都有常驻加载与结果状态区(self):
+        for page in PAGES:
+            html = _read(page)
+            with self.subTest(page=page):
+                self.assertIn('role="status"', html, f'{page} 缺常驻 status')
+                self.assertIn('aria-live="polite"', html, f'{page} 状态区未启用 polite live')
+                self.assertIn('aria-atomic="true"', html, f'{page} 状态区未整段播报')
+        self.assertIn('resultsStatus()', _read('app.computed.js'))
+        self.assertIn('liveStatus()', _read('stats.js'))
+        self.assertIn("getElementById('trend-status')", _read('visits-trend.js'))
+
+    def test_首页筛选菜单与搜索暴露选中态和名称(self):
+        html = _read('index.html')
+        self.assertGreaterEqual(html.count(':aria-pressed="campus === c"'), 2,
+                                '桌面/移动校区筛选都要暴露 aria-pressed')
+        for attr in (':aria-pressed="showLikedOnly"', ':aria-pressed="showWantedOnly"',
+                     ':aria-pressed="ongoingOnly"', ':aria-pressed="upcomingOnly"'):
+            self.assertIn(attr, html, f'首页缺 {attr}')
+        self.assertGreaterEqual(html.count(':aria-pressed="hasWanted('), 2,
+                                '普通卡与论坛卡的想听按钮都要暴露选中态')
+        self.assertGreaterEqual(html.count(':aria-pressed="hasLiked('), 2,
+                                '普通卡与论坛卡的点赞按钮都要暴露选中态')
+        for needle in ("(hasCalAdded(l.ck || l.sourceUrl) ? '已加入日历：' : '加入日历：')",
+                       "(hasGroupCalAdded(u) ? '整组已加入日历：' : '整组加入日历：')",
+                       "(hasWanted(u.ck) ? '取消想听：' : '想听：')",
+                       "(hasWanted(l.ck) ? '取消想听：' : '想听：')",
+                       "(hasLiked(u.ck) ? '取消点赞：' : '点赞：')",
+                       "(hasLiked(l.ck) ? '取消点赞：' : '点赞：')"):
+            self.assertIn(needle, html, f'图标操作按钮缺动态 aria-label：{needle}')
+        self.assertIn(':aria-expanded="showMenu"', html)
+        self.assertIn('aria-controls="more-menu"', html)
+        self.assertIn('id="more-menu"', html)
+        self.assertIn('@keydown.esc="closeMenu(true)"', html)
+        self.assertRegex(html, r'<input\b(?=[^>]*aria-label="搜索讲座")[^>]*>',
+                         '搜索框缺可访问名称')
+        self.assertIn('ref="menuButton"', html)
+
+    def test_首页折叠控件与讲者按钮语义完整(self):
+        html = _read('index.html')
+        self.assertRegex(html, r'<button\b(?=[^>]*@click="pickSpeaker\(l\)")[^>]*>',
+                         '讲者筛选仍是可点击 span/div，须用原生 button')
+        self.assertIn('speaker-filter-btn', html)
+        for needle in (
+            ':aria-controls="\'forum-list-\' + u.key"',
+            ':aria-controls="\'bio-\' + expKey(l, \'bio\')"',
+            ':aria-controls="\'abstract-\' + expKey(l, \'abs\')"',
+            ':id="\'sources-\' + l.ck"',
+        ):
+            self.assertIn(needle, html, f'首页折叠区缺 {needle}')
+        self.assertIn('v-show="isForumOpen(u)"', html,
+                      '折叠时 aria-controls 的目标必须仍存在于 DOM')
+        self.assertIn('v-show="expanded[l.ck]"', html)
+
+    def test_首页装饰图与报告弹窗(self):
+        html = _read('index.html')
+        self.assertGreaterEqual(len(re.findall(
+            r'<img\b[^>]*src="motto\.webp(?:\?[^"]*)?"[^>]*alt=""', html)), 2,
+                                '两侧校训水印必须作为装饰图使用空 alt')
+        for svg in _opening_tags(html, 'svg'):
+            self.assertIn('aria-hidden="true"', svg, '首页装饰 SVG 应对读屏隐藏')
+            self.assertIn('focusable="false"', svg, '首页装饰 SVG 不应进入 Tab 顺序')
+        dialog = next((tag for tag in _opening_tags(html, 'div')
+                       if 'ref="reportModal"' in tag), '')
+        for needle in ('role="dialog"', 'aria-modal="true"',
+                       'aria-labelledby="src-modal-title"',
+                       'aria-describedby="src-modal-desc"', '@keydown="onReportKeydown"'):
+            self.assertIn(needle, dialog, f'报告弹窗缺 {needle}')
+        self.assertIn('id="src-modal-title"', html)
+        self.assertIn('id="src-modal-desc"', html)
+        self.assertIn('ref="reportUnit"', html)
+
+    def test_统计页表格与滚动区语义(self):
+        html = _read('stats.html')
+        self.assertRegex(html, r'<label\b(?=[^>]*for="college-filter")[^>]*>')
+        self.assertRegex(html, r'<input\b(?=[^>]*id="college-filter")[^>]*>')
+        regions = [tag for tag in _opening_tags(html, 'div') if 'scroll-region' in tag]
+        self.assertGreaterEqual(len(regions), 3, '桌面表格与移动双滚动区都必须可键盘访问')
+        self.assertEqual(sum('role="region"' in tag for tag in regions), 1)
+        self.assertEqual(sum('role="rowgroup"' in tag for tag in regions), 2)
+        for tag in regions:
+            self.assertIn('tabindex="0"', tag)
+            self.assertRegex(tag, r'role="(?:region|rowgroup)"')
+            self.assertIn('aria-label=', tag)
+        mobile_header = re.search(r'<div id="m-thead-scroll"[^>]*>(.*?)<!-- 数据独立横滑容器 -->',
+                                  html, re.S).group(1)
+        self.assertRegex(mobile_header,
+                         r'<div[^>]*role="row"[^>]*>\s*<div[^>]*role="columnheader"',
+                         '表头行必须直接拥有列标题，不能嵌 rowgroup')
+        self.assertIn('class="flex" role="presentation"', mobile_header)
+        self.assertGreaterEqual(len([tag for tag in _opening_tags(html, 'div')
+                                     if 'role="rowheader"' in tag]), 2)
+        self.assertGreaterEqual(len([tag for tag in _opening_tags(html, 'div')
+                                     if 'role="cell"' in tag]), 8)
+        self.assertIn('<caption', html, '统计表缺 caption')
+        self.assertIn('<tfoot>', html, '合计行应放入 tfoot')
+        self.assertGreaterEqual(len(_opening_tags(html, 'th')), 7)
+        for th in _opening_tags(html, 'th'):
+            self.assertRegex(th, r'scope="(?:col|row)"', f'表头缺 scope：{th}')
+        self.assertGreaterEqual(len([tag for tag in _opening_tags(html, 'button')
+                                     if 'sort-button' in tag]), 10,
+                                '桌面与移动排序控件都应为原生 button')
+        self.assertGreaterEqual(html.count(':aria-sort='), 5,
+                                '桌面五个可排序列表头都要动态暴露 aria-sort')
+
+    def test_趋势页模板与产物同步且交互状态可播报(self):
+        import importlib.util
+        path = os.path.join(_ROOT, 'scripts', 'gen_visits_trend.py')
+        spec = importlib.util.spec_from_file_location('_trend_a11y_test', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        self.assertEqual(_read('visits-trend.js'), mod.JS, '趋势 JS 产物与生成器模板不同步')
+        self.assertEqual(_read('visits-trend.css'), mod.CSS, '趋势 CSS 产物与生成器模板不同步')
+        html = _read('visits-trend.html')
+        ranges = [tag for tag in _opening_tags(html, 'button') if 'data-range=' in tag]
+        self.assertEqual(len(ranges), 3)
+        for tag in ranges:
+            self.assertIn('aria-pressed=', tag)
+        self.assertRegex(html, r'<div\b(?=[^>]*class="tbl scroll-region")'
+                              r'(?=[^>]*tabindex="0")(?=[^>]*role="region")[^>]*>')
+        self.assertIn('id="trend-status"', html)
+        self.assertIn('<caption', html)
+        ths = _opening_tags(html, 'th')
+        self.assertEqual(len(ths), 3)
+        for th in ths:
+            self.assertIn('scope="col"', th)
+        toggle = next((tag for tag in _opening_tags(html, 'button')
+                       if 'id="toggleRows"' in tag), '')
+        for needle in ('aria-expanded="false"', 'aria-controls="tbody"', 'aria-pressed="false"'):
+            self.assertIn(needle, toggle)
+        js = _read('visits-trend.js')
+        for needle in ("setAttribute('aria-pressed'", "setAttribute('aria-expanded'",
+                       "trendStatus('访问量数据加载失败"):
+            self.assertIn(needle, js, f'趋势页交互/错误播报缺 {needle}')
+        self.assertIn('role="alert"', html, '加载错误应有独立 alert 播报')
+
+    def test_本轮修改资产保持LF(self):
+        names = ('index.html', 'stats.html', 'visits-trend.html', 'visits-trend.js',
+                 'visits-trend.css', 'stats.js', 'app.admin.js', 'app.computed.js')
+        for name in names:
+            with self.subTest(file=name):
+                with open(os.path.join(_SITE, name), 'rb') as f:
+                    raw = f.read()
+                self.assertNotIn(b'\r\n', raw, f'site/{name} 混入 CRLF')
+
+
 class TestIcons(unittest.TestCase):
     """图标三件套：每页都引用，且被引用的文件真实存在、尺寸正确。"""
 
@@ -458,6 +638,56 @@ class TestFeeds(unittest.TestCase):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
+
+    def test_空订阅源覆盖旧文件且格式合法(self):
+        import tempfile
+        import xml.etree.ElementTree as ET
+        from unittest import mock
+
+        mod = self._generator()
+        with tempfile.TemporaryDirectory(prefix='test_empty_feeds_') as tmp:
+            site = os.path.join(tmp, 'site')
+            os.makedirs(site)
+            for name in ('feed.xml', 'feed.ics'):
+                with open(os.path.join(site, name), 'w', encoding='utf-8') as f:
+                    f.write('STALE')
+            with mock.patch.object(mod, 'ROOT', tmp):
+                mod.write_feeds([], '2026-11-26T08:00:00+08:00')
+            with open(os.path.join(site, 'feed.xml'), encoding='utf-8') as f:
+                root = ET.fromstring(f.read())
+            self.assertEqual(root.tag, 'rss')
+            self.assertEqual(root.find('channel').findall('item'), [])
+            with open(os.path.join(site, 'feed.ics'), encoding='utf-8', newline='') as f:
+                ics = f.read()
+            self.assertTrue(ics.startswith('BEGIN:VCALENDAR\r\n'))
+            self.assertTrue(ics.rstrip('\r\n').endswith('END:VCALENDAR'))
+            self.assertNotIn('BEGIN:VEVENT', ics)
+            self.assertNotIn('STALE', ics)
+
+    def test_main空数据仍清空订阅源(self):
+        from unittest import mock
+
+        mod = self._generator()
+        with mock.patch.object(mod, 'load_lectures', return_value=([], '2026-11-26T08:00:00+08:00')), \
+                mock.patch.object(mod, 'write_visits_snapshot'), \
+                mock.patch.object(mod, 'warn_uncommitted_scripts'), \
+                mock.patch.object(mod, 'warn_stale_stamp_inputs'), \
+                mock.patch.object(mod, 'write_feeds') as feeds:
+            mod.main()
+        feeds.assert_called_once_with([], '2026-11-26T08:00:00+08:00')
+
+    def test_main读取失败时中止而不伪造空订阅源(self):
+        from unittest import mock
+
+        mod = self._generator()
+        with mock.patch.object(mod, 'write_visits_snapshot'), \
+                mock.patch.object(mod, 'warn_uncommitted_scripts'), \
+                mock.patch.object(mod, 'warn_stale_stamp_inputs'), \
+                mock.patch.object(mod, 'load_lectures', side_effect=ValueError('bad json')), \
+                mock.patch.object(mod, 'write_feeds') as feeds:
+            with self.assertRaises(ValueError):
+                mod.main()
+        feeds.assert_not_called()
 
     def test_main把派生数据交给订阅源(self):
         """评审 #10 行为锁：main() 交给 write_feeds 的必须是**已派生 ck** 的 full_data。

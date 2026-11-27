@@ -189,6 +189,79 @@ const STATS = {
      'test_07 合计行年度值应走 totalValue()，不要再写三元链（加第四态后不可读且易漏）');
 }
 
+// ---------- test_08：学院筛选后年度与总计必须只汇总可见行 ----------
+{
+  const self = makeSelf({ summary: SUMMARY, lectureStats: STATS, collegeFilter: '数科院' });
+  const yt = self.yearTotals;
+  ok(self.rows.length === 1 && yt[0].year === '2026' && yt[1].year === '2025',
+    'test_08 学院筛选后年份列顺序必须保持不变');
+  ok(yt[0].count === 2 && yt[0].visits === 3 && yt[0].likes === 1 && yt[0].wants === 7,
+    `test_08 数科院 2026 合计应为 2/3/1/7，实际 ${JSON.stringify(yt[0])}`);
+  ok(yt[1].count === 0 && yt[1].visits === 0 && yt[1].likes === 0 && yt[1].wants === 0,
+    `test_08 筛选数科院后 2025 必须全为 0，实际 ${JSON.stringify(yt[1])}`);
+  ok(self.grandTotal === 2 && self.grandVisits === 3 && self.grandLikes === 1 && self.grandWants === 7,
+    `test_08 总计必须与可见行一致，实际 ${self.grandTotal}/${self.grandVisits}/${self.grandLikes}/${self.grandWants}`);
+  for (const mode of ['count', 'visits', 'likes', 'wants']) {
+    self.displayMode = mode;
+    ok(self.totalValue(yt[0]) === yt[0][mode], `test_08 ${mode} 模式年度值应取同名字段`);
+    const grand = { count: self.grandTotal, visits: self.grandVisits,
+      likes: self.grandLikes, wants: self.grandWants }[mode];
+    ok(grand === self.rows[0][mode === 'count' ? 'total' : mode + 'Total'],
+      `test_08 ${mode} 模式总计应等于唯一可见行合计`);
+  }
+}
+
+// ---------- test_09：学院 + 校区组合筛选后仍与可见行一致 ----------
+{
+  const self = makeSelf({ summary: SUMMARY, lectureStats: STATS,
+    collegeFilter: '研究生院', campusFilter: '石牌' });
+  ok(self.rows.length === 1 && self.rows[0].college === '研究生院',
+    'test_09 联合发布单位的可见行应保留');
+  const [y2026, y2025] = self.yearTotals;
+  ok(y2026.count === 0 && y2026.visits === 3 && y2026.likes === 1 && y2026.wants === 2,
+    `test_09 组合筛选 2026 应为 0/3/1/2，实际 ${JSON.stringify(y2026)}`);
+  ok(y2025.count === 0 && y2025.visits === 0 && y2025.likes === 0 && y2025.wants === 0,
+    `test_09 组合筛选 2025 应为全 0，实际 ${JSON.stringify(y2025)}`);
+  ok(self.grandTotal === 0 && self.grandVisits === 3 && self.grandLikes === 1 && self.grandWants === 2,
+    `test_09 组合筛选总计应为 0/3/1/2，实际 ${self.grandTotal}/${self.grandVisits}/${self.grandLikes}/${self.grandWants}`);
+}
+
+// ---------- test_10：无匹配学院时年度、总计和空态全部归零 ----------
+{
+  const self = makeSelf({ summary: SUMMARY, lectureStats: STATS, collegeFilter: '不存在' });
+  ok(self.rows.length === 0, 'test_10 无匹配时应没有可见行');
+  ok(self.yearTotals.every(t => t.count === 0 && t.visits === 0 && t.likes === 0 && t.wants === 0),
+    `test_10 无匹配时年度合计应全为 0，实际 ${JSON.stringify(self.yearTotals)}`);
+  ok(self.grandTotal === 0 && self.grandVisits === 0 && self.grandLikes === 0 && self.grandWants === 0,
+    'test_10 无匹配时总计应全为 0');
+}
+
+// ---------- test_11：常驻 live status 覆盖加载/失败/筛选/排序/指标 ----------
+{
+  let self = makeSelf({});
+  ok(self.liveStatus === '统计数据加载中。', 'test_11 加载中应播报加载状态');
+
+  self = makeSelf({ summary: SUMMARY, lectureStats: STATS, loading: false,
+    loadError: '统计数据加载失败，请稍后刷新重试。' });
+  ok(self.liveStatus === self.loadError, 'test_11 加载失败应优先播报错误');
+
+  self = makeSelf({ summary: SUMMARY, lectureStats: STATS, loading: false });
+  ok(self.liveStatus.includes('全部校区') && self.liveStatus.includes('2 个单位'),
+     'test_11 加载完成应播报可见单位数');
+  self.campusFilter = '石牌';
+  self.collegeFilter = '数科院';
+  self.displayMode = 'wants';
+  self.sortBy = { key: 'wants', order: 'asc' };
+  const status = self.liveStatus;
+  ok(status.includes('石牌校区') && status.includes('学院筛选“数科院”'),
+     'test_11 校区/学院筛选变化应进入 live status');
+  ok(status.includes('想听数') && status.includes('想听数升序'),
+     `test_11 指标/排序变化应进入 live status，实际 ${status}`);
+
+  self = makeSelf({ summary: null, loading: false });
+  ok(self.liveStatus === '暂无统计数据。', 'test_11 空数据应有可理解的播报');
+}
+
 if (errs.length) {
   console.log('[FAIL]');
   errs.forEach(e => console.log(' -', e));

@@ -17,6 +17,34 @@ import re
 import datetime as _dt_module  # 仅为 timedelta（datetime 是类，不能取 .timedelta）
 from datetime import datetime, date
 
+def beijing_now():
+    """返回北京时间；GitHub Runner 的 UTC 跨年边界不能按本机日期补年。"""
+    try:
+        from zoneinfo import ZoneInfo
+        return _dt_module.datetime.now(ZoneInfo('Asia/Shanghai'))
+    except Exception:
+        return _dt_module.datetime.utcnow() + _dt_module.timedelta(hours=8)
+
+
+def current_year():
+    return beijing_now().year
+
+
+def _nearest_year(month, day, anchor):
+    """在锚点前后一年内选择日期距离最近的合法年份，同日优先锚点当年。"""
+    candidates = []
+    for year in (anchor.year - 1, anchor.year, anchor.year + 1):
+        try:
+            candidate = date(year, month, day)
+        except ValueError:
+            continue
+        distance = abs((candidate - anchor).days)
+        candidates.append((distance, year != anchor.year, year, candidate))
+    if not candidates:
+        return anchor.year
+    return min(candidates)[2]
+
+
 PERIOD_OFFSET = {'上午': 0, '早上': 0, '中午': '中午', '下午': 12, '晚上': 12, '傍晚': 12,
                  '晚': 12}
 
@@ -531,37 +559,60 @@ def _wrap_year(res, new_year):
     return new
 
 
-def _cross_year(res, publish_time, title, body_text, year, url_year, publish_year):
-    """R6：双向跨年修正。仅当 year ∈ {url_year, publish_year}（补年源为 URL/发布年）时触发。
+def _cross_year(res, publish_time, title, body_text, year, url_year, publish_year,
+                year_source=None):
+    """R6：双向跨年修正。返回 (res, confidence, note)。
 
-    返回 (res, confidence, note)。confidence ∈ {high, mid, low}。
+    URL 年保留既有跨年窗口规则；标题/标签年视为可靠年份。发布年与当前年补出的
+    月日按发布日或北京时间选择最近合法年份，避免 12 月发布 1 月讲座、1 月发布
+    12 月讲座时永远落在同一个错误年份。
     """
     ls = res['start']
     try:
         pub = datetime.strptime(publish_time[:10], '%Y-%m-%d')
     except (ValueError, TypeError):
-        return res, 'low', 'publish-unparseable'
-    can_cross = year in (url_year, publish_year)
+        pub = None
+    if year_source is None:
+        if url_year and year == url_year:
+            year_source = 'url'
+        elif publish_year and year == publish_year:
+            year_source = 'publish'
+        else:
+            year_source = 'other'
     hay = (title or '') + ' ' + (body_text or '')
     retro = any(w in hay for w in _RETRO_WORDS)
     preview = any(w in hay for w in _PREVIEW_WORDS)
 
-    if ls.date() == pub.date():
+    if pub and ls.date() == pub.date():
         return res, 'high', 'same-day-normal'
 
-    # 同年（未跨年边界）：年份来自 URL/标题等可靠源，无需跨年修正，直接定 high。
-    # 跨年修正只在"讲座与发布分属不同日历年"时才有意义。
-    if ls.year == pub.year:
-        return res, 'high', 'same-year'
-
-    if not can_cross:
-        # 2026-08-05 体检修正：can_cross 此前算出后从未使用，R6 触发面比文档宽。
-        # 按模块头 R6 规格收紧：补年源不属于 {URL年, 发布年}（如标题年/低 Tier 标签年）
-        # 时年份本身可靠，即使讲座与发布分属不同日历年也不做 ±1 年平移。
+    if year_source in ('title', 'label', 'other'):
+        if pub and ls.year == pub.year:
+            return res, 'high', 'same-year'
         return res, 'mid', 'year-source-reliable'
 
+    if year_source in ('publish', 'current'):
+        anchor = pub.date() if pub else beijing_now().date()
+        target_year = _nearest_year(ls.month, ls.day, anchor)
+        target = _wrap_year(res, target_year)
+        note = 'nearest-year'
+        if retro and target['start'].date() > anchor:
+            previous_year = ls.year if ls.date() <= anchor else ls.year - 1
+            target = _wrap_year(res, previous_year)
+            note = 'nearest-year-retro'
+        elif preview and target['start'].date() < anchor:
+            target = _wrap_year(res, target_year + 1)
+            note = 'nearest-year-preview'
+        if target['start'] == ls:
+            return res, 'high', 'same-year'
+        return target, ('high' if note != 'nearest-year' else 'mid'), note
+
+    # URL 年：保留历史规则，只有发布前后的跨年窗口才平移一年。
+    if not pub:
+        return res, 'low', 'publish-unparseable'
+    if ls.year == pub.year:
+        return res, 'high', 'same-year'
     if ls.date() < pub.date():
-        # 讲座落在发布前
         if retro:
             return res, 'high', 'retrospective-report'
         if preview:
@@ -569,8 +620,6 @@ def _cross_year(res, publish_time, title, body_text, year, url_year, publish_yea
         if pub.month in (11, 12) and ls.month in (1, 2):
             return _wrap_year(res, ls.year + 1), 'high', 'crossyear-window'
         return res, 'low', 'crossyear-uncertain'
-
-    # 讲座落在发布后
     if preview:
         return res, 'high', 'preview-normal'
     if retro:
@@ -597,7 +646,7 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
     # 此前 None 传入 _resolve_year 会在 R4 链末端返回 (None,'current')，
     # None 再传 _parse_segment/_build 被 try 吞掉、仅月日的日期被静默丢弃。
     if default_year is None:
-        default_year = date.today().year
+        default_year = current_year()
     if list_title:
         ly = _year_from_text(list_title)
         if ly:
@@ -650,9 +699,9 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
         if not dt:
             dt = primary['seg']
         # R6 跨年修正（仅月日补年结果）
-        if publish_time:
+        if publish_time or src == 'current':
             dt, conf, note = _cross_year(dt, publish_time, title, body_text, year,
-                                         url_year, publish_year)
+                                         url_year, publish_year, src)
             return {'start': dt['start'].isoformat(sep=' '),
                     'end': dt['end'].isoformat(sep=' ') if dt.get('end') else None,
                     'has_time': bool(dt.get('has_time')),
@@ -662,15 +711,8 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
                 'has_time': bool(dt.get('has_time')),
                 'confidence': 'high', 'note': 'monthday-nopublish'}
 
-    # ---- R2：通用解析只扫正文 ----
-    # 年份优先级与 R4/_resolve_year 统一：url_year > title_year > publish_year
-    eff = default_year
-    if url_year:
-        eff = url_year
-    elif title_year:
-        eff = title_year
-    elif publish_year:
-        eff = publish_year
+    # R2 通用解析只扫正文：年份优先级与 R4/_resolve_year 统一。
+    eff, eff_source = _resolve_year(url_year, title_year, publish_year, default_year)
 
     # R2 前置清洗：屏蔽"截止/截稿"语境的日期。
     # CFP/研讨会通知常含多个日期（报名截止/提要截稿/评审通知/会议日期），通用解析
@@ -698,9 +740,9 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
                     'confidence': 'high', 'note': 'general-body-full'}
         # 仅月日：补年 + R6
         year = g['start'].year
-        if publish_time:
+        if publish_time or eff_source == 'current':
             g, conf, note = _cross_year(g, publish_time, title, body_text, year,
-                                         url_year, publish_year)
+                                         url_year, publish_year, eff_source)
             return {'start': g['start'].isoformat(sep=' '),
                     'end': g['end'].isoformat(sep=' ') if g.get('end') else None,
                     'has_time': bool(g.get('has_time')),
@@ -728,9 +770,9 @@ def resolve_lecture_time(body_text, title, url_year, title_year, publish_time,
                         'has_time': bool(gb.get('has_time')),
                         'confidence': 'mid', 'note': 'general-page-full'}
             year = gb['start'].year
-            if publish_time:
+            if publish_time or eff_source == 'current':
                 gb, conf, note = _cross_year(gb, publish_time, title, pg, year,
-                                             url_year, publish_year)
+                                             url_year, publish_year, eff_source)
                 return {'start': gb['start'].isoformat(sep=' '),
                         'end': gb['end'].isoformat(sep=' ') if gb.get('end') else None,
                         'has_time': bool(gb.get('has_time')),
@@ -753,18 +795,33 @@ def parse_cn_time(text, default_year=None, publish_time=None, title_year=None, u
     **不做任何字符串删除**（修 Bug A）；仅在完整日期循环中精确跳过发布日。
     用于 OCR 路径与列表标题兜底。
     """
+    requested_default = default_year
     if default_year is None:
-        default_year = date.today().year
-    effective_default = default_year
-    if url_year is not None:
-        effective_default = url_year
-    elif title_year is not None:
-        effective_default = title_year
-    elif publish_time:
+        default_year = current_year()
+    publish_year = None
+    if publish_time:
         try:
-            effective_default = int(publish_time[:4])
-        except (ValueError, IndexError):
-            pass
+            publish_year = int(str(publish_time)[:4])
+        except (ValueError, TypeError):
+            publish_year = None
+    effective_default, year_source = _resolve_year(
+        url_year, title_year, publish_year, default_year)
+    anchor = None
+    if year_source == 'publish':
+        try:
+            anchor = datetime.strptime(str(publish_time)[:10], '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            anchor = None
+    elif year_source == 'current' and (
+            requested_default is None or default_year == current_year()):
+        anchor = beijing_now().date()
+
+    def _finish(res):
+        if res and anchor and not res.get('from_full'):
+            return _wrap_year(res, _nearest_year(res['start'].month,
+                                                 res['start'].day, anchor))
+        return res
+
     if not text:
         return None
     lm = re.search(
@@ -773,10 +830,10 @@ def parse_cn_time(text, default_year=None, publish_time=None, title_year=None, u
     if lm:
         res = _parse_segment(lm.group(2), effective_default, publish_time)
         if res:
-            return res
+            return _finish(res)
     res = _parse_segment(text, effective_default, publish_time)
     if res:
-        return res
+        return _finish(res)
     return None
 
 

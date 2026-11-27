@@ -47,6 +47,30 @@
       .text-11pt { font-size: 11pt; }
       .text-12pt { font-size: 12pt; }
       .text-18pt { font-size: 18pt; }
+      .sr-only {
+        position: absolute; width: 1px; height: 1px;
+        padding: 0; margin: -1px; overflow: hidden;
+        clip: rect(0 0 0 0); clip-path: inset(50%);
+        white-space: nowrap; border: 0;
+      }
+      .skip-link {
+        position: fixed; top: .5rem; left: .5rem; z-index: 100;
+        transform: translateY(-200%); padding: .5rem .75rem;
+        border-radius: .375rem; background: #1e3a8a; color: #fff;
+        font-weight: 600; text-decoration: none;
+      }
+      .skip-link:focus { transform: translateY(0); outline: 3px solid #fbbf24; outline-offset: 2px; }
+      .scroll-region:focus-visible {
+        outline: 2px solid #2563eb; outline-offset: -2px;
+      }
+      .sort-button:focus-visible {
+        outline: 2px solid #2563eb; outline-offset: 2px;
+      }
+      /* 原生排序按钮沿用表头文字排版，不改变既有列宽与对齐。 */
+      .sort-button {
+        appearance: none; background: transparent; border: 0; padding: 0;
+        font: inherit; color: inherit; cursor: pointer;
+      }
     </style>
     <!-- 华南师范大学 VI 主题（含黑白哀悼备选项）。由 site/_theme.json 后台切换，页面无 UI -->
     <link id="vi-theme" rel="stylesheet" href="theme-scnu.css?v=fd10da0c67">
@@ -54,6 +78,7 @@
     <script src="theme-loader.js?v=248fb77d42"></script>
   </head>
   <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+    <a class="skip-link" href="#stats-main">跳到主要内容</a>
     <div id="app" v-cloak class="flex flex-col min-h-screen">
 
     <!-- 顶部栏（不再固定，随页面自然滚动，移动端才看得到数据） -->
@@ -66,8 +91,9 @@
           </a>
 
           <!-- 校区导航（桌面）：与首页一致，放在木铎金声 logo 之后 -->
-          <nav class="hidden sm:flex items-center gap-1 ml-3">
-            <button v-for="cp in campuses" :key="cp" @click="campusFilter = cp"
+          <nav class="hidden sm:flex items-center gap-1 ml-3" aria-label="校区筛选">
+            <button v-for="cp in campuses" :key="cp" type="button" @click="campusFilter = cp"
+              :aria-pressed="campusFilter === cp"
               :class="['px-3 py-1.5 rounded-full text-12pt transition', campusFilter === cp ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
               {{ cp === '' ? '全部' : cp }}
             </button>
@@ -80,8 +106,9 @@
         </div>
 
         <!-- 校区导航（移动端） -->
-        <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1">
-          <button v-for="cp in campuses" :key="cp" @click="campusFilter = cp"
+        <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1" role="group" aria-label="校区筛选">
+          <button v-for="cp in campuses" :key="cp" type="button" @click="campusFilter = cp"
+            :aria-pressed="campusFilter === cp"
             :class="['px-3 py-1 rounded-full text-12pt whitespace-nowrap', campusFilter === cp ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
             {{ cp === '' ? '全部' : cp }}
           </button>
@@ -89,7 +116,8 @@
       </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-4 py-6 w-full">
+    <main id="stats-main" tabindex="-1" class="max-w-6xl mx-auto px-4 py-6 w-full">
+      <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ liveStatus }}</div>
       <div class="mb-4">
         <h1 class="text-18pt font-bold text-slate-800">各学院 / 部处讲座统计</h1>
         <p class="text-12pt text-slate-500 mt-1">
@@ -100,22 +128,22 @@
       <!-- 排序 + 筛选学院：同一行（筛选学院在左，排序在右） -->
       <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-          <label class="text-12pt text-slate-500 whitespace-nowrap">筛选学院：</label>
-          <input v-model="collegeFilter" type="text" placeholder="输入学院/部处名称..."
+          <label for="college-filter" class="text-12pt text-slate-500 whitespace-nowrap">筛选学院：</label>
+          <input id="college-filter" v-model="collegeFilter" type="text" placeholder="输入学院/部处名称..."
             class="w-full sm:w-64 px-3 py-1.5 rounded-lg border border-slate-200 text-12pt focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 bg-white" />
         </div>
         <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <span class="text-12pt text-slate-500 whitespace-nowrap">排序：</span>
-          <button @click="toggleSort('total')"
+          <button type="button" @click="toggleSort('total')" :aria-pressed="sortBy.key === 'total'"
             :class="['px-3 py-1.5 rounded-lg text-12pt border transition', sortBy.key === 'total' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按总数</button>
-          <button @click="toggleSort('college')"
+          <button type="button" @click="toggleSort('college')" :aria-pressed="sortBy.key === 'college'"
             :class="['px-3 py-1.5 rounded-lg text-12pt border transition', sortBy.key === 'college' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按学院名</button>
-          <button @click="toggleSort('visits')"
+          <button type="button" @click="toggleSort('visits')" :aria-pressed="sortBy.key === 'visits'"
             :class="['px-3 py-1.5 rounded-lg text-12pt border transition', sortBy.key === 'visits' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按访问数</button>
-          <button @click="toggleSort('likes')"
+          <button type="button" @click="toggleSort('likes')" :aria-pressed="sortBy.key === 'likes'"
             :class="['px-3 py-1.5 rounded-lg text-12pt border transition', sortBy.key === 'likes' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按点赞数</button>
           <!-- 想听数（2026-10-19）：与访问/点赞同一套排序 + 显示模式切换 -->
-          <button @click="toggleSort('wants')"
+          <button type="button" @click="toggleSort('wants')" :aria-pressed="sortBy.key === 'wants'"
             :class="['px-3 py-1.5 rounded-lg text-12pt border transition', sortBy.key === 'wants' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400']">按想听数</button>
         </div>
       </div>
@@ -136,36 +164,37 @@
         </div>
         <!-- 桌面端（≥640px）：表格，冻结表头/首列，内部滚动 -->
         <div class="hidden sm:block sm:bg-white sm:rounded-xl sm:border sm:border-slate-200 sm:shadow-sm sm:overflow-hidden">
-          <div class="sm:overflow-auto sm:max-h-[calc(100vh_-_13rem)]">
+          <div class="scroll-region sm:overflow-auto sm:max-h-[calc(100vh_-_13rem)]" tabindex="0" role="region" aria-label="学院讲座统计表，可横向和纵向滚动">
           <!-- border-separate + spacing-0：iOS Safari 下 border-collapse 会使单元格上的 position:sticky 失效（经典 WebKit bug），必须用 separate 模式才能让表头/首列钉住视口 -->
-          <table class="min-w-full text-12pt border-separate border-spacing-0">
+          <table id="stats-table" class="min-w-full text-12pt border-separate border-spacing-0">
+            <caption class="sr-only">各学院、部处讲座统计，可按列排序；当前显示 {{ rows.length }} 个单位。</caption>
             <thead class="bg-slate-50 text-slate-600">
               <tr>
-                <th class="text-center px-2 py-3 font-semibold border-b border-slate-200 sticky top-0 left-0 z-30 bg-slate-50 min-w-[48px] whitespace-nowrap hidden sm:table-cell">序号</th>
-                <th @click="toggleSort('college')" class="cursor-pointer select-none text-left px-4 py-3 font-semibold border-b border-slate-200 sticky top-0 left-0 z-30 bg-slate-50 max-w-[140px] break-words sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">
-                  <span class="inline-flex items-center gap-1 hover:text-slate-800">学院 / 部处 <span class="text-slate-400 text-10pt">{{ sortIcon('college') }}</span></span>
+                <th scope="col" class="text-center px-2 py-3 font-semibold border-b border-slate-200 sticky top-0 left-0 z-30 bg-slate-50 min-w-[48px] whitespace-nowrap hidden sm:table-cell">序号</th>
+                <th scope="col" :aria-sort="sortBy.key === 'college' ? (sortBy.order === 'asc' ? 'ascending' : 'descending') : 'none'" class="text-left px-4 py-3 font-semibold border-b border-slate-200 sticky top-0 left-0 z-30 bg-slate-50 max-w-[140px] break-words sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">
+                  <button type="button" class="sort-button inline-flex items-center gap-1 hover:text-slate-800" @click="toggleSort('college')">学院 / 部处 <span aria-hidden="true" class="text-slate-400 text-10pt">{{ sortIcon('college') }}</span></button>
                 </th>
-                <th v-if="displayMode === 'count'" @click="toggleSort('total')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[104px] whitespace-nowrap">
-                  <span class="inline-flex items-center gap-1 justify-end">总计 <span class="text-slate-400 text-10pt">{{ sortIcon('total') }}</span></span>
+                <th v-if="displayMode === 'count'" scope="col" :aria-sort="sortBy.key === 'total' ? (sortBy.order === 'asc' ? 'ascending' : 'descending') : 'none'" class="text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[104px] whitespace-nowrap">
+                  <button type="button" class="sort-button inline-flex items-center gap-1 justify-end" @click="toggleSort('total')">总计 <span aria-hidden="true" class="text-slate-400 text-10pt">{{ sortIcon('total') }}</span></button>
                 </th>
-                <th v-else-if="displayMode === 'visits'" @click="toggleSort('visits')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[104px] whitespace-nowrap">
-                  <span class="inline-flex items-center gap-1 justify-end">访问数 <span class="text-slate-400 text-10pt">{{ sortIcon('visits') }}</span></span>
+                <th v-else-if="displayMode === 'visits'" scope="col" :aria-sort="sortBy.key === 'visits' ? (sortBy.order === 'asc' ? 'ascending' : 'descending') : 'none'" class="text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[104px] whitespace-nowrap">
+                  <button type="button" class="sort-button inline-flex items-center gap-1 justify-end" @click="toggleSort('visits')">访问数 <span aria-hidden="true" class="text-slate-400 text-10pt">{{ sortIcon('visits') }}</span></button>
                 </th>
-                <th v-else-if="displayMode === 'likes'" @click="toggleSort('likes')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[104px] whitespace-nowrap">
-                  <span class="inline-flex items-center gap-1 justify-end">点赞数 <span class="text-slate-400 text-10pt">{{ sortIcon('likes') }}</span></span>
+                <th v-else-if="displayMode === 'likes'" scope="col" :aria-sort="sortBy.key === 'likes' ? (sortBy.order === 'asc' ? 'ascending' : 'descending') : 'none'" class="text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[104px] whitespace-nowrap">
+                  <button type="button" class="sort-button inline-flex items-center gap-1 justify-end" @click="toggleSort('likes')">点赞数 <span aria-hidden="true" class="text-slate-400 text-10pt">{{ sortIcon('likes') }}</span></button>
                 </th>
-                <th v-else-if="displayMode === 'wants'" @click="toggleSort('wants')" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[104px] whitespace-nowrap">
-                  <span class="inline-flex items-center gap-1 justify-end">想听数 <span class="text-slate-400 text-10pt">{{ sortIcon('wants') }}</span></span>
+                <th v-else-if="displayMode === 'wants'" scope="col" :aria-sort="sortBy.key === 'wants' ? (sortBy.order === 'asc' ? 'ascending' : 'descending') : 'none'" class="text-right px-4 py-3 font-semibold border-b border-slate-200 text-slate-800 sticky top-0 z-20 bg-slate-50 min-w-[104px] whitespace-nowrap">
+                  <button type="button" class="sort-button inline-flex items-center gap-1 justify-end" @click="toggleSort('wants')">想听数 <span aria-hidden="true" class="text-slate-400 text-10pt">{{ sortIcon('wants') }}</span></button>
                 </th>
-                <th v-for="y in years" :key="y" @click="toggleSort(String(y))" class="cursor-pointer select-none text-right px-4 py-3 font-semibold border-b border-slate-200 sticky top-0 z-20 bg-slate-50 min-w-[80px] whitespace-nowrap">
-                  <span class="inline-flex items-center gap-1 hover:text-slate-800 justify-end">{{ y }} 年 <span class="text-slate-400 text-10pt">{{ sortIcon(String(y)) }}</span></span>
+                <th v-for="y in years" :key="y" scope="col" :aria-sort="sortBy.key === String(y) ? (sortBy.order === 'asc' ? 'ascending' : 'descending') : 'none'" class="text-right px-4 py-3 font-semibold border-b border-slate-200 sticky top-0 z-20 bg-slate-50 min-w-[80px] whitespace-nowrap">
+                  <button type="button" class="sort-button inline-flex items-center gap-1 hover:text-slate-800 justify-end" @click="toggleSort(String(y))">{{ y }} 年 <span aria-hidden="true" class="text-slate-400 text-10pt">{{ sortIcon(String(y)) }}</span></button>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(row, idx) in rows" :key="row.college" class="hover:bg-slate-50">
                 <td class="px-2 py-3 text-center text-slate-400 sm:sticky sm:left-0 z-10 bg-white min-w-[48px] whitespace-nowrap hidden sm:table-cell border-b border-slate-100">{{ idx + 1 }}</td>
-                <td class="px-4 py-3 font-medium text-slate-700 sticky left-0 z-10 bg-white max-w-[140px] break-words sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none border-b border-slate-100">{{ row.college || '未分类' }}</td>
+                <th scope="row" class="px-4 py-3 font-medium text-slate-700 sticky left-0 z-10 bg-white max-w-[140px] break-words sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none border-b border-slate-100">{{ row.college || '未分类' }}</th>
                 <td v-if="displayMode === 'count'" class="px-4 py-3 text-right font-bold text-slate-800 min-w-[104px] whitespace-nowrap border-b border-slate-100">{{ row.total }}</td>
                 <td v-else-if="displayMode === 'visits'" class="px-4 py-3 text-right font-semibold text-slate-700 min-w-[104px] whitespace-nowrap border-b border-slate-100">{{ row.visitsTotal }}</td>
                 <td v-else-if="displayMode === 'likes'" class="px-4 py-3 text-right font-semibold text-slate-700 min-w-[104px] whitespace-nowrap border-b border-slate-100">{{ row.likesTotal }}</td>
@@ -174,16 +203,18 @@
                   {{ cellDisplay(n) }}
                 </td>
               </tr>
+            </tbody>
+            <tfoot>
               <tr class="bg-slate-50 font-semibold text-slate-700 sm:sticky sm:bottom-0 z-20">
                 <td class="px-2 py-3 text-center sm:sticky sm:left-0 sm:bottom-0 z-30 bg-slate-50 min-w-[48px] whitespace-nowrap hidden sm:table-cell"></td>
-                <td class="px-4 py-3 sticky left-0 z-30 bg-slate-50 max-w-[140px] break-words sm:bottom-0 sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">合计</td>
+                <th scope="row" class="px-4 py-3 sticky left-0 z-30 bg-slate-50 max-w-[140px] break-words sm:bottom-0 sm:left-[48px] sm:min-w-[140px] sm:whitespace-nowrap sm:max-w-none">合计</th>
                 <td v-if="displayMode === 'count'" class="px-4 py-3 text-right font-bold text-slate-800 sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[104px] whitespace-nowrap">{{ grandTotal }}</td>
                 <td v-else-if="displayMode === 'visits'" class="px-4 py-3 text-right font-bold text-slate-800 sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[104px] whitespace-nowrap">{{ grandVisits }}</td>
                 <td v-else-if="displayMode === 'likes'" class="px-4 py-3 text-right font-bold text-slate-800 sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[104px] whitespace-nowrap">{{ grandLikes }}</td>
                 <td v-else-if="displayMode === 'wants'" class="px-4 py-3 text-right font-bold text-slate-800 sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[104px] whitespace-nowrap">{{ grandWants }}</td>
                 <td v-for="n in yearTotals" :key="n.year" class="px-4 py-3 text-right sm:sticky sm:bottom-0 bg-slate-50 z-20 min-w-[80px] whitespace-nowrap">{{ totalValue(n) }}</td>
               </tr>
-            </tbody>
+            </tfoot>
           </table>
           <p v-if="summary && summary.lectureCount && displayMode === 'count'" class="mt-3 px-4 text-11pt text-slate-400 leading-relaxed">
             说明：同一讲座由多个单位联合发布（跨源合并）时，在每个相关单位各计 1 次；同一论坛 / 会议议程拆出的多场报告，在统计表中按 1 场计（首页列表仍逐场展示）。因此「各单位计数之和」与顶部「去重后讲座总数」不必相等。表内为归并后的场次，列名沿用「讲座数」。
@@ -198,54 +229,54 @@
              首列固定改用浏览器原生 CSS sticky left-0（首列是每行第一个子元素，自然位置即容器左缘，
              横滑时由合成层原生钉住，零 JS 帧延迟、无抖动（之前 JS translate3d 推回会因 1 帧时差抖动）。
              表头容器本身 sticky top-0 钉视口顶；外层卡片 overflow-hidden 裁切圆角与表格溢出。 -->
-        <div class="sm:hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="sm:hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" role="table" aria-label="移动端学院讲座统计">
           <!-- 表头独立横滑容器：sticky top-0 钉视口顶，自身 overflow-x-auto 不撑大外层 -->
-          <div id="m-thead-scroll" class="sticky top-0 z-30 overflow-x-auto bg-slate-50 border-b border-slate-200 shadow-sm" style="position:sticky;top:0;z-index:30">
-            <div class="flex" style="width: max-content">
-              <div @click="toggleSort('college')" class="mobile-sticky-left sticky left-0 z-40 bg-slate-50 w-[96px] shrink-0 px-2 py-3 font-semibold text-left border-r border-slate-200 break-words cursor-pointer select-none">
-                学院 / 部处 <span class="text-slate-400 text-10pt">{{ sortIcon('college') }}</span>
+          <div id="m-thead-scroll" class="scroll-region sticky top-0 z-30 overflow-x-auto bg-slate-50 border-b border-slate-200 shadow-sm" style="position:sticky;top:0;z-index:30" tabindex="0" role="rowgroup" aria-label="统计表头，可横向滚动">
+            <div class="flex" style="width: max-content" role="row">
+              <div role="columnheader" class="mobile-sticky-left sticky left-0 z-40 bg-slate-50 w-[96px] shrink-0 px-2 py-3 font-semibold text-left border-r border-slate-200 break-words">
+                <button type="button" class="sort-button text-left" :aria-pressed="sortBy.key === 'college'" @click="toggleSort('college')">学院 / 部处 <span aria-hidden="true" class="text-slate-400 text-10pt">{{ sortIcon('college') }}</span></button>
               </div>
-              <div class="flex">
-                <div v-if="displayMode === 'count'" @click="toggleSort('total')" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
-                  <span class="whitespace-nowrap">总计 <span class="ml-1 text-slate-400 text-10pt">{{ sortIcon('total') }}</span></span>
+              <div class="flex" role="presentation">
+                <div v-if="displayMode === 'count'" role="columnheader" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 whitespace-nowrap flex items-center justify-end">
+                  <button type="button" class="sort-button inline-flex items-center" :aria-pressed="sortBy.key === 'total'" @click="toggleSort('total')"><span class="whitespace-nowrap">总计 <span aria-hidden="true" class="ml-1 text-slate-400 text-10pt">{{ sortIcon('total') }}</span></span></button>
                 </div>
-                <div v-else-if="displayMode === 'visits'" @click="toggleSort('visits')" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
-                  <span class="whitespace-nowrap">访问数 <span class="ml-1 text-slate-400 text-10pt">{{ sortIcon('visits') }}</span></span>
+                <div v-else-if="displayMode === 'visits'" role="columnheader" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 whitespace-nowrap flex items-center justify-end">
+                  <button type="button" class="sort-button inline-flex items-center" :aria-pressed="sortBy.key === 'visits'" @click="toggleSort('visits')"><span class="whitespace-nowrap">访问数 <span aria-hidden="true" class="ml-1 text-slate-400 text-10pt">{{ sortIcon('visits') }}</span></span></button>
                 </div>
-                <div v-else-if="displayMode === 'likes'" @click="toggleSort('likes')" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
-                  <span class="whitespace-nowrap">点赞数 <span class="ml-1 text-slate-400 text-10pt">{{ sortIcon('likes') }}</span></span>
+                <div v-else-if="displayMode === 'likes'" role="columnheader" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 whitespace-nowrap flex items-center justify-end">
+                  <button type="button" class="sort-button inline-flex items-center" :aria-pressed="sortBy.key === 'likes'" @click="toggleSort('likes')"><span class="whitespace-nowrap">点赞数 <span aria-hidden="true" class="ml-1 text-slate-400 text-10pt">{{ sortIcon('likes') }}</span></span></button>
                 </div>
-                <div v-else-if="displayMode === 'wants'" @click="toggleSort('wants')" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
-                  <span class="whitespace-nowrap">想听数 <span class="ml-1 text-slate-400 text-10pt">{{ sortIcon('wants') }}</span></span>
+                <div v-else-if="displayMode === 'wants'" role="columnheader" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 whitespace-nowrap flex items-center justify-end">
+                  <button type="button" class="sort-button inline-flex items-center" :aria-pressed="sortBy.key === 'wants'" @click="toggleSort('wants')"><span class="whitespace-nowrap">想听数 <span aria-hidden="true" class="ml-1 text-slate-400 text-10pt">{{ sortIcon('wants') }}</span></span></button>
                 </div>
-                <div v-for="y in years" :key="y" @click="toggleSort(String(y))" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 cursor-pointer select-none whitespace-nowrap flex items-center justify-end">
-                  <span class="whitespace-nowrap">{{ y }}<span class="ml-1 text-slate-400 text-10pt">{{ sortIcon(String(y)) }}</span></span>
+                <div v-for="y in years" :key="y" role="columnheader" class="w-[72px] shrink-0 px-2 py-3 font-semibold text-right border-r border-slate-200 whitespace-nowrap flex items-center justify-end">
+                  <button type="button" class="sort-button inline-flex items-center" :aria-pressed="sortBy.key === String(y)" @click="toggleSort(String(y))"><span class="whitespace-nowrap">{{ y }}<span aria-hidden="true" class="ml-1 text-slate-400 text-10pt">{{ sortIcon(String(y)) }}</span></span></button>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- 数据独立横滑容器 -->
-          <div id="m-scrollx" class="overflow-x-auto">
-            <div v-for="(row, idx) in rows" :key="row.college" class="flex border-b border-slate-100" style="width: max-content">
-              <div class="mobile-sticky-left sticky left-0 z-20 bg-white w-[96px] shrink-0 px-2 py-3 font-medium text-slate-700 border-r border-slate-100 break-words">{{ row.college || '未分类' }}</div>
-              <div v-if="displayMode === 'count'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ row.total }}</div>
-              <div v-else-if="displayMode === 'visits'" class="w-[72px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.visitsTotal }}</div>
-              <div v-else-if="displayMode === 'likes'" class="w-[72px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.likesTotal }}</div>
-              <div v-else-if="displayMode === 'wants'" class="w-[72px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.wantsTotal }}</div>
-              <div v-for="(n, ci) in row.cells" :key="years[ci]" :class="['w-[72px] shrink-0 px-2 py-3 text-right border-r border-slate-100', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
+          <div id="m-scrollx" class="scroll-region overflow-x-auto" tabindex="0" role="rowgroup" aria-label="学院讲座统计数据，可横向滚动">
+            <div v-for="(row, idx) in rows" :key="row.college" role="row" class="flex border-b border-slate-100" style="width: max-content">
+              <div role="rowheader" class="mobile-sticky-left sticky left-0 z-20 bg-white w-[96px] shrink-0 px-2 py-3 font-medium text-slate-700 border-r border-slate-100 break-words">{{ row.college || '未分类' }}</div>
+              <div v-if="displayMode === 'count'" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ row.total }}</div>
+              <div v-else-if="displayMode === 'visits'" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.visitsTotal }}</div>
+              <div v-else-if="displayMode === 'likes'" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.likesTotal }}</div>
+              <div v-else-if="displayMode === 'wants'" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-semibold text-slate-700 border-r border-slate-100">{{ row.wantsTotal }}</div>
+              <div v-for="(n, ci) in row.cells" :key="years[ci]" role="cell" :class="['w-[72px] shrink-0 px-2 py-3 text-right border-r border-slate-100', cellValue(n) ? 'text-slate-700' : 'text-slate-300']">
                 {{ cellDisplay(n) }}
               </div>
             </div>
 
             <!-- 合计行 -->
-            <div class="flex bg-slate-50" style="width: max-content">
-              <div class="mobile-sticky-left sticky left-0 z-20 bg-slate-50 w-[96px] shrink-0 px-2 py-3 font-semibold text-slate-700 border-r border-slate-100">合计</div>
-              <div v-if="displayMode === 'count'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandTotal }}</div>
-              <div v-else-if="displayMode === 'visits'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandVisits }}</div>
-              <div v-else-if="displayMode === 'likes'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandLikes }}</div>
-              <div v-else-if="displayMode === 'wants'" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandWants }}</div>
-              <div v-for="t in yearTotals" :key="t.year" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ totalValue(t) }}</div>
+            <div role="row" class="flex bg-slate-50" style="width: max-content">
+              <div role="rowheader" class="mobile-sticky-left sticky left-0 z-20 bg-slate-50 w-[96px] shrink-0 px-2 py-3 font-semibold text-slate-700 border-r border-slate-100">合计</div>
+              <div v-if="displayMode === 'count'" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandTotal }}</div>
+              <div v-else-if="displayMode === 'visits'" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandVisits }}</div>
+              <div v-else-if="displayMode === 'likes'" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandLikes }}</div>
+              <div v-else-if="displayMode === 'wants'" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ grandWants }}</div>
+              <div v-for="t in yearTotals" :key="t.year" role="cell" class="w-[72px] shrink-0 px-2 py-3 text-right font-bold text-slate-800 border-r border-slate-100">{{ totalValue(t) }}</div>
             </div>
           </div>
 
@@ -272,11 +303,11 @@
 
   </div>
 
-  <script defer src="app.cloud.js?v=9c148fb828"></script>
-  <script defer src="stats.js?v=0e0329df0f"></script>
+  <script defer src="app.cloud.js?v=27c6be74db"></script>
+  <script defer src="stats.js?v=6160bd5bc9"></script>
   <!-- footer-counter.js：Supabase 云端计数 + 5 分钟缓存防重复。
        必须置于 stats.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
-  <script defer src="footer-counter.js?v=3e316d029b"></script>
+  <script defer src="footer-counter.js?v=c6082dfa5e"></script>
 </body>
 </html>

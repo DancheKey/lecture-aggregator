@@ -109,9 +109,62 @@ Object.assign(APP_METHODS, {
         .finally(() => { this.scraping = false; });
     },
 
+    /* ---------- 顶部更多菜单 ---------- */
+    closeMenu(returnFocus = false) {
+      this.showMenu = false;
+      if (returnFocus && this.$refs.menuButton) {
+        this.$nextTick(() => this.$refs.menuButton.focus());
+      }
+    },
+
     /* ---------- 信息源报告（反馈栏目网址变更 / 长期无更新） ---------- */
-    openReport() { this.showReport = true; },
-    closeReport() { this.showReport = false; },
+    openReport(returnFocus) {
+      // 菜单项关闭后不可聚焦，因此从菜单打开时由模板传入菜单开关本身。
+      this._reportTrigger = returnFocus || document.activeElement;
+      this.showReport = true;
+      this.$nextTick(() => {
+        if (this.showReport && this.$refs.reportUnit) this.$refs.reportUnit.focus();
+      });
+    },
+    closeReport() {
+      if (!this.showReport) return;
+      this.showReport = false;
+      const trigger = this._reportTrigger;
+      this._reportTrigger = null;
+      this.$nextTick(() => {
+        if (trigger && typeof trigger.focus === 'function' && trigger.isConnected !== false) {
+          trigger.focus();
+        }
+      });
+    },
+    reportFocusables() {
+      const modal = this.$refs.reportModal;
+      if (!modal || typeof modal.querySelectorAll !== 'function') return [];
+      return Array.from(modal.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]):not([type="hidden"]):not([tabindex="-1"]), '
+        + 'select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      )).filter(el => el.getAttribute('aria-hidden') !== 'true' && el.tabIndex >= 0);
+    },
+    onReportKeydown(e) {
+      if (!this.showReport) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeReport();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = this.reportFocusables();
+      if (!items.length) { e.preventDefault(); return; }
+      const active = document.activeElement;
+      const index = items.indexOf(active);
+      if (e.shiftKey && index <= 0) {
+        e.preventDefault();
+        items[items.length - 1].focus();
+      } else if (!e.shiftKey && (index === items.length - 1 || index < 0)) {
+        e.preventDefault();
+        items[0].focus();
+      }
+    },
 
     _nowStr() {
       const d = new Date(), p = n => String(n).padStart(2, '0');

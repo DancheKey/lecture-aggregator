@@ -4,7 +4,7 @@ const _warnedBadEnd = new Set();
 Object.assign(APP_METHODS, {
     // 论坛卡展开状态：未显式操作过时，「筛选/搜索命中子集」自动展开（2026-09-26 方案B）
     isForumOpen(u) {
-      const v = this.expandedForums[u.url];
+      const v = this.expandedForums[u.key];
       if (v !== undefined) return v;
       return u.recs.length < u.total;
     },
@@ -21,7 +21,7 @@ Object.assign(APP_METHODS, {
     },
 
     toggleForum(u) {
-      this.expandedForums[u.url] = !this.isForumOpen(u);
+      this.expandedForums[u.key] = !this.isForumOpen(u);
     },
 
     // 远期折叠组判定（2026-10-13 方案 B）：供 index.html 模板区分「折叠提示条」与
@@ -376,7 +376,8 @@ Object.assign(APP_METHODS, {
         this.all.length, this.dataStage, window.innerWidth,
         Object.keys(this._longText).length,
         JSON.stringify(this.expandedAbstract), JSON.stringify(this.expandedBio),
-        this.onlineOnly, this.ongoingOnly, this.farFutureOpen, toolbarGeo].join('|');
+        this.onlineOnly, this.upcomingOnly, this.upcomingRange, this.ongoingOnly,
+        this.farFutureOpen, toolbarGeo].join('|');
       if (sig === this._clampSig) return;
       this._clampSig = sig;
       const next = {};

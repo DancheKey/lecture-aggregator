@@ -58,6 +58,8 @@ class MainWaterGateTest(unittest.TestCase):
         self.s.ROOT = self.tmp
         self.s._LEDGER = {}
         self.s._LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0, 'dirty': 0}
+        self.s._LEDGER_RETRY_KEYS = set()
+        self.s._RETRY_RECOVERED_KEYS = set()
         self.s._LISTDATE_STATS = {'skipped': 0}
 
     # ---------- 工具 ----------
@@ -208,6 +210,43 @@ class MainWaterGateTest(unittest.TestCase):
         last = self._read_last()
         self.assertEqual(last.get('last_scrape'), '2026-08-01T00:00:00+08:00',
                          '显式 --since 且全部源失败时，水位必须沿用传入值')
+
+    def _run_old_record_after_retry(self, recovered):
+        source = self._two_sources()[0]
+        url = 'http://a.scnu.edu.cn/a/20200101/1.html'
+        self._patch_scrape_ledger_cfg()
+        self._patch_sources_cfg([source])
+        self._write_last({'last_scrape': '2026-09-01T08:00:00+08:00',
+                          'mode': 'incremental'})
+        self._stub_sources([('A学院', None)])
+
+        def fake_process(src, year, existing_urls, is_incremental, *args, **kwargs):
+            if recovered:
+                self.s._RETRY_RECOVERED_KEYS.add(self.s._canon_url_key(url))
+            return {url: {
+                'sourceUrl': url, 'title': '恢复后抓到的旧讲座',
+                'lectureStart': '2020-01-01 10:00:00',
+                'publishTime': '2020-01-01 08:00:00',
+                'college': 'A学院', 'campus': '石牌',
+            }}, None
+
+        self.s._process_source = fake_process
+        self._run_main(['scraper.py'])
+        with open(os.path.join(self.data_dir, 'lectures.json'), encoding='utf-8') as f:
+            return json.load(f)['data']
+
+    def test_13_失败重试成功的旧讲座不被重新锁180天(self):
+        records = self._run_old_record_after_retry(recovered=True)
+        self.assertEqual([r['sourceUrl'] for r in records],
+                         ['http://a.scnu.edu.cn/a/20200101/1.html'])
+        self.assertNotIn(self.s._canon_url_key(records[0]['sourceUrl']), self.s._LEDGER,
+                         '重试恢复的 URL 不得再被写成 180 天 old 台账')
+
+    def test_14_普通旧讲座仍走时间门并记old(self):
+        records = self._run_old_record_after_retry(recovered=False)
+        self.assertEqual(records, [])
+        key = self.s._canon_url_key('http://a.scnu.edu.cn/a/20200101/1.html')
+        self.assertEqual(self.s._LEDGER.get(key, {}).get('v'), 'old')
 
     # ---------- ⑥ 致命错误必须以非零状态码退出 ----------
     def test_09_未知源退出码为1(self):

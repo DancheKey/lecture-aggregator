@@ -102,18 +102,8 @@ if hasattr(P, 'get_judge_provider'):
 if hasattr(P, 'get_text_provider'):
     P.get_text_provider = lambda: None
 
-# VLM 密封化：与 test_parser_golden 同一套手法 —— provider 指向不可达地址，
-# 命中录制缓存即返回（零真实 API 调用）；未命中则快速失败而不是静默跳过。
-# ⚠ 2026-10-14：model 名必须与 golden 及 fixture 键一致（'golden-replay'）。
-#   两模块都在导入时桩 P._load_vlm_configs，后导入者覆盖前者；缓存键自 2026-10-14
-#   起纳入模型名（parsers.py:_vlm_extract_fields），模型名不一致会导致 golden 的
-#   test_07_65 等用例缓存未命中（fixture 键含 golden-replay）→ 触发不可达 provider
-#   → KeyError/连接失败。此前键不含模型名，两测试碰巧共享同一 fixture 条目掩盖了这一点。
-P._load_vlm_configs = lambda: [{'name': 'snapshot', 'model': 'golden-replay',
-                                'api_key': 'unused',
-                                'base_url': 'http://snapshot-test.invalid/vlm'}]
-P._vlm_cache_path = lambda: VLM_CACHE_FIXTURE
-P._vlm_cache_set = lambda key, val: None
+# VLM 密封化与 golden 共用同一 provider 身份和确定性图片桩，确保按请求内容
+# 生成的缓存键完全一致；缓存命中即返回，未命中则请求不可达地址并失败。
 # ⚠ 2026-10-02：缓存读写已收敛到 scraper/llm_cache.py，parsers 与 llm_provider
 # **共享同一个函数对象**（原先是两份独立实现，可分别打桩）。只桩 P 一侧时，
 # llm_provider 仍会写真实 data/.vlm_cache.json —— 于是「读」命中录制 fixture、
@@ -128,6 +118,10 @@ import llm_cache as _LC          # noqa: E402
 # ── 快照覆盖的用例（与 golden 的 CASES 同源，URL 即键）─────────────────
 # 复用 golden 的 CASES 而非复制一份，避免两处漂移。
 import test_parser_golden as G          # noqa: E402
+P._load_vlm_configs = G._vlm_test_configs
+P._vlm_img_b64 = G._vlm_test_image
+P._vlm_cache_path = lambda: VLM_CACHE_FIXTURE
+P._vlm_cache_set = lambda key, val: None
 
 # ── 字段策略 ────────────────────────────────────────────────────────
 # 1) 剔除非确定性：抓取时间戳

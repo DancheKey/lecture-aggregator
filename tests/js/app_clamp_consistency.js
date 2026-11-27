@@ -16,6 +16,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const HTML = path.join(ROOT, 'site', 'index.html');
 const DISPLAY = path.join(ROOT, 'site', 'app.display.js');
+const SOCIAL = path.join(ROOT, 'site', 'app.social.js');
 
 let pass = 0, fail = 0;
 function check(name, ok, detail) {
@@ -25,6 +26,7 @@ function check(name, ok, detail) {
 
 const html = fs.readFileSync(HTML, 'utf8');
 const display = fs.readFileSync(DISPLAY, 'utf8');
+const social = fs.readFileSync(SOCIAL, 'utf8');
 
 // 1) CSS 中定义的所有 .line-clamp-N
 const cssDefined = new Set();
@@ -83,12 +85,28 @@ const sigM = /const sig = \[([\s\S]*?)\]\.join\('\|'\)/.exec(display);
 check('_measureClamp 签名可定位', !!sigM);
 if (sigM) {
   const sigText = sigM[1];
-  for (const dim of ['onlineOnly', 'farFutureOpen']) {
+  for (const dim of ['onlineOnly', 'farFutureOpen', 'upcomingOnly', 'upcomingRange',
+                     'ongoingOnly', 'showWantedOnly']) {
     check(
       '签名覆盖 this.' + dim + '（整体更换卡片 DOM，漏则新卡片无展开按钮）',
       new RegExp('this\\.' + dim + '\\b').test(sigText),
       'sig=' + sigText.replace(/\s+/g, ' ').slice(0, 120)
     );
+  }
+
+  // clearFilters 是筛选字段的统一登记处；新增筛选若漏进签名，这里直接红灯。
+  const clearM = /clearFilters\(\)\s*\{([\s\S]*?)\}/.exec(social);
+  check('_measureClamp 元测试可定位 clearFilters', !!clearM);
+  if (clearM) {
+    const fields = [...clearM[1].matchAll(/this\.([A-Za-z_$][\w$]*)\s*=/g)].map(x => x[1]);
+    check('clearFilters 中能找到筛选字段', fields.length >= 10, 'fields=' + fields.join(','));
+    for (const field of fields) {
+      check(
+        'clearFilters 登记的 this.' + field + ' 已进入测量签名',
+        new RegExp('this\\.' + field + '\\b').test(sigText),
+        'sig=' + sigText.replace(/\s+/g, ' ').slice(0, 160)
+      );
+    }
   }
 }
 

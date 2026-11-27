@@ -31,21 +31,39 @@
 
   function getEl() { return document.getElementById('site_pv_value'); }
 
-  function isCacheValid() {
-    var ts = localStorage.getItem(COUNT_TS_KEY);
-    if (!ts) return false;
-    return (Date.now() - parseInt(ts, 10)) < EXPIRE_MS;
+  function validCount(n) { return Number.isSafeInteger(n) && n > 0; }
+
+  function readCache() {
+    try {
+      var rawTs = localStorage.getItem(COUNT_TS_KEY);
+      var rawCount = localStorage.getItem(COUNT_KEY);
+      if (!rawTs || !rawCount || !/^\d+$/.test(rawTs) || !/^\d+$/.test(rawCount)) return null;
+      var ts = Number(rawTs), count = Number(rawCount), age = Date.now() - ts;
+      if (!Number.isSafeInteger(ts) || !validCount(count) || age < 0 || age >= EXPIRE_MS) return null;
+      return count;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeCache(count) {
+    try {
+      localStorage.setItem(COUNT_KEY, String(count));
+      localStorage.setItem(COUNT_TS_KEY, String(Date.now()));
+    } catch (_) {}
   }
 
   // 云端不可用时读随站静态快照（CI 每日出片，最多滞后一天）。
   // 只读不计数，也**不写 localStorage 缓存**：云端恢复后应立刻回到实时值。
   function fallbackArchive() {
     return new Promise(function (resolve) {
-      fetch('lectures/visits.json', { cache: 'no-store' })
+      Promise.resolve().then(function () {
+        return fetch('lectures/visits.json', { cache: 'no-store' });
+      })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          var n = d ? parseInt(d.site_pv, 10) : NaN;
-          resolve(isNaN(n) || n <= 0 ? null : n);
+          var n = d ? Number(d.site_pv) : NaN;
+          resolve(validCount(n) ? n : null);
         })
         .catch(function () { resolve(null); });
     });
@@ -56,9 +74,9 @@
   function resolveSitePv() {
     if (_shared) return _shared;
     _shared = new Promise(function (resolve) {
-      if (isCacheValid()) {
-        var cached = parseInt(localStorage.getItem(COUNT_KEY), 10);
-        resolve(isNaN(cached) ? null : cached);
+      var cached = readCache();
+      if (cached !== null) {
+        resolve(cached);
         return;
       }
       if (typeof LectureCloud === 'undefined' || !LectureCloud ||
@@ -66,13 +84,14 @@
         fallbackArchive().then(resolve);
         return;
       }
-      LectureCloud.bump('visit', SITE_KEY, 1).then(function (row) {
-        if (!row || typeof row.visits !== 'number') {
+      Promise.resolve().then(function () {
+        return LectureCloud.bump('visit', SITE_KEY, 1);
+      }).then(function (row) {
+        if (!row || !validCount(row.visits)) {
           fallbackArchive().then(resolve);
           return;
         }
-        localStorage.setItem(COUNT_KEY, String(row.visits));
-        localStorage.setItem(COUNT_TS_KEY, String(Date.now()));
+        writeCache(row.visits);
         resolve(row.visits);
       }).catch(function () { fallbackArchive().then(resolve); });
     });

@@ -163,16 +163,31 @@ class TimeGateExemptionTest(unittest.TestCase):
                 fn = node
                 break
         self.assertIsNotNone(fn, '未找到 main()')
-        src_of_main = ast.get_source_segment(SRC, fn) or ''
 
-        idx_gate = src_of_main.find('dropped_keys, kept_keys = set(), set()')
-        self.assertGreater(idx_gate, 0, '未找到增量时间门循环')
-        loop_body = src_of_main[idx_gate:idx_gate + 900]
-        self.assertIn('new_source_names', loop_body,
-                      '增量时间门循环内未豁免新源——新源历史讲座仍会被丢弃'
-                      '（force_full 只放开了列表页侧闸门，入库前这道没放开）')
-        self.assertLess(loop_body.find('new_source_names'),
-                        loop_body.find('_parse_iso'),
+        gate_loop = None
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.For) or not isinstance(node.iter, ast.Name):
+                continue
+            if node.iter.id != 'all_fetched':
+                continue
+            if any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                   and n.func.id == '_parse_iso' for n in ast.walk(node)):
+                gate_loop = node
+                break
+        self.assertIsNotNone(gate_loop, '未找到含日期解析的增量时间门循环')
+
+        exemption = next((n for n in gate_loop.body
+                          if isinstance(n, ast.If)
+                          and 'new_source_names' in (ast.get_source_segment(SRC, n) or '')),
+                         None)
+        date_parse = next((n for n in ast.walk(gate_loop)
+                           if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                           and n.func.id == '_parse_iso'), None)
+        self.assertIsNotNone(exemption,
+                             '增量时间门循环内未豁免新源——新源历史讲座仍会被丢弃'
+                             '（force_full 只放开了列表页侧闸门，入库前这道没放开）')
+        self.assertIsNotNone(date_parse, '增量时间门循环内未找到日期解析')
+        self.assertLess(exemption.lineno, date_parse.lineno,
                         '豁免判断须在日期解析之前，否则仍会先被日期逻辑拦下')
 
     def test_13_豁免分支须continue且计入kept(self):

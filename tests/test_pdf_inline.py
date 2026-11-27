@@ -20,11 +20,14 @@ iframe 里的 PDF（Word 导出）中，HTML 正文只有标题 + 发布时间�
 本套件**全离线**：真实页面固化为 tests/fixtures/html/skc1124.html，PDF 文本
 固化为 tests/fixtures/pdf/skc1124.txt；下载用桩、fitz 用桩，无网络无密钥。
 """
+import gc
 import io
 import os
 import sys
+import tempfile
 import types
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr
 from unittest.mock import patch
 
@@ -52,6 +55,8 @@ WAF_HTML = b'<html><body>WAF blocked</body></html>' * 200
 def _fake_fitz(text=PDF_TEXT):
     """最小 fitz 替身：只实现 _collect_assets 用到的 open/get_text/转图接口。"""
     class _Page:
+        rect = types.SimpleNamespace(width=595, height=842)
+
         def get_text(self):
             return text
 
@@ -87,7 +92,7 @@ def _run_assets(html=REAL_HTML):
 
 
 class _Resp:
-    """requests.get 的最小响应替身（供 _safe_fetch 的 headers 断言）。"""
+    """safe_request 的最小响应替身（供 _safe_fetch 的 headers 断言）。"""
 
     def __init__(self, code=200, loc=None, body=b'%PDF-1.7'):
         self.status_code = code
@@ -198,7 +203,7 @@ class FetchHardeningTest(unittest.TestCase):
     """③ UA / Referer 与非 PDF 响应显式报错，杜绝静默吞。"""
 
     def test_07_safe_fetch_sends_browser_ua_and_referer(self):
-        with patch.object(P.requests, 'get',
+        with patch.object(P, 'safe_request',
                           return_value=_Resp()) as get:
             data = P._safe_fetch('https://statics.scnu.edu.cn/x.pdf', referer=URL)
         self.assertEqual(data, b'%PDF-1.7')
@@ -207,7 +212,7 @@ class FetchHardeningTest(unittest.TestCase):
         self.assertEqual(headers['Referer'], URL)
 
     def test_08_headers_survive_redirect_hop(self):
-        with patch.object(P.requests, 'get', side_effect=[
+        with patch.object(P, 'safe_request', side_effect=[
                 _Resp(302, '/final.pdf'), _Resp(200)]) as get:
             data = P._safe_fetch('https://statics.scnu.edu.cn/x.pdf', referer=URL)
         self.assertEqual(data, b'%PDF-1.7')
@@ -284,6 +289,115 @@ class EndToEndTimeTest(unittest.TestCase):
         self.assertIsNotNone(before)
         self.assertNotEqual(before['start'], '2026-11-23 09:00:00',
                             'PDF 文本必须是决定性证据，否则本用例失去意义')
+
+
+class PdfBudgetTest(unittest.TestCase):
+    class _Doc:
+        def __init__(self, texts):
+            self.texts = texts
+            self.page_count = len(texts)
+
+        def __getitem__(self, index):
+            page = types.SimpleNamespace()
+            page.get_text = lambda: self.texts[index]
+            return page
+
+    def test_15_page_count_is_capped(self):
+        doc = self._Doc(['第%d页' % i for i in range(P._MAX_PDF_PAGES + 5)])
+        text, truncated = P._extract_pdf_text_budget(doc)
+        self.assertTrue(truncated)
+        self.assertEqual(len(text.splitlines()), P._MAX_PDF_PAGES)
+        self.assertNotIn('第34页', text)
+
+    def test_16_cumulative_text_is_capped(self):
+        doc = self._Doc(['abcdef', 'ghijkl'])
+        with patch.object(P, '_MAX_PDF_TEXT_CHARS', 5):
+            text, truncated = P._extract_pdf_text_budget(doc)
+        self.assertEqual(text, 'abcde')
+        self.assertTrue(truncated)
+
+    def test_17_huge_page_is_scaled_before_rasterization(self):
+        captured = {}
+
+        class Page:
+            rect = types.SimpleNamespace(width=10000, height=10000)
+
+            def get_pixmap(self, matrix, alpha=False):
+                captured['scale'] = matrix[0]
+                scale = matrix[0]
+                return types.SimpleNamespace(
+                    width=int(10000 * scale), height=int(10000 * scale),
+                    save=lambda path: open(path, 'wb').write(b'not-an-image'))
+
+        class Doc:
+            def __getitem__(self, index):
+                return Page()
+
+        fitz = types.SimpleNamespace(Matrix=lambda x, y: (x, y))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = P._render_pdf_first_page(Doc(), fitz, tmp)
+        self.assertIsNotNone(path)
+        self.assertAlmostEqual(captured['scale'], 0.2)
+        self.assertLessEqual(captured['scale'], 0.2)
+
+    def test_18_render_pixel_guard_rejects_oversized_pixmap(self):
+        class Page:
+            rect = types.SimpleNamespace(width=100, height=100)
+
+            def get_pixmap(self, **kwargs):
+                return types.SimpleNamespace(
+                    width=2001, height=2000,
+                    save=lambda path: self.fail('超预算光栅图不得写盘'))
+
+        class Doc:
+            def __getitem__(self, index):
+                return Page()
+
+        fitz = types.SimpleNamespace(Matrix=lambda x, y: (x, y))
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(P._render_pdf_first_page(Doc(), fitz, tmp))
+
+    def test_19_concurrent_poster_tempfiles_are_unique_and_cleaned(self):
+        from PIL import Image
+
+        class Page:
+            rect = types.SimpleNamespace(width=595, height=842)
+
+            def get_text(self):
+                return PDF_TEXT
+
+            def get_pixmap(self, **kwargs):
+                def save(path):
+                    Image.new('RGB', (595, 842), 'white').save(path)
+                return types.SimpleNamespace(width=595, height=842, save=save)
+
+        class Doc:
+            page_count = 1
+
+            def __getitem__(self, index):
+                return Page()
+
+            def close(self):
+                pass
+
+        fitz = types.ModuleType('fitz')
+        fitz.open = lambda **kwargs: Doc()
+        fitz.Matrix = lambda x, y: (x, y)
+        with patch.object(P, '_safe_fetch', return_value=PDF_BYTES), \
+                patch.dict(sys.modules, {'fitz': fitz}):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(lambda _: _run_assets(), range(2)))
+        states = [r[0] for r in results]
+        dirs = [st._tempdir.name for st in states]
+        self.assertEqual(len(set(dirs)), 2, '并发解析不得共用同名 poster 文件')
+        for st in states:
+            self.assertTrue(os.path.exists(os.path.join(st._tempdir.name, 'poster.png')))
+        results = None
+        states = None
+        st = None
+        gc.collect()
+        for path in dirs:
+            self.assertFalse(os.path.exists(path), '共享状态释放后临时目录应清理')
 
 
 if __name__ == '__main__':

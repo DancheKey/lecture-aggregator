@@ -38,6 +38,22 @@ const mergedDayKey = l => (l.sourceUrl || '') + '|' + (l.lectureStart || '').sli
 const APP_COMPUTED = {
     totalCount() { return this.all.length; },
 
+    // 常驻 live status：加载、筛选、空结果与翻页都给出可朗读的文本。
+    // 不把秒级心跳写进文案，避免没有任何内容变化时反复打扰读屏用户。
+    resultsStatus() {
+      if (this.loading) return '讲座数据加载中。';
+      if (this.dataStage === 'partial') {
+        return `已加载 ${this.displayTotal} 场讲座，完整数据加载中。`;
+      }
+      if (this.dataStage === 'partial-error') {
+        return `已加载 ${this.displayTotal} 场讲座，部分数据加载失败，筛选结果不完整。`;
+      }
+      if (!this.filtered.length) return '没有匹配的讲座。';
+      const scope = this.hasActiveFilter ? '当前筛选' : '全部讲座';
+      const page = this.totalPages > 1 ? `，第 ${this.currentPage} / ${this.totalPages} 页` : '';
+      return `${scope}共 ${this.filtered.length} 场讲座${page}。`;
+    },
+
     // 「更新于」显示的日期（2026-09-10）：优先用 last_run.json 的最近运行时间——它由 CI
     // 每次运行刷新（空增量日也刷新），因此即便今天没有新讲座，页面也照常显示今天，
     // 不会让访客误以为站点停更；拿不到该文件时回退到 updatedAt（数据最后变化时间）。

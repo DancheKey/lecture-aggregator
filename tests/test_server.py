@@ -48,6 +48,7 @@ import threading
 import time
 import unittest
 import warnings
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_PATH = os.path.join(ROOT, 'server.py')
@@ -348,9 +349,22 @@ class TestUrlFieldTypeGuard(unittest.TestCase):
     def test_21_合法url正常返回并去空白(self):
         f = self.srv.Handler._url_from_body
         self.assertEqual(f({'url': 'http://a.scnu.edu.cn/x'}), 'http://a.scnu.edu.cn/x')
-        self.assertEqual(f({'url': '  http://a/  '}), 'http://a/')
+        self.assertEqual(f({'url': '  http://a/  '}), 'http://a')
+        self.assertEqual(f({'url': 'HTTP://A.SCNU.EDU.CN:80/x/?q=1#frag'}),
+                         'http://a.scnu.edu.cn/x?q=1')
+        self.assertEqual(f({'url': 'https://a.scnu.edu.cn:443/x~3'}),
+                         'https://a.scnu.edu.cn/x~3')
+        self.assertEqual(f({'url': 'https://a.scnu.edu.cn:8443/x'}),
+                         'https://a.scnu.edu.cn:8443/x')
         self.assertEqual(f({}), '')
         self.assertEqual(f(None), '')
+
+    def test_21b_非法或非HTTP地址不得进入统计键空间(self):
+        f = self.srv.Handler._url_from_body
+        for value in ('ftp://a/x', 'http:///x', 'http://a:bad/x',
+                      'http://user:pass@a/x', 'http://a/x\nInjected: y'):
+            with self.subTest(value=value):
+                self.assertEqual(f({'url': value}), '')
 
     def test_22_五端点均走统一入口(self):
         """静态锁：5 个统计端点不得再手写 `(body.get('url') or '').strip()`。
@@ -829,33 +843,118 @@ class TestHostHeaderGuard(_StaticGuardLiveBase):
                     'localhost.evil.com', '127.0.0.1@evil.com', '[::2]'):
             self.assertFalse(srv._host_allowed(bad), f'{bad!r} 应拒绝')
 
-    def test_56_局域网模式不强制Host校验(self):
-        """HOST=0.0.0.0 时必须关闭校验——否则 LAN 客户端全被 403 打挂。
+    def test_56_局域网模式保留恶意域名Host校验(self):
+        """HOST=0.0.0.0 放行 LAN IP，但不能因此重新放过 evil.com。
 
-        文档明确支持 HOST=0.0.0.0 局域网访问（main() 注释「自担风险」）。
-        LAN 客户端的 Host 是 http://<本机IP>:8000，不在回环白名单内，
-        若无条件强制，该模式下的所有请求都会 403。2026-10-10 实测发现。
-        回环绑定（默认模式）仍强制——那才是 DNS 重绑定攻击的前提。
-
-        ⚠ 必须翻转 setUp 里那个模块实例（self.srv_mod）：_load_server()
+        必须翻转 setUp 里那个模块实例（self.srv_mod）：_load_server()
         每次调用都重新 exec_module，另拿一个新实例改不到运行中 Handler
         的全局变量。
         """
         mod = self.srv_mod
-        orig = mod._ENFORCE_HOST
+        names = ('_ENFORCE_HOST', '_ALLOWED_BIND_HOSTS', '_ALLOW_IP_LITERAL_HOSTS')
+        orig = {name: getattr(mod, name) for name in names}
         try:
-            # 模拟 main() 在非回环绑定下的改写
-            mod._ENFORCE_HOST = False
+            self.assertFalse(mod._configure_host_policy('0.0.0.0'))
             status, _ = self._request(
                 self._req_host('GET', '/api/visits', '192.168.1.8:8000'))
             self.assertNotIn('403', status,
                              '局域网模式下 LAN Host 不应被拒，实际 ' + status)
+            status, _ = self._request(
+                self._req_host('GET', '/api/admin/token', 'evil.com'))
+            self.assertIn('403', status,
+                          '非回环绑定不得关闭恶意域名 Host 校验，实际 ' + status)
+            mod._configure_host_policy('lan-host.local')
+            self.assertTrue(mod._host_allowed('lan-host.local:8000'))
+            self.assertFalse(mod._host_allowed('evil.com'))
         finally:
-            mod._ENFORCE_HOST = orig
-        # 还原后仍强制
+            for name, value in orig.items():
+                setattr(mod, name, value)
         status, _ = self._request(
             self._req_host('GET', '/api/visits', 'evil.com'))
-        self.assertIn('403', status, '还原后应重新强制校验')
+        self.assertIn('403', status, '还原后应恢复回环 Host 白名单')
+
+
+class TestBoundedConnections(unittest.TestCase):
+    """并发上限必须在线程创建前生效，且处理器异常后也要归还名额。"""
+
+    def setUp(self):
+        from http.server import SimpleHTTPRequestHandler
+
+        self.mod = _load_server()
+        self.entered = threading.Event()
+        self.release = threading.Event()
+        entered, release = self.entered, self.release
+
+        class ProbeHandler(SimpleHTTPRequestHandler):
+            timeout = 3
+
+            def do_GET(self):
+                if self.path == '/hold':
+                    entered.set()
+                    release.wait(3)
+                elif self.path == '/boom':
+                    raise RuntimeError('probe')
+                self.send_response(200)
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        self.httpd = self.mod.BoundedThreadingHTTPServer(
+            ('127.0.0.1', 0), ProbeHandler, max_connections=1)
+        self.httpd.handle_error = lambda *args: None
+        self.port = self.httpd.server_address[1]
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+        self.sockets = []
+
+    def tearDown(self):
+        self.release.set()
+        for sock in self.sockets:
+            try:
+                sock.close()
+            except OSError:
+                pass
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+    def _open(self, path):
+        sock = socket.create_connection(('127.0.0.1', self.port), 3)
+        self.sockets.append(sock)
+        sock.sendall(f'GET {path} HTTP/1.0\r\n\r\n'.encode('ascii'))
+        return sock
+
+    @staticmethod
+    def _read(sock):
+        sock.settimeout(3)
+        data = b''
+        while True:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            data += chunk
+        return data.split(b'\r\n', 1)[0].decode('latin-1')
+
+    def test_57_超限返回503且释放后可恢复(self):
+        held = self._open('/hold')
+        self.assertTrue(self.entered.wait(2), '占用连接未进入处理器')
+        status = self._read(self._open('/ok'))
+        self.assertIn('503', status, '并发已满时第二连接必须 503，实际 ' + status)
+        self.release.set()
+        self.assertIn('200', self._read(held), '占用连接完成后应正常响应')
+        self.assertIn('200', self._read(self._open('/ok')), '名额释放后新连接应恢复')
+
+    def test_58_处理器异常不泄漏连接名额(self):
+        self._read(self._open('/boom'))
+        self.assertIn('200', self._read(self._open('/ok')), '异常处理后名额必须归还')
+
+    def test_59_main使用有界服务器且参数有效(self):
+        import inspect
+        self.assertIn('BoundedThreadingHTTPServer', inspect.getsource(self.mod.main))
+        with self.assertRaises(ValueError):
+            self.mod.BoundedThreadingHTTPServer(('127.0.0.1', 0),
+                                                self.mod.Handler, max_connections=0)
 
 
 class TestNoTestSideEffects(unittest.TestCase):
@@ -1068,6 +1167,171 @@ class TestKnownLectureUrlsCountKey(unittest.TestCase):
         urls = self.srv._known_lecture_urls()
         self.assertIn('http://c.scnu.edu.cn/3.html/~1', urls)
         self.assertIn('http://c.scnu.edu.cn/3.html/~1'.rstrip('/'), urls)
+
+
+    def test_23b_白名单与请求端使用同一canonical身份(self):
+        self._write([{'sourceUrl': 'HTTPS://Math.SCNU.EDU.CN:443/a/1.html/',
+                      'lectureIndex': 2}])
+        urls = self.srv._known_lecture_urls()
+        self.assertIn('https://math.scnu.edu.cn/a/1.html', urls)
+        self.assertIn('https://math.scnu.edu.cn/a/1.html~2', urls)
+        self.assertIn('https://math.scnu.edu.cn/a/1.html/~2', urls)
+        self.assertNotIn('HTTPS://Math.SCNU.EDU.CN:443/a/1.html/', urls)
+
+
+class TestStatFileRecovery(unittest.TestCase):
+    """统计文件必须结构校验、last-known-good 恢复且不销毁损坏原件。"""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp(prefix='test_stat_recovery_')
+        self.srv = _load_server()
+        self.orig = {name: getattr(self.srv, name) for name in
+                     ('DATA_DIR', 'VISITS_PATH', 'LECTURE_STATS_PATH',
+                      '_site_visits', '_lecture_stats')}
+        self.orig_dirty = dict(self.srv._stats_dirty)
+        self.srv.DATA_DIR = self.tmpdir
+        self.srv.VISITS_PATH = os.path.join(self.tmpdir, 'visits.json')
+        self.srv.LECTURE_STATS_PATH = os.path.join(self.tmpdir, 'lecture_stats.json')
+        self.srv._site_visits = {'total': 0, 'by_day': {}}
+        self.srv._lecture_stats = {}
+        self.srv._stats_dirty = {'visits': False, 'lectures': False}
+        self.srv._flush_stats = lambda: None
+
+    def tearDown(self):
+        self.srv._stats_dirty = {'visits': False, 'lectures': False}
+        for name, value in self.orig.items():
+            setattr(self.srv, name, value)
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _write(self, path, value, raw=False):
+        with open(path, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(value if raw else json.dumps(value, ensure_ascii=False))
+
+    def test_30_旧格式补齐by_day并标记待写回(self):
+        self._write(self.srv.VISITS_PATH, {'total': 9})
+        self.srv._load_stat_files()
+        self.assertEqual(self.srv._site_visits, {'total': 9, 'by_day': {}})
+        self.assertTrue(self.srv._stats_dirty['visits'])
+
+    def test_31_主文件损坏时恢复有效备份(self):
+        self._write(self.srv.VISITS_PATH, '{broken', raw=True)
+        self._write(self.srv.VISITS_PATH + '.bak',
+                    {'total': 12, 'by_day': {'2026-11-26': 2}})
+        self.srv._load_stat_files()
+        self.assertEqual(self.srv._site_visits['total'], 12)
+        self.assertTrue(self.srv._stats_dirty['visits'])
+        self.assertFalse(os.path.exists(self.srv.VISITS_PATH))
+        quarantined = [n for n in os.listdir(self.tmpdir)
+                       if n.startswith('visits.json.corrupt-')]
+        self.assertEqual(len(quarantined), 1)
+
+    def test_32_错误结构不会崩启动且主备均隔离(self):
+        self._write(self.srv.VISITS_PATH, [])
+        self._write(self.srv.VISITS_PATH + '.bak', {'total': True, 'by_day': []})
+        self.srv._load_stat_files()
+        self.assertEqual(self.srv._site_visits, {'total': 0, 'by_day': {}})
+        self.assertTrue(self.srv._stats_dirty['visits'])
+        quarantined = [n for n in os.listdir(self.tmpdir)
+                       if '.corrupt-' in n]
+        self.assertEqual(len(quarantined), 2)
+
+    def test_33_讲座统计迁移合并变体并钳制上限(self):
+        key = 'http://a.scnu.edu.cn/x'
+        raw = {
+            'HTTP://A.SCNU.EDU.CN:80/x/': {'visits': 2, 'likes': 4, 'wants': 9},
+            key: {'visits': 3, 'likes': 7, 'wants': 2},
+            key + '~2': {'visits': self.srv.LECTURE_VISIT_CAP + 10,
+                         'likes': self.srv.LIKE_CAP + 1,
+                         'wants': self.srv.WANT_CAP + 1},
+        }
+        normalized = self.srv._normalize_lecture_stats(raw)
+        self.assertEqual(normalized[key], {'visits': 5, 'likes': 7, 'wants': 9})
+        self.assertEqual(normalized[key + '~2'], {
+            'visits': self.srv.LECTURE_VISIT_CAP,
+            'likes': self.srv.LIKE_CAP,
+            'wants': self.srv.WANT_CAP,
+        })
+
+    def test_34_保存滚动有效备份且不覆盖好备份(self):
+        self._write(self.srv.VISITS_PATH, {'total': 1, 'by_day': {}})
+        self.srv._site_visits = {'total': 2, 'by_day': {}}
+        self.srv._save_visits()
+        with open(self.srv.VISITS_PATH + '.bak', encoding='utf-8') as f:
+            self.assertEqual(json.load(f)['total'], 1)
+        self._write(self.srv.VISITS_PATH, '{broken', raw=True)
+        self.srv._site_visits = {'total': 3, 'by_day': {}}
+        self.srv._save_visits()
+        with open(self.srv.VISITS_PATH + '.bak', encoding='utf-8') as f:
+            self.assertEqual(json.load(f)['total'], 1)
+        with open(self.srv.VISITS_PATH, encoding='utf-8') as f:
+            self.assertEqual(json.load(f)['total'], 3)
+        with open(self.srv.VISITS_PATH, 'rb') as f:
+            self.assertNotIn(b'\r\n', f.read())
+
+
+class TestLectureStatIdentityAndCaps(unittest.TestCase):
+    def setUp(self):
+        self.srv = _load_server()
+        self.orig = {name: getattr(self.srv, name) for name in
+                     ('_lecture_stats', '_recent_lecture', '_recent_like_action',
+                      '_recent_want_action', '_flush_stats')}
+        self.orig_dirty = dict(self.srv._stats_dirty)
+        self.srv._lecture_stats = {}
+        self.srv._recent_lecture = {}
+        self.srv._recent_like_action = {}
+        self.srv._recent_want_action = {}
+        self.srv._stats_dirty = {'visits': False, 'lectures': False}
+        self.srv._flush_stats = lambda: None
+        self.known = mock.patch.object(
+            self.srv, '_known_lecture_urls',
+            return_value=frozenset({'http://a.scnu.edu.cn/x'}))
+        self.known.start()
+        self.h = type('StatHandlerStub', (), {})()
+        for name in ('_api_lecture_visit_post', '_api_lecture_like_post',
+                     '_api_lecture_unlike_post', '_api_lecture_want_post',
+                     '_api_lecture_unwant_post'):
+            setattr(self.h, name, getattr(self.srv.Handler, name).__get__(self.h))
+        self.h._url_from_body = self.srv.Handler._url_from_body
+        self.h._client_ip = lambda: '127.0.0.1'
+        self.h.sent = []
+        self.h._send_json = lambda payload, code=200: self.h.sent.append((code, payload))
+        self.h._next_body = {}
+        self.h._read_body_json = lambda: self.h._next_body
+
+    def tearDown(self):
+        self.known.stop()
+        self.srv._stats_dirty = {'visits': False, 'lectures': False}
+        for name, value in self.orig.items():
+            setattr(self.srv, name, value)
+
+    def _post(self, method, url):
+        self.h._next_body = {'url': url}
+        getattr(self.h, method)()
+        return self.h.sent[-1][1]
+
+    def test_35_大小写与尾斜杠共享存储和节流键(self):
+        first = self._post('_api_lecture_visit_post',
+                           'HTTP://A.SCNU.EDU.CN:80/x/')
+        second = self._post('_api_lecture_visit_post', 'http://a.scnu.edu.cn/x')
+        self.assertEqual(first['visits'], 1)
+        self.assertEqual(second['visits'], 1)
+        self.assertEqual(list(self.srv._lecture_stats), ['http://a.scnu.edu.cn/x'])
+        self.assertEqual(len(self.srv._recent_lecture), 1)
+
+    def test_36_访问与想听到顶返回capped且取消仍可减(self):
+        key = 'http://a.scnu.edu.cn/x'
+        self.srv._lecture_stats[key] = {
+            'visits': self.srv.LECTURE_VISIT_CAP,
+            'likes': 0, 'wants': self.srv.WANT_CAP,
+        }
+        visit = self._post('_api_lecture_visit_post', key)
+        want = self._post('_api_lecture_want_post', key)
+        self.assertTrue(visit['capped'])
+        self.assertTrue(want['capped'])
+        self.assertEqual(self.srv._lecture_stats[key]['visits'], self.srv.LECTURE_VISIT_CAP)
+        self.assertEqual(self.srv._lecture_stats[key]['wants'], self.srv.WANT_CAP)
+        unwant = self._post('_api_lecture_unwant_post', key)
+        self.assertEqual(unwant['wants'], self.srv.WANT_CAP - 1)
 
 
 class TestSourceUrlValidation(unittest.TestCase):

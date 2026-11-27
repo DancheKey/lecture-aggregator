@@ -70,6 +70,12 @@ CSS = """
    访问后移除 class。⚠ 三处拷贝（app.core.js/stats.js/visits-trend.js 的
    IIFE）与三处 .pre-hidden 规则改动须同步。 */
 .pre-hidden{display:none}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip-link{position:fixed;top:.5rem;left:.5rem;z-index:100;transform:translateY(-200%);
+  padding:.5rem .75rem;border-radius:.375rem;background:#1e3a8a;color:#fff;
+  font-weight:600;text-decoration:none}
+.skip-link:focus{transform:translateY(0);outline:3px solid #fbbf24;outline-offset:2px}
 *{box-sizing:border-box}
 body{margin:0;padding:0;background:#f7f8fa;color:#2C2C2A;
   font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
@@ -115,6 +121,8 @@ h1{font-size:22px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
 .ranges button{font:inherit;font-size:14px;padding:5px 17px;border-radius:999px;
   border:1px solid #E1E0DA;background:#fff;color:#5F5E5A;cursor:pointer}
 .ranges button:hover{border-color:#C9C7BE}
+.ranges button:focus-visible,.tb-head button:focus-visible,.scroll-region:focus-visible{
+  outline:3px solid #B5D4F4;outline-offset:2px}
 .ranges button.on{background:#E6F1FB;color:#185FA5;border-color:#B5D4F4}
 /* 移动端（2026-10-29）：浅蓝底+中蓝字在手机反光/小字号下对比度不足，
    「全部」等选中标签文字发白看不清。仅在小屏把选中态改为实心深蓝底+白字加粗，
@@ -392,28 +400,50 @@ function renderTable() {
     tb.appendChild(tr);
   });
   var btn = document.getElementById('toggleRows');
+  btn.setAttribute('aria-expanded', EXPANDED ? 'true' : 'false');
+  btn.setAttribute('aria-pressed', EXPANDED ? 'true' : 'false');
   if (rows.length > 7) {
-    btn.style.display = '';
+    btn.hidden = false;
     btn.textContent = EXPANDED ? '收起（仅显示最近 7 条）' : '展开全部 ' + rows.length + ' 条';
   } else {
-    btn.style.display = 'none';
+    btn.hidden = true;
   }
   document.getElementById('tcount').textContent = rows.length;
+}
+
+function currentRangeLabel() {
+  var label = '近 7 天';
+  document.querySelectorAll('.ranges button').forEach(function (b) {
+    if (b.getAttribute('data-range') === String(RANGE)) label = b.textContent;
+  });
+  return label;
+}
+
+function trendStatus(msg) {
+  var status = document.getElementById('trend-status');
+  if (status) status.textContent = msg;
 }
 
 document.querySelectorAll('.ranges button').forEach(function (b) {
   b.addEventListener('click', function () {
     RANGE = Number(b.getAttribute('data-range'));
     document.querySelectorAll('.ranges button').forEach(function (x) {
-      x.classList.toggle('on', x === b);
+      var active = x === b;
+      x.classList.toggle('on', active);
+      x.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
     renderChart();
     renderTable();
+    trendStatus('当前显示' + b.textContent + '，共 ' + inRange(SNAPS, RANGE).length + ' 条快照。');
   });
 });
 document.getElementById('toggleRows').addEventListener('click', function () {
   EXPANDED = !EXPANDED;
   renderTable();
+  var total = inRange(SNAPS, RANGE).length;
+  trendStatus(EXPANDED
+    ? '快照明细已展开，显示 ' + total + ' 条记录。'
+    : '快照明细已收起，仅显示最近 ' + Math.min(total, 7) + ' 条记录。');
 });
 
 // 数据加载（2026-10-02：原先数据内联在页面脚本里，为收紧 CSP 的 script-src 改为 fetch）。
@@ -428,6 +458,7 @@ function showLoadError(msg) {
   }
   var chart = document.getElementById('chart');
   if (chart) clear(chart);
+  trendStatus('访问量数据加载失败，请稍后刷新重试。');
 }
 
 fetch('visits-trend-data.json', { cache: 'no-store' })
@@ -441,6 +472,7 @@ fetch('visits-trend-data.json', { cache: 'no-store' })
     if (!SNAPS.length) throw new Error('数据为空');
     renderChart();
     renderTable();
+    trendStatus('访问量数据已加载，共 ' + SNAPS.length + ' 条快照，当前显示' + currentRangeLabel() + '。');
     // 实时校正先于数据文件到达时，applyLivePv 只缓存了 _livePv 未生效——
     // 此处补挂一次（竞态收口的另一半，见 applyLivePv 注释）。
     if (_livePv) {
@@ -656,6 +688,7 @@ def main():
   <script src="theme-loader.js"></script>
 </head>
 <body>
+<a class="skip-link" href="#trend-main">跳到主要内容</a>
 
 <!-- 顶部站点栏（2026-10-22）：与 index.html / stats.html 同一套视觉——白底、
      底部 1px 分隔线、左侧校徽+站名、右侧页面导航。此前本页没有站点栏，导航
@@ -677,14 +710,15 @@ def main():
       <img src="scnu-emblem.png" alt="华南师范大学" class="emblem">
       <img src="site-title.png" alt="木铎金声" class="wordmark">
     </a>
-    <nav class="topnav">
+    <nav class="topnav" aria-label="页面导航">
       <a href="stats.html">讲座统计</a>
       <a href="./">返回首页</a>
     </nav>
   </div>
 </header>
 
-<div class="wrap">
+<main id="trend-main" tabindex="-1" class="wrap">
+<p id="trend-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true">访问量数据加载中。</p>
 <header>
   <h1>站点访问量趋势</h1>
   <p class="sub">数据来源：自建 Supabase 每日快照（2026-10-17 前为 busuanzi）· 覆盖
@@ -696,10 +730,10 @@ def main():
 
 <div class="card">
   <div class="toolbar">
-    <div class="ranges">
-      <button type="button" data-range="7" class="on">近 7 天</button>
-      <button type="button" data-range="30">近 30 天</button>
-      <button type="button" data-range="0">全部</button>
+    <div class="ranges" role="group" aria-label="选择时间范围">
+      <button type="button" data-range="7" class="on" aria-pressed="true">近 7 天</button>
+      <button type="button" data-range="30" aria-pressed="false">近 30 天</button>
+      <button type="button" data-range="0" aria-pressed="false">全部</button>
     </div>
     <div class="legend">
       <span><i class="sw-line"></i>累计访问次数</span>
@@ -712,12 +746,13 @@ def main():
 <div class="tb-head">
   <h2>快照明细</h2>
   <span class="sub">共 <span id="tcount">0</span> 条</span>
-  <button type="button" id="toggleRows">展开全部</button>
+  <button type="button" id="toggleRows" aria-expanded="false" aria-controls="tbody" aria-pressed="false">展开全部</button>
 </div>
-<div class="tbl">
+<div class="tbl scroll-region" tabindex="0" role="region" aria-label="访问量快照明细，可横向和纵向滚动">
   <table>
-    <thead><tr><th>日期</th><th>累计访问次数</th>
-    <th>日新增访问</th></tr></thead>
+    <caption class="sr-only">访问量快照明细，默认显示最近 7 条，可展开全部记录。</caption>
+    <thead><tr><th scope="col">日期</th><th scope="col">累计访问次数</th>
+    <th scope="col">日新增访问</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
 </div>
@@ -726,8 +761,8 @@ def main():
   <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。 本页只统计<b>页面访问次数</b>。
 </div>
 
-<p id="load-err" class="empty" hidden></p>
-</div><!-- /.wrap（2026-10-28 补闭合：此前模板漏写，footer 被困在 1000px 容器内不铺满） -->
+<p id="load-err" class="empty" role="alert" hidden></p>
+</main><!-- /.wrap（2026-10-28 补闭合：此前模板漏写，footer 被困在 1000px 容器内不铺满） -->
 
 <!-- 底部信息栏：与 stats.html footer 同形式（全宽、居中、16px、slate-400）。
      Tailwind 类名保留仅作 theme-scnu.css 的命中钩子（footer.bg-white /

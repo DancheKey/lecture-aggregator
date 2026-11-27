@@ -167,20 +167,27 @@ for (const tz of TZS) {
 
 // ---------- 4) 倒计时文案（statusInfo）跨时区一致 ----------
 // statusInfo 读 this.tick（组件 state，秒级心跳）。这里手工注入。
-M.tick = NOW;
-for (const tz of TZS) {
-  process.env.TZ = tz;
-  // 25 小时后开始 → 走「还有 N 天」分支，日历日差必须是 1（北京时间口径）
-  const rec = { lectureStart: bjLiteral(NOW + 25 * H), lectureEnd: bjLiteral(NOW + 26 * H) };
-  const si = M.statusInfo(rec);
-  if (!/还有 \d+ 天/.test(si.label)) {
-    errs.push(`statusInfo 在 ${tz} 下文案异常：「${si.label}」`);
-  } else {
-    const gap = parseInt((si.label.match(/还有 (\d+) 天/) || [])[1], 10);
-    if (gap !== 1) {
-      errs.push(`statusInfo 在 ${tz} 下日历日差得 ${gap}，应为 1（25 小时后即次日）`);
+// 固定北京中午：25 小时后必为次日，避免测试随当前钟点跨过两个自然日。
+const COUNTDOWN_NOW = Date.UTC(2026, 10, 26, 4, 0, 0);
+ctx.__origDateNow = vm.runInContext('Date.now', ctx);
+vm.runInContext('Date.now = () => ' + COUNTDOWN_NOW, ctx);
+M.tick = COUNTDOWN_NOW;
+try {
+  for (const tz of TZS) {
+    process.env.TZ = tz;
+    const rec = { lectureStart: bjLiteral(COUNTDOWN_NOW + 25 * H), lectureEnd: bjLiteral(COUNTDOWN_NOW + 26 * H) };
+    const si = M.statusInfo(rec);
+    if (!/还有 \d+ 天/.test(si.label)) {
+      errs.push(`statusInfo 在 ${tz} 下文案异常：「${si.label}」`);
+    } else {
+      const gap = parseInt((si.label.match(/还有 (\d+) 天/) || [])[1], 10);
+      if (gap !== 1) {
+        errs.push(`statusInfo 在 ${tz} 下日历日差得 ${gap}，应为 1（北京中午起 25 小时后为次日）`);
+      }
     }
   }
+} finally {
+  vm.runInContext('Date.now = __origDateNow', ctx);
 }
 
 // ---------- 5) 日历导出不受影响 + 与 core 口径不分叉 ----------

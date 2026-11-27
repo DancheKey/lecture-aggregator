@@ -110,6 +110,19 @@
       clip: rect(0 0 0 0); clip-path: inset(50%);
       white-space: nowrap; border: 0;
     }
+    /* 跳到正文：默认移出视口，键盘聚焦时回到可见位置（不依赖 Tailwind 子集）。 */
+    .skip-link {
+      position: fixed; top: .5rem; left: .5rem; z-index: 100;
+      transform: translateY(-200%); padding: .5rem .75rem;
+      border-radius: .375rem; background: #1e3a8a; color: #fff;
+      font-weight: 600; text-decoration: none;
+    }
+    .skip-link:focus { transform: translateY(0); outline: 3px solid #fbbf24; outline-offset: 2px; }
+    /* 原生讲者筛选按钮保持原 span 的行内排版，不引入边框/底色/内边距。 */
+    .speaker-filter-btn {
+      appearance: none; background: transparent; border: 0; padding: 0;
+      font: inherit; color: inherit; text-align: inherit;
+    }
     /* 卡片底部「想听 + 点赞」操作组：移动端随标签流式排列（两按钮始终相邻同行，
        放不下则整组换到下一行左端）；桌面端恢复右推，与原版式一致。
        注意：不用 Tailwind 的 sm:ml-auto——它不在预编译产物中（会静默失效），
@@ -303,6 +316,7 @@
   <script src="theme-loader.js?v=248fb77d42"></script>
 </head>
 <body class="bg-[#f7f8fa] text-slate-800 antialiased" style="font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
   <div id="app" v-cloak class="min-h-screen flex flex-col">
 
     <!-- 顶部栏 -->
@@ -320,15 +334,15 @@
           </div>
 
           <!-- 校区导航（桌面） -->
-          <nav class="hidden sm:flex items-center gap-1 ml-3">
-            <button v-for="c in campusList" :key="c"
-              @click="setCampus(c)"
+          <nav class="hidden sm:flex items-center gap-1 ml-3" aria-label="校区与互动筛选">
+            <button v-for="c in campusList" :key="c" type="button"
+              @click="setCampus(c)" :aria-pressed="campus === c"
               :class="['px-3 py-1.5 rounded-full text-12pt transition', campus===c ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
               {{ c || '全部' }}
             </button>
-            <button @click="toggleLikedFilter()"
+            <button type="button" @click="toggleLikedFilter()" :aria-pressed="showLikedOnly"
               :class="['px-3 py-1.5 rounded-full text-12pt transition flex items-center gap-1', showLikedOnly ? 'text-slate-900 font-semibold bg-slate-100' : 'text-slate-500 hover:bg-slate-100']">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
               </svg>
               点赞
@@ -337,26 +351,26 @@
                  标记过想听的场次（数据源 lectureStats 全表，2026-10-19 晚改全站口径）；
                  激活态用蓝色系，与卡片上的想听按钮同一视觉语言
                  （点赞是灰、想听是蓝），两者互斥——开一个会关掉另一个。 -->
-            <button @click="toggleWantedFilter()"
+            <button type="button" @click="toggleWantedFilter()" :aria-pressed="showWantedOnly"
               :class="['px-3 py-1.5 rounded-full text-12pt transition flex items-center gap-1', showWantedOnly ? 'text-blue-700 font-semibold bg-blue-50' : 'text-slate-500 hover:bg-slate-100']">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
               </svg>
               想听
             </button>
           </nav>
 
-          <div ref="menuContainer" class="relative ml-auto">
-            <button @click.stop="showMenu = !showMenu"
+          <div ref="menuContainer" class="relative ml-auto" @keydown.esc="closeMenu(true)">
+            <button ref="menuButton" type="button" @click.stop="showMenu = !showMenu"
               class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition"
-              aria-label="更多操作">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              aria-label="更多操作" :aria-expanded="showMenu" aria-controls="more-menu">
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
               </svg>
             </button>
-            <div v-show="showMenu" class="absolute right-0 top-full pt-2 w-44 z-30">
+            <div v-show="showMenu" id="more-menu" class="absolute right-0 top-full pt-2 w-44 z-30">
               <div class="bg-white rounded-lg shadow-lg border border-slate-200 py-1">
-                <button @click="scrape(); showMenu = false" :disabled="scraping"
+                <button type="button" @click="scrape(); showMenu = false" :disabled="scraping"
                   class="block w-full text-left px-4 py-2 text-12pt text-slate-600 hover:bg-slate-50 hover:text-blue-600 disabled:opacity-60">
                   {{ scraping ? '抓取中…' : '抓取新数据' }}
                 </button>
@@ -364,7 +378,7 @@
                   class="block px-4 py-2 text-12pt text-slate-600 hover:bg-slate-50 hover:text-blue-600">讲座统计</a>
                 <a href="visits-trend.html" @click="showMenu = false"
                   class="block px-4 py-2 text-12pt text-slate-600 hover:bg-slate-50 hover:text-blue-600">访问量趋势</a>
-                <button @click="openReport(); showMenu = false"
+                <button type="button" @click="showMenu = false; openReport($refs.menuButton)"
                   class="block w-full text-left px-4 py-2 text-12pt text-slate-600 hover:bg-slate-50 hover:text-blue-600 border-t border-slate-100">
                   报告信息源问题
                 </button>
@@ -374,23 +388,23 @@
         </div>
 
         <!-- 校区导航（移动端） -->
-        <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1">
-          <button v-for="c in campusList" :key="c"
-            @click="setCampus(c)"
+        <div class="sm:hidden flex gap-1 overflow-x-auto no-scrollbar pb-2 -mt-1" role="group" aria-label="校区与互动筛选">
+          <button v-for="c in campusList" :key="c" type="button"
+            @click="setCampus(c)" :aria-pressed="campus === c"
             :class="['px-3 py-1 rounded-full text-12pt whitespace-nowrap', campus===c ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
             {{ c || '全部' }}
           </button>
-          <button @click="toggleLikedFilter()"
+          <button type="button" @click="toggleLikedFilter()" :aria-pressed="showLikedOnly"
             :class="['px-3 py-1 rounded-full text-12pt whitespace-nowrap flex items-center gap-1', showLikedOnly ? 'text-slate-900 font-semibold bg-slate-200' : 'bg-slate-100 text-slate-500']">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
             </svg>
             点赞
           </button>
           <!-- 想听筛选片（移动端）：与桌面同构，激活态蓝色系 -->
-          <button @click="toggleWantedFilter()"
+          <button type="button" @click="toggleWantedFilter()" :aria-pressed="showWantedOnly"
             :class="['px-3 py-1 rounded-full text-12pt whitespace-nowrap flex items-center gap-1', showWantedOnly ? 'text-blue-700 font-semibold bg-blue-50' : 'bg-slate-100 text-slate-500']">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
             </svg>
             想听
@@ -400,10 +414,11 @@
     </header>
 
     <!-- 左右两侧校训：fixed 悬浮于视口两侧，上下滚动时始终不动；仅在视口宽度 ≥1700px 时显示，避免窄窗/高缩放时遮挡讲座卡片 -->
-    <img src="motto.webp?v=c002389075" alt="华南师范大学校训" loading="lazy" decoding="async" class="motto-side fixed top-1/2 -translate-y-1/2 object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 68vh; width: auto; left: 8rem;" />
-    <img src="motto.webp?v=c002389075" alt="华南师范大学校训" loading="lazy" decoding="async" class="motto-side fixed top-1/2 -translate-y-1/2 object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 68vh; width: auto; right: 8rem;" />
+    <img src="motto.webp?v=c002389075" alt="" loading="lazy" decoding="async" class="motto-side fixed top-1/2 -translate-y-1/2 object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 68vh; width: auto; left: 8rem;" />
+    <img src="motto.webp?v=c002389075" alt="" loading="lazy" decoding="async" class="motto-side fixed top-1/2 -translate-y-1/2 object-contain z-0 pointer-events-none rounded-lg shadow-sm" style="max-height: 68vh; width: auto; right: 8rem;" />
 
-    <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
+    <main id="main-content" tabindex="-1" class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
+          <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ resultsStatus }}</div>
           <!-- 统计 + 筛选工具栏：同一行，筛选时左侧文字切换为"当前筛选"，避免控件跳行 -->
           <div v-if="!loading" class="mb-5">
             <!-- 工具栏：单一左对齐 flex-wrap 流（2026-10-16 方案B'）。统计+搜索+字段+年份+筛选片
@@ -440,7 +455,7 @@
                 <template v-if="ongoingCount > 0 && !ongoingOnly">
                   <span class="text-slate-300">·</span>
                   进行中
-                  <button type="button" @click="toggleOngoing()"
+                  <button type="button" @click="toggleOngoing()" :aria-pressed="ongoingOnly" aria-controls="lecture-results"
                     class="px-2 py-0.5 rounded-full font-semibold transition"
                     :class="ongoingOnly ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-100'"
                     :title="ongoingOnly ? '点击取消进行中筛选' : '只看正在进行的讲座'">{{ ongoingCount }}</button>
@@ -454,7 +469,7 @@
                 <template v-if="upcomingCount > 0 && !upcomingOnly">
                   <span class="text-slate-300">·</span>
                   待开始
-                  <button type="button" @click="toggleUpcoming()"
+                  <button type="button" @click="toggleUpcoming()" :aria-pressed="upcomingOnly" aria-controls="lecture-results"
                     class="px-2 py-0.5 rounded-full font-semibold transition"
                     :class="upcomingOnly ? 'bg-blue-600 text-white' : 'text-orange-600 hover:bg-orange-100'"
                     :title="upcomingOnly ? '点击取消待开始筛选' : '只看还没开始的讲座'">{{ upcomingCount }}</button>
@@ -494,7 +509,7 @@
                    :class="{ 'ml-auto': dataStage !== 'full', 'is-wrap': toolbarWrapped }">
               <!-- 搜索框：固定宽 176px（.toolbar-search）；不用 flex-1——在 shrink-0 块内会塌陷 -->
               <div class="relative toolbar-search min-w-0">
-                <input v-model="query" type="search" :placeholder="searchPlaceholder" @focus="warmLongText()"
+                <input v-model="query" type="search" aria-label="搜索讲座" :placeholder="searchPlaceholder" @focus="warmLongText()"
                   class="w-full px-3 py-1.5 text-12pt rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 search-pad" />
                 <button v-if="query" type="button" @click="query = ''"
                   class="search-clear"
@@ -559,7 +574,7 @@
                 <button type="button" @click="toggleUpcoming()" aria-label="清除待开始筛选"
                   class="shrink-0 ml-0.5 w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 leading-none">×</button>
               </span>
-              <button v-if="hasActiveFilter" @click="clearFilters()"
+              <button v-if="hasActiveFilter" type="button" @click="clearFilters()"
                 class="shrink-0 px-2 py-1.5 text-12pt rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition whitespace-nowrap"
                 title="清除所有筛选条件">✕ 清除</button>
               </div>
@@ -573,18 +588,18 @@
           </div>
 
           <!-- 时间线 -->
-          <div v-if="loading" class="text-center text-slate-400 py-16 text-12pt">数据加载中…</div>
-          <div v-else-if="filtered.length">
-            <div v-for="g in pagedGroups" :key="g.key" class="mb-2">
+          <div v-if="loading" id="lecture-results" class="text-center text-slate-400 py-16 text-12pt" aria-busy="true">数据加载中…</div>
+          <div v-else-if="filtered.length" id="lecture-results" role="region" aria-label="讲座结果" :aria-busy="dataStage === 'partial'">
+            <div v-for="g in pagedGroups" :key="g.key" :id="'lecture-group-' + g.key" class="mb-2">
               <!-- 远期折叠组（2026-10-13 方案 B）：>7 天待开始讲座收在未来区末尾的一条提示条里。
                    折叠态 g.items 为空（只显示条）；展开态 items = 被折的 units，走下方与普通组
                    完全相同的渲染分支（分页不受影响：fold 容器恒占 1 个渲染单元位）。
                    展开态存 localStorage（toggleFarFuture），刷新不丢。 -->
               <button v-if="isFarFoldGroup(g)" type="button" @click="toggleFarFuture()"
-                :aria-expanded="farFutureOpen ? 'true' : 'false'"
+                :aria-expanded="farFutureOpen ? 'true' : 'false'" :aria-controls="'lecture-group-' + g.key"
                 :class="['far-fold-bar w-full text-left flex items-center gap-2 text-12pt text-slate-900 border border-amber-200 rounded-xl px-4 py-3 mb-3 transition',
                          farFutureOpen ? 'far-fold-bar--open' : 'bg-amber-50 border-dashed hover:bg-amber-100']">
-                <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>
                 <span class="font-medium">距今 7 天以上的预告</span>
@@ -605,7 +620,7 @@
                   <span class="hidden sm:inline font-medium text-slate-600 truncate min-w-0 max-w-college">{{ u.head.college }}</span>
                   <span class="hidden sm:inline text-slate-300 shrink-0">·</span>
                   <span class="whitespace-nowrap inline-flex items-center gap-1 text-slate-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span class="font-medium">{{ u.dateLabel }}</span>
@@ -622,7 +637,7 @@
                 </h2>
                 <div class="text-12pt text-slate-600 space-y-1 mb-2">
                   <div v-if="u.head.location" class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                     </svg>
@@ -630,18 +645,19 @@
                     <span class="text-slate-700 min-w-0">{{ u.head.location }}</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
                     </svg>
                     <span class="text-slate-700">同日 <span class="font-bold text-slate-900">{{ u.total }}</span> 场报告，点标题可查看源页完整议程</span>
                   </div>
                   <div v-if="u.recs.length < u.total" class="text-amber-600 text-11pt">⚠ 当前筛选命中 {{ u.recs.length }} / {{ u.total }} 场</div>
                 </div>
-                <button @click="toggleForum(u)"
+                <button type="button" @click="toggleForum(u)"
+                  :aria-expanded="isForumOpen(u) ? 'true' : 'false'" :aria-controls="'forum-list-' + u.key"
                   class="text-11pt text-blue-600 hover:text-blue-800 hover:underline mb-1">
                   {{ isForumOpen(u) ? '收起场次清单 ▲' : '展开场次清单 ▼' }}
                 </button>
-                <div v-if="isForumOpen(u)" class="mt-1 border-t border-slate-100 pt-2 space-y-1">
+                <div v-show="isForumOpen(u)" :id="'forum-list-' + u.key" class="mt-1 border-t border-slate-100 pt-2 space-y-1">
                   <div v-for="r in forumRecsSorted(u)" :key="r.lectureIndex ?? (r.topic || '').slice(0, 16)" class="flex items-baseline gap-2 text-11pt min-w-0">
                     <span class="shrink-0 text-slate-400 tabular-nums w-[86px]">{{ (r.lectureStart || '').slice(5, 16) }}</span>
                     <span class="min-w-0 text-slate-700 truncate" :title="r.topic">{{ r.topic || r.title }}</span>
@@ -649,17 +665,17 @@
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 items-center mt-2">
-                  <button @click="onTagClick('college', u.head.college)"
+                  <button type="button" @click="onTagClick('college', u.head.college)"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.college }}</button>
                   <!-- 实际举办校区标签（2026-10-13）：归口校级但 location 可推导出举办校区时显示。
                        actualCampusDup 守卫：与归口校区同值时不重复渲染（用户截图反馈
                        多来源记录出现两个「# 石牌」）；campus-tag class 供 CDP 探针/测试定位。 -->
-                  <button v-if="u.head.actualCampus && !actualCampusDup(u.head)" @click="onTagClick('campus', u.head.actualCampus)"
+                  <button v-if="u.head.actualCampus && !actualCampusDup(u.head)" type="button" @click="onTagClick('campus', u.head.actualCampus)"
                     class="campus-tag px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ u.head.actualCampus }}</button>
                   <!-- 线上标签（2026-10-13 用户要求）：location 写的是参会方式（腾讯会议/
                        Zoom/会议号等）而非实体地点时显示；点击进入「仅线上讲座」筛选
                        （toggleOnline），再点一次或点顶部筛选片 × 取消。 -->
-                  <button v-if="u.head.isOnline" @click="toggleOnline()"
+                  <button v-if="u.head.isOnline" type="button" @click="toggleOnline()"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># 线上</button>
                   <div class="card-actions flex items-center gap-2 shrink-0">
                     <!-- 整组加入日历（2026-10-20 批次 B）：合并卡代表「同页同日 ≥4 场」，
@@ -668,19 +684,24 @@
                          「组内还有能加的」或「组内我加过任意一场」。后半让「加过」的
                          蓝色高亮在整组过期后仍保留（与想听/点赞的纯状态语义一致）；
                          全组已结束时点击由 addGroupToCalendar 提示、不下载。 -->
-                    <button v-if="showGroupCalBtn(u)" @click="addGroupToCalendar(u)"
+                    <button v-if="showGroupCalBtn(u)" type="button" @click="addGroupToCalendar(u)"
+                      :aria-label="(hasGroupCalAdded(u) ? '整组已加入日历：' : '整组加入日历：') + u.head.title"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border', hasGroupCalAdded(u) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
                       :title="hasGroupCalAdded(u) ? (hasLiveRecs(u) ? '已加入日历（本机标记，组内至少一场）' : '已加入日历（本机标记）·本组已结束') : '整组加入日历：把这一组里还没结束的场次一次性导出（.ics）'">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                       </svg>
                     </button>
-                    <button @click="toggleWant(u.ck, $event)"
+                    <button type="button" @click="toggleWant(u.ck, $event)"
+                      :aria-label="(hasWanted(u.ck) ? '取消想听：' : '想听：') + u.head.title + '，当前 ' + wantCount(u.ck) + ' 人想听'"
+                      :aria-pressed="hasWanted(u.ck)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(u.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300']"
                       title="想听就点^_^">
                       <span v-if="wantCount(u.ck) > 0" class="text-center">{{ capDisplay(wantCount(u.ck)) }}</span>
                     </button>
-                    <button @click="toggleLike(u.ck, $event)"
+                    <button type="button" @click="toggleLike(u.ck, $event)"
+                      :aria-label="(hasLiked(u.ck) ? '取消点赞：' : '点赞：') + u.head.title + '，当前 ' + likeCount(u.ck) + ' 个赞'"
+                      :aria-pressed="hasLiked(u.ck)"
                       :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(u.ck) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-500 hover:text-slate-600 hover:border-slate-400']"
                       title="喜欢就赞^_^">
                       <span v-if="likeCount(u.ck) > 0" class="text-center">{{ capDisplay(likeCount(u.ck)) }}</span>
@@ -699,7 +720,7 @@
                   <span class="hidden sm:inline font-medium text-slate-600 truncate min-w-0 max-w-college">{{ l.college }}</span>
                   <span class="hidden sm:inline text-slate-300 shrink-0">·</span>
                   <span class="whitespace-nowrap inline-flex items-center gap-1 text-slate-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span class="font-medium">{{ fmtDateTime(l) }}</span>
@@ -723,14 +744,14 @@
                 <div v-if="l.topic || l.location || l.speaker || l.host || l.participants || notesText(l) || hasBio(l) || abstractOf(l)"
                   class="text-12pt text-slate-600 space-y-1 mb-2">
                   <div v-if="l.topic" class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold">题目</span>
                     <span class="text-slate-700 min-w-0">{{ truncate(l.topic, 120) }}</span>
                   </div>
                   <div v-if="l.location" class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                     </svg>
@@ -738,22 +759,22 @@
                     <span :class="l.location ? 'text-slate-700 min-w-0' : 'text-slate-400 italic min-w-0'">{{ l.location || '待公布' }}</span>
                   </div>
                   <div v-if="l.speaker" class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold">主讲</span>
-                    <span class="text-slate-700 min-w-0"><span class="cursor-pointer underline decoration-slate-300 underline-offset-2 hover:decoration-slate-500"
-                      :title="'查看 ' + speakerDisplayName(l) + ' 的所有讲座'" @click="pickSpeaker(l)">{{ speakerDisplayName(l) }}</span><span v-if="l.speakerAffiliation" class="text-slate-500">（{{ l.speakerAffiliation }}）</span><span v-if="isMultiSpeaker(l)" class="text-slate-500">{{ l.speakerAffiliation ? '等' : ' 等' }}</span></span>
+                    <span class="text-slate-700 min-w-0"><button type="button" class="speaker-filter-btn cursor-pointer underline decoration-slate-300 underline-offset-2 hover:decoration-slate-500"
+                      :title="'查看 ' + speakerDisplayName(l) + ' 的所有讲座'" @click="pickSpeaker(l)">{{ speakerDisplayName(l) }}</button><span v-if="l.speakerAffiliation" class="text-slate-500">（{{ l.speakerAffiliation }}）</span><span v-if="isMultiSpeaker(l)" class="text-slate-500">{{ l.speakerAffiliation ? '等' : ' 等' }}</span></span>
                   </div>
                   <div v-if="l.host" class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.688z" />
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold">主持</span>
                     <span class="text-slate-700 min-w-0">{{ l.host }}</span>
                   </div>
                   <div v-if="l.participants" class="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold">参与</span>
@@ -762,13 +783,14 @@
                   <div v-if="notesText(l)" class="text-amber-600 text-11pt">⚠ {{ notesText(l) }}</div>
                   <!-- 主讲简介：跟在主讲之后，默认最多两行，超长展开/收起 -->
                   <div v-if="hasBio(l)" class="flex items-start gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" style="margin-top:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" style="margin-top:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold leading-relaxed">简介</span>
                     <div class="min-w-0 flex-1">
-                      <p :data-clamp-key="clampKey(l, 'bio')" :class="['lecture-prose text-slate-500 leading-relaxed', expandedBio[expKey(l, 'bio')] ? '' : 'line-clamp-2']">{{ bioText(l) }}</p>
-                      <button v-if="bioLong(l)" @click="toggleBio(l)"
+                      <p :id="'bio-' + expKey(l, 'bio')" :data-clamp-key="clampKey(l, 'bio')" :class="['lecture-prose text-slate-500 leading-relaxed', expandedBio[expKey(l, 'bio')] ? '' : 'line-clamp-2']">{{ bioText(l) }}</p>
+                      <button v-if="bioLong(l)" type="button" @click="toggleBio(l)"
+                        :aria-expanded="expandedBio[expKey(l, 'bio')] ? 'true' : 'false'" :aria-controls="'bio-' + expKey(l, 'bio')"
                         class="block tap-min text-11pt text-blue-600 hover:text-blue-800 hover:underline mt-1">
                         {{ expandedBio[expKey(l, 'bio')] ? '收起简介 ▲' : '展开简介 ▼' }}
                       </button>
@@ -778,13 +800,14 @@
                        中位数摘要 330 字，3 行约可承载 130 字、足以说清主旨；「展开摘要」按钮由
                        _measureClamp 的 DOM 实测决定是否出现，裁剪不会让人看不到全文） -->
                   <div v-if="abstractOf(l)" class="flex items-start gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="d-ico text-slate-900 shrink-0" style="margin-top:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="d-ico text-slate-900 shrink-0" style="margin-top:3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                     </svg>
                     <span class="shrink-0 text-slate-900 font-semibold leading-relaxed">摘要</span>
                     <div class="min-w-0 flex-1">
-                      <p :data-clamp-key="clampKey(l, 'abs')" :class="['lecture-prose text-slate-600 leading-relaxed', expandedAbstract[expKey(l, 'abs')] ? '' : 'line-clamp-3']">{{ abstractOf(l) }}</p>
-                      <button v-if="abstractLong(l)" @click="toggleAbstract(l)"
+                      <p :id="'abstract-' + expKey(l, 'abs')" :data-clamp-key="clampKey(l, 'abs')" :class="['lecture-prose text-slate-600 leading-relaxed', expandedAbstract[expKey(l, 'abs')] ? '' : 'line-clamp-3']">{{ abstractOf(l) }}</p>
+                      <button v-if="abstractLong(l)" type="button" @click="toggleAbstract(l)"
+                        :aria-expanded="expandedAbstract[expKey(l, 'abs')] ? 'true' : 'false'" :aria-controls="'abstract-' + expKey(l, 'abs')"
                         class="block tap-min text-11pt text-blue-600 hover:text-blue-800 hover:underline mt-1">
                         {{ expandedAbstract[expKey(l, 'abs')] ? '收起摘要 ▲' : '展开摘要 ▼' }}
                       </button>
@@ -795,26 +818,27 @@
                 <div class="flex flex-wrap gap-2 items-center">
                   <!-- 多来源讲座：列出所有来源单位标签 -->
                   <template v-if="l.merged">
-                    <button v-for="c in sourceColleges(l)" :key="c"
+                    <button v-for="c in sourceColleges(l)" :key="c" type="button"
                       @click="onTagClick('college', c)"
                       class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ c }}</button>
                   </template>
                   <template v-else>
-                    <button @click="onTagClick('college', l.college)"
+                    <button type="button" @click="onTagClick('college', l.college)"
                       class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># {{ l.college }}</button>
                   </template>
                   <!-- 校区标签行（2026-10-13 改版）：campusTags = 归口校区 ∪ actualCampus
                        统一去重（用户截图反馈多来源记录出现两个「# 石牌」），只渲染一个 v-for；
                        campus-tag class 仅落在 actualCampus 项上，供 CDP 探针/测试定位（无视觉影响）。 -->
-                  <button v-for="c in campusTags(l)" :key="c" @click="onTagClick('campus', c)"
+                  <button v-for="c in campusTags(l)" :key="c" type="button" @click="onTagClick('campus', c)"
                     :class="['px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition', c === l.actualCampus ? 'campus-tag' : '']"># {{ c }}</button>
                   <!-- 线上标签（2026-10-13 用户要求）：见 forum 模板同款注释；点击进入线上筛选 -->
-                  <button v-if="l.isOnline" @click="toggleOnline()"
+                  <button v-if="l.isOnline" type="button" @click="toggleOnline()"
                     class="px-2.5 py-1 rounded bg-slate-100 text-slate-600 text-12pt hover:bg-blue-100 hover:text-blue-700 transition"># 线上</button>
                   <!-- 多来源切换按钮（2026-10-13 用户裁定挪到标签行末尾）：展开各官方
                        原文链接的入口，琥珀色高亮以示「可展开更多内容」，与普通筛选标签
                        （灰底可点击筛选）视觉区分。 -->
-                  <button v-if="l.merged" @click="toggleSources(l.ck)"
+                  <button v-if="l.merged" type="button" @click="toggleSources(l.ck)"
+                    :aria-expanded="expanded[l.ck] ? 'true' : 'false'" :aria-controls="'sources-' + l.ck"
                     class="multi-sources-toggle px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-12pt border border-amber-200 hover:bg-amber-100 transition">多来源 {{ expanded[l.ck] ? '▲' : '▼' }}</button>
                   <!-- 想听 + 点赞：包成一个整体（.card-actions）——避免「想听被 ml-auto 留在上一行右端、
                        点赞被迫换行到下一行左端」的割裂。移动端整组随标签流式排列（放不下则整组换行，
@@ -825,26 +849,31 @@
                        时间的 1 条，也挡掉「已结束且没加过」的场次；但「加过的」即使
                        结束仍显示——蓝色高亮当作历史记录留着（与想听/点赞纯状态标记一致）。
                        已结束的点击由 addToCalendar 提示、不下载，不会误加过去事件。 -->
-                  <button v-if="showCalBtn(l)" @click="addToCalendar(l)"
+                  <button v-if="showCalBtn(l)" type="button" @click="addToCalendar(l)"
+                    :aria-label="(hasCalAdded(l.ck || l.sourceUrl) ? '已加入日历：' : '加入日历：') + l.title"
                     :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border', hasCalAdded(l.ck || l.sourceUrl) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-400']"
                     :title="hasCalAdded(l.ck || l.sourceUrl) ? (canAddCal(l) ? '已加入日历（本机标记）' : '已加入日历（本机标记）·本场已结束') : '把当前讲座加进日历，下载后双击 .ics 文件导入'">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                     </svg>
                     <span v-if="calCount(l.ck) > 0" class="text-center">{{ capDisplay(calCount(l.ck)) }}</span>
                   </button>
-                  <button @click="toggleWant(l.ck, $event)"
+                  <button type="button" @click="toggleWant(l.ck, $event)"
+                    :aria-label="(hasWanted(l.ck) ? '取消想听：' : '想听：') + l.title + '，当前 ' + wantCount(l.ck) + ' 人想听'"
+                    :aria-pressed="hasWanted(l.ck)"
                     :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasWanted(l.ck) ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300']"
                     title="想听就点^_^">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" :fill="hasWanted(l.ck) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 24 24" :fill="hasWanted(l.ck) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                     </svg>
                     <span v-if="wantCount(l.ck) > 0" class="text-center">{{ capDisplay(wantCount(l.ck)) }}</span>
                   </button>
-                  <button @click="toggleLike(l.ck, $event)"
+                  <button type="button" @click="toggleLike(l.ck, $event)"
+                    :aria-label="(hasLiked(l.ck) ? '取消点赞：' : '点赞：') + l.title + '，当前 ' + likeCount(l.ck) + ' 个赞'"
+                    :aria-pressed="hasLiked(l.ck)"
                     :class="['px-2.5 py-1 rounded-full flex items-center gap-1 text-12pt transition border whitespace-nowrap', hasLiked(l.ck) ? 'bg-slate-100 border-slate-200 text-slate-700' : 'bg-white border-slate-200 text-slate-500 hover:text-slate-600 hover:border-slate-400']"
                     title="喜欢就赞^_^">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.ck) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-4 w-4" viewBox="0 0 20 20" :fill="hasLiked(l.ck) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
                       <path stroke-linejoin="round" d="M9.653 16.915l-.005-.003-.019-.01a20.76 20.76 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002z" />
                     </svg>
                     <span v-if="likeCount(l.ck) > 0" class="text-center">{{ capDisplay(likeCount(l.ck)) }}</span>
@@ -852,7 +881,7 @@
                   </div>
                 </div>
                 <!-- 多来源：展开各官方原文链接 -->
-                <div v-if="l.merged && expanded[l.ck]" class="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
+                <div v-if="l.merged" v-show="expanded[l.ck]" :id="'sources-' + l.ck" class="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
                   <a v-for="s in l.sources" :key="s.sourceUrl" :href="safeUrl(s.sourceUrl)" target="_blank" rel="noopener noreferrer"
                     @click="recordVisit(l.ck)"
                     class="flex items-center gap-2 text-12pt text-blue-600 hover:text-blue-800 hover:underline">
@@ -866,21 +895,21 @@
             </div>
           </div>
 
-          <div v-else class="text-center text-slate-400 py-16 text-12pt">没有匹配的讲座。</div>
+          <div v-else id="lecture-results" role="region" aria-label="讲座结果" class="text-center text-slate-400 py-16 text-12pt">没有匹配的讲座。</div>
 
           <!-- 分页导航（2026-10-19 B5）：显示条件必须与分页实际使用的数组一致。
                分页基于 foldedUnits（totalPages / pagedUnits 都取它），而远期折叠会把
                N 个单元压成 1 个——用 units.length 判断时，折叠后只有 1 页仍会渲染出
                一个孤零零的「1」。totalPages 已是 computed，直接判它。 -->
-          <nav v-if="totalPages > 1" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-12pt">
-            <button @click="prevPage" :disabled="currentPage === 1"
+          <nav v-if="totalPages > 1" aria-label="讲座分页" class="flex flex-wrap items-center justify-center gap-1.5 mt-8 mb-2 text-12pt">
+            <button type="button" @click="prevPage" :disabled="currentPage === 1"
               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
             <template v-for="p in pageNumbers" :key="p">
-              <button v-if="p !== '...'" @click="gotoPage(p)"
+              <button v-if="p !== '...'" type="button" @click="gotoPage(p)" :aria-current="p === currentPage ? 'page' : null"
                 :class="['min-w-page px-2 py-1.5 rounded-lg border transition', p === currentPage ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50']">{{ p }}</button>
               <span v-else class="px-1.5 text-slate-400 select-none">…</span>
             </template>
-            <button @click="nextPage" :disabled="currentPage === totalPages"
+            <button type="button" @click="nextPage" :disabled="currentPage === totalPages"
               class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
             <span class="ml-3 inline-flex items-center gap-1 whitespace-nowrap">
               <span class="text-slate-400">跳至</span>
@@ -888,7 +917,7 @@
                 aria-label="跳至页码"
                 class="w-16 px-2 py-1.5 text-center rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
               <span class="text-slate-400">页</span>
-              <button @click="jumpToPage"
+              <button type="button" @click="jumpToPage"
                 class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">跳转</button>
             </span>
           </nav>
@@ -927,19 +956,19 @@
          纯静态站接不住 POST，故由页面直接 POST 到 Web3Forms（见 app.js 的
          REPORT_ENDPOINT），由其转发到维护者邮箱；提交失败时自动降级为复制内容。 -->
     <div v-if="showReport" class="src-mask" @click.self="closeReport()">
-      <div class="src-modal" role="dialog" aria-modal="true" aria-labelledby="src-modal-title">
+      <div ref="reportModal" class="src-modal" role="dialog" aria-modal="true" aria-labelledby="src-modal-title" aria-describedby="src-modal-desc" @keydown="onReportKeydown">
         <div class="src-head">
           <h3 id="src-modal-title">报告信息源问题</h3>
-          <button class="src-x" @click="closeReport()" aria-label="关闭">✕</button>
+          <button type="button" class="src-x" @click="closeReport()" aria-label="关闭">✕</button>
         </div>
         <div class="src-body">
-          <p class="src-intro">
+          <p id="src-modal-desc" class="src-intro">
             如果某个学院 / 部处的讲座栏目换了网址、页面打不开，或长期没有新讲座，
             请把新地址填在下面，我们会在后续更新中纳入抓取。
           </p>
           <label class="src-field">
             <span class="src-label">单位名称 <em>*</em></span>
-            <input v-model="reportForm.unit" class="src-input" maxlength="60"
+            <input ref="reportUnit" v-model="reportForm.unit" class="src-input" maxlength="60"
               placeholder="如：数学科学学院、图书馆" />
           </label>
           <label class="src-field">
@@ -975,8 +1004,8 @@
           <p class="src-note">提交后内容直接送达维护者邮箱，不会公开显示。</p>
         </div>
         <div class="src-foot">
-          <button class="src-btn ghost" :disabled="reportSending" @click="copyReport()">仅复制内容</button>
-          <button class="src-btn primary" :disabled="reportSending" @click="submitReport()">
+          <button type="button" class="src-btn ghost" :disabled="reportSending" @click="copyReport()">仅复制内容</button>
+          <button type="button" class="src-btn primary" :disabled="reportSending" @click="submitReport()">
             {{ reportSending ? '提交中…' : '提交报告' }}
           </button>
         </div>
@@ -991,10 +1020,10 @@
 
     <!-- 回到顶部：下滑后出现，纯灰箭头圆形白底，悬停放大+阴影 -->
     <transition name="fade">
-      <button v-if="showBackTop" @click="scrollToTop"
+      <button v-if="showBackTop" type="button" @click="scrollToTop"
         class="back-top-btn fixed bottom-6 right-6 z-40 flex items-center justify-center w-11 h-11 rounded-full bg-white text-slate-500 shadow-lg border border-slate-200"
         aria-label="回到顶部">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M10 15V5M5 10l5-5 5 5" />
         </svg>
       </button>
@@ -1004,18 +1033,18 @@
   <!-- 前端分片：按依赖顺序 defer 加载，app.js 只做组装与挂载。
        插入顺序即执行顺序（defer 保证），新增分片须插在 app.js 之前。 -->
   <script defer src="app.core.js?v=c55fc540e1"></script>
-  <script defer src="app.state.js?v=dd5d2f91e2"></script>
-  <script defer src="app.computed.js?v=e387f7f0d4"></script>
-  <script defer src="app.display.js?v=ea6b7f1ce1"></script>
-  <script defer src="app.cloud.js?v=9c148fb828"></script>
-  <script defer src="app.social.js?v=3c408fec27"></script>
+  <script defer src="app.state.js?v=87aa4533cb"></script>
+  <script defer src="app.computed.js?v=957ce2a34c"></script>
+  <script defer src="app.display.js?v=802ce4ca0d"></script>
+  <script defer src="app.cloud.js?v=27c6be74db"></script>
+  <script defer src="app.social.js?v=4a5dc2c549"></script>
   <script defer src="app.calendar.js?v=9daf678249"></script>
   <script defer src="app.data.js?v=c12c52afb2"></script>
-  <script defer src="app.admin.js?v=51c29f817b"></script>
+  <script defer src="app.admin.js?v=6107dffa6d"></script>
   <script defer src="app.js?v=44480907c9"></script>
   <!-- footer-counter.js：Supabase 云端计数 + 5 分钟缓存防重复。
        必须置于 app.js（mount('#app')）之后执行，否则其写入的缓存值
        会随 Vue 重建 DOM 一起被摧毁，页脚退回显示「—」。 -->
-  <script defer src="footer-counter.js?v=3e316d029b"></script>
+  <script defer src="footer-counter.js?v=c6082dfa5e"></script>
 </body>
 </html>

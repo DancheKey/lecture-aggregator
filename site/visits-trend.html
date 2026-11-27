@@ -38,13 +38,14 @@
 <link rel="icon" href="favicon-16.png" sizes="16x16" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="description" content="木铎金声站点每日访问量与累计访问次数趋势（数据来自自建计数快照）。">
-<link rel="stylesheet" href="visits-trend.css?v=c921dc331b">
+<link rel="stylesheet" href="visits-trend.css?v=dfe28880eb">
   <!-- 讲座站点风格备选项（VI / 黑白 / 原版，由 site/_theme.json 后台切换，页面无 UI） -->
   <link id="vi-theme" rel="stylesheet" href="theme-scnu.css?v=fd10da0c67">
   <link id="bw-theme" rel="stylesheet" href="theme-bw.css?v=d61b02f793" disabled>
   <script src="theme-loader.js?v=248fb77d42"></script>
 </head>
 <body>
+<a class="skip-link" href="#trend-main">跳到主要内容</a>
 
 <!-- 顶部站点栏（2026-10-22）：与 index.html / stats.html 同一套视觉——白底、
      底部 1px 分隔线、左侧校徽+站名、右侧页面导航。此前本页没有站点栏，导航
@@ -66,29 +67,30 @@
       <img src="scnu-emblem.png" alt="华南师范大学" class="emblem">
       <img src="site-title.png" alt="木铎金声" class="wordmark">
     </a>
-    <nav class="topnav">
+    <nav class="topnav" aria-label="页面导航">
       <a href="stats.html">讲座统计</a>
       <a href="./">返回首页</a>
     </nav>
   </div>
 </header>
 
-<div class="wrap">
+<main id="trend-main" tabindex="-1" class="wrap">
+<p id="trend-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true">访问量数据加载中。</p>
 <header>
   <h1>站点访问量趋势</h1>
   <p class="sub">数据来源：自建 Supabase 每日快照（2026-10-17 前为 busuanzi）· 覆盖
-    2026-09-10 至 2026-11-27</p>
-  <p class="subline">生成于 2026-11-27 08:48 · 台账 data/visits_history.json</p>
+    2026-09-10 至 2026-11-26</p>
+  <p class="subline">生成于 2026-11-26 23:28 · 台账 data/visits_history.json</p>
 </header>
 
-<div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v" id="kpi_pv_value">2,165</div><div class="kpi-d" id="kpi_pv_delta">较前次 +0</div></div><div class="kpi"><div class="kpi-k">近 7 条快照新增</div><div class="kpi-v" id="kpi_recent7_value">30</div><div class="kpi-d">覆盖 2026-11-20 起共 7 次快照</div></div><div class="kpi"><div class="kpi-k">日均新增访问</div><div class="kpi-v" id="kpi_perday_value">14</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">79 天</div><div class="kpi-d">快照 76 条，缺 3 天</div></div></div>
+<div class="kpis"><div class="kpi"><div class="kpi-k">累计访问次数</div><div class="kpi-v" id="kpi_pv_value">2,156</div><div class="kpi-d" id="kpi_pv_delta">较前次 +1</div></div><div class="kpi"><div class="kpi-k">近 7 条快照新增</div><div class="kpi-v" id="kpi_recent7_value">26</div><div class="kpi-d">覆盖 2026-11-19 起共 7 次快照</div></div><div class="kpi"><div class="kpi-k">日均新增访问</div><div class="kpi-v" id="kpi_perday_value">14</div><div class="kpi-d">按首末快照间隔计</div></div><div class="kpi"><div class="kpi-k">时间跨度</div><div class="kpi-v">78 天</div><div class="kpi-d">快照 75 条，缺 3 天</div></div></div>
 
 <div class="card">
   <div class="toolbar">
-    <div class="ranges">
-      <button type="button" data-range="7" class="on">近 7 天</button>
-      <button type="button" data-range="30">近 30 天</button>
-      <button type="button" data-range="0">全部</button>
+    <div class="ranges" role="group" aria-label="选择时间范围">
+      <button type="button" data-range="7" class="on" aria-pressed="true">近 7 天</button>
+      <button type="button" data-range="30" aria-pressed="false">近 30 天</button>
+      <button type="button" data-range="0" aria-pressed="false">全部</button>
     </div>
     <div class="legend">
       <span><i class="sw-line"></i>累计访问次数</span>
@@ -101,12 +103,13 @@
 <div class="tb-head">
   <h2>快照明细</h2>
   <span class="sub">共 <span id="tcount">0</span> 条</span>
-  <button type="button" id="toggleRows">展开全部</button>
+  <button type="button" id="toggleRows" aria-expanded="false" aria-controls="tbody" aria-pressed="false">展开全部</button>
 </div>
-<div class="tbl">
+<div class="tbl scroll-region" tabindex="0" role="region" aria-label="访问量快照明细，可横向和纵向滚动">
   <table>
-    <thead><tr><th>日期</th><th>累计访问次数</th>
-    <th>日新增访问</th></tr></thead>
+    <caption class="sr-only">访问量快照明细，默认显示最近 7 条，可展开全部记录。</caption>
+    <thead><tr><th scope="col">日期</th><th scope="col">累计访问次数</th>
+    <th scope="col">日新增访问</th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
 </div>
@@ -115,8 +118,8 @@
   <b>累计访问次数</b>：每打开一次页面就计 1 次，同一人多次访问会重复累计。 本页只统计<b>页面访问次数</b>。
 </div>
 
-<p id="load-err" class="empty" hidden></p>
-</div><!-- /.wrap（2026-10-28 补闭合：此前模板漏写，footer 被困在 1000px 容器内不铺满） -->
+<p id="load-err" class="empty" role="alert" hidden></p>
+</main><!-- /.wrap（2026-10-28 补闭合：此前模板漏写，footer 被困在 1000px 容器内不铺满） -->
 
 <!-- 底部信息栏：与 stats.html footer 同形式（全宽、居中、16px、slate-400）。
      Tailwind 类名保留仅作 theme-scnu.css 的命中钩子（footer.bg-white /
@@ -138,7 +141,7 @@
      ⚠ defer 顺序不可乱：app.cloud → footer-counter → visits-trend，
      后两者都依赖前者先定义。裸引用（无 ?v=）是待打戳源形态，
      main() 里 stamp_script_version。 -->
-<script src="app.cloud.js?v=9c148fb828" defer></script>
-<script src="footer-counter.js?v=3e316d029b" defer></script>
-<script src="visits-trend.js?v=8c691f522b" defer></script>
+<script src="app.cloud.js?v=27c6be74db" defer></script>
+<script src="footer-counter.js?v=c6082dfa5e" defer></script>
+<script src="visits-trend.js?v=7b5a1886a3" defer></script>
 </body></html>

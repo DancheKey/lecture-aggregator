@@ -4,13 +4,16 @@
 
 运行：python tests/test_timeparse.py
 """
+import datetime as dt
 import os
 import sys
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'scraper'))
 
+import timeparse  # noqa: E402
 from timeparse import parse_cn_time
 
 
@@ -274,6 +277,113 @@ class TestMalformedDayRecovery(unittest.TestCase):
         r = parse_cn_time('时间：2026年11月14日（周六）18:30-20:30', 2026)
         self.assertEqual(r['start'].strftime('%Y-%m-%d %H:%M'), '2026-11-14 18:30')
         self.assertEqual(r['end'].strftime('%Y-%m-%d %H:%M'), '2026-11-14 20:30')
+
+
+class TestBeijingYearCompletion(unittest.TestCase):
+    def test_utc_year_boundary_uses_beijing_date(self):
+        real_datetime = dt.datetime
+
+        class FixedDateTime(real_datetime):
+            @classmethod
+            def now(cls, tz=None):
+                value = cls(2026, 12, 31, 16, 30,
+                            tzinfo=dt.timezone.utc)
+                return value.astimezone(tz) if tz else value
+
+            @classmethod
+            def utcnow(cls):
+                return cls(2026, 12, 31, 16, 30)
+
+        with mock.patch.object(timeparse._dt_module, 'datetime', FixedDateTime):
+            got = timeparse.beijing_now()
+            self.assertEqual(timeparse.current_year(), 2027)
+        self.assertEqual(got.date(), dt.date(2027, 1, 1))
+        self.assertEqual(got.hour, 0)
+
+    def test_publish_december_january_lecture_uses_next_year(self):
+        r = parse_cn_time('时间：1月5日 09:00-10:00', None,
+                          publish_time='2025-12-30 10:00:00')
+        self.assertEqual(r['start'].strftime('%Y-%m-%d %H:%M'), '2026-01-05 09:00')
+        self.assertEqual(r['end'].strftime('%Y-%m-%d %H:%M'), '2026-01-05 10:00')
+
+    def test_publish_january_december_lecture_uses_previous_year(self):
+        r = parse_cn_time('时间：12月28日 09:00', None,
+                          publish_time='2026-01-02 10:00:00')
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2025-12-28')
+
+    def test_preview_january_publish_december_lecture_stays_in_publish_year(self):
+        r = timeparse.resolve_lecture_time(
+            '时间：12月28日 09:00', '学术报告预告', None, None,
+            '2026-01-02 10:00:00', 1, None)
+        self.assertEqual(r['start'], '2026-12-28 09:00:00')
+
+    def test_retrospective_december_publish_january_lecture_stays_in_publish_year(self):
+        r = timeparse.resolve_lecture_time(
+            '时间：1月5日 09:00', '学术报告回顾', None, None,
+            '2026-12-30 10:00:00', 1, None)
+        self.assertEqual(r['start'], '2026-01-05 09:00:00')
+
+    def test_current_year_december_january_lecture_uses_next_year(self):
+        with mock.patch.object(timeparse, 'beijing_now',
+                               return_value=dt.datetime(2026, 12, 31, 12, 0)):
+            r = parse_cn_time('时间：1月5日 09:00')
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2027-01-05')
+
+    def test_current_year_january_december_lecture_uses_previous_year(self):
+        with mock.patch.object(timeparse, 'beijing_now',
+                               return_value=dt.datetime(2027, 1, 1, 12, 0)):
+            r = parse_cn_time('时间：12月31日 09:00')
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2026-12-31')
+
+    def test_url_year_keeps_priority_over_title_and_publish(self):
+        r = parse_cn_time('时间：6月1日 09:00', 2026,
+                          publish_time='2025-12-30 10:00:00',
+                          title_year=2025, url_year=2024)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2024-06-01')
+
+    def test_title_year_keeps_priority_over_publish(self):
+        r = parse_cn_time('时间：1月5日 09:00', 2026,
+                          publish_time='2025-12-30 10:00:00', title_year=2024)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2024-01-05')
+
+    def test_explicit_noncurrent_default_is_not_rebased(self):
+        r = parse_cn_time('时间：1月5日 09:00', 2025)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2025-01-05')
+
+    def test_explicit_full_year_is_never_shifted(self):
+        r = parse_cn_time('时间：2024年1月5日 09:00', None,
+                          publish_time='2025-12-30 10:00:00')
+        self.assertEqual(r['start'].strftime('%Y-%m-%d'), '2024-01-05')
+
+    def test_resolve_current_year_without_publish_uses_nearest(self):
+        with mock.patch.object(timeparse, 'beijing_now',
+                               return_value=dt.datetime(2026, 12, 31, 12, 0)):
+            r = timeparse.resolve_lecture_time(
+                '时间：1月5日 09:00', '讲座', None, None, None, None, None)
+        self.assertEqual(r['start'], '2027-01-05 09:00:00')
+        self.assertEqual(r['note'], 'nearest-year')
+
+    def test_vlm_monthday_crosses_publish_year_both_directions(self):
+        import parsers as P
+        got = P._parse_vlm_datetime('01-05 09:30', None,
+                                    '2025-12-30 10:00:00', None, None)
+        self.assertEqual(got.strftime('%Y-%m-%d %H:%M'), '2026-01-05 09:30')
+        got = P._parse_vlm_datetime('12-28 09:30', None,
+                                    '2026-01-02 10:00:00', None, None)
+        self.assertEqual(got.strftime('%Y-%m-%d %H:%M'), '2025-12-28 09:30')
+
+    def test_vlm_current_year_crosses_beijing_year_boundary(self):
+        import parsers as P
+        with mock.patch.object(timeparse, 'beijing_now',
+                               return_value=dt.datetime(2027, 1, 1, 0, 30)):
+            got = P._parse_vlm_datetime('12-31 09:30', None, None, None, None)
+        self.assertEqual(got.strftime('%Y-%m-%d'), '2026-12-31')
+
+    def test_vlm_explicit_year_is_trusted(self):
+        import parsers as P
+        got = P._parse_vlm_datetime('2024-01-05 09:30', None,
+                                    '2025-12-30 10:00:00', None, None)
+        self.assertEqual(got.strftime('%Y-%m-%d'), '2024-01-05')
 
 
 if __name__ == '__main__':

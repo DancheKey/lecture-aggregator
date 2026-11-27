@@ -10,7 +10,7 @@ from urllib.parse import urljoin, unquote, urlparse, parse_qs
 from bs4 import BeautifulSoup
 from timeparse import (parse_cn_time, _year_from_text, resolve_lecture_time,
                        _date_from_title, is_reasonable_span as _is_reasonable_span,
-                       COLLAPSED_SHIFT_MAX_MINUTES)
+                       COLLAPSED_SHIFT_MAX_MINUTES, _cross_year, current_year)
 import field_vocab as _fv  # 字段边界统一词表（单一事实源）
 
 # N1a / O3a（2026-07-20 修正）— CJK 间空格不再无脑删除：
@@ -1428,6 +1428,11 @@ import env_flags  # 开关真值判定的单一事实源（4 处判定此前各�
 # ============================================================================
 import ipaddress as _ipaddress
 import socket as _socket
+from requests.adapters import HTTPAdapter as _HTTPAdapter
+from urllib3.connection import HTTPConnection as _HTTPConnection
+from urllib3.connection import HTTPSConnection as _HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool as _HTTPConnectionPool
+from urllib3.connectionpool import HTTPSConnectionPool as _HTTPSConnectionPool
 
 _MAX_FETCH_BYTES = 20 * 1024 * 1024   # 单次出站响应上限：20MB
 _MAX_REDIRECTS = 5                     # 最大重定向跳数（逐跳重新校验目标）
@@ -1446,28 +1451,196 @@ def _allowed_local_image(path):
         return False
 
 
-def _is_safe_http_url(url):
-    """SSRF 校验：仅 http/https，且解析后的 IP 全部为公网地址才放行。"""
+class UnsafeURLError(ValueError):
+    pass
+
+
+def _resolve_public_addresses(url):
+    """每跳只解析一次，返回全部公网地址；任何私网/保留地址都 fail closed。"""
+    if not isinstance(url, str) or not url or any(ord(ch) < 32 for ch in url):
+        raise UnsafeURLError('URL 含非法控制字符')
     try:
-        p = urlparse(url)
-    except Exception:
-        return False
-    if p.scheme not in ('http', 'https') or not p.hostname:
-        return False
+        parts = urlparse(url)
+        host = parts.hostname
+        port = parts.port
+        if port is None:
+            port = 443 if parts.scheme == 'https' else 80
+    except (TypeError, ValueError) as e:
+        raise UnsafeURLError('URL 格式非法') from e
+    if (parts.scheme not in ('http', 'https') or not host
+            or parts.username is not None or port == 0):
+        raise UnsafeURLError('仅允许无用户信息且端口有效的 HTTP(S) URL')
     try:
-        port = p.port or (443 if p.scheme == 'https' else 80)
-        infos = _socket.getaddrinfo(p.hostname, port, proto=_socket.IPPROTO_TCP)
-    except Exception:
-        return False
+        infos = _socket.getaddrinfo(host, port, type=_socket.SOCK_STREAM,
+                                    proto=_socket.IPPROTO_TCP)
+    except OSError as e:
+        raise requests.exceptions.ConnectionError('DNS 解析失败: ' + str(e)) from e
+    addresses = []
     for info in infos:
         try:
-            ip = _ipaddress.ip_address(info[4][0])
-        except ValueError:
-            return False
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
-            return False
-    return True
+            ip = _ipaddress.ip_address(info[4][0].split('%', 1)[0])
+        except ValueError as e:
+            raise UnsafeURLError('DNS 返回非法地址') from e
+        mapped = ip.ipv4_mapped if ip.version == 6 else None
+        if not ip.is_global or (mapped is not None and not mapped.is_global):
+            raise UnsafeURLError('DNS 返回非公网地址')
+        if str(ip) not in addresses:
+            addresses.append(str(ip))
+    if not addresses:
+        raise UnsafeURLError('DNS 未返回可用地址')
+    return parts, addresses
+
+
+def _connect_pinned_socket(ip, port, timeout, source_address, socket_options):
+    family = _socket.AF_INET6 if ':' in ip else _socket.AF_INET
+    sock = _socket.socket(family, _socket.SOCK_STREAM)
+    try:
+        connect_timeout = getattr(timeout, 'connect_timeout', timeout)
+        sock.settimeout(connect_timeout)
+        if source_address:
+            sock.bind(source_address)
+        for option in socket_options or ():
+            sock.setsockopt(*option)
+        sock.connect((ip, port))
+        return sock
+    except BaseException:
+        sock.close()
+        raise
+
+
+class _PinnedConnectionMixin:
+    _pinned_ips = ()
+
+    def _new_conn(self):
+        # 保留原 host 供 Host 头、TLS SNI 与证书校验使用，仅 TCP 对端固定为已验 IP。
+        last_error = None
+        for ip in self._pinned_ips:
+            try:
+                sock = _connect_pinned_socket(ip, self.port, self.timeout,
+                                              self.source_address, self.socket_options)
+            except OSError as exc:
+                last_error = exc
+                continue
+            sys.audit('http.client.connect', self, self.host, self.port)
+            return sock
+        if last_error is not None:
+            raise last_error
+        raise OSError('没有已校验的公网连接地址')
+
+
+def _pinned_connection_class(base, ips):
+    if isinstance(ips, str):
+        ips = (ips,)
+    return type('Pinned' + base.__name__, (_PinnedConnectionMixin, base),
+                {'_pinned_ips': tuple(ips)})
+
+
+class _PinnedHTTPAdapter(_HTTPAdapter):
+    def __init__(self, ips):
+        self._http_connection = _pinned_connection_class(_HTTPConnection, ips)
+        self._https_connection = _pinned_connection_class(_HTTPSConnection, ips)
+        super().__init__(max_retries=0)
+
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        http_pool = type('PinnedHTTPPool', (_HTTPConnectionPool,),
+                         {'ConnectionCls': self._http_connection})
+        https_pool = type('PinnedHTTPSPool', (_HTTPSConnectionPool,),
+                          {'ConnectionCls': self._https_connection})
+        self.poolmanager.pool_classes_by_scheme = {
+            'http': http_pool, 'https': https_pool,
+        }
+
+
+def _request_with_pin(method, url, addresses, **kwargs):
+    session = requests.Session()
+    session.trust_env = False
+    adapter = _PinnedHTTPAdapter(addresses)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    try:
+        response = session.request(method, url, allow_redirects=False, **kwargs)
+    except BaseException:
+        session.close()
+        raise
+    if kwargs.get('stream'):
+        original_close = response.close
+
+        def close_response():
+            try:
+                original_close()
+            finally:
+                session.close()
+
+        response.close = close_response
+    else:
+        session.close()
+    return response
+
+
+def _same_origin(a, b):
+    def origin(parts):
+        return (parts.scheme, (parts.hostname or '').lower(),
+                parts.port or (443 if parts.scheme == 'https' else 80))
+    return origin(a) == origin(b)
+
+
+def safe_request(method, url, *, timeout=20, max_redirects=_MAX_REDIRECTS, **kwargs):
+    """直连公网的 requests 封装：逐跳验 DNS、固定连接 IP，并安全处理重定向。"""
+    proxies = kwargs.pop('proxies', None)
+    kwargs.pop('allow_redirects', None)
+    if proxies is not None and not isinstance(proxies, dict):
+        raise UnsafeURLError('代理参数必须是映射')
+    if proxies and any(value not in (None, '') for value in proxies.values()):
+        raise UnsafeURLError('安全直连不支持代理，避免目标 DNS 脱离本进程校验')
+    method = method.upper()
+    if not isinstance(max_redirects, int) or isinstance(max_redirects, bool) or max_redirects < 0:
+        raise UnsafeURLError('重定向跳数必须是非负整数')
+    headers = {(k.decode('latin-1') if isinstance(k, bytes) else k): v
+               for k, v in dict(kwargs.get('headers') or {}).items()}
+    headers = {k: v for k, v in headers.items() if k.lower() != 'host'}
+    cur = url
+    for hop in range(max_redirects + 1):
+        parts, addresses = _resolve_public_addresses(cur)
+        request_kwargs = dict(kwargs, headers=headers, timeout=timeout)
+        response = _request_with_pin(method, cur, addresses, **request_kwargs)
+        if response.status_code not in (301, 302, 303, 307, 308):
+            return response
+        if max_redirects == 0:
+            return response
+        location = response.headers.get('Location')
+        response.close()
+        if not location:
+            raise UnsafeURLError('重定向缺少 Location')
+        if hop >= max_redirects:
+            raise UnsafeURLError('重定向跳数超限')
+        nxt = urljoin(cur, location)
+        next_parts = urlparse(nxt)
+        if next_parts.scheme not in ('http', 'https'):
+            raise UnsafeURLError('重定向协议不允许')
+        if parts.scheme == 'https' and next_parts.scheme != 'https':
+            raise UnsafeURLError('拒绝 HTTPS 降级重定向')
+        same_origin = _same_origin(parts, next_parts)
+        if not same_origin:
+            headers = {k: v for k, v in headers.items()
+                       if k.lower() not in ('authorization', 'cookie', 'proxy-authorization')}
+            for key in ('auth', 'cookies', 'cert'):
+                kwargs.pop(key, None)
+            has_body = any(key in kwargs and kwargs[key] is not None
+                           for key in ('json', 'data', 'files'))
+            if (response.status_code in (307, 308)
+                    and (method not in ('GET', 'HEAD') or has_body)):
+                raise UnsafeURLError('拒绝跨域转发写请求')
+        if response.status_code not in (307, 308):
+            if ((response.status_code == 303 and method != 'HEAD')
+                    or (response.status_code in (301, 302) and method == 'POST')):
+                method = 'GET'
+            for key in ('json', 'data', 'files'):
+                kwargs.pop(key, None)
+            headers = {k: v for k, v in headers.items()
+                       if k.lower() not in ('content-length', 'content-type', 'transfer-encoding')}
+        cur = nxt
+    raise UnsafeURLError('重定向跳数超限')
 
 
 _BROWSER_UA = (
@@ -1475,12 +1648,16 @@ _BROWSER_UA = (
     '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
 
 
+_TLS_VERIFY_FALLBACK_HOSTS = frozenset({'statics.scnu.edu.cn'})
+
+
 def _safe_fetch(url, max_bytes=_MAX_FETCH_BYTES, timeout=20, verify=True,
-                referer=None, user_agent=None):
+                referer=None, user_agent=None, error_out=None):
     """安全下载：SSRF 校验 + 逐跳校验的重定向跟随 + 响应体大小上限。
 
     成功返回 bytes；任何校验失败 / 网络错误 / 超限返回 None。
-    verify=False 仅限已知校内域名的证书链残缺兜底（见 PDF 下载处），勿扩散使用。
+    error_out 可接收失败异常，供附件下载决定是否值得做窄范围 TLS 兜底。
+    verify=False 仅限 statics.scnu.edu.cn 的已知证书链残缺场景，勿扩散使用。
     referer / user_agent 供 PDF-INLINE 等场景透传来源页，绕过校内 CDN 的 WAF。
 
     2026-11-06：默认 UA 由 'Mozilla/5.0' 换成完整浏览器 UA。statics.scnu.edu.cn
@@ -1493,20 +1670,29 @@ def _safe_fetch(url, max_bytes=_MAX_FETCH_BYTES, timeout=20, verify=True,
         _headers['Referer'] = referer
     cur = url
     for _hop in range(_MAX_REDIRECTS + 1):
-        if not _is_safe_http_url(cur):
-            return None
         try:
-            r = requests.get(cur, headers=_headers,
-                             timeout=timeout, stream=True,
-                             allow_redirects=False, verify=verify)
-        except requests.exceptions.RequestException:
+            host = (urlparse(cur).hostname or '').lower().rstrip('.')
+            hop_verify = verify
+            if verify is False and host not in _TLS_VERIFY_FALLBACK_HOSTS:
+                hop_verify = True
+            r = safe_request('GET', cur, headers=_headers, timeout=timeout,
+                             stream=True, max_redirects=0, verify=hop_verify)
+        except (requests.exceptions.RequestException, UnsafeURLError) as exc:
+            if error_out is not None:
+                error_out['error'] = exc
             return None
         try:
             if r.status_code in (301, 302, 303, 307, 308):
                 loc = r.headers.get('Location')
                 if not loc:
                     return None
-                cur = urljoin(cur, loc)
+                nxt = urljoin(cur, loc)
+                next_scheme = urlparse(nxt).scheme
+                if next_scheme not in ('http', 'https'):
+                    return None
+                if urlparse(cur).scheme == 'https' and next_scheme != 'https':
+                    return None
+                cur = nxt
                 continue
             if r.status_code != 200:
                 return None
@@ -1519,6 +1705,10 @@ def _safe_fetch(url, max_bytes=_MAX_FETCH_BYTES, timeout=20, verify=True,
                     return None
                 chunks.append(ch)
             return b''.join(chunks)
+        except requests.exceptions.RequestException as exc:
+            if error_out is not None:
+                error_out['error'] = exc
+            return None
         finally:
             r.close()
     return None
@@ -1554,6 +1744,11 @@ VLM_PROMPT = """你是一个学术讲座海报信息提取助手。下面是一�
 - 禁止输出示例性/占位性内容（如 张三、李四、某某大学、XX大学）
 - 年份规则：仅当海报【明确印出】4 位年份（如「2023年5月11日」「2023-05-11」）时，lectureStart 才输出完整「YYYY-MM-DD HH:MM」；若海报只写「5月11日」「07-04」等【无年份】日期，【不要猜测年份】，lectureStart 只输出「MM-DD HH:MM」（系统会按网页发布年份自动补全为正确年份）
 - speaker 字段只放姓名，职称放到 speakerTitle，单位放到 speakerAffiliation"""
+
+
+VLM_CACHE_VERSION = 2
+VLM_EXTRACTOR_VERSION = 2
+_VLM_TEMPERATURE = 0.1
 
 
 LLM_TEXT_PROMPT = """你是一个学术讲座信息提取助手。从下面的讲座通知正文中提取结构化字段，只输出一个 JSON 对象，不要任何解释或 markdown 代码块。
@@ -1724,6 +1919,27 @@ def _vlm_img_b64(img_url):
         return _b64.b64encode(buf.getvalue()).decode('ascii')
     except Exception:
         return None
+
+
+def _vlm_cache_key(contents, cfgs):
+    """按实际请求内容生成 VLM 缓存键；URL 变化但图片未变时仍可命中。"""
+    providers = [
+        {k: cfg.get(k, '') for k in ('name', 'model', 'base_url')}
+        for cfg in cfgs
+    ]
+    identity = {
+        'cache_version': VLM_CACHE_VERSION,
+        'extractor_version': VLM_EXTRACTOR_VERSION,
+        'prompt': VLM_PROMPT,
+        'temperature': _VLM_TEMPERATURE,
+        'providers': providers,
+        'images': [_hash.sha256(b.encode('ascii')).hexdigest() for b in contents],
+    }
+    digest = _hash.sha256(_json.dumps(
+        identity, ensure_ascii=False, sort_keys=True,
+        separators=(',', ':')).encode('utf-8')).hexdigest()
+    models = '|'.join(cfg.get('model', '') for cfg in cfgs)
+    return 'vlm:v%d:%s:%s' % (VLM_CACHE_VERSION, models, digest)
 
 
 _VLM_KEY_MAP = {
@@ -1980,19 +2196,41 @@ def _parse_vlm_datetime(s, default_year, publish_time, title_year, url_year):
     if not s:
         return None
     s2 = s.replace('年', '-').replace('月', '-').replace('日', ' ').replace('/', '-').strip()
-    # 缺年补全：VLM 仅给「05-21 09:30」（海报只印月日，无年份）时，按用户规则用「网页发布年份」兜底。
-    # 优先级：url_year(URL路径年) > title_year > 发布年 > default_year(当前年)。
-    # 注：若 VLM 已给出完整 4 位年（海报确实印了年份），则不进入此分支，直接信任。
-    if not re.match(r'^\d{4}-', s2):
-        if re.match(r'^\d{1,2}-\d{1,2}', s2):
-            _fill = url_year or title_year or (int(publish_time[:4]) if publish_time else None) or default_year
-            if _fill:
-                s2 = f'{_fill}-{s2}'
+    missing_year = not re.match(r'^\d{4}-', s2)
+    source = 'other'
+    publish_year = None
+    if publish_time:
+        try:
+            publish_year = int(str(publish_time)[:4])
+        except (ValueError, TypeError):
+            publish_year = None
+    if missing_year and re.match(r'^\d{1,2}-\d{1,2}', s2):
+        if url_year:
+            fill, source = url_year, 'url'
+        elif title_year:
+            fill, source = title_year, 'title'
+        elif publish_year:
+            fill, source = publish_year, 'publish'
+        elif default_year is None or default_year == current_year():
+            fill, source = current_year(), 'current'
+        else:
+            fill, source = default_year, 'other'
+        if fill:
+            s2 = f'{fill}-{s2}'
+    parsed = None
     for fmt in ('%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
         try:
-            return datetime.datetime.strptime(s2, fmt)
+            parsed = datetime.datetime.strptime(s2, fmt)
+            break
         except Exception:
             pass
+    if parsed and missing_year:
+        adjusted, _, _ = _cross_year(
+            {'start': parsed}, publish_time, '', '', parsed.year,
+            url_year, publish_year, source)
+        parsed = adjusted['start']
+    if parsed:
+        return parsed
     try:
         rt = parse_cn_time(s, default_year, publish_time=publish_time,
                            title_year=title_year, url_year=url_year)
@@ -2059,18 +2297,6 @@ def _vlm_extract_fields(img_urls, cfgs):
     from llm_provider import _is_neg, _neg_expired, _neg_marker
     if not cfgs or not img_urls:
         return None
-    # 缓存键纳入 provider+模型名：换模型（如 glm-4v-flash→glm-4v-plus）自动全量
-    # 失效重抽，不用手动清缓存（对齐 llm_provider 文本通道 :468/:593；此前 VLM 键
-    # 不含模型名，模型升级后旧结果仍被命中、锁死）。
-    _models = '|'.join(cfg.get('model', '') for cfg in cfgs)
-    key = 'vlm:' + _models + ':' + _hash.md5('|'.join(sorted(img_urls)).encode('utf-8')).hexdigest()
-    cached = _vlm_cache_get(key)
-    if _is_neg(cached):
-        if not _neg_expired(cached):
-            return None  # 负缓存命中（未过期），跳过 VLM 调用
-        # 已过期：当作未命中，继续重试
-    elif cached is not None and _vlm_fields_useful(cached):
-        return cached
     contents = []
     for u in img_urls[:2]:
         b = _vlm_img_b64(u)
@@ -2078,14 +2304,20 @@ def _vlm_extract_fields(img_urls, cfgs):
             contents.append(b)
     if not contents:
         return None
+    key = _vlm_cache_key(contents, cfgs)
+    cached = _vlm_cache_get(key)
+    if _is_neg(cached):
+        if not _neg_expired(cached):
+            return None  # 负缓存命中（未过期），跳过 VLM 调用
+        # 已过期：当作未命中，继续重试
+    elif cached is not None and _vlm_fields_useful(cached):
+        return cached
     message = [{"type": "text", "text": VLM_PROMPT}]
     for b in contents:
         message.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b}})
-    # 本地调试走代理（读 HTTPS_PROXY 环境变量）；CI 未设则空 dict -> 传 None，requests 直连
-    _proxies = {}
-    _hp = _os.environ.get('HTTPS_PROXY') or _os.environ.get('https_proxy')
-    if _hp:
-        _proxies = {'https': _hp, 'http': _hp}
+    # 出站统一安全直连：代理会让目标 DNS 在代理侧解析，无法保证本进程校验的 IP
+    # 就是实际对端，因此 VLM 不再读取 HTTP(S)_PROXY。
+    _proxies = None
     got_empty_any = False
     for cfg in cfgs:
         fields, got_empty = _vlm_try_one_provider(message, cfg, _proxies or None, rpm=_VLM_RPM)
@@ -2143,7 +2375,7 @@ def _vlm_try_one_provider(message, cfg, proxies, rpm=None):
     payload = {
         "model": cfg['model'],
         "messages": messages,
-        "temperature": 0.1,
+        "temperature": _VLM_TEMPERATURE,
     }
     headers = {
         "Authorization": "Bearer " + cfg['api_key'],
@@ -2152,7 +2384,8 @@ def _vlm_try_one_provider(message, cfg, proxies, rpm=None):
     got_empty = False
     for attempt in range(3):
         try:
-            r = requests.post(cfg['base_url'], headers=headers, json=payload, timeout=60, proxies=proxies)
+            r = safe_request('POST', cfg['base_url'], headers=headers, json=payload,
+                             timeout=60, proxies=proxies)
             if r.status_code in (401, 403):
                 # 鉴权失败（key 失效/无权限）：重试无意义，立即放弃并回落下一 provider / OCR
                 return None, False
@@ -3504,6 +3737,10 @@ _SIDEBAR_TITLE_RE = re.compile(
 # （skc/1124 侧栏把正文灌到 504 字，反而漏掉整份 PDF），只作为「可能选错
 # 正文容器」的兜底信号：正文中找不到附件且正文极短时，扩展到整页再找一次。
 _PDF_SHORT_BODY = 150
+_MAX_PDF_PAGES = 30
+_MAX_PDF_TEXT_CHARS = 200000
+_MAX_PDF_RENDER_PIXELS = 4_000_000
+_MAX_PDF_RENDER_SIDE = 2000
 
 
 def _sidebar_blocks(content_div):
@@ -3728,6 +3965,57 @@ def clear_attachment_events():
     _ATTACHMENT_EVENTS.clear()
 
 
+def _extract_pdf_text_budget(doc):
+    """按页数与累计字符数提取 PDF 文本，返回 (text, truncated)。"""
+    page_count = int(getattr(doc, 'page_count', 0) or 0)
+    limit = min(page_count, _MAX_PDF_PAGES)
+    parts = []
+    total = 0
+    truncated = page_count > _MAX_PDF_PAGES
+    for index in range(limit):
+        if total >= _MAX_PDF_TEXT_CHARS:
+            truncated = True
+            break
+        text = doc[index].get_text() or ''
+        remaining = _MAX_PDF_TEXT_CHARS - total
+        if len(text) > remaining:
+            text = text[:remaining]
+            truncated = True
+        if text.strip():
+            parts.append(text)
+            total += len(text)
+        if total >= _MAX_PDF_TEXT_CHARS and index + 1 < limit:
+            truncated = True
+            break
+    return '\n'.join(parts), truncated
+
+
+def _render_pdf_first_page(doc, fitz, tmp_dir):
+    """在渲染前按页面尺寸降采样，避免超大 PDF 页直接触发光栅化 OOM。"""
+    page = doc[0]
+    width = max(float(page.rect.width), 1.0)
+    height = max(float(page.rect.height), 1.0)
+    scale = min(2.0, _MAX_PDF_RENDER_SIDE / width,
+                _MAX_PDF_RENDER_SIDE / height,
+                (_MAX_PDF_RENDER_PIXELS / (width * height)) ** 0.5)
+    if scale <= 0:
+        return None
+    pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+    if pix.width * pix.height > _MAX_PDF_RENDER_PIXELS:
+        return None
+    path = _os.path.join(tmp_dir, 'poster.png')
+    pix.save(path)
+    try:
+        from PIL import Image
+        with Image.open(path) as image:
+            if max(image.size) > _MAX_PDF_RENDER_SIDE:
+                image.thumbnail((_MAX_PDF_RENDER_SIDE, _MAX_PDF_RENDER_SIDE))
+                image.save(path)
+    except Exception:
+        pass
+    return path
+
+
 def _fetch_pdf_bytes(abs_pdf, referer=None):
     """下载一份附件（PDF / Word），返回 (data, err)。成功时 err 为 None。
 
@@ -3740,14 +4028,16 @@ def _fetch_pdf_bytes(abs_pdf, referer=None):
     `%PDF-` 魔数判断、不匹配就静默 pass，于是整份附件丢了也没人知道。
     这里把「下载失败」「拿到非 PDF」都变成显式错误原因，交给调用方打日志。
 
-    证书链残缺兜底沿用 2026-08-05 的安全修复：只对 scnu.edu.cn 及其子域
-    放宽一次 TLS 校验，且仍然走 _safe_fetch 的 SSRF / 逐跳重定向 / 大小上限。
+    证书链残缺兜底沿用 2026-08-05 的安全修复：仅当 statics.scnu.edu.cn
+    首次请求明确抛出 SSLError 时放宽一次 TLS 校验；其他失败与其他域名一律不重试。
+    重定向到外部主机仍恢复证书校验，且继续走 SSRF / 大小上限。
     """
-    data = _safe_fetch(abs_pdf, referer=referer)
+    failure = {}
+    data = _safe_fetch(abs_pdf, referer=referer, error_out=failure)
     if data is None:
-        host = urlparse(abs_pdf).hostname or ''
-        # 域名边界锁死：endswith('scnu.edu.cn') 会被 evilscnu.edu.cn 绕过
-        if host == 'scnu.edu.cn' or host.endswith('.scnu.edu.cn'):
+        host = (urlparse(abs_pdf).hostname or '').lower().rstrip('.')
+        if (host in _TLS_VERIFY_FALLBACK_HOSTS
+                and isinstance(failure.get('error'), requests.exceptions.SSLError)):
             data = _safe_fetch(abs_pdf, verify=False, referer=referer)
     if data is None:
         return None, '下载失败（网络错误 / 非安全 URL / 重定向或体积超限）'
@@ -4644,7 +4934,11 @@ class _OcrSt:
       外层变量而 _st.text 永久陈旧 → 下游读 _st.text 拿到旧值，且 OCR 文字被拼到
       「未移除邀请人标签」的正文上。故 store 必须逐点改为写属性。
     """
-    __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text', 'text_folded', 'body_text_folded', 'body_text_html')
+    __slots__ = ('body_text_llm', 'ocr_text', 'body_text', 'text', 'text_folded',
+                 'body_text_folded', 'body_text_html', '_tempdir')
+
+    def __init__(self):
+        self._tempdir = None
 
 
 def _meta_time_conflicts_with_body(body_text, meta_text):
@@ -4662,7 +4956,7 @@ def _meta_time_conflicts_with_body(body_text, meta_text):
       - 任一侧缺日期/缺时刻（正文无时间、全靠 meta 的美术学院类页面属此类）
         → 不算冲突，照旧追加——此时追加正是既有功能，不得误伤。
     """
-    _y = datetime.date.today().year
+    _y = current_year()
     tb = parse_cn_time(body_text, default_year=_y)
     tm = parse_cn_time(meta_text, default_year=_y)
     if not tb or not tm:
@@ -4967,17 +5261,26 @@ def _collect_assets(soup, content_div, url, _st):
         _kind = _attachment_kind(_pdf_data)
         if _kind == 'pdf':
             try:
-                import io
+                import fitz as _fitz
+            except ImportError:
+                _attachment_alert(
+                    url,
+                    '取到 PDF（%d 字节）但 PyMuPDF 未安装，附件文本无法提取；'
+                    '检查 scraper/requirements.txt' % len(_pdf_data),
+                    tag='[PDF-INLINE]')
+            else:
+                _doc = None
                 try:
-                    import fitz as _fitz
+                    import io
                     _doc = _fitz.open(stream=io.BytesIO(_pdf_data), filetype='pdf')
-                    _pages_text = []
-                    for _pg in _doc:
-                        _t = _pg.get_text()
-                        if _t.strip():
-                            _pages_text.append(_t)
-                    _pdf_text = '\n'.join(_pages_text)
+                    _pdf_text, _pdf_truncated = _extract_pdf_text_budget(_doc)
                     _append_attachment_text(_st, _pdf_text)
+                    if _pdf_truncated:
+                        _attachment_alert(
+                            url,
+                            '的 PDF 超过提取预算（最多 %d 页 / %d 字），已截断'
+                            % (_MAX_PDF_PAGES, _MAX_PDF_TEXT_CHARS),
+                            tag='[PDF-INLINE]')
                     # PDF-POSTER-VLM: PDF 文件名含"海报"、正文原本极短，或正文容器内直接嵌 iframe/PDF，
                     # 把第一页转成图片，让后续 poster_only VLM 路径补齐地点/摘要等字段。
                     _is_poster_pdf = (('海报' in (_abs_pdf or ''))
@@ -4985,38 +5288,36 @@ def _collect_assets(soup, content_div, url, _st):
                                       or (content_div and bool(content_div.find('iframe'))))
                     if _is_poster_pdf and _doc.page_count > 0:
                         try:
-                            from PIL import Image as _Image
-                            _pg = _doc[0]
-                            _mat = _fitz.Matrix(2, 2)
-                            _pix = _pg.get_pixmap(matrix=_mat)
-                            _tmp_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'tmp', 'pdf_posters')
-                            _os.makedirs(_tmp_dir, exist_ok=True)
-                            _pdf_basename = re.sub(r'[^\w.-]', '_', _os.path.basename(unquote(_abs_pdf)))
-                            _tmp_path = _os.path.join(_tmp_dir, _pdf_basename + '.png')
-                            _pix.save(_tmp_path)
-                            _im = _Image.open(_tmp_path)
-                            if max(_im.size) > 2000:
-                                _im.thumbnail((2000, 2000))
-                                _im.save(_tmp_path)
-                            _pdf_local_imgs.append(_tmp_path)
-                            _pdf_poster_converted = True
-                        except Exception:
-                            pass  # PDF 转图失败不阻塞主流程
-                    _doc.close()
-                except ImportError:
-                    # 2026-11-06：CI 曾因 requirements 漏列 PyMuPDF 而整条通道空转，
-                    # 连一行日志都没有。依赖再丢必须当场可见，不许再静默吞。
-                    _attachment_alert(
-                        url,
-                        '取到 PDF（%d 字节）但 PyMuPDF 未安装，附件文本无法提取；'
-                        '检查 scraper/requirements.txt' % len(_pdf_data),
-                        tag='[PDF-INLINE]')
+                            import tempfile
+                            if _st._tempdir is None:
+                                _tmp_root = _os.path.join(
+                                    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+                                    'tmp', 'pdf_posters')
+                                _os.makedirs(_tmp_root, exist_ok=True)
+                                _st._tempdir = tempfile.TemporaryDirectory(
+                                    prefix='pdf_', dir=_tmp_root)
+                            _tmp_path = _render_pdf_first_page(
+                                _doc, _fitz, _st._tempdir.name)
+                            if _tmp_path:
+                                _pdf_local_imgs.append(_tmp_path)
+                                _pdf_poster_converted = True
+                            else:
+                                _attachment_alert(
+                                    url, '的 PDF 首页渲染超过像素预算，已跳过',
+                                    tag='[PDF-INLINE]')
+                        except Exception as _poster_e:
+                            _attachment_alert(
+                                url, '的 PDF 首页转图失败：%s' % _poster_e,
+                                tag='[PDF-INLINE]')
                 except Exception as _pdf_e:
                     _attachment_alert(url, '的 PDF 解析失败：%s' % _pdf_e,
                                       tag='[PDF-INLINE]')
-            except Exception as _pdf_e:
-                _attachment_alert(url, '的 PDF 处理失败：%s' % _pdf_e,
-                                  tag='[PDF-INLINE]')
+                finally:
+                    if _doc is not None:
+                        try:
+                            _doc.close()
+                        except Exception:
+                            pass
         elif _kind == 'ooxml':
             _docx_text, _docx_err = _extract_docx_text(_pdf_data)
             if _docx_text:

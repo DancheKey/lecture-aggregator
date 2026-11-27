@@ -143,8 +143,26 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
     ok(methods.isForumOpen.call(Object.assign({}, cm, { expandedForums: {} }), forum) === true,
        'B1: 部分命中时论坛卡应默认自动展开');
     // 显式 toggle 后应能收起（expandedForums 优先级高于默认值）
-    const t = Object.assign({}, cm, { expandedForums: { [forum.url]: false } });
+    const t = Object.assign({}, cm, { expandedForums: { [forum.key]: false } });
     ok(methods.isForumOpen.call(t, forum) === false, 'B1: 用户显式收起后应保持收起');
+  }
+}
+
+// 场景 2b：同一 sourceUrl 的不同日期论坛卡必须使用不同展开键。
+{
+  const day1 = [1, 2, 3, 4].map(i => Object.assign(mk(i), { lectureStart: '2026-05-01 14:00:00' }));
+  const day2 = [5, 6, 7, 8].map(i => Object.assign(mk(i), { lectureStart: '2026-05-02 14:00:00' }));
+  const cm = makeCtx(day1.concat(day2));
+  const forums = computed.units.call(cm).filter(u => u.type === 'forum');
+  ok(forums.length === 2, `B1b: 同源两日应生成两个论坛卡，实得 ${forums.length}`);
+  if (forums.length === 2) {
+    ok(forums[0].key !== forums[1].key, 'B1b: 同源不同日论坛卡 key 不得相同');
+    const t = Object.assign({}, cm, { expandedForums: { [forums[0].key]: true } });
+    methods.toggleForum.call(t, forums[0]);
+    ok(t.expandedForums[forums[0].key] === false, 'B1b: 第一张卡显式收起后应写入自己的 key');
+    ok(!(forums[1].key in t.expandedForums), 'B1b: 第一张卡的展开操作不得污染第二张卡');
+    ok(methods.isForumOpen.call(t, forums[1]) === false,
+       'B1b: 第二张卡仍应按自己的默认状态收起');
   }
 }
 
@@ -175,14 +193,45 @@ const all = [mk(1), mk(2), mk(3), mk(4), mk(5), mkCM(1)];
   const m = src.match(/const sig = \[([\s\S]*?)\]\.join\('\|'\)/);
   ok(!!m, 'B2: 找不到 _measureClamp 的 sig 定义');
   if (m) {
-    for (const field of ['speaker', 'showLikedOnly', 'searchField', 'currentPage',
-                         'query', 'campus', 'college', 'year']) {
+    for (const field of ['speaker', 'showLikedOnly', 'showWantedOnly', 'searchField',
+                         'currentPage', 'query', 'campus', 'college', 'year',
+                         'upcomingOnly', 'upcomingRange']) {
       ok(m[1].includes('this.' + field),
          `B2: clamp 签名缺少 this.${field} —— 换筛选后 DOM 变了却不重测，展开按钮会缺失`);
     }
   }
   // 静态锁：speaker 必须进签名（B2 的主体）
   ok(/this\.speaker/.test(src), 'B2: app.display.js 的 clamp 签名未包含 this.speaker');
+
+  // 行为锁：只改 upcomingOnly / upcomingRange 时也必须重新测量，不能只靠源码字符串。
+  const originalQuery = sandbox.document.querySelectorAll;
+  sandbox.document.querySelectorAll = () => [{
+    getAttribute: () => 'abs|behavior',
+    classList: { contains: () => true },
+    scrollHeight: 100,
+    clientHeight: 20,
+  }];
+  try {
+    for (const field of ['upcomingOnly', 'upcomingRange']) {
+      const cm = Object.assign(vm.runInContext('APP_STATE()', ctx), methods, {
+        all: [], currentPage: 1, query: '', searchField: '', campus: '', college: '',
+        year: '', speaker: '', showLikedOnly: false, showWantedOnly: false,
+        upcomingOnly: false, upcomingRange: '', onlineOnly: false, ongoingOnly: false,
+        farFutureOpen: false, dataStage: 'full', _longText: {},
+        expandedAbstract: {}, expandedBio: {}, _clampOverflow: {}, $refs: {},
+      });
+      methods._measureClamp.call(cm);
+      ok(cm._clampOverflow['abs|behavior'] === true,
+         `B2 ${field}: 首次测量应记录溢出`);
+      cm._clampOverflow = {};
+      cm[field] = field === 'upcomingOnly' ? true : '7';
+      methods._measureClamp.call(cm);
+      ok(cm._clampOverflow['abs|behavior'] === true,
+         `B2 ${field}: 只改此筛选也应重测 DOM 并恢复溢出按钮`);
+    }
+  } finally {
+    sandbox.document.querySelectorAll = originalQuery;
+  }
 }
 
 // ================= B3：clamp 键必须含 lectureIndex（2026-10-11）=================

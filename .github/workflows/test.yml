@@ -572,6 +572,9 @@ jobs:
       - name: Run PDF inline tests
         run: python tests/test_pdf_inline.py
 
+      - name: Run safe HTTP transport tests
+        run: python tests/test_safe_http.py
+
       # 2026-11-07：通用附件正文通道（PDF + Word）回归。锁 9 种静态附件形态、
       # DOCX 纯标准库提取进入 5 份正文副本并影响 lectureStart、老 .doc 只告警、
       # 3 个真实站点页面回放不误下载/不误剔侧栏、告警台账与体检报告转义。

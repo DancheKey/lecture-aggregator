@@ -1012,8 +1012,7 @@ def write_feeds(data, updated_at):
     """
     rows = feed_records(data)
     if not rows:
-        print('[warn] 没有可订阅的讲座，跳过 feed 生成')
-        return
+        print('[warn] 没有可订阅的讲座，将生成空 feed 以清除旧条目')
     built = _parse_cst(updated_at.replace('T', ' ')) or datetime.now(CST)
     base = SITE_BASE_URL
     title_site = '木铎金声 · 华师讲座聚合'
@@ -1090,7 +1089,8 @@ def main():
     write_visits_snapshot()
     data, updated_at = load_lectures()
     if not data:
-        print('[warn] 没有讲座数据，跳过生成')
+        write_feeds([], updated_at)
+        print('[warn] 没有讲座数据，跳过页面切片生成')
         return
 
     # 全局排除名单：凡是列入的 URL 不应出现在聚合页面（与爬虫端跳过抓取保持一致）。
@@ -1171,6 +1171,8 @@ def main():
     #   导航改落生成脚本模板——都是「清单漏一处、零告警」。）
     stamp_script_version('visits-trend.html', 'visits-trend.js')
     stamp_script_version('visits-trend.html', 'visits-trend.css')
+    stamp_script_version('visits-trend.html', 'app.cloud.js')
+    stamp_script_version('visits-trend.html', 'footer-counter.js')
     # 华南师范大学 VI 主题 + 黑白哀悼模式（2026-10-28）。备选项由 site/_theme.json 后台切换，
     # 页面无 UI；下列资源须打戳，否则回访用户缓存旧版且零告警（test_frontend_schema test_98/99）。
     for _page in ('index.html', 'stats.html', 'visits-trend.html'):
