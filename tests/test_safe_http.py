@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """出站 HTTP 的 DNS 重绑定、固定对端与重定向边界回归。"""
+import ipaddress
 import os
 import socket
 import ssl
@@ -79,7 +80,12 @@ class DnsPolicyTest(unittest.TestCase):
         with mock.patch.object(P._socket, 'getaddrinfo',
                                return_value=_infos('::ffff:8.8.8.8')):
             _parts, addresses = P._resolve_public_addresses('https://a.example/x')
-        self.assertEqual(addresses, ['::ffff:808:808'])
+        # IPv4-mapped IPv6 的字符串写法随 Python patch 版本变化
+        # （3.12.10 为 ::ffff:808:808，3.12.16 为 ::ffff:8.8.8.8），
+        # 按 IP 语义比对，避免把表示形式当成行为。
+        self.assertEqual(len(addresses), 1)
+        self.assertEqual(ipaddress.ip_address(addresses[0]),
+                         ipaddress.ip_address('::ffff:8.8.8.8'))
 
     def test_04_dns_failure_is_a_connection_error(self):
         with mock.patch.object(P._socket, 'getaddrinfo', side_effect=socket.gaierror('no dns')):
@@ -94,6 +100,16 @@ class DnsPolicyTest(unittest.TestCase):
                     with self.assertRaises(P.UnsafeURLError):
                         P._resolve_public_addresses(url)
                 resolve.assert_not_called()
+
+
+class _WrappedSocketResult:
+    """兼容 urllib3 2.4 读 .is_verified 与 2.8 解包 (socket, is_verified)。"""
+    def __init__(self, sock, is_verified=True):
+        self.socket = sock
+        self.is_verified = is_verified
+
+    def __iter__(self):
+        return iter((self.socket, self.is_verified))
 
 
 class PinnedTransportTest(unittest.TestCase):
@@ -137,7 +153,9 @@ class PinnedTransportTest(unittest.TestCase):
         cls = P._pinned_connection_class(P._HTTPSConnection, PUBLIC_A)
         conn = cls('api.example', 443, timeout=2)
         sock = mock.Mock()
-        wrapped = types.SimpleNamespace(socket=sock, is_verified=True)
+        wrapped = _WrappedSocketResult(sock)
+        # urllib3 2.8 改为解包返回值，锁住兼容契约（本地 2.4 走属性分支）
+        self.assertEqual(tuple(wrapped), (sock, True))
         with mock.patch.object(P, '_connect_pinned_socket', return_value=sock) as connect, \
                 mock.patch('urllib3.connection._ssl_wrap_socket_and_match_hostname',
                            return_value=wrapped) as wrap, \
