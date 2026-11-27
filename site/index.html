@@ -309,6 +309,12 @@
       font-size: 11pt; font-weight: 500; cursor: pointer;
     }
     .data-hint__btn:hover { background: #b45309; }
+    /* 长英文标题断词（2026-11-27 移动端横向溢出）：标题按词换行，但超长英文
+       单词不会被拆开，会撑破 h2 → article → main → body —— 375px 视口实测整页
+       宽 642px、右滑露白 267px。overflow-wrap: break-word 优先在词边界断开，
+       放不下才在词内断；anywhere 会在任意字符硬切，观感更差，故不采用。
+       ⚠ 不能用 html/body 的 overflow-x:hidden 掩盖——内容仍被切，标题看不到全。 */
+    h2 a { overflow-wrap: break-word; }
   </style>
   <!-- 华南师范大学 VI 主题（含黑白哀悼备选项）。由 site/_theme.json 后台切换，页面无 UI -->
   <link id="vi-theme" rel="stylesheet" href="theme-scnu.css?v=fd10da0c67">

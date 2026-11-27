@@ -69,6 +69,32 @@ for (const f of files) {
   }
 }
 
+// ── 长英文标题断词（2026-11-27 移动端横向溢出）──────────────────────────────
+// 背景：375px 视口下，标题里的超长英文单词不拆行，撑宽整页至 642px，右滑露白
+// 267px（CDP 实测）。这是「零报错但展示错」的静默错，故入门禁。
+// CI 无无头浏览器，改用精确解析 <style> 内的 CSS 规则做语义断言：
+//   ① 必须存在选择器含 `h2 a` 的规则，且 overflow-wrap 为 break-word/anywhere；
+//   ② 禁止靠 html/body 的 overflow-x:hidden|clip 掩盖（内容仍被切，标题看不全）。
+// 只扫 <style> 块而非整份源码，注释里提到规则名不算数（防「扫了空气」假绿）。
+const indexHtml = fs.readFileSync(path.join(SITE, 'index.html'), 'utf-8');
+const styleText = [...indexHtml.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)]
+  .map(m => m[1]).join('\n');
+const cssRules = [...styleText.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .map(m => ({ selector: m[1].trim(), body: m[2] }));
+const hasTitleWrap = cssRules.some(r => /\bh2\s+a\b/.test(r.selector)
+  && /overflow-wrap\s*:\s*(?:break-word|anywhere)\b/i.test(r.body));
+if (!hasTitleWrap) {
+  errs.push('site/index.html 的 <style> 缺少 `h2 a { overflow-wrap: break-word; }`：'
+    + '长英文标题会撑破容器，375px 视口整页横向溢出 267px（2026-11-27 实测）');
+}
+const overflowMasks = cssRules.filter(r =>
+  /(?:^|,)\s*(?:html|body)\s*$/i.test(r.selector)
+  && /overflow-x\s*:\s*(?:hidden|clip)\b/i.test(r.body));
+if (overflowMasks.length) {
+  errs.push('html/body 不得用 overflow-x:hidden|clip 掩盖标题溢出：'
+    + '滚动条虽消失，但内容仍被切掉，访客看不到完整标题');
+}
+
 if (pages < 2 || tmplPages < 1) {
   errs.push(`扫描范围异常：site/ 下只有 ${pages} 个 HTML（Vue 模板页 ${tmplPages} 个）——`
     + '正则或目录结构失效？宁可红也不放过「扫了空气」的假绿');
