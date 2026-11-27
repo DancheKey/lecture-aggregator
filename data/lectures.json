@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-26T16:24:49+08:00",
+  "updatedAt": "2026-11-27T08:48:16+08:00",
   "data": [
     {
       "sourceUrl": "http://maths.scnu.edu.cn/a/20261218/8898.html",
@@ -17053,8 +17053,8 @@
       "campus": "石牌",
       "title": "第九届全国师范大学美术教育论坛",
       "topic": "第九届全国师范大学美术教育论坛",
-      "lectureStart": "2025-11-04 08:00:00",
-      "lectureEnd": "2025-11-06 08:00:00",
+      "lectureStart": "2025-11-05 00:00:00",
+      "lectureEnd": "2025-11-05 23:59:00",
       "location": "广州东站城际酒店",
       "speaker": "",
       "speakerTitle": "",
@@ -17072,9 +17072,9 @@
       "images": [
         "http://statics.scnu.edu.cn/pics/aol/2025/1030/1761806280239166.jpg"
       ],
-      "timeUnknown": true,
+      "timeUnknown": false,
       "llmTextEnhanced": false,
-      "timeUnknownSource": "legacy",
+      "timeUnknownSource": "auto",
       "abstract": "The gth National Normal University 华南新范大学 1933 Art Education Forum 第九届全国师范大学 美术教育论坛聚 焦 FoCus 重塑 Reshape 会议"
     },
     {
@@ -55944,7 +55944,9 @@
       "vlmBackfilled": true,
       "qaRepaired": "2026-09-05.2-marker",
       "timeUnknownSource": "legacy",
-      "abstract": "华南师范大学统一身份验证登录 使用说明 统一身份认证采用师生一卡通卡号为帐号,初始密码为身份证后八位(字母统一大写),港澳台学生以及留学生则需要将证件号码去除括号之后再按前面的规则计算。用户若用一卡通号登录过校园网,登录平台的密码与校园网密码一致。该账号是华南师范大学师生员工进入信息系统的唯一标识。"
+      "abstract": "华南师范大学统一身份验证登录 使用说明 统一身份认证采用师生一卡通卡号为帐号,初始密码为身份证后八位(字母统一大写),港澳台学生以及留学生则需要将证件号码去除括号之后再按前面的规则计算。用户若用一卡通号登录过校园网,登录平台的密码与校园网密码一致。该账号是华南师范大学师生员工进入信息系统的唯一标识。",
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
     },
     {
       "sourceUrl": "http://em.scnu.edu.cn/a/20221216/9338.html",
@@ -64666,6 +64668,39 @@
       "listTitle": "● 华师经管学术讲座第383期（管理）"
     },
     {
+      "sourceUrl": "http://em.scnu.edu.cn/a/20211028/8643.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/em/2021/1011/1633942669692077.png"
+      ],
+      "college": "经济与管理学院",
+      "campus": "大学城",
+      "title": "（时间更改为10月28日）华师经管学术讲座第381期（经济）",
+      "topic": "汉密尔顿方程、普莱斯方程与群体选择",
+      "lectureStart": "2021-10-28 14:00:00",
+      "lectureEnd": "2021-10-28 15:30:00",
+      "location": "文二栋301会议室（线上会议）",
+      "speaker": "刘业进",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "首都经贸大学",
+      "inviter": "",
+      "speakerBio": "刘业进,博士毕业于北京师范大学,获管理学博士学位。美国密歇根州立大学访问学者。研究方向为新制度经济学、演化经济学。现任首都经济贸易大学城市经济与公共管理学院教授,博士研究生导师。主要社会兼职:北京师范大学政府研究院研究员、北京航空航天大学高等研究院兼职教授、CDRF(中国发展研究基金会)\"公共预算和财政绩效\"评估专家。教育部研究生论文匿名评审专家。入选北京市属市管高校\"人才强教计划\"中青年骨干教师(2009);入选校级后备学科带头人(2012);入选人\"才强教计划\"青年拔尖人才(2014),获得北京市委组织部\"北京市优秀人才\"资助(2012)。 在《读书》《学术月刊》《新政治经济学评论》、《改革》、《制度经济学研究》、《清华大学教育研究》、《中国行政管理》等期刊发表文70余篇。主持国家社科基金一般项目1项(2016)全国教育科学规划教育部重点项目1项(2015);北京社科规划重点项目1项;主持北京市委组织部\"北京市优秀人才\"资助项目(2013);教育部人文社会科学规划青年基金项目(2008)。",
+      "organizer": "经济与管理学院",
+      "publishTime": "2021-10-28 16:48",
+      "publishTimeSource": "companion",
+      "timeConfidence": "high",
+      "timeNote": "same-day-normal",
+      "newsFilterBypass": true,
+      "llmTextEnhanced": false,
+      "llmVerdict": null,
+      "llmSpeakerSource": null,
+      "listTitle": "● （时间更改为10月28日）华师经管学术讲座第381期（经济）",
+      "timeUnknown": false,
+      "timeUnknownSource": "auto",
+      "abstract": "本次讲座将深入探讨量子力学的核心概念和最新应用。",
+      "imageParseMethod": "vlm",
+      "vlmExtracted": true
+    },
+    {
       "sourceUrl": "http://em.scnu.edu.cn/a/20211028/8661.html",
       "images": [],
       "college": "经济与管理学院",
@@ -64692,39 +64727,6 @@
       "llmSpeakerSource": null,
       "llmAdopted": "speakerTitle|speakerAffiliation",
       "listTitle": "● 华师经英seminar第32期"
-    },
-    {
-      "sourceUrl": "http://em.scnu.edu.cn/a/20211028/8643.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/em/2021/1011/1633942669692077.png"
-      ],
-      "college": "经济与管理学院",
-      "campus": "大学城",
-      "title": "（时间更改为10月28日）华师经管学术讲座第381期（经济）",
-      "topic": "汉密尔顿方程、普莱斯方程与群体选择",
-      "lectureStart": "2021-10-28 08:00:00",
-      "lectureEnd": "2021-10-28 15:30:00",
-      "location": "文二栋301会议室（线上会议）",
-      "speaker": "刘业进",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "首都经贸大学",
-      "inviter": "",
-      "speakerBio": "刘业进,博士毕业于北京师范大学,获管理学博士学位。美国密歇根州立大学访问学者。研究方向为新制度经济学、演化经济学。现任首都经济贸易大学城市经济与公共管理学院教授,博士研究生导师。主要社会兼职:北京师范大学政府研究院研究员、北京航空航天大学高等研究院兼职教授、CDRF(中国发展研究基金会)\"公共预算和财政绩效\"评估专家。教育部研究生论文匿名评审专家。入选北京市属市管高校\"人才强教计划\"中青年骨干教师(2009);入选校级后备学科带头人(2012);入选人\"才强教计划\"青年拔尖人才(2014),获得北京市委组织部\"北京市优秀人才\"资助(2012)。 在《读书》《学术月刊》《新政治经济学评论》、《改革》、《制度经济学研究》、《清华大学教育研究》、《中国行政管理》等期刊发表文70余篇。主持国家社科基金一般项目1项(2016)全国教育科学规划教育部重点项目1项(2015);北京社科规划重点项目1项;主持北京市委组织部\"北京市优秀人才\"资助项目(2013);教育部人文社会科学规划青年基金项目(2008)。",
-      "organizer": "经济与管理学院",
-      "publishTime": "2021-10-28 16:48",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "same-day-normal",
-      "newsFilterBypass": true,
-      "llmTextEnhanced": false,
-      "llmVerdict": null,
-      "llmSpeakerSource": null,
-      "listTitle": "● （时间更改为10月28日）华师经管学术讲座第381期（经济）",
-      "timeUnknown": true,
-      "timeUnknownSource": "auto",
-      "abstract": "本次讲座将深入探讨量子力学的核心概念和最新应用。",
-      "imageParseMethod": "vlm",
-      "vlmExtracted": true
     },
     {
       "sourceUrl": "https://swc.scnu.edu.cn/collaborative/2021/1026/28.html",
@@ -68234,6 +68236,38 @@
       "listTitle": "● 华师经英seminar第26期"
     },
     {
+      "sourceUrl": "http://em.scnu.edu.cn/a/20210429/8363.html",
+      "images": [
+        "http://statics.scnu.edu.cn/pics/em/2021/0416/1618560414620561.jpg"
+      ],
+      "college": "经济与管理学院",
+      "campus": "大学城",
+      "title": "(时间更改）华师经英seminar第25期",
+      "topic": "Bank Green Credit to the Prosperity of Green Innovation (中文:银行绿色信贷推动企业绿色创新)",
+      "lectureStart": "2021-04-29 13:00:00",
+      "lectureEnd": "2021-04-29 14:30:00",
+      "location": "文二栋301会议室",
+      "speaker": "吴明琴",
+      "speakerTitle": "教授",
+      "speakerAffiliation": "华南师范大学经济与管理学院",
+      "inviter": "",
+      "speakerBio": "吴明琴,华南师范大学经济与管理学院教授。研究方向集中在发展经济学、区域经济学和环境经济学。文章见于Journal of Development Economics,Journal of Environmental Economics and Management,经济研究等国际国内权威期刊,主持国家自然科学基金和广东省软科学等项目。",
+      "organizer": "经济与管理学院",
+      "publishTime": "2021-04-29 15:49",
+      "publishTimeSource": "companion",
+      "timeConfidence": "high",
+      "timeNote": "same-day-normal",
+      "abstract": "In this paper, we examine the impact of bank green credit on firm green innovation, which is accurately measured by a machine learning approach. Using a difference-in-difference (DID) strategy, we find that green patents of environmentally friendly firms increased significantly after the implementation of green bank credit policy. This suggests that green credit policy improved the green innovation of environmentally friendly firms. Two mechanisms are responsible for this finding: on the one hand, more loans are available for environmentally friendly firms; on the other hand, less rent-seeking behaviors are required for these firms. Moreover, we find that the effect of green credit policy is more pronounced for firms that rely less on internal financing and firms that located in high banking development provinces. Finally, we find that bank green credit also improves the quality of green innovation to a higher extent. 华师经英seminar吸引了经济与管理学院广大师生参与,促进了学院内部学术交流。",
+      "newsFilterBypass": true,
+      "llmTextEnhanced": true,
+      "llmVerdict": "consistent",
+      "llmSpeakerSource": null,
+      "llmAdopted": "speakerTitle|speakerAffiliation",
+      "listTitle": "● (时间更改）华师经英seminar第25期",
+      "timeUnknown": false,
+      "timeUnknownSource": "auto"
+    },
+    {
       "sourceUrl": "http://ctld.scnu.edu.cn/a/20210422/1341.html",
       "images": [
         "http://statics.scnu.edu.cn/pics/ctld/2021/0422/1619063726653652.jpg"
@@ -68284,38 +68318,6 @@
       "speakerBio": "王新农,1945年2月出生,江苏东台人,中共党员,教授,专长经济社会学。原天津大学社会科学与外国语学院人文社会科学系主任。曾承担国家社科基金项目1项、参与国家社科基金、国家部委研究项目10余项。承担天津社科规划重点项目1项、承担市级人文社会科学项目10余项。承担天津大学985建设项目5项。主编专著、教材、工具书、参著、参编各10余部。发表论文30余篇,为国家部委多部门及天津市委市政府多部门提供调研报告10余篇,其研究成果曾多次获奖。",
       "llmTextEnhanced": false,
       "timeUnknownSource": "legacy"
-    },
-    {
-      "sourceUrl": "http://em.scnu.edu.cn/a/20210429/8363.html",
-      "images": [
-        "http://statics.scnu.edu.cn/pics/em/2021/0416/1618560414620561.jpg"
-      ],
-      "college": "经济与管理学院",
-      "campus": "大学城",
-      "title": "(时间更改）华师经英seminar第25期",
-      "topic": "Bank Green Credit to the Prosperity of Green Innovation (中文:银行绿色信贷推动企业绿色创新)",
-      "lectureStart": "2021-04-29 08:00:00",
-      "lectureEnd": "2021-04-29 14:30:00",
-      "location": "文二栋301会议室",
-      "speaker": "吴明琴",
-      "speakerTitle": "教授",
-      "speakerAffiliation": "华南师范大学经济与管理学院",
-      "inviter": "",
-      "speakerBio": "吴明琴,华南师范大学经济与管理学院教授。研究方向集中在发展经济学、区域经济学和环境经济学。文章见于Journal of Development Economics,Journal of Environmental Economics and Management,经济研究等国际国内权威期刊,主持国家自然科学基金和广东省软科学等项目。",
-      "organizer": "经济与管理学院",
-      "publishTime": "2021-04-29 15:49",
-      "publishTimeSource": "companion",
-      "timeConfidence": "high",
-      "timeNote": "same-day-normal",
-      "abstract": "In this paper, we examine the impact of bank green credit on firm green innovation, which is accurately measured by a machine learning approach. Using a difference-in-difference (DID) strategy, we find that green patents of environmentally friendly firms increased significantly after the implementation of green bank credit policy. This suggests that green credit policy improved the green innovation of environmentally friendly firms. Two mechanisms are responsible for this finding: on the one hand, more loans are available for environmentally friendly firms; on the other hand, less rent-seeking behaviors are required for these firms. Moreover, we find that the effect of green credit policy is more pronounced for firms that rely less on internal financing and firms that located in high banking development provinces. Finally, we find that bank green credit also improves the quality of green innovation to a higher extent. 华师经英seminar吸引了经济与管理学院广大师生参与,促进了学院内部学术交流。",
-      "newsFilterBypass": true,
-      "llmTextEnhanced": true,
-      "llmVerdict": "consistent",
-      "llmSpeakerSource": null,
-      "llmAdopted": "speakerTitle|speakerAffiliation",
-      "listTitle": "● (时间更改）华师经英seminar第25期",
-      "timeUnknown": true,
-      "timeUnknownSource": "auto"
     },
     {
       "sourceUrl": "http://psy.scnu.edu.cn/a/20210423/2094.html",
