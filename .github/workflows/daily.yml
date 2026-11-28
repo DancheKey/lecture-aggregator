@@ -124,6 +124,11 @@ jobs:
       - name: 同步静态数据源并生成前端切片
         run: python scripts/generate_frontend_data.py
 
+      - name: 刷新 Supabase SQL 白名单快照
+        run: |
+          python scripts/gen_supabase_sql.py > supabase-migration.sql
+          python scripts/gen_supabase_patch.py
+
       # 新讲座上线前必须进入数据库白名单，否则匿名点赞/想听/日历/访问会被 RPC 拒绝。
       # 未配置同步令牌时只告警，兼容补丁尚未执行或 Secret 尚未启用的过渡期；配置后失败即红。
       - name: 自动同步 Supabase 讲座白名单
@@ -438,7 +443,7 @@ jobs:
            # Pages 部署（当日新讲座与访问量快照全丢）。
           # data/ 与 site/ 在 CI 中全部由脚本产出，目录级纳入不会误收 gitignore 内容；
           # 访问量趋势报告（site/visits-trend.html）也在 site/ 内，由本条一并纳入。
-          git add -A data site || { echo "::error::git add 失败（产物含无法暂存的文件？查文件名/体积/磁盘）"; exit 1; }
+          git add -A data site supabase-migration.sql supabase-patch-current.sql || { echo "::error::git add 失败（产物含无法暂存的文件？查文件名/体积/磁盘）"; exit 1; }
           # 2026-09-30 事故记录：曾有一行 `git add reports/visits-trend.html`，
           # 与 .gitignore 的 `reports/`（2026-09-29 起整个 reports/ 不入库）冲突——
           # `git add` 一个被 ignore 且未跟踪的文件会以 exit 1 失败，在 `set -e` 下

@@ -160,14 +160,21 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             'grant execute on function public.sync_whitelist(jsonb) to anon, service_role;',
             self.sql)
 
-    def test_00f_daily自动同步白名单(self):
+    def test_00f_daily自动同步白名单并刷新SQL快照(self):
         with open(os.path.join(ROOT, '.github', 'workflows', 'daily.yml'), encoding='utf-8') as f:
             workflow = f.read()
         generate_at = workflow.index('run: python scripts/generate_frontend_data.py')
+        sql_at = workflow.index('python scripts/gen_supabase_sql.py > supabase-migration.sql')
+        patch_at = workflow.index('python scripts/gen_supabase_patch.py')
         sync_at = workflow.index('python scripts/sync_supabase_whitelist.py')
-        self.assertLess(generate_at, sync_at, '必须先生成最新 lectures.json 再同步白名单')
+        self.assertLess(generate_at, sql_at, '必须先生成最新 lectures.json 再刷新 SQL 白名单')
+        self.assertLess(sql_at, sync_at, 'SQL 白名单快照必须先于数据库同步刷新')
+        self.assertLess(patch_at, sync_at, '云端补丁必须先于数据库同步刷新')
         self.assertIn('SUPABASE_WHITELIST_SYNC_TOKEN', workflow)
         self.assertIn('--whitelist-json', workflow)
+        self.assertIn(
+            'git add -A data site supabase-migration.sql supabase-patch-current.sql',
+            workflow, '每日提交必须纳入两份 SQL 快照，否则下次代码推送会再次触发一致性门禁')
 
     def test_00g_同步模式不能与存量导入组合(self):
         for mode in ('--whitelist-only', '--whitelist-json', '--rotate-sync-token'):

@@ -3398,6 +3398,8 @@ insert into public.lecture_allowed_keys (url, allowed_actions) values
   ('https://em.scnu.edu.cn/a/20261126/11260.html', array['visit','like','want','cal']::text[]),
   ('https://em.scnu.edu.cn/a/20261126/11267.html', array['visit','like','want','cal']::text[]),
   ('https://em.scnu.edu.cn/a/20261127/11263.html', array['visit','like','want','cal']::text[]),
+  ('https://em.scnu.edu.cn/a/20261203/11280.html', array['visit','like','want','cal']::text[]),
+  ('https://em.scnu.edu.cn/a/20261203/11281.html', array['visit','like','want','cal']::text[]),
   ('https://lib.scnu.edu.cn/news/zuixingonggao/2017/0327/61.html', array['visit','like','want','cal']::text[]),
   ('https://lib.scnu.edu.cn/news/zuixingonggao/2018/0419/180.html', array['visit','like','want','cal']::text[]),
   ('https://lib.scnu.edu.cn/news/zuixingonggao/2019/0409/433.html', array['visit','like','want','cal']::text[]),
