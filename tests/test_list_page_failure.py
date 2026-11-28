@@ -26,6 +26,7 @@ import inspect
 import os
 import re
 import unittest
+from unittest import mock
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -53,7 +54,8 @@ class _SourceRun:
     """跑一次 _process_source，桩掉 fetch/parse_detail/sleep，返回 (err, 记录数)。"""
 
     def __init__(self, mod, pages, existing_urls=None, is_incremental=False,
-                 parse_mode='ok', robots_denied=(), status_codes=None):
+                 parse_mode='ok', robots_denied=(), status_codes=None,
+                 parse_records=None):
         self.mod = mod
         self.pages = pages          # {url: html 或 None}；详情页不登记 → 视为取回失败
         self.fetched = []
@@ -63,6 +65,7 @@ class _SourceRun:
         # 生产 fetch 2026-11-20 起支持 status_out：桩必须同步透传状态码，
         # 否则「404 终态 vs 可重试故障」的分支在本套件里永远测不到。
         self.status_codes = status_codes or {}
+        self.parse_records = parse_records
 
     def run(self, list_urls, **kw):
         m = self.mod
@@ -96,6 +99,9 @@ class _SourceRun:
                 raise ValueError('桩注入的解析异常')
             if self.parse_mode == 'none':
                 return None   # SKIP-NEWS：有意跳过，不是失败
+            if self.parse_records is not None:
+                return [dict(rec, sourceUrl=href, listTitle=list_title)
+                        for rec in self.parse_records]
             return {'sourceUrl': href, 'listTitle': list_title, 'title': list_title}
 
         m.fetch = fake_fetch
@@ -455,6 +461,99 @@ class FailedRetryRecoveryTest(unittest.TestCase):
         self.assertEqual(local, {})
         self.assertEqual(P._RETRY_RECOVERED_KEYS, set())
         self.assertEqual(P._LEDGER[self.key]['v'], 'failed')
+
+
+class SourceMetricsTest(unittest.TestCase):
+    U = 'http://t.scnu.edu.cn/list'
+    DETAIL = 'http://t.scnu.edu.cn/a/202601/1.html'
+    PAGE = ('<html><body><a href="/a/202601/1.html">学术讲座通知</a>'
+            '</body></html>')
+    OLD_ITEM_PAGE = ('<html><body><li><a href="/a/202601/1.html">学术讲座通知</a>'
+                     '<span>2020-01-01</span></li></body></html>')
+
+    def setUp(self):
+        P._LISTDATE_STATS = {'flagged': 0}
+        P._SOURCE_STATS.clear()
+
+    @staticmethod
+    def _clock(start, step):
+        clock = mock.Mock()
+        now = [start]
+
+        def perf_counter():
+            now[0] += step
+            return now[0]
+
+        clock.perf_counter.side_effect = perf_counter
+        clock.sleep = mock.Mock()
+        return clock
+
+    def test_01_一个详情页四条记录_请求数与产出数分开(self):
+        records = [{'title': f'第{i}讲', 'lectureIndex': i} for i in range(1, 5)]
+        with mock.patch.object(P, 'time', self._clock(10.0, 2.5)):
+            r = _SourceRun(P, {self.U: self.PAGE}, parse_records=records)
+            err, local = r.run([_lu(self.U)])
+        self.assertIsNone(err)
+        self.assertEqual(len(local), 4)
+        self.assertEqual(r.parsed, [self.DETAIL])
+        stats = P._SOURCE_STATS['测试源']
+        self.assertEqual(stats['list_fetches'], 1)
+        self.assertEqual(stats['detail_fetches'], 1)
+        self.assertEqual(stats['parsed_records'], 4)
+        self.assertEqual(stats['elapsed_seconds'], 2.5)
+
+    def test_02_旧日期候选被robots拦截_只标记不发详情请求(self):
+        r = _SourceRun(P, {self.U: self.OLD_ITEM_PAGE},
+                       robots_denied=(self.DETAIL,))
+        err, local = r.run([_lu(self.U)], is_incremental=True,
+                           cutoff_date_str='2026-01-01')
+        self.assertIsNone(err)
+        self.assertEqual(local, {})
+        self.assertNotIn(self.DETAIL, r.fetched)
+        self.assertEqual(P._LISTDATE_STATS['flagged'], 1)
+        self.assertEqual(P._SOURCE_STATS['测试源']['detail_fetches'], 0)
+
+    def test_03_汇总行来自真实计数器且耗时使用墙钟值(self):
+        import contextlib
+        import io
+        records = [{'title': f'第{i}讲', 'lectureIndex': i} for i in range(1, 5)]
+        with mock.patch.object(P, 'time', self._clock(10.0, 2.5)):
+            r = _SourceRun(P, {self.U: self.PAGE}, parse_records=records)
+            r.run([_lu(self.U)])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            P._print_source_stats([{'name': '测试源'}], 2.5)
+        out = buf.getvalue()
+        self.assertIn('解析产出不等于最终新增', out)
+        self.assertIn('耗时含源尾礼貌等待（正常完成为1秒）', out)
+        self.assertIn('[SOURCE-STATS] 测试源 | 1 | 1 | 4 | 2.500', out)
+        self.assertIn('[SOURCE-STATS] TOTAL(wall) | 1 | 1 | 4 | 2.500', out)
+
+    def test_04_列表页失败也计入请求并记录耗时(self):
+        with mock.patch.object(P, 'time', self._clock(20.0, 1.25)):
+            r = _SourceRun(P, {self.U: None})
+            err, local = r.run([_lu(self.U)])
+        self.assertIsNotNone(err)
+        self.assertEqual(local, {})
+        stats = P._SOURCE_STATS['测试源']
+        self.assertEqual(stats['list_fetches'], 1)
+        self.assertEqual(stats['detail_fetches'], 0)
+        self.assertEqual(stats['parsed_records'], 0)
+        self.assertEqual(stats['elapsed_seconds'], 1.25)
+
+    def test_05_同一来源重复处理时累计而不覆盖(self):
+        with mock.patch.object(P, 'time', self._clock(0.0, 1.0)):
+            for _ in range(2):
+                r = _SourceRun(P, {self.U: self.PAGE},
+                               parse_records=[{'title': '讲座', 'lectureIndex': 1}])
+                err, local = r.run([_lu(self.U)])
+                self.assertIsNone(err)
+                self.assertEqual(len(local), 1)
+        stats = P._SOURCE_STATS['测试源']
+        self.assertEqual(stats['list_fetches'], 2)
+        self.assertEqual(stats['detail_fetches'], 2)
+        self.assertEqual(stats['parsed_records'], 2)
+        self.assertEqual(stats['elapsed_seconds'], 2.0)
 
 
 class ListDateSwitchTest(unittest.TestCase):

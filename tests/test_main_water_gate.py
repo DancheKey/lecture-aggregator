@@ -60,7 +60,7 @@ class MainWaterGateTest(unittest.TestCase):
         self.s._LEDGER_STATS = {'skipped': 0, 'added': 0, 'expired': 0, 'dirty': 0}
         self.s._LEDGER_RETRY_KEYS = set()
         self.s._RETRY_RECOVERED_KEYS = set()
-        self.s._LISTDATE_STATS = {'skipped': 0}
+        self.s._LISTDATE_STATS = {'flagged': 0}
 
     # ---------- 工具 ----------
     def _write_last(self, obj):
@@ -200,6 +200,18 @@ class MainWaterGateTest(unittest.TestCase):
         last = self._read_last()
         self.assertEqual(last.get('last_scrape'), old,
                          '局部重抓不得改动全局水位（否则下次增量被局部任务的基准污染）')
+
+    def test_04b_每来源统计只输出一次汇总(self):
+        self._patch_scrape_ledger_cfg()
+        self._patch_sources_cfg(self._two_sources())
+        self._stub_sources([('A学院', None), ('B学院', None)])
+        self._run_main(['scraper.py'])
+        self.assertIn('[SOURCE-STATS] 来源 | 列表请求 | 详情请求 | 解析产出 | 耗时(s)',
+                      self._last_out)
+        self.assertIn('[SOURCE-STATS] A学院 |', self._last_out)
+        self.assertIn('[SOURCE-STATS] B学院 |', self._last_out)
+        self.assertEqual(self._last_out.count('[SOURCE-STATS] A学院 |'), 1)
+        self.assertEqual(self._last_out.count('[SOURCE-STATS] B学院 |'), 1)
 
     # ---------- ⑤ --since 显式传入时，失败也必须沿用它 ----------
     def test_05_显式since时失败沿用(self):

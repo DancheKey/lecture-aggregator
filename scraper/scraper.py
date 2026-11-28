@@ -11,6 +11,7 @@ import threading
 import requests
 import charset_normalizer
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import wraps
 from urllib.parse import urljoin, urlparse
 import urllib.robotparser  # _can_fetch() 依赖：缺失会被 except 静默吞掉，导致 robots 合规失效
 from bs4 import BeautifulSoup
@@ -1031,23 +1032,61 @@ def _norm_url(u):
 # 本文件顶部 `from excluded_urls import canon_url_key as _canon_url_key` 导入。
 
 
-# ── 列表页条目日期就地过滤（2026-09-28）────────────────────────────────────
-# 增量轮原本要把「未入库」的所有详情页 fetch+parse 一遍，但列表页 72 页里绝大多数
-# 是早已入库或早该丢弃的历史条目，导致每轮重抓 1128 页、撞满 CI 的 120 分钟超时。
-# 实测列表页条目文本里 **99.0%** 能就地抽到日期，其中 4654/4699 条早于水位线——
-# 在枚举阶段就判掉，详情页抓取 1128→1 页，单轮 3.9 小时→约 7 分钟。
-#
-# ⛔ **不能改成「只翻前 N 页」**：实测 `lectureStart >= 水位线` 的记录散落在列表页
-#   第 1、35、67 页——列表页并非严格日期倒序，只翻首页会漏抓。
-# ⛔ **必须用「或」逻辑**：仅当「成功抽到日期」且「日期 < 水位线」才跳过；抽不到
-#   日期（实测占 1.0%）一律照抓。源站可能补发旧页，宁多抓不漏抓。
+# ── 列表页条目日期候选标记（2026-09-28，2026-11-20 改为仅标记）──────────────
+# 日期只用于观测与 PAGESTOP；源站会补录旧讲座，不能据此硬跳过详情页。
 _ITEM_DATE_RE = re.compile(r'(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})')
 _ITEM_HOST_TAGS = ('li', 'tr', 'p', 'dd', 'td', 'div')
 
-# 全局累计：被列表页条目日期过滤跳过的详情页数（可观测性 + 单轮汇总日志）。
-# 用模块级变量而非改 _process_source 的返回契约（该函数返回 (local, err) 二元组，
-# 多处解包，扩参会波及所有调用方）。
-_LISTDATE_STATS = {'skipped': 0}
+# 全局累计：列表页条目日期早于水位线的候选链接数（仅标记，不决定是否抓取）。
+_LISTDATE_STATS = {'flagged': 0}
+_SOURCE_STATS = {}
+_METRICS_LOCK = threading.Lock()
+
+
+def _track_source_metrics(func):
+    @wraps(func)
+    def wrapped(src, *args, **kwargs):
+        name = src['name']
+        with _METRICS_LOCK:
+            stats = _SOURCE_STATS.setdefault(name, {
+                'list_fetches': 0, 'detail_fetches': 0,
+                'parsed_records': 0, 'elapsed_seconds': 0.0,
+            })
+        started = time.perf_counter()
+        try:
+            return func(src, *args, **kwargs)
+        finally:
+            with _METRICS_LOCK:
+                stats['elapsed_seconds'] += time.perf_counter() - started
+    return wrapped
+
+
+def _bump_source_stat(name, field):
+    with _METRICS_LOCK:
+        _SOURCE_STATS[name][field] += 1
+
+
+def _print_source_stats(sources, wall_seconds):
+    with _METRICS_LOCK:
+        rows = [(src.get('name', ''), dict(_SOURCE_STATS.get(src.get('name', ''), {})))
+                for src in sources]
+    print('[SOURCE-STATS] 口径：请求按 fetch 调用计（内部重试不重复计）；'
+          '解析产出不等于最终新增；耗时含源尾礼貌等待（正常完成为1秒）')
+    print('[SOURCE-STATS] 来源 | 列表请求 | 详情请求 | 解析产出 | 耗时(s)')
+    total_list = total_detail = total_records = 0
+    for name, stats in rows:
+        list_fetches = stats.get('list_fetches', 0)
+        detail_fetches = stats.get('detail_fetches', 0)
+        parsed_records = stats.get('parsed_records', 0)
+        elapsed = stats.get('elapsed_seconds', 0.0)
+        total_list += list_fetches
+        total_detail += detail_fetches
+        total_records += parsed_records
+        print(f'[SOURCE-STATS] {name} | {list_fetches} | {detail_fetches} | '
+              f'{parsed_records} | {elapsed:.3f}')
+    # 并发下各源耗时之和会大于墙钟时间，合计行只表达本轮抓取阶段总耗时。
+    print(f'[SOURCE-STATS] TOTAL(wall) | {total_list} | {total_detail} | '
+          f'{total_records} | {wall_seconds:.3f}')
 
 
 def _listdate_skip_enabled():
@@ -2101,22 +2140,20 @@ def restore_human_time_annotations(new_records, existing):
     return new_records
 
 
+@_track_source_metrics
 def _process_source(src, year, existing_urls, is_incremental, global_exclude=None,
                     cutoff_date_str=None, src_latest_date=None,
                     listdate_skip_enabled=True, force_full=False):
     """处理单个信息源，返回 {url: rec} 字典。
 
-    cutoff_date_str: 增量水位日期（'YYYY-MM-DD'）。配合列表页条目日期过滤，
-        跳过「条目日期早于水位线」的详情页，显著压缩单轮抓取量。
-        None/空 → 不启用该过滤（宁可多抓不漏抓）。
+    cutoff_date_str: 增量水位日期（'YYYY-MM-DD'）。列表页条目日期早于它时仅标记为
+        历史存量候选，不据此跳过详情页。None/空 → 不启用该标记。
     src_latest_date: 该源已入库的最晚条目日期（'YYYY-MM-DD'），来自
         _build_source_latest_date。用于翻页停止判据：整页条目日期都早于它
         → 该页往后全是存量，停止翻页（仅增量生效，见循环内守卫）。
-    listdate_skip_enabled: SCNU_LISTDATE_SKIP 的值（默认 True = 过滤开启）。
-        2026-09-30 B7：此前该开关只影响 main() 的日志文案、真实过滤无条件
-        执行（假开关）。现作为参数显式下传；为 True 时行为与旧版完全一致。
-        ⚠ 由 main() 传入 env 判定结果，不在函数内读 env——便于测试注入
-        （真实值每轮固定，读 env 只会让测试必须改进程环境）。
+    listdate_skip_enabled: SCNU_LISTDATE_SKIP 的值（默认 True = 开启日期候选标记）。
+        甲方案后日期不决定抓不抓；False 仅关闭标记，便于回退对照。
+        ⚠ 由 main() 传入 env 判定结果，不在函数内读 env——便于测试注入。
     force_full: 新源强制全量（2026-10-10 改造 1）。True 表示「本源的库中历史
         不可信或不存在」——新加的源，或改版后换了新地址的源。此时必须**无视
         水位线与台账**，把官网上所有页面重新扫一遍：
@@ -2189,6 +2226,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                           f'按预期过滤（不判本源失败）', file=sys.stderr)
                     break
                 _ls = {}
+                _bump_source_stat(name, 'list_fetches')
                 html = fetch(cur, allowed_domains=['scnu.edu.cn'], status_out=_ls)
                 new_count = 0
                 # 列表页取不到正文：此前**无守卫静默空转**——collect_links(None) 返回 []、
@@ -2212,29 +2250,18 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                                   file=sys.stderr)
                     # 与既有逻辑一致：取不到页面就到此为止（_next_page_url(None) 本就返回 None）
                     break
-                # 列表页条目日期映射。两种用途，故与 LISTDATE 开关解耦：
-                #   ① 条目级跳过（由下面 skip_itemdate 实际生效）；
-                #   ② 翻页停止判据（下方循环尾部，仅增量 + src_latest_date 时生效）。
+                # 列表页条目日期映射：① 日期候选标记；② PAGESTOP 翻页停止判据。
                 use_item_date = bool(cutoff_date_str) or bool(
                     is_incremental and src_latest_date)
-                # 2026-09-30 B7 修复：SCNU_LISTDATE_SKIP 此前是**假开关**——
-                # 它只在 main() 里决定打不打日志，真实条目级跳过（本处
-                # _should_skip_by_item_date）无条件执行。于是回退对照
-                # （SCNU_LISTDATE_SKIP=0）根本关不掉过滤，日志却宣称
-                # 「过滤未启用」，排查者据此得出完全相反的结论。
-                # 修法：把「是否跳过」显式成一个变量，与用途②解耦——
-                # 翻页停止判据不关（它是"要不要继续翻页"，不是"要不要抓这一页"，
-                # 关掉它会让无日期列表页被无限翻页，反而更慢）。
+                # 开关只控制候选标记；PAGESTOP 仍使用日期映射，不能随之关闭。
                 skip_itemdate = (bool(cutoff_date_str) and listdate_skip_enabled
                                   and not force_full)
                 item_date_map = (_build_item_date_map(html, cur, base, collect_mode)
                                  if use_item_date else {})
-                # 条目级跳过判据取「全局水位」与「本源基线」的更早者（见
-                # _effective_listdate_cutoff 注释），避免本源严重滞后时被全局
-                # 水位误挡新公告。force_full（新源）时判据整体失效 → 全部重扫。
+                # 标记判据取「全局水位」与「本源基线」的更早者，避免误标新公告。
                 eff_cutoff = ('' if force_full else
                               _effective_listdate_cutoff(cutoff_date_str, src_latest_date))
-                listdate_skipped = 0
+                listdate_flagged = 0
                 page_links = collect_links(html, base, list_url=cur, collect_mode=collect_mode)
                 # 本页全部链接的归一 key（供 PAGESTOP 判定「本页是否都已处理」）
                 _page_norm_keys = []
@@ -2266,16 +2293,16 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     # 10 月的 366，创建顺序在之后），日期字段却填成 6 月，一出现
                     # 在列表页就被判为存量，每轮静默跳过且不记台账 → 永久漏抓
                     # （11-17 日志「按条目日期跳过 2 条」正是这两条）。
-                    # 省流量的职责改由前面两道闸门承担：已入库的跳、台账已判的跳，
-                    # 剩下的一律抓详情页；抓完是否旧存量由 parse 结果与台账收敛
-                    # （解析成功入库 / 判回顾稿记 rejected / 失败记 failed）。
+                    # 省流量的职责由已入库、台账等闸门承担；日期候选不直接跳过，
+                    # 后续仍按排除名单、站内校验、robots 等规则处理。
                     # skip_itemdate 保留仅为兼容 SCNU_LISTDATE_SKIP 的回退对照语义。
                     if (skip_itemdate
                             and item_date_map
                             and _should_skip_by_item_date(_canon_url_key(href_norm),
                                                           item_date_map, eff_cutoff)):
-                        listdate_skipped += 1
-                        _LISTDATE_STATS['skipped'] += 1
+                        listdate_flagged += 1
+                        with _METRICS_LOCK:
+                            _LISTDATE_STATS['flagged'] += 1
                     if href_norm in exclude_urls or (global_exclude and href_norm in global_exclude):
                         print(f'[SKIP] {name} exclude {href}')
                         continue
@@ -2293,6 +2320,7 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                     if not _can_fetch(href, allowed_domains=['scnu.edu.cn']):
                         continue
                     _fs = {}
+                    _bump_source_stat(name, 'detail_fetches')
                     d = fetch(href, allowed_domains=['scnu.edu.cn'], status_out=_fs)
                     if not d:
                         if _fs.get('code') in (404, 410):
@@ -2347,11 +2375,12 @@ def _process_source(src, year, existing_urls, is_incremental, global_exclude=Non
                         _li = r.get('lectureIndex')
                         key = r['sourceUrl'] + (('#' + str(_li)) if _li is not None else '')
                         local[key] = r
+                        _bump_source_stat(name, 'parsed_records')
                         tag = f' (第{_li}期)' if _li is not None else ''
                         print(f'[OK] {name} | {r.get("lectureStart")} | {txt}{tag}')
-                if listdate_skipped:
-                    print(f'[LISTDATE] {name} | {cur} | 按条目日期判为历史存量 '
-                          f'{listdate_skipped} 条（甲方案：照抓，不跳过）')
+                if listdate_flagged:
+                    print(f'[LISTDATE] {name} | {cur} | 按条目日期标记历史存量候选 '
+                          f'{listdate_flagged} 条（仅标记，不因日期跳过；仍按其他规则处理）')
                 # 翻页停止判据（2026-09-28）：仅增量生效。列表页严格时间倒序时，
                 # 若本页**整页**条目日期都早于该源已入库的最晚条目日期，说明本页
                 # 及其之后所有页全是早已入库的存量，继续翻纯属每轮重复枚举
@@ -2468,6 +2497,10 @@ def main():
                                       '用于「并行多进程分批重抓 + 最后统一合并」的场景，避免空库并发写竞争')
     args = parser.parse_args()
 
+    with _METRICS_LOCK:
+        _SOURCE_STATS.clear()
+        _LISTDATE_STATS['flagged'] = 0
+
     # P0-3（2026-10-10，外部审查发现）：增量水位线改取「本轮开始时间 − 5 分钟重叠」。
     # 此前写 last_scrape 用的是抓取**结束**时刻的 now_iso：本轮运行期间、某源列表页
     # 已被抓过之后才发布的讲座，其发布时间 < 旧水位（结束时刻），下轮会被
@@ -2509,21 +2542,22 @@ def main():
                   file=sys.stderr)
     is_incremental = bool(since) and not args.full
 
-    # 列表页条目日期过滤用的水位日期（'YYYY-MM-DD'）。仅增量模式有意义：
-    # 条目日期早于它 → 该详情页不必再抓（历史页每轮重抓是 CI 超时的根因）。
-    # ⛔ 只做「早于则跳过」，绝不做「晚于才抓」——源站可能补发旧页，宁多抓不漏抓。
+    # 列表页条目日期标记用的水位日期（'YYYY-MM-DD'）。仅增量模式有意义：
+    # 条目日期早于它 → 标记为历史存量候选，但仍按正常规则决定是否抓取。
+    # 源站可能补录旧讲座，不能把日期早于水位直接等同于“无需抓取”。
     cutoff_date_str = None
     if is_incremental and since:
         _c = _parse_iso(since)
         if _c is not None:
             cutoff_date_str = '%04d-%02d-%02d' % (_c.year, _c.month, _c.day)
         if cutoff_date_str and _listdate_skip_enabled():
-            print(f'[LISTDATE] 列表页条目日期过滤已开启：条目日期 < {cutoff_date_str} 的详情页将跳过不抓')
+            print(f'[LISTDATE] 列表页条目日期标记已开启：条目日期 < {cutoff_date_str} 时'
+                  '仅标记历史存量候选，不因日期跳过；仍按其他规则处理')
         elif cutoff_date_str:
-            print('[LISTDATE] 列表页条目日期过滤已关闭（SCNU_LISTDATE_SKIP=0）：'
-                  '本轮回退对照，全部条目照抓（翻页停止判据仍生效）')
+            print('[LISTDATE] 列表页条目日期标记已关闭（SCNU_LISTDATE_SKIP=0）：'
+                  '本轮回退对照，不标记日期候选（抓取与翻页规则不变）')
         elif is_incremental:
-            print('[LISTDATE] 列表页条目日期过滤未启用（since 无法解析或非增量轮）')
+            print('[LISTDATE] 列表页条目日期标记未启用（since 无法解析或非增量轮）')
 
     # 被拒 URL 台账：仅增量轮读取（全量只写不读，保证宁多抓不漏抓）。
     # 作用与水位线互补——水位线管「新的才抓」，台账管「已判过的不再抓」。
@@ -2662,6 +2696,7 @@ def main():
     all_fetched = []  # 收集所有源抓回的记录（增量模式用于追加，不覆盖基底）
     failed_sources = []  # 体检修复（严重-3）：本次抓取失败的源，水位不得推进
     _RETRY_RECOVERED_KEYS.clear()
+    _source_phase_started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # ⚠ 第 8 个实参必须是**本源自己**的最晚条目日期（字符串），不是整张
         # {源名: 日期} 字典。传错类型会让 _process_source 里的
@@ -2689,6 +2724,8 @@ def main():
             except Exception as e:
                 failed_sources.append(f'{src_name}: {e}')
                 print(f'[ERROR] 合并信息源「{src_name}」结果失败：{e}', file=sys.stderr)
+
+    _print_source_stats(sources, time.perf_counter() - _source_phase_started)
 
     # 同源去重：同一学院标题相似的只保留一条
     raw = list(lectures.values())
@@ -2915,10 +2952,9 @@ def main():
             _atomic_write_json(last_scrape_path, payload)
     print(f'[DONE] total {len(out)} lectures -> data/lectures.json  '
           f'(mode={"incremental" if is_incremental else "full"}, source={args.source or "all"}, since={since})')
-    if _LISTDATE_STATS['skipped']:
-        print(f'[LISTDATE] 本轮 {_LISTDATE_STATS["skipped"]} 个详情页的列表页条目日期'
-              f'早于水位线，已按下述策略处理：照抓不跳过（甲方案 2026-11-20），'
-              f'是否旧存量由解析结果与台账收敛')
+    if _LISTDATE_STATS['flagged']:
+        print(f'[LISTDATE] 本轮 {_LISTDATE_STATS["flagged"]} 个列表页链接的条目日期'
+              '早于水位线，仅作标记，不因日期跳过；仍按排除名单、站内校验、robots 等规则处理')
     # 附件通道告警台账（2026-11-07）：本轮 [PDF-INLINE]/[ATTACH] 失败写进
     # data/attachment_health.json，供 scripts/audit_fields.py 的每日体检报告展示。
     # 新站点「附件拿不到」因此当天可见，而不是只留在 CI 日志里等人翻。
