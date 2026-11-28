@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 # 确保 scripts/ 下的共享模块（如 excluded_urls）可被 import
@@ -36,6 +37,8 @@ SITE_DIR = os.path.join(ROOT, 'site', 'lectures')
 SITE_BASE_URL = 'https://danchekey.github.io/lecture-aggregator/'
 LATEST_SIZE = 50
 CHUNK_SIZE = 100        # 公网分片加载：每片 100 条（2026-10-14 用户定，原 500）。
+CONTENT_HASH_LENGTH = 24
+VERSIONED_FILE_RETENTION_HOURS = 48
 # 背景：阶梯跳变形态下数字只在分片到达时更新（bumpCount 恒等于已加载真实条数，
 # 无插值动画——插值方案 2026-09-30 两轮被否：观感「平滑上滚→长时间不动→猛跳」
 # 且出现过负数）。500/片时 8 片大跳观感迟缓；100/片后 3830 条约 38 片，
@@ -60,15 +63,109 @@ def atomic_write_text(path, content):
     工作区字节对不上就是「改了没 add」的假绿形态。CI（Linux）不复现，
     故此坑只在本地跑生成脚本时暴露。
     """
-    tmp = path + '.tmp'
-    with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
-        f.write(content)
-    os.replace(tmp, path)
+    tmp = path + '.' + str(os.getpid()) + '.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(content)
+        os.replace(tmp, path)
+    except BaseException:
+        # 并发生成器用 PID 区分临时文件；失败时不留半份临时产物。
+        try:
+            os.remove(tmp)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def atomic_write_json(path, data):
     """JSON 文件的原子写入（用于改写切片等）。"""
     atomic_write_text(path, json.dumps(data, ensure_ascii=False, separators=(',', ':')))
+
+
+def canonical_json(value):
+    """稳定 JSON 字节串：排序对象键、保留数组顺序、无额外空白。"""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True,
+                      separators=(',', ':')).encode('utf-8')
+
+
+def content_hash(value, length=CONTENT_HASH_LENGTH):
+    """内容寻址文件名所用的 SHA-256 短哈希。"""
+    return hashlib.sha256(canonical_json(value)).hexdigest()[:length]
+
+
+def ordered_files_version(files):
+    """有序文件名列表的完整 SHA-256，供 chunksVersion/detailVersion 使用。"""
+    return hashlib.sha256(canonical_json(files)).hexdigest()
+
+
+def compute_generation(full_data, detail_buckets):
+    """完整主数据与长文本桶的确定性代际哈希（不含 updatedAt）。"""
+    return hashlib.sha256(canonical_json({
+        'full_data': full_data,
+        'detail_buckets': detail_buckets,
+    })).hexdigest()
+
+
+def git_added_timestamps(directory, files=None):
+    """返回文件首次进入 Git 的提交时间；非 Git 环境返回空映射。"""
+    try:
+        rel_dir = os.path.relpath(directory, ROOT).replace(os.sep, '/')
+    except ValueError:
+        return {}
+    paths = [path for path in (files or []) if path]
+    if not paths:
+        paths = [rel_dir]
+    try:
+        output = subprocess.check_output(
+            ['git', 'log', '--no-renames', '--diff-filter=A', '--format=%ct',
+             '--name-only', '--'] + paths,
+            cwd=ROOT, stderr=subprocess.DEVNULL, timeout=30,
+            text=True, encoding='utf-8')
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    timestamps = {}
+    current = None
+    for line in output.splitlines():
+        if line.isdigit():
+            current = int(line)
+        elif current is not None and line:
+            timestamps[line] = current
+    return timestamps
+
+
+def prune_old_versioned_files(directory, pattern):
+    """只删除 48 小时前的旧分片/哈希清单，固定清单与新鲜文件绝不删除。
+
+    内容寻址文件发布后仍可能被上一代页面或缓存引用；保留两天兼顾回滚与缓存安全。
+    CI 全新检出会把所有文件的 mtime 刷成当前时间，因此 tracked 文件按 Git 首次提交
+    时间判断年龄；未跟踪的新文件才退回 mtime，避免误删另一并发生成器刚写的文件。
+    """
+    if not os.path.isdir(directory):
+        return 0
+    cutoff = time.time() - VERSIONED_FILE_RETENTION_HOURS * 3600
+    candidates = []
+    for fname in os.listdir(directory):
+        if not pattern.fullmatch(fname):
+            continue
+        path = os.path.join(directory, fname)
+        try:
+            rel = os.path.relpath(path, ROOT).replace(os.sep, '/')
+        except ValueError:
+            rel = None
+        candidates.append((path, rel))
+    added_at = git_added_timestamps(directory, [rel for _, rel in candidates])
+    removed = 0
+    for path, rel in candidates:
+        try:
+            born = added_at.get(rel)
+            age_base = born if born is not None else os.path.getmtime(path)
+            if age_base < cutoff:
+                os.remove(path)
+                removed += 1
+        except FileNotFoundError:
+            # 另一并发清理/发布已先处理该文件，视为完成。
+            pass
+    return removed
 
 
 def _short_hash(path, length=10, git_first=True):
@@ -663,58 +760,87 @@ def with_unit(item, url_dates, venue_blocked=None):
     return strip_frontend_fields(it)
 
 
-def write_detail_chunks(buckets, updated_at):
-    """写出长文本分片与清单。空桶不产出文件（省请求）。"""
-    import glob
+def write_detail_chunks(buckets, updated_at, generation):
+    """写出内容寻址长文本分片、哈希清单及固定兼容清单。
+
+    所有桶文件先落盘，随后发布哈希清单，最后刷新固定 manifest.json；空桶不产出。
+    """
     detail_dir = os.path.join(SITE_DIR, 'detail')
-    for old in glob.glob(os.path.join(detail_dir, 'detail_*.json')):
-        os.remove(old)
     os.makedirs(detail_dir, exist_ok=True)
     files = []
     total = 0
     for i, rows in enumerate(buckets):
         if not rows:
             continue
-        fname = 'detail_%02d.json' % i
-        atomic_write_json(os.path.join(detail_dir, fname),
-                          {'updatedAt': updated_at, 'data': rows})
+        payload = {'data': rows}
+        digest = content_hash(payload)
+        fname = f'detail_{i:02d}.{digest}.json'
+        atomic_write_text(os.path.join(detail_dir, fname),
+                          canonical_json(payload).decode('utf-8'))
         files.append('lectures/detail/' + fname)
         total += len(rows)
-    manifest = {'updatedAt': updated_at, 'buckets': DETAIL_BUCKETS, 'files': files}
-    atomic_write_json(os.path.join(detail_dir, 'manifest.json'), manifest)
+    manifest = {
+        'updatedAt': updated_at,
+        'generation': generation,
+        'buckets': DETAIL_BUCKETS,
+        'files': files,
+        'detailVersion': ordered_files_version(files),
+    }
+    manifest_hash = content_hash(manifest)
+    hashed_name = f'manifest.{manifest_hash}.json'
+    manifest_text = canonical_json(manifest).decode('utf-8')
+    atomic_write_text(os.path.join(detail_dir, hashed_name), manifest_text)
+    atomic_write_text(os.path.join(detail_dir, 'manifest.json'), manifest_text)
+    prune_old_versioned_files(detail_dir, re.compile(
+        r'detail_\d+(?:\.[0-9a-f]{%d})?\.json' % CONTENT_HASH_LENGTH))
+    prune_old_versioned_files(detail_dir, re.compile(
+        r'manifest\.[0-9a-f]{%d}\.json' % CONTENT_HASH_LENGTH))
     print(f'[done] 长文本分片 {len(files)}/{DETAIL_BUCKETS} 桶 (共 {total} 条, '
-          f'{os.path.getsize(os.path.join(detail_dir, "manifest.json"))} B 清单)')
-    return files
+          f'{os.path.getsize(os.path.join(detail_dir, "manifest.json"))} B 清单, '
+          f'{hashed_name})')
+    return manifest
 
 
-def write_chunks(data, updated_at):
-    """将全量数据切片为 chunk_NNNN.json，并写入 chunks.json 清单。
+def write_chunks(data, updated_at, generation, detail_manifest):
+    """将全量数据写为内容寻址分片，最后发布固定 chunks.json 主清单。
 
-    公网（GitHub Pages）下前端改为逐片加载：每片 ~200KB（100 条），比整文件 6MB 更抗弱网；
-    任一片失败仅重试该片，不影响其它片；每片到达数字跳变到已加载真实条数
-    （阶梯跳变，2026-10-14 起 100/片，数字以 4 页为粒度持续小步更新），
-    彻底解决「手机端一次性拉 6MB 失败 -> 数字定格在 50」的问题。
+    公网（GitHub Pages）下前端逐片加载：每片 ~200KB（100 条），比整文件 6MB 更抗弱网；
+    任一片失败仅重试该片。主清单是发布点，只有它引用不到任何尚未落盘的文件。
     """
-    # 清理旧分片：数据量减少时不残留（如 100 片缩到 50 片后旧的 chunk_0051+ 仍会被 git add 提交）
-    import glob
-    for old in glob.glob(os.path.join(SITE_DIR, 'chunk_*.json')):
-        os.remove(old)
+    os.makedirs(SITE_DIR, exist_ok=True)
+    detail_manifest_name = f'manifest.{content_hash(detail_manifest)}.json'
+    detail_manifest_rel = 'lectures/detail/' + detail_manifest_name
+    detail_manifest_path = os.path.join(os.path.dirname(SITE_DIR), detail_manifest_rel)
+    if not os.path.isfile(detail_manifest_path):
+        raise FileNotFoundError(f'chunks.json 引用的 detail 清单尚未发布：{detail_manifest_rel}')
+
     chunks = []
     n = len(data)
     for i in range(0, n, CHUNK_SIZE):
         part = data[i:i + CHUNK_SIZE]
         idx = i // CHUNK_SIZE + 1
-        fname = 'chunk_%04d.json' % idx
-        atomic_write_json(os.path.join(SITE_DIR, fname), {'updatedAt': updated_at, 'data': part})
+        payload = {'data': part}
+        digest = content_hash(payload)
+        fname = f'chunk_{idx:04d}.{digest}.json'
+        atomic_write_text(os.path.join(SITE_DIR, fname),
+                          canonical_json(payload).decode('utf-8'))
         chunks.append('lectures/' + fname)
     manifest = {
         'updatedAt': updated_at,
+        'generation': generation,
         'total': n,
         'chunkSize': CHUNK_SIZE,
         'chunks': chunks,
+        'chunksVersion': ordered_files_version(chunks),
+        'detailVersion': detail_manifest['detailVersion'],
+        'detailManifest': detail_manifest_rel,
     }
+    # 主清单必须最后写：此前所有分片与哈希 detail 清单已经可见。
     atomic_write_json(os.path.join(SITE_DIR, 'chunks.json'), manifest)
+    prune_old_versioned_files(SITE_DIR, re.compile(
+        r'chunk_\d+(?:\.[0-9a-f]{%d})?\.json' % CONTENT_HASH_LENGTH))
     print(f'[done] chunks.json + {len(chunks)} 片 (每片 {CHUNK_SIZE} 条, 共 {n} 条)')
+    return manifest
 
 
 def warn_uncommitted_scripts():
@@ -917,9 +1043,10 @@ def _ics_stamp(dt):
 
 def _ics_esc(s):
     """RFC 5545 转义：反斜杠、分号、逗号，换行写成字面量 \\n。"""
-    return (str(s if s is not None else '')
-            .replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,')
-            .replace('\r\n', '\\n').replace('\n', '\\n').replace('\r', '\\n'))
+    escaped = (str(s if s is not None else '')
+               .replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,')
+               .replace('\r\n', '\\n').replace('\n', '\\n').replace('\r', '\\n'))
+    return re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ud800-\udfff]', '', escaped)
 
 
 def _ics_fold(line):
@@ -943,8 +1070,9 @@ def _ics_fold(line):
 
 
 def _xml_esc(s):
-    return (str(s if s is not None else '')
-            .replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]',
+                  '', str(s if s is not None else ''))
+    return (text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             .replace('"', '&quot;').replace("'", '&apos;'))
 
 
@@ -1126,6 +1254,7 @@ def main():
     # 否则用户在这 50 条上点「展开更多」时前端不知道去哪一桶取全文。
     full_data = [with_unit(item, url_dates, venue_blocked) for item in data]
     full_data, detail_buckets = split_long_text(full_data)
+    generation = compute_generation(full_data, detail_buckets)
     latest_src = [with_unit(item, url_dates, venue_blocked)
                   for item in sorted_data[:LATEST_SIZE]]
     latest = []
@@ -1135,13 +1264,18 @@ def main():
             it['b'] = b
         latest.append(latest_preview(it))
     stats = build_stats(data, updated_at, venue_blocked)
+    stats['generation'] = generation
 
-    # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致
-    atomic_write_json(SITE_LECTURES_PATH, {'updatedAt': updated_at, 'data': full_data})
-    atomic_write_json(os.path.join(SITE_DIR, 'latest.json'), {'updatedAt': updated_at, 'data': latest})
+    # 同时写入 site/lectures.json 与切片，全部使用原子写入，确保首页与统计页版本一致。
+    # generation 覆盖主数据和长文本桶；updatedAt 只用于展示/兼容查询版本戳，不参与哈希。
+    atomic_write_json(SITE_LECTURES_PATH,
+                      {'updatedAt': updated_at, 'generation': generation, 'data': full_data})
+    atomic_write_json(os.path.join(SITE_DIR, 'latest.json'),
+                      {'updatedAt': updated_at, 'generation': generation, 'data': latest})
     atomic_write_json(os.path.join(SITE_DIR, 'stats.json'), stats)
-    write_chunks(full_data, updated_at)
-    write_detail_chunks(detail_buckets, updated_at)
+    # 先发布 detail 的桶与哈希清单，再写分片；chunks.json 是最后的主发布点。
+    detail_manifest = write_detail_chunks(detail_buckets, updated_at, generation)
+    write_chunks(full_data, updated_at, generation, detail_manifest)
 
     latest_bytes = os.path.getsize(os.path.join(SITE_DIR, 'latest.json'))
     stats_bytes = os.path.getsize(os.path.join(SITE_DIR, 'stats.json'))

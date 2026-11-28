@@ -124,6 +124,17 @@ jobs:
       - name: 同步静态数据源并生成前端切片
         run: python scripts/generate_frontend_data.py
 
+      # 新讲座上线前必须进入数据库白名单，否则匿名点赞/想听/日历/访问会被 RPC 拒绝。
+      # 未配置同步令牌时只告警，兼容补丁尚未执行或 Secret 尚未启用的过渡期；配置后失败即红。
+      - name: 自动同步 Supabase 讲座白名单
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_WHITELIST_SYNC_TOKEN: ${{ secrets.SUPABASE_WHITELIST_SYNC_TOKEN }}
+        run: |
+          python scripts/gen_supabase_sql.py --whitelist-json > "$RUNNER_TEMP/lecture_whitelist.json"
+          python scripts/sync_supabase_whitelist.py "$RUNNER_TEMP/lecture_whitelist.json"
+
       # 访问量趋势报告（2026-09-30 起出片到 site/visits-trend.html）：随 site/ 入库、
       # 随 Pages 部署公网可见（用户要求直接在公网看趋势），下方 git add -A site 会带上它。
       - name: 生成访问量趋势报告

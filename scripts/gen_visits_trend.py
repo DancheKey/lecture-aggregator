@@ -490,8 +490,9 @@ fetch('visits-trend-data.json', { cache: 'no-store' })
 // 静态快照），两处拿到的必然是同一个数字，不会因请求时点差分叉。
 // ⚠ 只读不计数：页面打开的 +1 统一归 footer-counter 的全站 5 分钟防刷 bump，
 // 趋势页不单独计数，也不再单独 fetch 云端。
-// 拿到值后同步：KPI 首卡 + 近 7 条/日均两张静态卡、图表今日点位、明细最新行；
-// 历史往日快照原样不动。失败 / 沙箱无 LectureSitePv → 静默保留快照值，
+// 拿到值后先校正 KPI 首卡；末条为北京时间今天时再同步近 7 条/日均两张静态卡、
+// 图表今日点位、明细最新行，历史往日快照原样不动。末条不是今天时只显示
+// 相对最近快照的实时增量。失败 / 沙箱无 LectureSitePv → 静默保留快照值，
 // 页面行为与未接链路时完全一致。
 // ⚠ 竞态收口：共享 Promise 与数据文件 fetch 谁先到都可能——若值先到而
 // SNAPS 还是空数组，直接 apply 会白做（门禁曾抓到：校正静默跳过）。故先缓存
@@ -525,12 +526,18 @@ function applyLivePv(n) {
   var last = SNAPS[SNAPS.length - 1];
   var snapPv = Number(last.site_pv) || 0;
   if (n <= snapPv) return;   // 快照已是最新（或异常回退值），不动
-  var prev = SNAPS.length > 1 ? (Number(SNAPS[SNAPS.length - 2].site_pv) || 0) : 0;
-  last.site_pv = n;
-  last.pv_delta = n - prev;   // 日新增：相对上一条（昨日）快照，供曲线/明细
   var kv = document.getElementById('kpi_pv_value');
   if (kv) kv.textContent = fmt(n);
   var kd = document.getElementById('kpi_pv_delta');
+  var today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+  if (last.date !== today) {
+    if (kd) kd.textContent = '较最近快照（' + last.date + '）+'
+      + (n - snapPv).toLocaleString('en-US') + ' · 实时';
+    return;
+  }
+  var prev = SNAPS.length > 1 ? (Number(SNAPS[SNAPS.length - 2].site_pv) || 0) : 0;
+  last.site_pv = n;
+  last.pv_delta = n - prev;   // 日新增：相对上一条（昨日）快照，供曲线/明细
   // #2：旧文案「较前次快照 +N」实际算的是 n − 上一条快照，字面与数值不符，
   // 用户对照累计值 2027→2035 会发现 +17 对不上。改为相对「今日凌晨快照」，
   // 字面与实际一致：n − snapPv。

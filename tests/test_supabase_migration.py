@@ -30,12 +30,17 @@ p_delta=99999 即可把 likes/wants 刷爆（表级 RLS 挡得住直接 INSERT/U
 
 只用标准库；读仓库内文件，无网络、无 key、无 Supabase 依赖。
 """
+import hashlib
+import importlib.util
+import io
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SQL_PATH = os.path.join(ROOT, 'supabase-migration.sql')
@@ -109,6 +114,88 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         self.assertIn('insert into public.lecture_allowed_keys', r.stdout)
         self.assertNotIn('create or replace function', r.stdout,
                          '--whitelist-only 只应输出键同步，不能顺带重写函数')
+
+    def test_00d_whitelist_json与当前键一致(self):
+        r = subprocess.run([sys.executable, GEN_PATH, '--whitelist-json'],
+                           capture_output=True, text=True, encoding='utf-8')
+        self.assertEqual(r.returncode, 0, 'JSON 白名单生成失败: ' + r.stderr[-300:])
+        keys = json.loads(r.stdout)
+        self.assertIsInstance(keys, list)
+        self.assertEqual(len(keys), len(set(keys)), 'JSON 白名单不得含重复键')
+        self.assertIn('__site__', keys)
+        with open(LECTURES_JSON, encoding='utf-8') as f:
+            items = json.load(f).get('data', [])
+        expected = {'__site__'} | {x.get('ck') for x in items
+                                  if isinstance(x, dict) and x.get('ck')}
+        self.assertEqual(set(keys), expected, 'JSON 白名单必须完整覆盖当前讲座键')
+
+    def test_00e_whitelist_sync函数受限且只增不删(self):
+        body = _func_body(self.sql, 'sync_whitelist')
+        definition = _func_def(self.sql, 'sync_whitelist')
+        self.assertIn('security definer', definition)
+        self.assertIn('set search_path = pg_catalog, public', definition)
+        self.assertIn("current_setting('request.headers', true)", body)
+        self.assertIn("'x-sync-token'", body)
+        self.assertIn('sha256(', body)
+        self.assertIn('previous_token_hash', body)
+        self.assertIn('jsonb_typeof', body)
+        self.assertIn("'__site__'", body)
+        self.assertIn('10000', body, '白名单同步必须有全局行数上限')
+        lock_at = body.index('lock table public.lecture_allowed_keys in share row exclusive mode;')
+        count_at = body.index('select count(*) into v_existing')
+        insert_at = body.index('insert into public.lecture_allowed_keys')
+        self.assertLess(lock_at, count_at)
+        self.assertLess(count_at, insert_at, '行数检查必须发生在插入前')
+        self.assertIn('on conflict (url) do update', body)
+        self.assertRegex(body, r"jsonb_build_object\(\s*'received'")
+        self.assertNotRegex(body, r'(?i)\bdelete\s+from\b|\btruncate\b')
+        self.assertIn('create table if not exists public.lecture_whitelist_sync', self.sql)
+        self.assertIn('alter table public.lecture_whitelist_sync enable row level security;', self.sql)
+        self.assertIn(
+            'revoke all on table public.lecture_whitelist_sync from public, anon, authenticated;',
+            self.sql)
+        self.assertIn(
+            'revoke all on function public.sync_whitelist(jsonb) from public;', self.sql)
+        self.assertIn(
+            'grant execute on function public.sync_whitelist(jsonb) to anon, service_role;',
+            self.sql)
+
+    def test_00f_daily自动同步白名单(self):
+        with open(os.path.join(ROOT, '.github', 'workflows', 'daily.yml'), encoding='utf-8') as f:
+            workflow = f.read()
+        generate_at = workflow.index('run: python scripts/generate_frontend_data.py')
+        sync_at = workflow.index('python scripts/sync_supabase_whitelist.py')
+        self.assertLess(generate_at, sync_at, '必须先生成最新 lectures.json 再同步白名单')
+        self.assertIn('SUPABASE_WHITELIST_SYNC_TOKEN', workflow)
+        self.assertIn('--whitelist-json', workflow)
+
+    def test_00g_同步模式不能与存量导入组合(self):
+        for mode in ('--whitelist-only', '--whitelist-json', '--rotate-sync-token'):
+            with self.subTest(mode=mode):
+                r = subprocess.run([sys.executable, GEN_PATH, mode, '--with-existing'],
+                                   capture_output=True, text=True, encoding='utf-8')
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn('不能与其它模式组合', r.stderr)
+
+    def test_00h_令牌轮换只写忽略文件且日志不泄露明文(self):
+        path = os.path.join(ROOT, 'scripts', 'gen_supabase_sql.py')
+        spec = importlib.util.spec_from_file_location('gen_supabase_sql', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        token = 'rotation-test-token-' + 'x' * 32
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(mod, 'ROOT', directory), \
+                mock.patch.object(mod.secrets, 'token_urlsafe', return_value=token), \
+                mock.patch.object(sys, 'stdout', output):
+            mod.rotate_sync_token()
+            token_path = os.path.join(directory, 'tmp', 'supabase_whitelist_sync_token.txt')
+            with open(token_path, encoding='utf-8', newline='') as f:
+                self.assertEqual(f.read(), token + '\n')
+            if os.name != 'nt':
+                self.assertEqual(os.stat(token_path).st_mode & 0o777, 0o600)
+            self.assertNotIn(token, output.getvalue())
+            self.assertIn(hashlib.sha256(token.encode('utf-8')).hexdigest(), output.getvalue())
 
     def test_01_两路径双钳(self):
         """insert 与 on conflict 都必须 least(greatest(...))——当晚漏洞即缺此。
@@ -339,6 +426,16 @@ class TestSupabaseMigrationSql(unittest.TestCase):
         self.assertIn('pg_get_functiondef', sql, '核查 SQL 应读取线上真实函数定义')
         self.assertIn('pg_class', sql, '核查 SQL 应检查 RLS 状态')
 
+    def test_04c_核查SQL覆盖白名单同步(self):
+        if not os.path.exists(VERIFY_PATH):
+            self.skipTest('supabase-verify-current.sql 不存在')
+        with open(VERIFY_PATH, encoding='utf-8') as f:
+            sql = f.read()
+        self.assertIn("'sync_whitelist'", sql)
+        self.assertIn("'lecture_whitelist_sync'", sql)
+        self.assertIn('token_hash', sql)
+        self.assertNotIn('x-sync-token', sql, '核查 SQL 不应读取或打印同步令牌')
+
     def test_04_入库SQL与生成器一致(self):
         """单一事实源：手改 SQL 会被本测试抓住（生成器重新产出比对）。"""
         r = subprocess.run([sys.executable, GEN_PATH], capture_output=True,
@@ -350,6 +447,62 @@ class TestSupabaseMigrationSql(unittest.TestCase):
             'supabase-migration.sql 与 gen_supabase_sql.py 产出不一致——'
             '请重新生成（python scripts/gen_supabase_sql.py > supabase-migration.sql）'
             '而非手改 SQL')
+
+
+class TestWhitelistSyncClient(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        path = os.path.join(ROOT, 'scripts', 'sync_supabase_whitelist.py')
+        spec = importlib.util.spec_from_file_location('sync_supabase_whitelist', path)
+        cls.sync = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.sync)
+
+    def test_01_输入校验拒绝重复或缺站点键(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, 'keys.json')
+            cases = ({'__site__': 1}, ['__site__', '__site__'], ['a'], [1], [])
+            for keys in cases:
+                with self.subTest(keys=keys):
+                    with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                        json.dump(keys, f)
+                    with self.assertRaises(ValueError):
+                        self.sync.load_keys(path)
+
+    def test_02_请求带令牌且只post白名单RPC(self):
+        response = io.BytesIO(b'{"received":2,"upserted":2,"total":3948}')
+        response.__enter__ = lambda: response
+        response.__exit__ = lambda *args: None
+        keys = ['__site__', 'https://example.edu.cn/a']
+        with mock.patch.object(self.sync.urllib.request, 'urlopen', return_value=response) as call:
+            result = self.sync.sync_keys(keys, 'secret-token-value',
+                                         ('https://project.supabase.co', 'public-anon-key'))
+        request = call.call_args.args[0]
+        self.assertEqual(request.full_url, 'https://project.supabase.co/rest/v1/rpc/sync_whitelist')
+        self.assertEqual(request.get_method(), 'POST')
+        headers = {name.lower(): value for name, value in request.header_items()}
+        self.assertEqual(headers['x-sync-token'], 'secret-token-value')
+        self.assertEqual(headers['authorization'], 'Bearer public-anon-key')
+        self.assertEqual(json.loads(request.data), {'p_keys': keys})
+        self.assertEqual(result, {'received': 2, 'upserted': 2, 'total': 3948})
+
+    def test_03_返回数量不符必须失败(self):
+        response = io.BytesIO(b'{"received":1,"upserted":0,"total":2}')
+        response.__enter__ = lambda: response
+        response.__exit__ = lambda *args: None
+        with mock.patch.object(self.sync.urllib.request, 'urlopen', return_value=response):
+            with self.assertRaises(ValueError):
+                self.sync.sync_keys(['__site__', 'https://example.edu.cn/a'], 'token',
+                                    ('https://project.supabase.co', 'anon'))
+
+    def test_04_未配置令牌时告警跳过(self):
+        output = io.StringIO()
+        with mock.patch.dict(os.environ, {'SUPABASE_WHITELIST_SYNC_TOKEN': ''}), \
+                mock.patch.object(sys, 'stdout', output), \
+                mock.patch.object(self.sync.urllib.request, 'urlopen') as call:
+            self.assertEqual(self.sync.main(['unused.json']), 0)
+        call.assert_not_called()
+        self.assertIn('::warning::', output.getvalue())
 
 
 if __name__ == '__main__':

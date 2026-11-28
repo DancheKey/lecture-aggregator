@@ -55,6 +55,8 @@ Object.assign(APP_METHODS, {
       // 兼容多种后端返回：
       //  - {data:[...], updatedAt, mtime}            （新版 server.py，已解包）
       //  - {data:{updatedAt,data:[...]}, updatedAt}  （旧版 server.py，未解包）
+      // generation 是内容寻址产物的事实版本；旧响应缺该字段时保持原有兼容行为。
+      if (resp && resp.generation) this._generation = resp.generation;
       if (Array.isArray(resp)) { this._absorbAll(resp); this.mtime = 0; this.updatedAt = ''; return; }
       let arr = resp.data;
       let updatedAt = resp.updatedAt || '';
@@ -143,7 +145,19 @@ Object.assign(APP_METHODS, {
         return this._loadFullSingle();
       }
       const chunks = (manifest && manifest.chunks) || [];
-      if (!chunks.length) return this._loadFullSingle();
+      if (!chunks.length) {
+        this._chunksManifest = manifest || null;
+        return this._loadFullSingle();
+      }
+      // latest 与 chunks 必须属于同一内容代际。旧清单可能被不遵守 no-store 的
+      // 中间层返回；一旦混龄，绝不合并分片覆盖新 latest，改走整文件并再次校验。
+      if (manifest.generation && this._generation
+          && manifest.generation !== this._generation) {
+        console.warn('[load] latest/chunks generation 不一致，拒绝合并旧分片',
+          this._generation, manifest.generation);
+        return this._loadFullSingle();
+      }
+      this._chunksManifest = manifest;
       // 进度分母（清单自带 total，几十字节先于分片到手）：模板「已加载 X / Y」用。
       this.chunkTotal = manifest.total || 0;
       this.dataStage = 'partial';
@@ -152,8 +166,8 @@ Object.assign(APP_METHODS, {
       // 的 max-age=600 旧副本——部署后的 10 分钟窗口内，浏览器会拿**旧分片覆盖
       // 新 latest 记录**（_mergeChunk 的覆盖设计），表现为「刚刷新有阿里云、加载
       // 完又没了」，且各设备因缓存龄不同而表现不一（移动端有/电脑没有）。
-      // 修法：用清单里的 updatedAt 给分片 URL 加 ?v= —— 数据版本变则 URL 变，
-      // 浏览器缓存天然按版本隔离；同版本重复访问仍命中缓存，性能不损失。
+      // 修法：清单引用内容哈希文件名（数据变则 URL 变，主缓存身份），同时保留
+      // updatedAt 的 ?v= 查询戳兼容旧部署与既有测试；浏览器缓存天然按版本隔离。
       // GitHub Pages 忽略查询串，CDN 侧同理按完整 URL 键控，新版本 URL 必为回源。
       const _ver = (manifest && manifest.updatedAt) || '';
       const _urlOf = u => _ver
@@ -218,6 +232,11 @@ Object.assign(APP_METHODS, {
       return fetch('lectures.json', { cache: 'no-store' })
         .then(r => r.json())
         .then(resp => {
+          if (resp && resp.generation && this._generation
+              && resp.generation !== this._generation) {
+            throw new Error('lectures-generation-mismatch: ' + this._generation
+              + ' != ' + resp.generation);
+          }
           this._applyLectureData(resp);
           this.dataStage = 'full';
           this._warmHayCache();   // 降级路径同样预建（见 _loadChunks 的同名调用）
@@ -372,16 +391,52 @@ Object.assign(APP_METHODS, {
       h.nt = undefined;
     },
 
+    // 同时兼容 content-addressed detail_00.<24 hex>.json 与旧 detail_00.json。
+    _detailFileIndex(file) {
+      const m = String(file || '').match(/(?:^|\/)detail_(\d+)(?:\.[0-9a-f]{24})?\.json(?:[?#]|$)/);
+      return m ? parseInt(m[1], 10) : null;
+    },
+
     async _ltManifestJson() {
-      if (this._ltManifest) return this._ltManifest;
-      // no-store（2026-10-12 与分片同因）：清单仅 ~600B，若走 default 命中旧副本，
-      // 下方桶 URL 会带旧版本戳去取**旧桶覆盖新 latest 的内联长文本**，与分片同一类
-      // 混龄覆盖。与 chunks.json 同口径恒新，桶按版本戳隔离。
-      // cache-busting（2026-10-13）：同 _loadLastRun——清单旧副本会让桶 URL 带旧版本戳，
-      // 命中旧桶缓存覆盖新 latest 的内联长文本（与分片同一类混龄事故）。
-      const r = await fetch('lectures/detail/manifest.json?t=' + Date.now(), { cache: 'no-store' });
-      if (!r.ok) throw new Error('detail-manifest-' + r.status);
-      this._ltManifest = await r.json();
+      const knownGenerations = () => [this._generation,
+        this._chunksManifest && this._chunksManifest.generation].filter(Boolean);
+      const rejectMismatch = man => {
+        if (man && man.generation && knownGenerations().some(g => g !== man.generation)) {
+          throw new Error('detail-generation-mismatch: ' + knownGenerations().join(',')
+            + ' != ' + man.generation);
+        }
+      };
+      if (this._ltManifest) {
+        try {
+          rejectMismatch(this._ltManifest);
+        } catch (e) {
+          this._ltManifest = null;
+          throw e;
+        }
+        return this._ltManifest;
+      }
+      // 新 chunks 清单直接链接不可变的哈希 detail manifest；旧清单/降级路径
+      // 回退固定 manifest.json。两种清单都 no-store + 时间戳，避免旧副本覆盖新长文本。
+      const linked = this._chunksManifest && this._chunksManifest.detailManifest;
+      const primary = typeof linked === 'string' && linked
+        ? linked : 'lectures/detail/manifest.json';
+      const fetchManifest = async file => {
+        const url = file + (file.includes('?') ? '&' : '?') + 't=' + Date.now();
+        const r = await fetch(url, { cache: 'no-store' });
+        if (!r.ok) throw new Error('detail-manifest-' + r.status);
+        return r.json();
+      };
+      let man;
+      try {
+        man = await fetchManifest(primary);
+      } catch (e) {
+        // 链接文件尚未部署/网络失败时才回退固定清单；generation 不一致是内容
+        // 错误，不能通过回退另一个旧清单来绕过校验。
+        if (primary === 'lectures/detail/manifest.json') throw e;
+        man = await fetchManifest('lectures/detail/manifest.json');
+      }
+      rejectMismatch(man);
+      this._ltManifest = man;
       return this._ltManifest;
     },
 
@@ -390,7 +445,7 @@ Object.assign(APP_METHODS, {
       this._ltPending = { ...this._ltPending, [idx]: true };
       try {
         const man = await this._ltManifestJson();
-        const file = (man.files || []).find(f => f.endsWith('detail_' + String(idx).padStart(2, '0') + '.json'));
+        const file = (man.files || []).find(f => this._detailFileIndex(f) === idx);
         if (!file) return;
         // 版本戳与分片同口径（2026-10-12）：按清单 updatedAt 分桶缓存键
         const ver = man.updatedAt || '';
@@ -473,7 +528,7 @@ Object.assign(APP_METHODS, {
         const files = man.files || [];
         const CONC = 4;
         let cur = 0;
-        const idxs = files.map(f => parseInt((f.match(/detail_(\d+)\.json/) || [])[1], 10));
+        const idxs = files.map(f => this._detailFileIndex(f)).filter(Number.isInteger);
         const worker = async () => {
           while (cur < idxs.length) await this._loadDetailBucket(idxs[cur++]);
         };

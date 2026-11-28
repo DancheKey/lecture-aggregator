@@ -354,12 +354,13 @@ def _parse_segment(seg, default_year, publish_time):
     y = default_year
 
     # 1) 完整中文日期（含中文年）：最可靠，优先使用显式年份。
-    m = re.search(
-        r'(?<!\d)(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,3})(?!\d)\s*[日号]', seg)
-    if m:
+    invalid_cn_spans = []
+    for m in re.finditer(
+            r'(?<!\d)(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,3})(?!\d)\s*[日号]', seg):
         r = _cn_date_with_malformed_day(m, seg)
         if not r:
-            return None
+            invalid_cn_spans.append(m.span())
+            continue
         r['from_full'] = True
         return _attach_range_end(r, seg, m.group(1))
 
@@ -387,23 +388,25 @@ def _parse_segment(seg, default_year, publish_time):
             return cand
 
     # 4) 仅有 M月D日：使用外部传入的默认年份（title_year / url_year / publish_time / current）
-    md = re.search(MONTHDAY, seg)
-    if md:
+    for md in re.finditer(MONTHDAY, seg):
+        # 非法完整中文日期恢复失败后，不把其月日前缀重新当作仅月日解析。
+        if any(start <= md.start() < end for start, end in invalid_cn_spans):
+            continue
         r = _build(md, seg, y, md.group(1), md.group(2))
         if not r:
-            return None
+            continue
         r['from_full'] = False
         return _attach_range_end(r, seg, y)
 
     # 5) 图片 OCR 常见美式月日：06/10，默认取 default_year
-    sm = re.search(SLASH_MONTHDAY, seg)
-    if sm:
-        if not re.search(r'20\d{2}/' + sm.group(0), seg):
-            r = _build(sm, seg, y, sm.group(1), sm.group(2))
-            if not r:
-                return None
-            r['from_full'] = False
-            return r
+    for sm in re.finditer(SLASH_MONTHDAY, seg):
+        if re.search(r'20\d{2}/' + sm.group(0), seg):
+            continue
+        r = _build(sm, seg, y, sm.group(1), sm.group(2))
+        if not r:
+            continue
+        r['from_full'] = False
+        return r
     return None
 
 

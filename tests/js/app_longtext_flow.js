@@ -42,11 +42,12 @@ const ctx = {
         ok: true, status: 200,
         json: async () => ({
           files: Array.from({ length: BUCKETS }, (_, i) =>
-            'lectures/detail/detail_' + String(i).padStart(2, '0') + '.json'),
+            'lectures/detail/detail_' + String(i).padStart(2, '0') + '.'
+            + String(i).padStart(24, '0') + '.json'),
         }),
       };
     }
-    const m = String(url).match(/detail_(\d+)\.json/);
+    const m = String(url).match(/detail_(\d+)(?:\.[0-9a-f]{24})?\.json/);
     const i = m ? m[1] : '00';
     if (m && failBucket === m[1]) {
       failBucket = null;   // 只失败一次，下一轮即可补齐

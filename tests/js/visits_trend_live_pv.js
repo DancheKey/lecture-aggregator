@@ -6,12 +6,13 @@
 // window.LectureSitePv.get()（全页记忆化的同一次取值），不再各自 fetch，
 // 权威值同步进 KPI 首卡 + 近 7 条/日均两张静态卡、图表今日点位、明细最新行。
 //
-// 本门禁锁四件事（相对现有 visits_trend_render.js 多锁的语义）：
-//   ① 共享值 > 快照值 → KPI 值/副文案/近 7 条/日均、SNAPS 末条、明细最新行同步；
+// 本门禁锁五件事（相对现有 visits_trend_render.js 多锁的语义）：
+//   ① 末条为北京时间今天且共享值 > 快照值 → KPI/静态卡、SNAPS 末条、图表、明细同步；
 //   ② 副文案增量口径 = 共享值 − 今日凌晨快照（不是 − 上一条快照，评审 #2）；
 //   ③ 共享值 ≤ 快照值 / null → 静默保留快照值（不得回退、不得写 0）；
-//   ④ 无 LectureSitePv 环境（本机降级/沙箱）→ 不抛错，页面照常渲染。
-// 这三类都是零报错的「静默错」，浏览器里看不出异常但数字错，必须锁。
+//   ④ 无 LectureSitePv 环境（本机降级/沙箱）→ 不抛错，页面照常渲染；
+//   ⑤ 末条不是今天 → 只更新 KPI 实时总量，历史快照/图表/明细/静态 KPI 不动。
+// 这些场景都是零报错的「静默错」，浏览器里看不出异常但数字错，必须锁。
 //
 // 运行：node tests/js/visits_trend_live_pv.js（纯 node + vm，无浏览器无网络）
 const fs = require('fs');
@@ -23,6 +24,11 @@ const js = fs.readFileSync(path.join(SITE, 'visits-trend.js'), 'utf-8');
 const data = JSON.parse(
   fs.readFileSync(path.join(SITE, 'visits-trend-data.json'), 'utf-8'));
 const errs = [];
+
+// 固定为 UTC 1/1 16:00（北京时间 1/2），同时锁定跨日与东八区口径。
+const NOW = Date.parse('2030-01-01T16:00:00Z');
+const TODAY = '2030-01-02';
+const STALE_DATE = '2030-01-01';
 
 const snapPv = Number(data.snaps[data.snaps.length - 1].site_pv) || 0;
 if (!snapPv) {
@@ -50,8 +56,9 @@ function mkNode(tag) {
 
 // 起一个沙箱跑完脚本、排空微任务。livePv 为共享 Promise 桩的返回值；
 // hasShared=false 时不注入 window.LectureSitePv（场景 ④）；delayData=true 时
-// 数据文件 fetch 延迟一轮（模拟场景 ⑤：共享值先到）。
-async function runScenario(name, { livePv, hasShared, delayData }) {
+// 数据文件 fetch 延迟一轮（模拟场景 ⑤：共享值先到）。日期由固定时钟控制，
+// snapshotDate 指定末条快照日期，整段日期等距平移。
+async function runScenario(name, { livePv, hasShared, delayData, snapshotDate = TODAY }) {
   const byId = {};
   ['chart', 'tbody', 'tcount', 'toggleRows', 'load-err',
    'kpi_pv_value', 'kpi_pv_delta',
@@ -63,10 +70,19 @@ async function runScenario(name, { livePv, hasShared, delayData }) {
   byId['kpi_pv_delta']._text = '较前次 +1';
   byId['kpi_recent7_value']._text = '__STATIC__';
   byId['kpi_perday_value']._text = '__STATIC__';
-  // ⚠ data 必须每场景深拷贝：applyLivePv 会写 SNAPS 末条（last.site_pv = n），
-  // 共享引用会让场景①的写入污染后续场景的「快照基线」（实测踩过：
-  // 场景②③④全拿到已被改写的 2,027，断言全假红）。
+  // ⚠ data 必须每场景深拷贝：今日场景下 applyLivePv 会写 SNAPS 末条
+  // （last.site_pv = n），共享引用会让后续场景拿到已被改写的快照基线。
   const dataClone = JSON.parse(JSON.stringify(data));
+  const shiftDays = (Date.parse(snapshotDate + 'T00:00:00Z')
+    - Date.parse(dataClone.snaps[dataClone.snaps.length - 1].date + 'T00:00:00Z')) / 86400000;
+  dataClone.snaps.forEach(function (s) {
+    s.date = new Date(Date.parse(s.date + 'T00:00:00Z')
+      + shiftDays * 86400000).toISOString().slice(0, 10);
+  });
+  class FixedDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [NOW])); }
+    static now() { return NOW; }
+  }
   const sandbox = {
     console,
     document: {
@@ -87,7 +103,7 @@ async function runScenario(name, { livePv, hasShared, delayData }) {
         ? new Promise(res => setTimeout(() => res(dataClone), 0))
         : Promise.resolve(dataClone)),
     }),
-    Date, Math, Number, String, JSON, Array, Object, parseInt, parseFloat,
+    Date: FixedDate, Math, Number, String, JSON, Array, Object, parseInt, parseFloat,
     isNaN, Set, Map, Infinity, NaN, Promise,
   };
   if (hasShared) {
@@ -100,13 +116,13 @@ async function runScenario(name, { livePv, hasShared, delayData }) {
   for (let i = 0; i < (delayData ? 30 : 6); i++) await Promise.resolve();
   await new Promise(res => setTimeout(res, 0));
   for (let i = 0; i < 10; i++) await Promise.resolve();
-  return byId;
+  return { byId, dataClone };
 }
 
 (async () => {
   // ---------- ① 实时值 > 快照值：三处同步更新 ----------
   const live = snapPv + 8;
-  const a = await runScenario('实时大于快照', { livePv: live, hasShared: true });
+  const { byId: a } = await runScenario('实时大于快照', { livePv: live, hasShared: true });
   const fmtLive = live.toLocaleString('en-US');
   if (a['kpi_pv_value']._text !== fmtLive) {
     errs.push(`KPI 值应为 ${fmtLive}，实得 "${a['kpi_pv_value']._text}"`);
@@ -153,10 +169,10 @@ async function runScenario(name, { livePv, hasShared, delayData }) {
               + '——静态卡未联动');
   }
 
-  // ---------- ② 实时值 ≤ 快照值：保留快照值，不回退 ----------
+  // ---------- ③ 实时值 ≤ 快照值：保留快照值，不回退 ----------
   const fmtSnap = snapPv.toLocaleString('en-US');
   for (const [label, v] of [['小于快照', snapPv - 1], ['等于快照', snapPv], ['null', null]]) {
-    const b = await runScenario(label, { livePv: v, hasShared: true });
+    const { byId: b } = await runScenario(label, { livePv: v, hasShared: true });
     if (b['kpi_pv_value']._text !== fmtSnap) {
       errs.push(`[${label}] KPI 应保留快照值 ${fmtSnap}，实得 "${b['kpi_pv_value']._text}"`);
     }
@@ -168,7 +184,7 @@ async function runScenario(name, { livePv, hasShared, delayData }) {
   }
 
   // ---------- ④ 无 LectureSitePv：不抛错，快照值照常渲染 ----------
-  const c = await runScenario('无共享层', { hasShared: false });
+  const { byId: c } = await runScenario('无共享层', { hasShared: false });
   const svgC = c['chart'].children.filter(x => x.tagName === 'svg').length;
   if (svgC !== 1) errs.push(`无 LectureSitePv 时渲染应不受影响，svg=${svgC}`);
   if (c['load-err'].hidden === false && c['load-err']._text) {
@@ -182,7 +198,7 @@ async function runScenario(name, { livePv, hasShared, delayData }) {
   // 2026-11-04 实测坑：取值先 resolve 时 SNAPS 还是空数组，早期实现
   // 直接 return，校正静默跳过（KPI 停在旧值，零报错）。现实现先缓存 _livePv、
   // 数据到达后补挂——本场景锁住该收口，防回潮。
-  const d = await runScenario('实时先到', { livePv: live, hasShared: true, delayData: true });
+  const { byId: d } = await runScenario('实时先到', { livePv: live, hasShared: true, delayData: true });
   if (d['kpi_pv_value']._text !== fmtLive) {
     errs.push(`[实时先到] KPI 应为 ${fmtLive}，实得 "${d['kpi_pv_value']._text}"`
               + '——竞态收口失效，校正被静默跳过');
@@ -190,12 +206,39 @@ async function runScenario(name, { livePv, hasShared, delayData }) {
   const svgD = d['chart'].children.filter(x => x.tagName === 'svg').length;
   if (svgD !== 1) errs.push(`[实时先到] 图表应渲染恰好 1 个 svg，实得 ${svgD}`);
 
-  console.log(`snapPv=${snapPv} livePv=${live} · 场景①②③④⑤`
+  // ---------- ⑥ 末条不是北京时间今天：只校正 KPI 实时总量 ----------
+  const { byId: baseline, dataClone: baselineData } = await runScenario(
+    '非今日基线', { hasShared: false, snapshotDate: STALE_DATE });
+  const { byId: stale, dataClone: staleData } = await runScenario(
+    '非今日实时值', { livePv: live, hasShared: true, snapshotDate: STALE_DATE });
+  if (stale['kpi_pv_value']._text !== fmtLive) {
+    errs.push(`[非今日] KPI 实时总量应为 ${fmtLive}，实得 "${stale['kpi_pv_value']._text}"`);
+  }
+  const staleDelta = `较最近快照（${STALE_DATE}）+${live - snapPv} · 实时`;
+  if (stale['kpi_pv_delta']._text !== staleDelta) {
+    errs.push(`[非今日] KPI 副文案应为「${staleDelta}」，实得 "${stale['kpi_pv_delta']._text}"`);
+  }
+  for (const id of ['kpi_recent7_value', 'kpi_perday_value']) {
+    if (stale[id]._text !== baseline[id]._text) {
+      errs.push(`[非今日] 静态 KPI ${id} 不应重算，实得 "${stale[id]._text}"`);
+    }
+  }
+  if (JSON.stringify(staleData.snaps) !== JSON.stringify(baselineData.snaps)) {
+    errs.push('[非今日] SNAPS 被改写，历史快照必须原样保留');
+  }
+  if (JSON.stringify(stale['chart']) !== JSON.stringify(baseline['chart'])) {
+    errs.push('[非今日] 历史图表被改写或重渲染成不同内容');
+  }
+  if (JSON.stringify(stale['tbody']) !== JSON.stringify(baseline['tbody'])) {
+    errs.push('[非今日] 明细表被改写，最新行应保留快照值');
+  }
+
+  console.log(`snapPv=${snapPv} livePv=${live} · 场景①②③④⑤⑥`
     + (errs.length ? '' : ' 全部通过'));
   if (errs.length) {
     console.log('[FAIL]');
     errs.forEach(e => console.log(' -', e));
     process.exit(1);
   }
-  console.log('[PASS] 趋势页同源校正：KPI/静态卡/今日点位/明细最新行同步，降级静默保留快照');
+  console.log('[PASS] 趋势页同源校正：今日联动更新，非今日仅更新 KPI 实时总量，降级静默保留快照');
 })();

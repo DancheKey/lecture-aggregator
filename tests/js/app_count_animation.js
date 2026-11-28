@@ -37,6 +37,7 @@ const vm = require('vm');
 const SITE = path.join(__dirname, '..', '..', 'site');
 const CORE = fs.readFileSync(path.join(SITE, 'app.core.js'), 'utf8');
 const ADMIN = fs.readFileSync(path.join(SITE, 'app.admin.js'), 'utf8');
+const STATS = fs.readFileSync(path.join(SITE, 'stats.js'), 'utf8');
 
 let failures = 0;
 function check(name, ok, detail) {
@@ -168,6 +169,49 @@ check(
   steps.every(d => d > 0 && d <= 100),
   '增量序列=' + steps.join(',')
 );
+
+console.log('\n[3] 统计页最终冲刺：动画进度时钟回拨不得产生负数或越界值');
+{
+  let now = 1000;
+  let nextId = 1;
+  const frames = new Map();
+  let options;
+  const sb = {
+    console, Object, Math, Set, Map, JSON, Date,
+    window: null,
+    document: { documentElement: { classList: { remove() {} } }, getElementById: () => null },
+    performance: { now: () => now },
+    localStorage: { getItem: () => null, setItem() {} },
+    fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }),
+    requestAnimationFrame: cb => { const id = nextId++; frames.set(id, cb); return id; },
+    cancelAnimationFrame: id => frames.delete(id),
+    Vue: { createApp: value => { options = value; return { mount() {} }; } },
+  };
+  sb.window = sb;
+  vm.createContext(sb);
+  vm.runInContext(STATS, sb, { filename: 'stats.js' });
+  const state = Object.assign(options.data(), options.methods, {
+    _finalized: true, _finalStart: 1000,
+    _fromL: 5, _toL: 100, _fromS: 10, _toS: 200,
+  });
+  state.startCountAnimation();
+  const first = [...frames.values()][0];
+  frames.clear();
+  now = 0;   // 比 finalStart 早 1 秒：复现只钳上限时的负进度
+  first(now);
+  check('时钟回拨时讲座数停留在起点', state.displayLecture === 5,
+    `实得 ${state.displayLecture}`);
+  check('时钟回拨时来源数停留在起点', state.displaySource === 10,
+    `实得 ${state.displaySource}`);
+  const second = [...frames.values()][0];
+  frames.clear();
+  now = 1300;
+  second(now);
+  check('时钟恢复后讲座数定格到真实值', state.displayLecture === 100 && state._countRAF === null,
+    `实得 ${state.displayLecture}`);
+  check('时钟恢复后来源数定格到真实值', state.displaySource === 200,
+    `实得 ${state.displaySource}`);
+}
 
 console.log('\n' + (failures === 0
   ? '全部通过'

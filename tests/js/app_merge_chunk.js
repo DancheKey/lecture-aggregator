@@ -77,7 +77,14 @@ function newState() {
     _ltFull: {},
     _ltPending: {},
     _ltLoaded: {},
+    _ltManifest: null,
+    _chunksManifest: null,
+    _generation: '',
+    _applyLectureData: M._applyLectureData,
+    _absorbAll: M._absorbAll,
     _absorbLongText: M._absorbLongText,
+    _absorbDetailRows: M._absorbDetailRows,
+    _detailFileIndex: M._detailFileIndex,
     _invalidateHay: M._invalidateHay,
     _mergeChunk: M._mergeChunk,
     _ltKey: M._ltKey,
@@ -179,54 +186,167 @@ const rec = (url, start, title, idx, extra) => Object.assign({
   ok(st4.all.length === 2, 'lectureIndex=0 与缺失应视为两条（键不得用 || 吞 0）');
 }
 
-// ---------- ⑤ 分片/桶 URL 必须按数据版本分桶（2026-10-12 混龄缓存事故）----------
+// ---------- ⑤ 内容寻址分片/桶 URL 与 generation 混龄防护 ----------
 // 事故：latest.json 是 no-store（恒新），分片却走 cache:'default' 命中 Pages 的
 // max-age=600 旧副本；_mergeChunk 的覆盖设计让**旧分片把新 latest 记录覆盖回旧版**，
 // 表现为「刚刷新有阿里云、加载完又没了」，且各设备因缓存龄不同表现不一。
-// 修法：分片与长文本桶的 fetch URL 必须带 ?v=<清单 updatedAt>，缓存按数据版本隔离。
-// 本节直接执行真实 _loadChunks / _loadDetailBucket，锁死 URL 形态。
+// 修法：分片与长文本桶文件名按内容哈希，URL 仍保留 ?v=<清单 updatedAt>；
+// latest/chunks/detail 的 generation 必须一致，旧清单不得覆盖新数据。
+// 本节直接执行真实 _loadChunks / _loadFullSingle / _ltManifestJson / _loadDetailBucket。
 (async () => {
-  // —— _loadChunks：清单 updatedAt 必须进分片 URL ——
   const VER = '2026-10-12T05:00:00+08:00';
+  const GEN = 'a'.repeat(64);
+  const OTHER_GEN = 'b'.repeat(64);
+  const CHUNK_FILE = 'lectures/chunk_0001.' + '1'.repeat(24) + '.json';
+  const DETAIL_FILE = 'lectures/detail/detail_00.' + '2'.repeat(24) + '.json';
+  const DETAIL_MANIFEST = 'lectures/detail/manifest.' + '3'.repeat(24) + '.json';
+
+  // —— _loadChunks：保存已接受清单，哈希文件名仍带 updatedAt 版本戳 ——
   const fetched = [];
+  const chunkManifest = {
+    updatedAt: VER, generation: GEN, total: 1, chunkSize: 100,
+    chunks: [CHUNK_FILE], detailManifest: DETAIL_MANIFEST,
+  };
   sandbox.fetch = async (url) => {
     fetched.push(String(url));
     if (String(url).includes('chunks.json')) {
-      return { ok: true, json: async () => ({ updatedAt: VER, chunks: ['lectures/chunk_0001.json'] }) };
+      return { ok: true, json: async () => chunkManifest };
     }
-    return { ok: true, json: async () => ({ data: [] }) };
+    return { ok: true, json: async () => ({ data: [rec('c1', '2026-01-01 10:00', 'C1', 1)] }) };
   };
   const stChunks = Object.assign(newState(), {
-    dataStage: 'loading', bumpCount: noop, _sleep: () => Promise.resolve(),
+    _generation: GEN, dataStage: 'loading', bumpCount: noop, _sleep: () => Promise.resolve(),
   });
   await M._loadChunks.call(stChunks);
-  const chunkUrls = fetched.filter(u => u.includes('chunk_0001'));
-  ok(chunkUrls.length === 1, `分片应被请求一次，实得 ${chunkUrls.length} 次：${JSON.stringify(fetched)}`);
+  const chunkUrls = fetched.filter(u => u.includes('chunk_0001.'));
+  ok(chunkUrls.length === 1, `哈希分片应被请求一次，实得 ${chunkUrls.length} 次：${JSON.stringify(fetched)}`);
   ok(chunkUrls[0].includes('?v=' + encodeURIComponent(VER)),
-     `分片 URL 必须带 ?v=<清单 updatedAt>（防旧副本覆盖新 latest），实得 ${chunkUrls[0]}`);
-  ok(stChunks.dataStage === 'full', '空数据分片应正常完成到 full');
+     `分片 URL 必须保留 ?v=<清单 updatedAt>，实得 ${chunkUrls[0]}`);
+  ok(stChunks._chunksManifest === chunkManifest, '_loadChunks 必须保存已接受的 chunks 清单');
+  ok(stChunks.all.length === 1 && stChunks.all[0].sourceUrl === 'c1', '同 generation 分片应正常合并');
+  ok(stChunks.dataStage === 'full', '哈希分片应正常完成到 full');
 
-  // —— _loadDetailBucket：清单 updatedAt 必须进桶 URL，清单本身 no-store ——
+  // —— latest 与 chunks generation 不同：不得请求/合并分片，改走整文件 ——
+  const mismatchFetched = [];
+  let fallbackCalls = 0;
+  sandbox.fetch = async (url) => {
+    mismatchFetched.push(String(url));
+    return { ok: true, json: async () => ({ updatedAt: VER, generation: OTHER_GEN, chunks: [CHUNK_FILE] }) };
+  };
+  const stMismatch = Object.assign(newState(), {
+    _generation: GEN, all: [rec('latest', '2026-01-01 09:00', 'Latest', 1)],
+    dataStage: 'partial', bumpCount: noop, _sleep: () => Promise.resolve(),
+    _loadFullSingle: () => { fallbackCalls++; return Promise.resolve(); },
+  });
+  await M._loadChunks.call(stMismatch);
+  ok(fallbackCalls === 1, 'latest/chunks generation 不同必须回退 _loadFullSingle');
+  ok(!mismatchFetched.some(u => u.includes('chunk_0001.')), 'generation 不同时不得请求任何分片');
+  ok(stMismatch.all.length === 1 && stMismatch.all[0].sourceUrl === 'latest',
+     'generation 不同时不得合并旧分片');
+
+  // —— _applyLectureData 记录 generation；_loadFullSingle 也拒绝混龄响应 ——
+  const stApply = newState();
+  stApply._applyLectureData({ data: [], generation: GEN });
+  ok(stApply._generation === GEN, '_applyLectureData 必须保存 resp.generation');
+  const fullFetched = [];
+  sandbox.fetch = async (url) => {
+    fullFetched.push(String(url));
+    return { ok: true, json: async () => ({
+      generation: OTHER_GEN, data: [rec('old', '2026-01-01 08:00', 'Old', 1)],
+    }) };
+  };
+  const stFull = Object.assign(newState(), {
+    _generation: GEN, all: [rec('latest', '2026-01-01 09:00', 'Latest', 1)],
+    dataStage: 'partial', loading: true,
+  });
+  await M._loadFullSingle.call(stFull);
+  ok(fullFetched.length === 1, '整文件降级应仍请求 lectures.json');
+  ok(stFull.all.length === 1 && stFull.all[0].sourceUrl === 'latest',
+     '_loadFullSingle 不得用不同 generation 的整文件覆盖 latest');
+  ok(stFull.dataStage === 'partial-error', '拒绝混龄整文件后应保留可重试错误态');
+
+  // —— detail：优先 chunks 清单链接的哈希 manifest，桶名按哈希/旧名均可解析 ——
   const fetched2 = [];
   let manifestCacheOpts = null;
   sandbox.fetch = async (url, opts) => {
     fetched2.push(String(url));
-    if (String(url).includes('manifest.json')) {
+    if (String(url).includes(DETAIL_MANIFEST)) {
       manifestCacheOpts = (opts && opts.cache) || '';
-      return { ok: true, json: async () => ({ updatedAt: VER, files: ['lectures/detail/detail_00.json'] }) };
+      return { ok: true, json: async () => ({
+        updatedAt: VER, generation: GEN, files: [DETAIL_FILE],
+      }) };
     }
-    return { ok: true, json: async () => ({ data: [] }) };
+    if (String(url).includes(DETAIL_FILE)) {
+      return { ok: true, json: async () => ({ data: [
+        { key: 'https://x/detail#', speakerBio: '新简介', abstract: '新摘要' },
+      ] }) };
+    }
+    return { ok: false, status: 404 };
   };
   const stBucket = Object.assign(newState(), {
+    _generation: GEN,
+    _chunksManifest: { generation: GEN, detailManifest: DETAIL_MANIFEST },
     _ltManifest: null, _absorbDetailRows: M._absorbDetailRows,
     _ltManifestJson: M._ltManifestJson, _loadDetailBucket: M._loadDetailBucket,
   });
   await M._loadDetailBucket.call(stBucket, 0);
-  const bucketUrls = fetched2.filter(u => u.includes('detail_00'));
+  const bucketUrls = fetched2.filter(u => u.includes('detail_00.'));
+  ok(fetched2.some(u => u.includes(DETAIL_MANIFEST + '?t=')),
+     `detail 必须优先请求 chunks 链接的 ${DETAIL_MANIFEST}，实得 ${JSON.stringify(fetched2)}`);
+  ok(!fetched2.some(u => u.includes('lectures/detail/manifest.json?t=')),
+     '有 detailManifest 链接时不应再请求固定 detail/manifest.json');
   ok(bucketUrls.length === 1 && bucketUrls[0].includes('?v=' + encodeURIComponent(VER)),
-     `长文本桶 URL 必须带 ?v=<清单 updatedAt>，实得 ${JSON.stringify(bucketUrls)}`);
+     `哈希长文本桶 URL 必须保留 ?v=<清单 updatedAt>，实得 ${JSON.stringify(fetched2)}`);
   ok(manifestCacheOpts === 'no-store',
-     `detail 清单必须 no-store（与 chunks.json 同口径），实得 cache='${manifestCacheOpts}'`);
+     `detail 清单必须 no-store，实得 cache='${manifestCacheOpts}'`);
+  ok(stBucket._longText['https://x/detail#'] &&
+     stBucket._longText['https://x/detail#'].speakerBio === '新简介',
+     '同 generation 的哈希 detail 桶应正常吸收');
+
+  // —— detail generation 不同：拒绝缓存清单与桶数据，不能覆盖新长文本 ——
+  const mismatchDetailFetched = [];
+  sandbox.fetch = async (url) => {
+    mismatchDetailFetched.push(String(url));
+    if (String(url).includes('manifest')) {
+      return { ok: true, json: async () => ({
+        updatedAt: VER, generation: OTHER_GEN, files: [DETAIL_FILE],
+      }) };
+    }
+    return { ok: true, json: async () => ({ data: [
+      { key: 'https://x/detail#', speakerBio: '旧简介', abstract: '旧摘要' },
+    ] }) };
+  };
+  const stDetailMismatch = Object.assign(newState(), {
+    _generation: GEN,
+    _chunksManifest: { generation: GEN, detailManifest: DETAIL_MANIFEST },
+    _ltManifest: null,
+    _longText: { 'https://x/detail#': { speakerBio: '新简介', abstract: '新摘要' } },
+    _ltManifestJson: M._ltManifestJson, _loadDetailBucket: M._loadDetailBucket,
+  });
+  await M._loadDetailBucket.call(stDetailMismatch, 0);
+  ok(!mismatchDetailFetched.some(u => u.includes(DETAIL_FILE)),
+     'detail generation 不同时不得请求旧桶');
+  ok(stDetailMismatch._ltManifest === null, '不同 generation 的 detail 清单不得进缓存');
+  ok(stDetailMismatch._longText['https://x/detail#'].speakerBio === '新简介',
+     '不同 generation 的旧长文本不得覆盖新值');
+
+  // —— 旧 chunks 清单无 detailManifest：兼容回退固定清单与旧桶名 ——
+  const legacyFetched = [];
+  sandbox.fetch = async (url) => {
+    legacyFetched.push(String(url));
+    return { ok: true, json: async () => ({
+      updatedAt: VER, generation: GEN, files: ['lectures/detail/detail_00.json'],
+    }) };
+  };
+  const stLegacy = Object.assign(newState(), {
+    _generation: GEN, _chunksManifest: { generation: GEN }, _ltManifest: null,
+    _ltManifestJson: M._ltManifestJson, _loadDetailBucket: M._loadDetailBucket,
+  });
+  await M._loadDetailBucket.call(stLegacy, 0);
+  ok(legacyFetched.some(u => u.includes('lectures/detail/manifest.json?t=')),
+     '旧 chunks 清单必须回退固定 detail/manifest.json');
+  ok(legacyFetched.some(u => u.includes('lectures/detail/detail_00.json?v=')),
+     '旧式 detail_00.json 文件名必须继续可用');
   sandbox.fetch = () => Promise.resolve({ ok: false, json: () => ({}) });  // 还原
 })().then(report).catch(e => { errs.push('⑤ 执行异常: ' + e); report(); });
 
@@ -237,5 +357,5 @@ function report() {
     process.exit(1);
   }
   console.log('[PASS] _mergeChunk：重叠覆盖不追加、真实规模 500 条正确、长文本抽离、'
-    + '键四要素与 lectureIndex=0 均正确、分片/桶 URL 版本戳防混龄缓存');
+    + '键四要素与 lectureIndex=0 均正确、哈希分片/桶版本戳与 generation 混龄防护');
 }

@@ -56,6 +56,7 @@ GROUPS = [
     # 云端计数（Supabase）：app.cloud.js / footer-counter.js / SQL 生成器 / 快照脚本
     {'name': 'cloud', 'pats': ['site/app.cloud.js', 'site/footer-counter.js',
                                'site/supabase-config.json', 'scripts/gen_supabase_sql.py',
+                               'scripts/sync_supabase_whitelist.py',
                                'scripts/gen_supabase_patch.py', 'scripts/fetch_visits_snapshot.py',
                                'supabase-migration.sql', 'supabase-patch-current.sql',
                                'supabase-verify-current.sql'],

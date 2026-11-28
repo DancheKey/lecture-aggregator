@@ -5,27 +5,33 @@
 -- 幂等：结构语句均可重复执行；白名单按当前 site/lectures.json upsert，
 -- 不覆盖 lecture_stats 中已经积累的真实计数。
 --
--- 2026-11-26 版：
---   ① 新增 lecture_allowed_keys：只有当前讲座键可写统计；__site__ 仅允许 visit。
+-- 2026-11-28 版：
+--   ① lecture_allowed_keys：只有当前讲座键可写统计；__site__ 仅允许 visit。
 --   ② 四个 RPC 写入前校验白名单动作，并拒绝 p_delta=null。
 --   ③ 所有 RPC 使用 SECURITY DEFINER + 固定 search_path，撤销 PUBLIC 默认执行权。
 --   ④ lecture_stats / lecture_allowed_keys 显式开启 RLS；匿名只有统计表 SELECT，
---      没有两表的 INSERT/UPDATE/DELETE 权限；白名单只交给受信任 service_role 同步。
---   ⑤ 保留既有单次增量钳制、取消点赞 -1、累计上限与正常前端接口。
+--      没有两表的 INSERT/UPDATE/DELETE 权限。
+--   ⑤ 新增 sync_whitelist：日常流水线用共享令牌同步，数据库只存令牌哈希；
+--      只 upsert、不删除，限制输入与总行数；轮换时短暂接受上一条哈希。
+--   ⑥ 保留既有单次增量钳制、取消点赞 -1、累计上限与正常前端接口。
 --
 -- 上线前后核查：运行仓库根 supabase-verify-current.sql（只读，不调用增量 RPC）。
--- 后续新增讲座：运行 python scripts/gen_supabase_sql.py --whitelist-only，
--- 把它输出的 SQL 粘贴到 SQL Editor 执行；自动同步需另行配置 service_role secret。
+-- 上线后：把同步令牌加入 GitHub Secret SUPABASE_WHITELIST_SYNC_TOKEN，
+-- 每日生成前端数据后由 .github/workflows/daily.yml 自动同步，无需手工加白名单。
+-- 令牌轮换：运行 python scripts/gen_supabase_sql.py --rotate-sync-token，
+-- 按输出顺序更新 Secret 与数据库哈希，最后关闭 previous_token_hash 接受窗口。
 --
 -- 边界：本补丁解决「任意 URL 建行」和「null 增量」。同一合法讲座键的匿名重复投票、
 -- 设备级幂等与时间窗限流仍是后续独立批次，不因本补丁而视为已经解决。
 -- ============================================================
 
 -- ============================================================
--- 讲座聚合站 · Supabase 迁移 SQL（2026-11-26 修订，可重复执行）
+-- 讲座聚合站 · Supabase 迁移 SQL（2026-11-28 修订，可重复执行）
 -- 执行位置：Supabase 控制台 → SQL Editor → 粘贴整段运行
 -- 前置：已建表 public.lecture_stats(url text PK, visits int8, likes int8, wants int8)
 -- 安全边界：anon key 公开，所有写操作只走白名单 RPC；表级写权限显式关闭。
+-- 白名单由 GitHub Actions 通过 sync_whitelist(jsonb) 自动同步；
+-- 同步令牌只存哈希，函数只 upsert、不删除，并限制白名单总行数。
 -- ============================================================
 
 -- ① 列兜底：默认值 0 + not null；存量 null 先归零，避免插入新键时 23502。
@@ -70,6 +76,20 @@ create table if not exists public.lecture_allowed_keys (
 alter table public.lecture_allowed_keys enable row level security;
 revoke all on table public.lecture_allowed_keys from public, anon, authenticated;
 grant all on table public.lecture_allowed_keys to service_role;
+
+-- 同步令牌只保存 SHA-256 哈希；previous_token_hash 用于无缝轮换。
+create table if not exists public.lecture_whitelist_sync (
+  id boolean primary key default true check (id),
+  token_hash text not null check (token_hash ~ '^[0-9a-f]{64}$'),
+  previous_token_hash text check (previous_token_hash ~ '^[0-9a-f]{64}$'),
+  updated_at timestamptz not null default now()
+);
+alter table public.lecture_whitelist_sync enable row level security;
+revoke all on table public.lecture_whitelist_sync from public, anon, authenticated;
+grant all on table public.lecture_whitelist_sync to service_role;
+insert into public.lecture_whitelist_sync (id, token_hash, previous_token_hash)
+values (true, 'de821c43aa7742513d36008090e2f997b7225bb31659a200cac770dd835713a0', null)
+on conflict (id) do nothing;
 -- 当前前端讲座键白名单（由 site/lectures.json 确定性生成，按 URL 排序）。
 insert into public.lecture_allowed_keys (url, allowed_actions) values
   ('__site__', array['visit']::text[]),
@@ -4036,6 +4056,102 @@ as $$
 $$;
 revoke all on function public.lecture_stat_key_allowed(text, text) from public, anon, authenticated;
 
+-- GitHub Actions 专用：只 upsert 当前讲座键，不删除历史键。
+-- 令牌通过请求头传入，数据库只保存哈希；轮换期间同时接受上一条哈希。
+create or replace function public.sync_whitelist(p_keys jsonb)
+returns jsonb language plpgsql security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_header jsonb;
+  v_token text;
+  v_hash text;
+  v_state public.lecture_whitelist_sync%rowtype;
+  v_received bigint;
+  v_unique bigint;
+  v_existing bigint;
+  v_new bigint;
+  v_upserted bigint;
+  v_total bigint;
+begin
+  if p_keys is null or jsonb_typeof(p_keys) <> 'array' then
+    raise exception 'p_keys must be a jsonb array' using errcode = '22023';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(p_keys) e
+    where jsonb_typeof(e.value) <> 'string'
+  ) then
+    raise exception 'p_keys must contain only strings' using errcode = '22023';
+  end if;
+
+  select count(*), count(distinct value)
+    into v_received, v_unique
+  from jsonb_array_elements_text(p_keys);
+  if v_received < 1 or v_received > 10000 then
+    raise exception 'p_keys count must be 1..10000' using errcode = '22023';
+  end if;
+  if v_received <> v_unique then
+    raise exception 'p_keys must not contain duplicates' using errcode = '22023';
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements_text(p_keys) where value = '__site__'
+  ) then
+    raise exception 'p_keys must contain __site__' using errcode = '22023';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements_text(p_keys)
+    where value <> '__site__'
+      and (length(value) > 300 or value !~* '^https?://[^/?#[:space:]]+')
+  ) then
+    raise exception 'p_keys contains an invalid lecture key' using errcode = '22023';
+  end if;
+
+  v_header := nullif(current_setting('request.headers', true), '')::jsonb;
+  v_token := nullif(v_header ->> 'x-sync-token', '');
+  if v_token is null or length(v_token) < 32 then
+    raise exception 'whitelist sync is unauthorized' using errcode = '42501';
+  end if;
+  v_hash := encode(sha256(convert_to(v_token, 'UTF8')), 'hex');
+  select * into v_state from public.lecture_whitelist_sync where id = true;
+  if not found
+     or (v_hash <> v_state.token_hash
+         and v_hash is distinct from v_state.previous_token_hash) then
+    raise exception 'whitelist sync is unauthorized' using errcode = '42501';
+  end if;
+
+  -- 串行化持令牌的同步调用，避免并发都在锁前通过行数检查后共同插入。
+  lock table public.lecture_allowed_keys in share row exclusive mode;
+
+  select count(*) into v_existing from public.lecture_allowed_keys;
+  select count(*) into v_new
+  from (
+    select distinct value from jsonb_array_elements_text(p_keys)
+  ) q
+  left join public.lecture_allowed_keys k on k.url = q.value
+  where k.url is null;
+  if v_existing + v_new > 10000 then
+    raise exception 'whitelist row cap exceeded' using errcode = '22023';
+  end if;
+
+  insert into public.lecture_allowed_keys (url, allowed_actions)
+  select value,
+         case when value = '__site__'
+              then array['visit']::text[]
+              else array['visit','like','want','cal']::text[]
+         end
+  from jsonb_array_elements_text(p_keys)
+  on conflict (url) do update set allowed_actions = excluded.allowed_actions;
+  get diagnostics v_upserted = row_count;
+
+  select count(*) into v_total from public.lecture_allowed_keys;
+  return jsonb_build_object(
+    'received', v_received,
+    'upserted', v_upserted,
+    'total', v_total
+  );
+end $$;
+
 -- ⑤ 增量 RPC：所有关系名显式指定 public，搜索路径固定；null 增量直接拒绝。
 --    like/want 保留 -1 取消语义；visit/cal 为单向动作，负增量仍钳成 0。
 create or replace function public.increment_like(p_url text, p_delta int)
@@ -4159,7 +4275,9 @@ grant execute on function public.increment_want(text, int) to anon, authenticate
 grant execute on function public.increment_visit(text, int) to anon, authenticated, service_role;
 grant execute on function public.increment_cal(text, int) to anon, authenticated, service_role;
 
+revoke all on function public.sync_whitelist(jsonb) from public;
+grant execute on function public.sync_whitelist(jsonb) to anon, service_role;
+
 -- ⑦ 存量导入默认关闭；启用后只补本地历史计数，不覆盖云端真实增量。
 --    运行：python scripts/gen_supabase_sql.py --with-existing > supabase-migration.sql
---    新讲座发布后同步白名单：python scripts/gen_supabase_sql.py --whitelist-only
---    生成的 SQL 在 SQL Editor 执行；自动同步需另行配置受信任的 service_role secret。
+--    日常白名单由 GitHub Actions 调 sync_whitelist 自动同步；SQL Editor 手动同步仅作兜底。

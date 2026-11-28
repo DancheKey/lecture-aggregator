@@ -139,8 +139,9 @@ const computed = vm.runInContext('APP_COMPUTED', ctx);
 // （2026-11-05：评审 #35 —— _isSaveDataOrSlowNetwork（saveData / 2G·3G 时跳过
 //   空闲全量预取 1.6MB，app.data.js），147 → 148）
 // （2026-11-26：#20 无障碍 —— closeMenu / reportFocusables / onReportKeydown，148 → 151）
+// （2026-11-28：内容寻址长文本清单 —— _detailFileIndex 兼容哈希与旧桶名，151 → 152）
 const nMethods = Object.keys(methods).length;
-if (nMethods !== 151) errs.push(`方法数 ${nMethods} != 151`);
+if (nMethods !== 152) errs.push(`方法数 ${nMethods} != 152`);
 if (typeof state !== 'object' || !('all' in state)) errs.push('APP_STATE 未产出正确状态对象');
 if (!computed || !computed.filtered) errs.push('APP_COMPUTED 缺少 filtered');
 if (!mounted) errs.push('app.mount 未被调用');

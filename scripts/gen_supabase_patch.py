@@ -30,17 +30,21 @@ HEADER = """-- ============================================================
 -- 幂等：结构语句均可重复执行；白名单按当前 site/lectures.json upsert，
 -- 不覆盖 lecture_stats 中已经积累的真实计数。
 --
--- 2026-11-26 版：
---   ① 新增 lecture_allowed_keys：只有当前讲座键可写统计；__site__ 仅允许 visit。
+-- 2026-11-28 版：
+--   ① lecture_allowed_keys：只有当前讲座键可写统计；__site__ 仅允许 visit。
 --   ② 四个 RPC 写入前校验白名单动作，并拒绝 p_delta=null。
 --   ③ 所有 RPC 使用 SECURITY DEFINER + 固定 search_path，撤销 PUBLIC 默认执行权。
 --   ④ lecture_stats / lecture_allowed_keys 显式开启 RLS；匿名只有统计表 SELECT，
---      没有两表的 INSERT/UPDATE/DELETE 权限；白名单只交给受信任 service_role 同步。
---   ⑤ 保留既有单次增量钳制、取消点赞 -1、累计上限与正常前端接口。
+--      没有两表的 INSERT/UPDATE/DELETE 权限。
+--   ⑤ 新增 sync_whitelist：日常流水线用共享令牌同步，数据库只存令牌哈希；
+--      只 upsert、不删除，限制输入与总行数；轮换时短暂接受上一条哈希。
+--   ⑥ 保留既有单次增量钳制、取消点赞 -1、累计上限与正常前端接口。
 --
 -- 上线前后核查：运行仓库根 supabase-verify-current.sql（只读，不调用增量 RPC）。
--- 后续新增讲座：运行 python scripts/gen_supabase_sql.py --whitelist-only，
--- 把它输出的 SQL 粘贴到 SQL Editor 执行；自动同步需另行配置 service_role secret。
+-- 上线后：把同步令牌加入 GitHub Secret SUPABASE_WHITELIST_SYNC_TOKEN，
+-- 每日生成前端数据后由 .github/workflows/daily.yml 自动同步，无需手工加白名单。
+-- 令牌轮换：运行 python scripts/gen_supabase_sql.py --rotate-sync-token，
+-- 按输出顺序更新 Secret 与数据库哈希，最后关闭 previous_token_hash 接受窗口。
 --
 -- 边界：本补丁解决「任意 URL 建行」和「null 增量」。同一合法讲座键的匿名重复投票、
 -- 设备级幂等与时间窗限流仍是后续独立批次，不因本补丁而视为已经解决。

@@ -366,7 +366,7 @@ createApp({
           this._countRAF = requestAnimationFrame(tick);
         } else {
           // 数据到达后快速（300ms）滚到真实值，营造「最后冲刺」感
-          const dt = Math.min((now - this._finalStart) / 300, 1);
+          const dt = Math.max(0, Math.min((now - this._finalStart) / 300, 1));
           const e = 1 - Math.pow(1 - dt, 3);
           this.displayLecture = Math.round(this._fromL + e * (this._toL - this._fromL));
           this.displaySource = Math.round(this._fromS + e * (this._toS - this._fromS));

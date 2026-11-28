@@ -14,12 +14,16 @@
 
 运行：python tests/test_frontend_consistency.py
 """
+import hashlib
 import importlib.util
 import json
 import os
 import re
 import sys
+import tempfile
+import time
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(ROOT, 'data', 'lectures.json')
@@ -316,6 +320,246 @@ class ConsistencyTest(unittest.TestCase):
         self.assertTrue(os.path.exists(ltkey_js),
                         '缺少 tests/js/app_ltkey_consistency.js —— '
                         '_ltKey 与 lt_key 的跨语言一致性将无人守护')
+
+
+class ChunkVersioningTest(unittest.TestCase):
+    """内容寻址分片、generation 混龄防护与 48 小时保留期回归。"""
+
+    UPDATED = '2026-11-28T10:00:00+08:00'
+
+    @staticmethod
+    def canonical(value):
+        return json.dumps(value, ensure_ascii=False, sort_keys=True,
+                          separators=(',', ':')).encode('utf-8')
+
+    @classmethod
+    def digest(cls, value):
+        return hashlib.sha256(cls.canonical(value)).hexdigest()
+
+    @staticmethod
+    def read_json(path):
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.site_root = tmp.name
+        self.chunk_dir = os.path.join(tmp.name, 'lectures')
+        patcher = mock.patch.object(gen, 'SITE_DIR', self.chunk_dir)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def write_pair(self, data=None, buckets=None, updated_at=None):
+        data = data if data is not None else [
+            {'sourceUrl': 'https://x/1', 'title': '一'},
+            {'sourceUrl': 'https://x/2', 'title': '二'},
+        ]
+        buckets = buckets if buckets is not None else [
+            [], [{'key': 'https://x/1#', 'speakerBio': '简介', 'abstract': '摘要'}], [],
+        ]
+        updated_at = updated_at or self.UPDATED
+        generation = gen.compute_generation(data, buckets)
+        detail = gen.write_detail_chunks(buckets, updated_at, generation)
+        chunks = gen.write_chunks(data, updated_at, generation, detail)
+        return data, buckets, generation, detail, chunks
+
+    def test_generation_deterministic_and_covers_full_data_and_detail(self):
+        data = [{'sourceUrl': 'u', 'title': '标题'}]
+        buckets = [[], [{'key': 'u#', 'abstract': '摘要'}]]
+        first = gen.compute_generation(data, buckets)
+        self.assertRegex(first, r'^[0-9a-f]{64}$')
+        self.assertEqual(first, gen.compute_generation(
+            [{'title': '标题', 'sourceUrl': 'u'}], buckets))
+        self.assertNotEqual(first, gen.compute_generation(
+            [{'sourceUrl': 'u', 'title': '变更'}], buckets))
+        self.assertNotEqual(first, gen.compute_generation(
+            data, [[], [{'key': 'u#', 'abstract': '变更'}]]))
+
+    def test_content_addressed_payloads_versions_and_manifest_link(self):
+        data = [{'sourceUrl': f'https://x/{i}', 'title': f'讲座{i}'}
+                for i in range(gen.CHUNK_SIZE + 1)]
+        buckets = [[], [{'key': 'https://x/0#', 'speakerBio': '简介', 'abstract': ''}]]
+        _, _, generation, detail, chunks = self.write_pair(data, buckets)
+
+        self.assertEqual(detail['generation'], generation)
+        self.assertEqual(detail['updatedAt'], self.UPDATED)
+        self.assertEqual(detail['buckets'], gen.DETAIL_BUCKETS)
+        self.assertEqual(len(detail['files']), 1)
+        detail_file = detail['files'][0]
+        self.assertRegex(detail_file, r'^lectures/detail/detail_01\.[0-9a-f]{24}\.json$')
+        detail_payload = self.read_json(os.path.join(self.site_root, detail_file))
+        self.assertEqual(set(detail_payload), {'data'})
+        self.assertEqual(detail_payload['data'], buckets[1])
+        self.assertEqual(os.path.basename(detail_file).split('.')[1],
+                         self.digest(detail_payload)[:24])
+        self.assertEqual(detail['detailVersion'], self.digest(detail['files']))
+
+        detail_hash = self.digest(detail)[:24]
+        detail_manifest_rel = f'lectures/detail/manifest.{detail_hash}.json'
+        detail_manifest_path = os.path.join(self.site_root, detail_manifest_rel)
+        self.assertTrue(os.path.isfile(detail_manifest_path))
+        self.assertEqual(self.read_json(detail_manifest_path), detail)
+        self.assertEqual(self.read_json(os.path.join(self.chunk_dir, 'detail', 'manifest.json')),
+                         detail)
+
+        self.assertEqual(chunks['generation'], generation)
+        self.assertEqual(chunks['total'], len(data))
+        self.assertEqual(chunks['chunkSize'], gen.CHUNK_SIZE)
+        self.assertEqual(len(chunks['chunks']), 2)
+        self.assertEqual(chunks['chunksVersion'], self.digest(chunks['chunks']))
+        self.assertEqual(chunks['detailVersion'], detail['detailVersion'])
+        self.assertEqual(chunks['detailManifest'], detail_manifest_rel)
+        self.assertTrue(os.path.isfile(os.path.join(self.site_root, chunks['detailManifest'])))
+        self.assertEqual(self.read_json(os.path.join(self.chunk_dir, 'chunks.json')), chunks)
+        for i, rel in enumerate(chunks['chunks'], 1):
+            self.assertRegex(rel, rf'^lectures/chunk_{i:04d}\.[0-9a-f]{{24}}\.json$')
+            payload = self.read_json(os.path.join(self.site_root, rel))
+            self.assertEqual(set(payload), {'data'})
+            self.assertEqual(payload['data'], data[(i - 1) * gen.CHUNK_SIZE:i * gen.CHUNK_SIZE])
+            self.assertEqual(os.path.basename(rel).split('.')[1], self.digest(payload)[:24])
+
+    def test_unchanged_payloads_keep_names_when_updated_at_changes(self):
+        _, _, generation1, _, chunks1 = self.write_pair()
+        _, _, generation2, _, chunks2 = self.write_pair(
+            updated_at='2026-11-28T11:00:00+08:00')
+        self.assertEqual(generation1, generation2)
+        self.assertEqual(chunks1['chunks'], chunks2['chunks'])
+        for rel in chunks1['chunks']:
+            self.assertTrue(os.path.isfile(os.path.join(self.site_root, rel)))
+
+    def test_chunks_manifest_published_after_every_referenced_file_exists(self):
+        _, _, generation = self.compute_pair_inputs()
+        detail = gen.write_detail_chunks([[], [{'key': 'u#', 'abstract': '摘要'}]],
+                                         self.UPDATED, generation)
+        real_write = gen.atomic_write_json
+        writes = []
+
+        def checked_write(path, value):
+            if os.path.basename(path) == 'chunks.json':
+                for rel in value['chunks'] + [value['detailManifest']]:
+                    self.assertTrue(os.path.isfile(os.path.join(self.site_root, rel)),
+                                    f'chunks.json 发布时引用文件尚不存在：{rel}')
+            writes.append(os.path.basename(path))
+            return real_write(path, value)
+
+        with mock.patch.object(gen, 'atomic_write_json', side_effect=checked_write):
+            gen.write_chunks([{'sourceUrl': 'u'}], self.UPDATED, generation, detail)
+        self.assertEqual(writes[-1], 'chunks.json')
+
+    @staticmethod
+    def compute_pair_inputs():
+        data = [{'sourceUrl': 'u', 'title': '标题'}]
+        buckets = [[], [{'key': 'u#', 'abstract': '摘要'}]]
+        return data, buckets, hashlib.sha256(json.dumps(
+            {'full_data': data, 'detail_buckets': buckets}, ensure_ascii=False,
+            sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
+
+    def test_prunes_only_old_matching_files_and_keeps_fresh_and_fixed(self):
+        now = time.time()
+        old = now - 49 * 3600
+        recent = now - 47 * 3600
+        old_files = [
+            'lectures/chunk_9999.' + 'a' * 24 + '.json',
+            'lectures/chunk_9998.json',
+            'lectures/detail/detail_99.' + 'b' * 24 + '.json',
+            'lectures/detail/detail_98.json',
+            'lectures/detail/manifest.' + 'c' * 24 + '.json',
+        ]
+        fresh_files = [
+            'lectures/chunk_9997.' + 'd' * 24 + '.json',
+            'lectures/detail/detail_97.' + 'e' * 24 + '.json',
+            'lectures/detail/manifest.' + 'f' * 24 + '.json',
+        ]
+        fixed_and_other = [
+            'lectures/latest.json', 'lectures/stats.json', 'lectures/chunks.json',
+            'lectures/detail/manifest.json', 'lectures/notes.json',
+            'lectures/chunk_not-a-version.json',
+        ]
+        for rel in old_files + fixed_and_other:
+            path = os.path.join(self.site_root, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                f.write('{}')
+            os.utime(path, (old, old))
+        for rel in fresh_files:
+            path = os.path.join(self.site_root, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                f.write('{}')
+            os.utime(path, (recent, recent))
+
+        self.write_pair()
+        for rel in old_files:
+            self.assertFalse(os.path.exists(os.path.join(self.site_root, rel)), rel)
+        for rel in fresh_files + fixed_and_other:
+            self.assertTrue(os.path.isfile(os.path.join(self.site_root, rel)), rel)
+
+    def test_prune_uses_git_birth_time_when_checkout_mtime_is_fresh(self):
+        fname = 'chunk_9996.' + 'a' * 24 + '.json'
+        path = os.path.join(self.chunk_dir, fname)
+        os.makedirs(self.chunk_dir, exist_ok=True)
+        with open(path, 'w', encoding='utf-8', newline='\n') as f:
+            f.write('{}')
+        rel = os.path.relpath(path, self.site_root).replace(os.sep, '/')
+        old = int(time.time() - 49 * 3600)
+        output = f'{old}\n{rel}\n'
+        with mock.patch.object(gen, 'ROOT', self.site_root), \
+                mock.patch.object(gen.subprocess, 'check_output', return_value=output):
+            removed = gen.prune_old_versioned_files(
+                self.chunk_dir, gen.re.compile(r'chunk_\d+\.[0-9a-f]{24}\.json'))
+        self.assertEqual(removed, 1)
+        self.assertFalse(os.path.exists(path), 'CI 新检出的旧 tracked 文件也必须清理')
+
+    def test_atomic_temp_uses_pid_and_is_cleaned_on_failure(self):
+        target = os.path.join(self.chunk_dir, 'atomic.json')
+        os.makedirs(self.chunk_dir, exist_ok=True)
+        with mock.patch.object(gen.os, 'replace', side_effect=OSError('replace failed')):
+            with self.assertRaises(OSError):
+                gen.atomic_write_text(target, '{}')
+        self.assertFalse(os.path.exists(target + '.' + str(os.getpid()) + '.tmp'))
+        self.assertFalse(os.path.exists(target + '.tmp'))
+
+    def test_main_tags_every_primary_artifact_and_writes_detail_before_chunks(self):
+        data = [{'sourceUrl': 'https://x/1', 'title': '标题',
+                 'lectureStart': '2026-11-28 10:00:00', 'abstract': '摘要'}]
+        full_path = os.path.join(self.site_root, 'lectures.json')
+        calls = []
+        real_detail = gen.write_detail_chunks
+        real_chunks = gen.write_chunks
+
+        def detail_writer(*args, **kwargs):
+            calls.append('detail')
+            return real_detail(*args, **kwargs)
+
+        def chunk_writer(*args, **kwargs):
+            calls.append('chunks')
+            return real_chunks(*args, **kwargs)
+
+        with mock.patch.multiple(
+                gen,
+                SITE_LECTURES_PATH=full_path,
+                load_lectures=mock.Mock(return_value=(data, self.UPDATED)),
+                load_excluded=mock.Mock(return_value=set()),
+                write_visits_snapshot=mock.Mock(),
+                write_sitemap=mock.Mock(),
+                write_feeds=mock.Mock(),
+                stamp_script_version=mock.Mock(),
+                write_detail_chunks=detail_writer,
+                write_chunks=chunk_writer):
+            gen.main()
+
+        self.assertEqual(calls, ['detail', 'chunks'])
+        artifacts = [
+            self.read_json(full_path),
+            self.read_json(os.path.join(self.chunk_dir, 'latest.json')),
+            self.read_json(os.path.join(self.chunk_dir, 'stats.json')),
+            self.read_json(os.path.join(self.chunk_dir, 'chunks.json')),
+            self.read_json(os.path.join(self.chunk_dir, 'detail', 'manifest.json')),
+        ]
+        generations = {item['generation'] for item in artifacts}
+        self.assertEqual(len(generations), 1)
+        self.assertRegex(generations.pop(), r'^[0-9a-f]{64}$')
 
 
 class TestGeneratedArtifactsCovered(unittest.TestCase):

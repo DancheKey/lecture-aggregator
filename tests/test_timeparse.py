@@ -279,6 +279,34 @@ class TestMalformedDayRecovery(unittest.TestCase):
         self.assertEqual(r['end'].strftime('%Y-%m-%d %H:%M'), '2026-11-14 20:30')
 
 
+class TestInvalidDateCandidateFallback(unittest.TestCase):
+    """首个日期候选非法时，继续查找后续合法日期，而非丢弃整段文本。"""
+
+    def test_chinese_full_date_skips_invalid_candidate(self):
+        r = parse_cn_time('2026年13月40日 会议 2026年11月28日 19:30', 2026)
+        self.assertIsNotNone(r)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d %H:%M'), '2026-11-28 19:30')
+        self.assertTrue(r['from_full'])
+
+    def test_monthday_skips_invalid_candidate(self):
+        r = parse_cn_time('11月31日 会议 11月28日 19:30', 2026)
+        self.assertIsNotNone(r)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d %H:%M'), '2026-11-28 19:30')
+        self.assertFalse(r['from_full'])
+
+    def test_monthday_after_invalid_chinese_full_date_is_used(self):
+        r = parse_cn_time('2026年11月114日 会议 11月28日 19:30', 2026)
+        self.assertIsNotNone(r)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d %H:%M'), '2026-11-28 19:30')
+        self.assertFalse(r['from_full'])
+
+    def test_slash_monthday_skips_invalid_candidate(self):
+        r = parse_cn_time('13/40 会议 11/28 19:30', 2026)
+        self.assertIsNotNone(r)
+        self.assertEqual(r['start'].strftime('%Y-%m-%d %H:%M'), '2026-11-28 19:30')
+        self.assertFalse(r['from_full'])
+
+
 class TestBeijingYearCompletion(unittest.TestCase):
     def test_utc_year_boundary_uses_beijing_date(self):
         real_datetime = dt.datetime

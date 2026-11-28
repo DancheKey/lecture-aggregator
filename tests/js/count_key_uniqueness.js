@@ -23,17 +23,30 @@ const errs = [];
 
 // ---------- ① 分片数据：ck 存在且全局唯一 ----------
 const chunkDir = path.join(SITE, 'lectures');
-const chunks = fs.readdirSync(chunkDir)
-  .filter(f => /^chunk_\d+\.json$/.test(f))
-  .sort();
-if (!chunks.length) errs.push('site/lectures/ 下无 chunk_*.json（未出片？）');
+const manifestPath = path.join(chunkDir, 'chunks.json');
+let chunks = [];
+try {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+  if (!Array.isArray(manifest.chunks)) throw new Error('chunks 字段不是数组');
+  // 只检查当前主清单引用的分片：内容寻址后会同时保留多代文件，
+  // 固定名 glob 会把旧代数据重复扫入，或漏掉带 24 位哈希的新文件名。
+  chunks = manifest.chunks.map(f => path.basename(String(f)));
+} catch (e) {
+  errs.push(`读取 ${manifestPath} 失败：${e.message}`);
+}
+if (!chunks.length) errs.push('chunks.json 未引用任何 chunk 文件（未出片？）');
 
 const seen = new Map();   // ck -> sourceUrl
 let total = 0;
 let missing = 0;
 let ruleBad = 0;
 for (const f of chunks) {
-  const rows = JSON.parse(fs.readFileSync(path.join(chunkDir, f), 'utf-8'));
+  const chunkPath = path.join(chunkDir, f);
+  if (!fs.existsSync(chunkPath)) {
+    errs.push(`chunks.json 引用的分片不存在：${f}`);
+    continue;
+  }
+  const rows = JSON.parse(fs.readFileSync(chunkPath, 'utf-8'));
   const list = Array.isArray(rows) ? rows : (rows.data || []);
   for (const r of list) {
     total++;

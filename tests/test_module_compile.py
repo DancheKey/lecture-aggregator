@@ -524,6 +524,7 @@ class ScriptEntrypointTest(unittest.TestCase):
         本用例不依赖「谁 import 谁」的静态猜测，而是直接比对：daily 声明安装的
         依赖集，是否覆盖 daily 调用的脚本**实际 import**的第三方包。
         """
+        import ast
         import re
         import subprocess as sp
         wf = os.path.join(ROOT, '.github', 'workflows', 'daily.yml')
@@ -573,8 +574,13 @@ class ScriptEntrypointTest(unittest.TestCase):
                 continue
             with open(p, encoding='utf-8') as f:
                 src = f.read()
-            for mod in re.findall(r'^\s*(?:import|from)\s+([a-zA-Z_][\w.]*)',
-                                  src, re.M):
+            imports = []
+            for node in ast.walk(ast.parse(src, filename=s)):
+                if isinstance(node, ast.Import):
+                    imports.extend(alias.name for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    imports.append(node.module)
+            for mod in imports:
                 top = mod.split('.')[0].lower()
                 if top in stdlib_ok or top in local_mods:
                     continue

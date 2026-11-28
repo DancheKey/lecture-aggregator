@@ -639,6 +639,19 @@ class TestFeeds(unittest.TestCase):
         spec.loader.exec_module(mod)
         return mod
 
+    def test_xml与ics转义保留合法换行并移除非法控制字符(self):
+        mod = self._generator()
+        self.assertEqual(
+            mod._xml_esc('A\x00B\tC\nD\rE\x0bF\x1fG\ufffe\uffff\ud800<&'),
+            'AB\tC\nD\rEFG&lt;&amp;')
+        self.assertEqual(
+            mod._ics_esc('line1\r\nline2\nline3\r'),
+            'line1\\nline2\\nline3\\n')
+        self.assertEqual(
+            mod._ics_esc('a;b,c\\d\x00\x0b\x7f\ud800'),
+            'a\\;b\\,c\\\\d')
+        self.assertEqual(mod._ics_esc('t\tab'), 't\tab')
+
     def test_空订阅源覆盖旧文件且格式合法(self):
         import tempfile
         import xml.etree.ElementTree as ET
