@@ -635,7 +635,7 @@ class BoundedThreadingHTTPServer(ThreadingHTTPServer):
                 except OSError:
                     pass
                 try:
-                    request.setblocking(False)
+                    # Windows 下若非阻塞读取尚未到达的请求就关闭，会丢回 503 并触发 RST。
                     while request.recv(4096):
                         pass
                 except OSError:
